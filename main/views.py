@@ -177,4 +177,3 @@ def run_background_check(request, application_id):
     return render(request, 'main/background_check_requested.html', {
         'application': application,
     })
-    })
