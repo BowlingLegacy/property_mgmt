@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    <h2 class="mb-4">Available Properties</h2>
+
+    <div class="row">
+        {% for property in properties %}
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                {% if property.image_url %}
+                <img src="{{ property.image_url }}" class="card-img-top" alt="{{ property.name }}">
+                {% endif %}
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title">{{ property.name }}</h5>
+                    <p class="card-text">{{ property.address }}</p>
+                    <p class="card-text small text-muted">
+                        {{ property.description|truncatewords:20 }}
+                    </p>
+                    <div class="mt-auto">
+                        <a href="{% url 'property_detail' property.slug %}" class="btn btn-outline-secondary btn-sm">
+                            More info
+                        </a>
+                        <a href="{% url 'apply_for_property' property.slug %}" class="btn btn-primary btn-sm">
+                            Apply
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <p>No properties are currently listed.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
