@@ -1,12 +1,18 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.decorators import login_required
 from .forms import ApplicationForm
-from .models import Application, UserProfile
+from .models import Application, Property, OwnerProfile, Resident
 
-# Homepage
-def home(request):
-    return render(request, 'main/home.html')
+# Property list (homepage)
+def property_list(request):
+    properties = Property.objects.all()
+    return render(request, 'main/property_list.html', {'properties': properties})
+
+# Property detail page
+def property_detail(request, slug):
+    property_obj = get_object_or_404(Property, slug=slug)
+    return render(request, 'main/property_detail.html', {'property': property_obj})
 
 # Signup page
 def signup(request):
@@ -14,33 +20,33 @@ def signup(request):
         form = UserCreationForm(request.POST)
         if form.is_valid():
             user = form.save()
-            UserProfile.objects.create(user=user)
+            # later we can decide if this user is an owner or resident
             return redirect('login')
     else:
         form = UserCreationForm()
 
     return render(request, 'registration/signup.html', {'form': form})
 
-# Application form (logged-in users only)
+# Application form for a specific property
 @login_required
-def apply(request):
+def apply_for_property(request, slug):
+    property_obj = get_object_or_404(Property, slug=slug)
+
     if request.method == 'POST':
         form = ApplicationForm(request.POST)
         if form.is_valid():
             application = form.save(commit=False)
             application.user = request.user
+            application.property = property_obj
             application.save()
-
-            # update user status
-            profile = UserProfile.objects.get(user=request.user)
-            profile.status = 'submitted'
-            profile.save()
-
             return redirect('application_submitted')
     else:
         form = ApplicationForm()
 
-    return render(request, 'main/application.html', {'form': form})
+    return render(request, 'main/application.html', {
+        'form': form,
+        'property': property_obj,
+    })
 
 # Application submitted confirmation page
 def application_submitted(request):
