@@ -14,7 +14,7 @@ def signup(request):
         form = UserCreationForm(request.POST)
         if form.is_valid():
             user = form.save()
-            UserProfile.objects.create(user=user)  # create profile automatically
+            UserProfile.objects.create(user=user)
             return redirect('login')
     else:
         form = UserCreationForm()
@@ -36,11 +36,13 @@ def apply(request):
             profile.status = 'submitted'
             profile.save()
 
-           return redirect('application_submitted')
-
+            return redirect('application_submitted')
     else:
         form = ApplicationForm()
 
     return render(request, 'main/application.html', {'form': form})
 
+# Application submitted confirmation page
+def application_submitted(request):
+    return render(request, 'main/application_submitted.html')
 
