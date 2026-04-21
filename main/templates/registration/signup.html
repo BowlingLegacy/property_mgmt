@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Create an Account</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f7f7f7;
+            margin: 0;
+            padding: 40px;
+        }
+        .container {
+            max-width: 420px;
+            margin: auto;
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 0 12px rgba(0,0,0,0.1);
+        }
+        h1 {
+            margin-top: 0;
+            text-align: center;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #2c7be5;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #1a5fc4;
+        }
+        .alt {
+            text-align: center;
+            margin-top: 15px;
+        }
+        a {
+            color: #2c7be5;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Create an Account</h1>
+
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Sign Up</button>
+    </form>
+
+    <div class="alt">
+        Already have an account?
+        <a href="{% url 'login' %}">Log in</a>
+    </div>
+</div>
+
+</body>
+</html>
