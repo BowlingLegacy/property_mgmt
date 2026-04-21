@@ -12,6 +12,10 @@ from .models import (
     BackgroundCheckRequest,
 )
 
+# TEMPORARY HOMEPAGE
+def temp_home(request):
+    return render(request, "home_temp.html")
+
 
 def property_list(request):
     properties = Property.objects.all().select_related('owner').prefetch_related('photos')
@@ -160,11 +164,9 @@ def manage_owner_documents(request):
 
 @login_required
 def run_background_check(request, application_id):
-    # Landlord triggers this; YOU are the Site Controller.
     application = get_object_or_404(Application, pk=application_id)
     owner_profile = get_object_or_404(OwnerProfile, user=request.user)
     if application.property.owner != owner_profile:
-        # Simple guard: landlord can only request checks on their own properties
         return redirect('owner_dashboard')
 
     BackgroundCheckRequest.objects.create(
@@ -172,7 +174,7 @@ def run_background_check(request, application_id):
         status='pending_not_connected',
     )
 
-    # Simple confirmation (Option A)
     return render(request, 'main/background_check_requested.html', {
         'application': application,
+    })
     })
