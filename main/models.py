@@ -1,108 +1,125 @@
+from django.conf import settings
 from django.db import models
-from django.contrib.auth.models import User
 from django.utils.text import slugify
 
-# ---------------------------------------------------------
-# OWNER PROFILE (Landlord / Admin User)
-# ---------------------------------------------------------
+
 class OwnerProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    company_name = models.CharField(max_length=200, blank=True)
-    phone = models.CharField(max_length=20, blank=True)
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='owner_profile')
+    company_name = models.CharField(max_length=255, blank=True)
+    # You are the Site Controller globally, so no per-owner site controller fields needed.
 
     def __str__(self):
-        return self.company_name if self.company_name else self.user.username
+        return self.company_name or self.user.get_username()
 
 
-# ---------------------------------------------------------
-# PROPERTY (Owned by an OwnerProfile)
-# ---------------------------------------------------------
 class Property(models.Model):
-    owner = models.ForeignKey(OwnerProfile, on_delete=models.CASCADE)
-    name = models.CharField(max_length=200)
+    owner = models.ForeignKey(OwnerProfile, on_delete=models.CASCADE, related_name='properties')
+    name = models.CharField(max_length=255)
     slug = models.SlugField(unique=True, blank=True)
-    address = models.CharField(max_length=300)
+    address = models.CharField(max_length=255)
+    city = models.CharField(max_length=100, blank=True)
+    state = models.CharField(max_length=50, blank=True)
+    postal_code = models.CharField(max_length=20, blank=True)
     description = models.TextField(blank=True)
-    image_url = models.URLField(blank=True)  # for future property photos
+    amenities = models.TextField(blank=True)
+    main_image_url = models.URLField(blank=True)  # fallback if no primary PropertyPhoto
+
+    def __str__(self):
+        return self.name
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(self.name)
+            base = slugify(self.name)
+            slug = base
+            counter = 1
+            while Property.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                slug = f"{base}-{counter}"
+                counter += 1
+            self.slug = slug
         super().save(*args, **kwargs)
 
+    @property
+    def primary_photo(self):
+        primary = self.photos.filter(is_primary=True).first()
+        if primary:
+            return primary
+        return self.photos.first()
+
+
+class PropertyPhoto(models.Model):
+    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='photos')
+    image_url = models.URLField(blank=True)  # URL now; file upload can be added later
+    is_primary = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-is_primary', 'id']
+
     def __str__(self):
-        return f"{self.name} ({self.owner})"
+        return f"{self.property.name} photo"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.is_primary:
+            PropertyPhoto.objects.filter(property=self.property).exclude(pk=self.pk).update(is_primary=False)
 
 
-# ---------------------------------------------------------
-# UNIT / ROOM (Belongs to a Property)
-# ---------------------------------------------------------
 class Unit(models.Model):
-    property = models.ForeignKey(Property, on_delete=models.CASCADE)
-    unit_number = models.CharField(max_length=50)
-    is_occupied = models.BooleanField(default=False)
+    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='units')
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    rent = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    is_available = models.BooleanField(default=True)
 
     def __str__(self):
-        return f"{self.property.name} – Unit {self.unit_number}"
+        return f"{self.property.name} - {self.name}"
 
 
-# ---------------------------------------------------------
-# RESIDENT PROFILE (Approved applicant living in a unit)
-# ---------------------------------------------------------
-class Resident(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    property = models.ForeignKey(Property, on_delete=models.CASCADE)
-    unit = models.ForeignKey(Unit, on_delete=models.SET_NULL, null=True, blank=True)
-    move_in_date = models.DateField(null=True, blank=True)
-    active = models.BooleanField(default=True)
+class OwnerDocument(models.Model):
+    DOCUMENT_TYPES = [
+        ('application', 'Application Form'),
+        ('lease', 'Lease Agreement'),
+        ('rules', 'House Rules'),
+        ('other', 'Other'),
+    ]
+
+    owner = models.ForeignKey(OwnerProfile, on_delete=models.CASCADE, related_name='documents')
+    title = models.CharField(max_length=255)
+    document_type = models.CharField(max_length=20, choices=DOCUMENT_TYPES, default='other')
+    document_url = models.URLField()  # URL now; file upload later
+    show_to_public = models.BooleanField(default=False)
+    show_to_applicants = models.BooleanField(default=True)
+    show_to_residents = models.BooleanField(default=True)
 
     def __str__(self):
-        return f"{self.user.username} – {self.property.name}"
+        return f"{self.owner} - {self.title}"
 
 
-# ---------------------------------------------------------
-# APPLICATION (Submitted by a prospective resident)
-# ---------------------------------------------------------
 class Application(models.Model):
-    property = models.ForeignKey(Property, on_delete=models.CASCADE)
-    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
-
-    full_name = models.CharField(max_length=200)
-    dob = models.DateField()
-    phone = models.CharField(max_length=20)
+    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='applications')
+    unit = models.ForeignKey(Unit, on_delete=models.SET_NULL, null=True, blank=True, related_name='applications')
+    full_name = models.CharField(max_length=255)
     email = models.EmailField()
-    income = models.CharField(max_length=200)
-    current_address = models.CharField(max_length=300)
-    emergency_contact = models.CharField(max_length=200)
-    background_info = models.TextField(blank=True)
-
-    submitted_at = models.DateTimeField(auto_now_add=True)
-
-    status = models.CharField(
-        max_length=20,
-        choices=[
-            ('new', 'New'),
-            ('reviewing', 'Reviewing'),
-            ('approved', 'Approved'),
-            ('denied', 'Denied'),
-        ],
-        default='new'
-    )
+    phone = models.CharField(max_length=50, blank=True)
+    message = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, default='pending')  # pending, approved, rejected
 
     def __str__(self):
-        return f"Application from {self.full_name} for {self.property.name}"
+        return f"{self.full_name} - {self.property.name}"
 
 
-# ---------------------------------------------------------
-# LEASE (Resident + Unit + Property)
-# ---------------------------------------------------------
-class Lease(models.Model):
-    resident = models.ForeignKey(Resident, on_delete=models.CASCADE)
-    unit = models.ForeignKey(Unit, on_delete=models.CASCADE)
-    start_date = models.DateField()
-    end_date = models.DateField(null=True, blank=True)
-    monthly_rent = models.DecimalField(max_digits=8, decimal_places=2)
+class BackgroundCheckRequest(models.Model):
+    STATUS_CHOICES = [
+        ('pending_not_connected', 'Pending – Service Not Connected'),
+        ('pending', 'Pending'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    ]
+
+    application = models.ForeignKey(Application, on_delete=models.CASCADE, related_name='background_checks')
+    created_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='pending_not_connected')
 
     def __str__(self):
-        return f"Lease for {self.resident.user.username} – Unit {self.unit.unit_number}"
+        return f"Background check for {self.application.full_name} ({self.application.property.name})"
 
