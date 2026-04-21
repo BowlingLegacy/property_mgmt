@@ -1,26 +1,9 @@
-{% extends 'base.html' %}
-
+{% extends "base.html" %}
 {% block content %}
-<div class="container mt-5" style="max-width: 700px;">
-    <h2 class="text-center mb-4">🎉 Application Submitted</h2>
-
-    <p class="lead text-center">
-        Thank you for applying to the Painted Lady Inn.
-    </p>
-
-    <p>
-        Your application has been successfully submitted and is now under review.
-        Our team will contact you if additional information is needed or to discuss
-        next steps in the housing process.
-    </p>
-
-    <p>
-        Painted Lady Inn is a stability‑focused, senior‑friendly community. We appreciate
-        your interest in joining us and will review your application with care and respect.
-    </p>
-
-    <div class="text-center mt-4">
-        <a href="{% url 'home' %}" class="btn btn-primary btn-lg">Return to Home</a>
-    </div>
-</div>
+<h1>Application submitted</h1>
+{% if application %}
+  <p>Thank you, {{ application.full_name }}. Your application for {{ application.property.name }} has been received.</p>
+{% else %}
+  <p>Your application has been received.</p>
+{% endif %}
 {% endblock %}
