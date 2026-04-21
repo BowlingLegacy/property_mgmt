@@ -1,6 +1,8 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.decorators import login_required
+from .forms import ApplicationForm
+from .models import Application, UserProfile
 
 # Homepage
 def home(request):
@@ -11,10 +13,33 @@ def signup(request):
     if request.method == 'POST':
         form = UserCreationForm(request.POST)
         if form.is_valid():
-            form.save()
-            return redirect('login')  # send user to login page after successful signup
+            user = form.save()
+            UserProfile.objects.create(user=user)  # create profile automatically
+            return redirect('login')
     else:
         form = UserCreationForm()
 
     return render(request, 'registration/signup.html', {'form': form})
+
+# Application form (logged-in users only)
+@login_required
+def apply(request):
+    if request.method == 'POST':
+        form = ApplicationForm(request.POST)
+        if form.is_valid():
+            application = form.save(commit=False)
+            application.user = request.user
+            application.save()
+
+            # update user status
+            profile = UserProfile.objects.get(user=request.user)
+            profile.status = 'submitted'
+            profile.save()
+
+            return redirect('home')
+    else:
+        form = ApplicationForm()
+
+    return render(request, 'main/application.html', {'form': form})
+
 
