@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Apply for {{ property.name }}</h1>
+
+<form method="post">
+  {% csrf_token %}
+  <label>Full name</label>
+  <input type="text" name="full_name" required>
+
+  <label>Email</label>
+  <input type="email" name="email" required>
+
+  <label>Phone</label>
+  <input type="text" name="phone">
+
+  {% if units %}
+    <label>Unit (optional)</label>
+    <select name="unit_id">
+      <option value="">Any available unit</option>
+      {% for unit in units %}
+        <option value="{{ unit.id }}">{{ unit.name }}{% if unit.rent %} – ${{ unit.rent }}{% endif %}</option>
+      {% endfor %}
+    </select>
+  {% endif %}
+
+  <label>Message</label>
+  <textarea name="message" rows="4"></textarea>
+
+  <button type="submit" class="btn btn-primary">Submit application</button>
+</form>
+{% endblock %}
