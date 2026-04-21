@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils.text import slugify
 
 # ---------------------------------------------------------
 # OWNER PROFILE (Landlord / Admin User)
@@ -19,8 +20,15 @@ class OwnerProfile(models.Model):
 class Property(models.Model):
     owner = models.ForeignKey(OwnerProfile, on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
+    slug = models.SlugField(unique=True, blank=True)
     address = models.CharField(max_length=300)
     description = models.TextField(blank=True)
+    image_url = models.URLField(blank=True)  # for future property photos
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.name} ({self.owner})"
@@ -56,13 +64,9 @@ class Resident(models.Model):
 # APPLICATION (Submitted by a prospective resident)
 # ---------------------------------------------------------
 class Application(models.Model):
-    # Which property the application is for
     property = models.ForeignKey(Property, on_delete=models.CASCADE)
-
-    # Optional: If the applicant already has a user account
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
 
-    # Application fields
     full_name = models.CharField(max_length=200)
     dob = models.DateField()
     phone = models.CharField(max_length=20)
@@ -74,7 +78,6 @@ class Application(models.Model):
 
     submitted_at = models.DateTimeField(auto_now_add=True)
 
-    # Status tracking
     status = models.CharField(
         max_length=20,
         choices=[
