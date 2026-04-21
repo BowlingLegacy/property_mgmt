@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Manage Photos – {{ property.name }}</h1>
+
+<h2>Add Photo (URL)</h2>
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="add_photo" value="1">
+  <label>Image URL</label>
+  <input type="url" name="image_url" required>
+  <label>
+    <input type="checkbox" name="is_primary"> Set as primary
+  </label>
+  <button type="submit" class="btn">Add Photo</button>
+</form>
+
+<h2>Existing Photos</h2>
+<ul>
+  {% for photo in photos %}
+    <li>
+      <img src="{{ photo.image_url }}" alt="photo" style="max-width:150px;">
+      {% if photo.is_primary %}<strong>(Primary)</strong>{% endif %}
+      <form method="post" style="display:inline;">
+        {% csrf_token %}
+        <input type="hidden" name="photo_id" value="{{ photo.id }}">
+        <button type="submit" name="set_primary" value="1">Set Primary</button>
+        <button type="submit" name="delete_photo" value="1">Delete</button>
+      </form>
+    </li>
+  {% empty %}
+    <li>No photos yet.</li>
+  {% endfor %}
+</ul>
+
+<p><a href="{% url 'owner_dashboard' %}">Back to dashboard</a></p>
+{% endblock %}
