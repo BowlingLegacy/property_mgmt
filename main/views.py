@@ -36,7 +36,8 @@ def apply(request):
             profile.status = 'submitted'
             profile.save()
 
-            return redirect('home')
+           return redirect('application_submitted')
+
     else:
         form = ApplicationForm()
 
