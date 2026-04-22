@@ -7,12 +7,13 @@ class HomepageImageForm(forms.ModelForm):
         model = HomepageImage
         fields = ["image"]
 
-
-# Admin selects which image is active
+# Admin selects which image is active (your existing model)
 class ActiveHomepageImageForm(forms.ModelForm):
     class Meta:
         model = ActiveHomepageImage
         fields = ["active_image"]
+
+# THIS is the missing form Django is crashing over
 class HomepageImageSelectForm(forms.Form):
     image = forms.ModelChoiceField(
         queryset=HomepageImage.objects.all(),
