@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Housing Application</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #fafafa; padding: 40px; }
+        .container { max-width: 700px; margin: auto; background: white; padding: 30px; border-radius: 8px; }
+        h1 { color: #4a6fa5; }
+        label { font-weight: bold; }
+        button { background: #4a6fa5; color: white; padding: 10px 20px; border: none; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Housing Application</h1>
+    <p>Please complete the form below. We review every application with care and dignity.</p>
+
+    <form method="POST">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Submit Application</button>
+    </form>
+</div>
+
+</body>
+</html>
