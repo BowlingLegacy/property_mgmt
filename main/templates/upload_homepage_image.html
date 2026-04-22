@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Upload Homepage Image</title>
+    <style>
+        body { font-family: Arial; padding: 40px; }
+        .dropzone {
+            width: 100%;
+            padding: 60px;
+            border: 3px dashed #888;
+            text-align: center;
+            border-radius: 10px;
+            cursor: pointer;
+            background: #fafafa;
+        }
+        .dropzone.dragover {
+            background: #e0ffe0;
+            border-color: #2ecc71;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Upload Homepage Image</h2>
+
+<form method="POST" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="dropzone" id="dropzone">
+        <p>Drag & Drop Image Here<br>or click to select</p>
+        {{ form.image }}
+    </div>
+    <br>
+    <button type="submit">Upload</button>
+</form>
+
+<script>
+    const dz = document.getElementById("dropzone");
+    const fileInput = document.querySelector("input[type='file']");
+
+    dz.onclick = () => fileInput.click();
+
+    dz.addEventListener("dragover", e => {
+        e.preventDefault();
+        dz.classList.add("dragover");
+    });
+
+    dz.addEventListener("dragleave", () => {
+        dz.classList.remove("dragover");
+    });
+
+    dz.addEventListener("drop", e => {
+        e.preventDefault();
+        dz.classList.remove("dragover");
+        fileInput.files = e.dataTransfer.files;
+    });
+</script>
+
+</body>
+</html>
