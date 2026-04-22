@@ -1,11 +1,12 @@
 from pathlib import Path
 import os
 
+DEBUG = True
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")
 
-DEBUG = True
 
 ALLOWED_HOSTS = [
     "bowlinglegacy.com",
