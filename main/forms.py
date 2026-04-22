@@ -1,20 +1,15 @@
 from django import forms
-from .models import Application
+from .models import HomepageImage, ActiveHomepageImage
 
-class ApplicationForm(forms.ModelForm):
+# Drag-and-drop upload form
+class HomepageImageForm(forms.ModelForm):
     class Meta:
-        model = Application
-        fields = [
-            'full_name',
-            'dob',
-            'phone',
-            'email',
-            'income',
-            'current_address',
-            'emergency_contact',
-            'background_info',
-        ]
-        widgets = {
-            'dob': forms.DateInput(attrs={'type': 'date'}),
-            'background_info': forms.Textarea(attrs={'rows': 4}),
-        }
+        model = HomepageImage
+        fields = ["image"]
+
+
+# Admin selects which image is active
+class ActiveHomepageImageForm(forms.ModelForm):
+    class Meta:
+        model = ActiveHomepageImage
+        fields = ["active_image"]
