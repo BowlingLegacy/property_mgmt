@@ -9,11 +9,13 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")
 
 
 ALLOWED_HOSTS = [
-    "bowlinglegacy.com",
-    "www.bowlinglegacy.com",
-    "localhost",
-    "127.0.0.1",
+    'property-mgmt-tg4s.onrender.com',
+    'bowlinglegacy.com',
+    'www.bowlinglegacy.com',
+    'localhost',
+    '127.0.0.1'
 ]
+
 
 INSTALLED_APPS = [
     "django.contrib.admin",
