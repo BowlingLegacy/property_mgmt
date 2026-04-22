@@ -1,32 +1,18 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Select Active Homepage Image</title>
-    <style>
-        body { font-family: Arial; padding: 40px; }
-        img { width: 200px; margin: 10px; border-radius: 6px; }
-        .active { border: 4px solid #2ecc71; }
-    </style>
+    <title>Upload Homepage Image</title>
 </head>
 <body>
 
-<h2>Select Active Homepage Image</h2>
+<h1>Upload Homepage Image</h1>
 
-<form method="POST">
+<form method="POST" enctype="multipart/form-data">
     {% csrf_token %}
     {{ form.as_p }}
-    <button type="submit">Save Active Image</button>
+    <button type="submit">Upload</button>
 </form>
-
-<hr>
-
-<h3>All Uploaded Images</h3>
-
-{% for img in images %}
-    <img src="{{ img.image.url }}" class="{% if active and active.id == img.id %}active{% endif %}">
-{% empty %}
-    <p>No images uploaded yet.</p>
-{% endfor %}
 
 </body>
 </html>
+
