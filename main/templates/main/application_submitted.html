@@ -1,9 +1,0 @@
-{% extends "base.html" %}
-{% block content %}
-<h1>Application submitted</h1>
-{% if application %}
-  <p>Thank you, {{ application.full_name }}. Your application for {{ application.property.name }} has been received.</p>
-{% else %}
-  <p>Your application has been received.</p>
-{% endif %}
-{% endblock %}
