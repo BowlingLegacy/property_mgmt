@@ -1,45 +1,21 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Bowling Legacy Housing</title>
-    <style>
-        body { font-family: Arial, sans-serif; background: #fafafa; margin: 0; padding: 0; }
-        header { background: #4a6fa5; color: white; padding: 40px; text-align: center; }
-        .section { padding: 40px; max-width: 900px; margin: auto; }
-        h2 { color: #4a6fa5; }
-        .btn {
-            display: inline-block;
-            background: #4a6fa5;
-            color: white;
-            padding: 12px 20px;
-            border-radius: 6px;
-            text-decoration: none;
-            font-weight: bold;
-        }
-    </style>
-</head>
-<body>
-
-<header>
-    <h1>Bowling Legacy Housing</h1>
-    <p>Dignified, stable housing for older adults in need.</p>
-    <a href="/apply/" class="btn">Start Application</a>
-</header>
-
 <div class="section">
-    <h2>Our Mission</h2>
-    <p>We provide safe, stable, and supportive housing for older adults who deserve dignity, respect, and a place to call home.</p>
+    <h2>Our Properties</h2>
+
+    {% for property in properties %}
+        <div style="background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
+            <h3>{{ property.name }}</h3>
+
+            {% if property.photo %}
+                <img src="{{ property.photo.url }}" alt="{{ property.name }}" style="max-width: 100%; border-radius: 6px; margin-top: 10px;">
+            {% endif %}
+
+            <p style="margin-top: 10px;">{{ property.description }}</p>
+        </div>
+    {% empty %}
+        <p>No properties available yet.</p>
+    {% endfor %}
 </div>
 
-<div class="section">
-    <h2>Available Rooms</h2>
-    <p>Room availability and property listings will appear here once added in the admin panel.</p>
-</div>
-
-<div class="section">
-    <h2>Support Our Work</h2>
-    <p>Your support helps us maintain housing, improve living conditions, and expand our mission.</p>
-</div>
 
 </body>
 </html>
