@@ -2,18 +2,14 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    # TEMPORARY HOMEPAGE
-    path("", views.temp_home, name="temp_home"),
+    path("", views.temp_home, name="home"),
 
-    # PUBLIC PROPERTY ROUTES
-    path("properties/", views.property_list, name="property_list"),
-    path("properties/<slug:slug>/", views.property_detail, name="property_detail"),
-    path("properties/<slug:slug>/apply/", views.apply_for_property, name="apply_for_property"),
-    path("application-submitted/", views.application_submitted, name="application_submitted"),
+    # Admin-only drag-and-drop uploader
+    path("admin-upload-homepage-image/", views.admin_upload_homepage_image, name="admin_upload_homepage_image"),
 
-    # OWNER DASHBOARD
-    path("owner/dashboard/", views.owner_dashboard, name="owner_dashboard"),
-    path("owner/documents/", views.manage_owner_documents, name="manage_owner_documents"),
-    path("owner/properties/<int:property_id>/photos/", views.manage_property_photos, name="manage_property_photos"),
-    path("owner/applications/<int:application_id>/background-check/", views.run_background_check, name="run_background_check"),
+    # Admin selects which image is active
+    path("admin-select-homepage-image/", views.admin_select_homepage_image, name="admin_select_homepage_image"),
+
+    # Future owner uploader (not used yet)
+    path("owner-upload-image/", views.owner_upload_image, name="owner_upload_image"),
 ]
