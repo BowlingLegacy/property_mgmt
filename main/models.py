@@ -13,3 +13,13 @@ class HousingApplication(models.Model):
 
     def __str__(self):
         return f"{self.full_name} ({self.phone})"
+
+
+class Property(models.Model):
+    name = models.CharField(max_length=200)
+    address = models.CharField(max_length=300)
+    description = models.TextField(blank=True)
+    photo = models.ImageField(upload_to='property_photos/', blank=True, null=True)
+
+    def __str__(self):
+        return self.name
