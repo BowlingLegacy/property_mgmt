@@ -13,3 +13,9 @@ class ActiveHomepageImageForm(forms.ModelForm):
     class Meta:
         model = ActiveHomepageImage
         fields = ["active_image"]
+class HomepageImageSelectForm(forms.Form):
+    image = forms.ModelChoiceField(
+        queryset=HomepageImage.objects.all(),
+        widget=forms.RadioSelect,
+        empty_label=None
+    )
