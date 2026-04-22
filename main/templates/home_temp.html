@@ -1,6 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Homepage</title>
+</head>
+<body>
+
+<h1>Welcome</h1>
+
 {% if hero %}
-    <img src="{{ hero.url }}" alt="Homepage Image">
+    <img src="{{ hero.url }}" alt="Homepage Image" style="max-width:100%; height:auto;">
 {% else %}
-    <div style="height:300px; background:#ddd;">No active image selected</div>
+    <p>No active homepage image selected.</p>
 {% endif %}
 
+</body>
+</html>
