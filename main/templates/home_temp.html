@@ -1,28 +1,6 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Homepage</title>
-    <style>
-        header {
-            height: 300px;
-            background-size: cover;
-            background-position: center;
-            border-bottom: 4px solid #333;
-        }
-    </style>
-</head>
-<body>
-
-<header
-    {% if hero %}
-        style="background-image: url('{{ hero.image.url }}');"
-    {% else %}
-        style="background: #ccc;"
-    {% endif %}
-></header>
-
-<h1>Welcome to Painted Lady Inn</h1>
-
-</body>
-</html>
+{% if hero %}
+    <img src="{{ hero.url }}" alt="Homepage Image">
+{% else %}
+    <div style="height:300px; background:#ddd;">No active image selected</div>
+{% endif %}
 
