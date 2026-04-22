@@ -9,9 +9,9 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")
 
 
 ALLOWED_HOSTS = [
-    'property-mgmt-tg4s.onrender.com',
     'bowlinglegacy.com',
     'www.bowlinglegacy.com',
+    'property-mgmt-tg4s.onrender.com',
     'localhost',
     '127.0.0.1'
 ]
