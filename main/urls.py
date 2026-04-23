@@ -14,4 +14,7 @@ urlpatterns = [
     # Portals
     path("tenant/dashboard/", views.tenant_dashboard, name="tenant_dashboard"),
     path("landlord/dashboard/", views.landlord_dashboard, name="landlord_dashboard"),
+
+    # Property Detail Page
+    path("property/<int:pk>/", views.property_detail, name="property_detail"),
 ]
