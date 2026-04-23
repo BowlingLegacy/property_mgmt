@@ -10,21 +10,16 @@ class User(AbstractUser):
         ("landlord", "Landlord / Property Manager"),
         ("admin", "Platform Admin"),
     ]
+
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="tenant")
-invite_code = models.CharField(max_length=6, blank=True, null=True, unique=True)
+    invite_code = models.CharField(max_length=6, blank=True, null=True, unique=True)
+
+    def __str__(self):
+        return self.username
 
 
 # -----------------------------
-# -----------------------------
-# This will expand in Phase 2 with:
-# - Photo gallery
-# - Documents
-# - Slug
-# - Owner (landlord)
-# - Address
-# - Amenities
-# - Age restrictions
-# - Application link
+# Property Model
 # -----------------------------
 class Property(models.Model):
     name = models.CharField(max_length=255)
@@ -33,4 +28,3 @@ class Property(models.Model):
 
     def __str__(self):
         return self.name
-
