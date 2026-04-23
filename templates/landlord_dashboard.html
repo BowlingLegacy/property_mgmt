@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2 class="mb-4">Landlord Dashboard</h2>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+
+    <p class="lead">Welcome, {{ user.username }}.</p>
+
+    <p>
+      This is your landlord portal. In future phases, this page will include:
+    </p>
+
+    <ul>
+      <li>Manage your properties</li>
+      <li>Upload photos and documents</li>
+      <li>View and process tenant applications</li>
+      <li>Send notices and messages</li>
+      <li>Track rent payments and balances</li>
+    </ul>
+
+    <p class="mt-3 text-muted">
+      Phase 1: This page is intentionally simple.  
+      Phase 2 will add full landlord functionality.
+    </p>
+
+  </div>
+</div>
+
+{% endblock %}
