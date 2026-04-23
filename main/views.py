@@ -1,4 +1,4 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login
 from django.contrib.auth.forms import UserCreationForm
 from django import forms
@@ -26,7 +26,6 @@ def signup(request):
             user = form.save()
             login(request, user)
 
-            # Redirect based on role
             if user.role == "landlord":
                 return redirect("landlord_dashboard")
             elif user.role == "tenant":
@@ -60,3 +59,10 @@ def home(request):
     properties = Property.objects.all()
     return render(request, "home.html", {"properties": properties})
 
+
+# -------------------------
+# Property Detail Page
+# -------------------------
+def property_detail(request, pk):
+    property_obj = get_object_or_404(Property, pk=pk)
+    return render(request, "property_detail.html", {"property": property_obj})
