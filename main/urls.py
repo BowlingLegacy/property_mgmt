@@ -17,4 +17,17 @@ urlpatterns = [
 
     # Property Detail Page
     path("property/<int:pk>/", views.property_detail, name="property_detail"),
+
+    # ----------------------------------------------------
+    # PHASE 3 — INVITE CODE APPLICATION SYSTEM
+    # ----------------------------------------------------
+
+    # Step 1: Enter Invite Code
+    path("apply/", views.enter_invite_code, name="enter_invite_code"),
+
+    # Step 2: Application Form (landlord-specific)
+    path("apply/<int:landlord_id>/", views.apply, name="apply"),
+
+    # Step 3: Application Success Page
+    path("application-success/", views.application_success, name="application_success"),
 ]
