@@ -1,6 +1,9 @@
 from django import forms
 from .models import HousingApplication
 
+# -------------------------
+# Housing Application Form
+# -------------------------
 class HousingApplicationForm(forms.ModelForm):
     class Meta:
         model = HousingApplication
@@ -19,3 +22,13 @@ class HousingApplicationForm(forms.ModelForm):
             'additional_notes': forms.Textarea(attrs={'rows': 3}),
         }
 
+
+# -------------------------
+# Invite Code Entry Form
+# -------------------------
+class InviteCodeForm(forms.Form):
+    invite_code = forms.CharField(
+        max_length=6,
+        label="Enter your invite code",
+        widget=forms.TextInput(attrs={"class": "form-control"})
+    )
