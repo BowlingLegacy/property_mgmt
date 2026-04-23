@@ -25,9 +25,6 @@ urlpatterns = [
     # Step 1: Enter Invite Code
     path("apply/", views.enter_invite_code, name="enter_invite_code"),
 
-    # Step 2: Application Form (landlord-specific)
-    path("apply/<int:landlord_id>/", views.apply, name="apply"),
-
     # Step 3: Application Success Page
     path("application-success/", views.application_success, name="application_success"),
 ]
