@@ -73,3 +73,10 @@ def property_detail(request, pk):
 # -------------------------
 def enter_invite_code(request):
     return render(request, "enter_invite_code.html")
+
+
+# -------------------------
+# Application Success Page
+# -------------------------
+def application_success(request):
+    return render(request, "application_success.html")
