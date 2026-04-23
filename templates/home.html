@@ -1,21 +1,38 @@
-<div class="section">
-    <h2>Our Properties</h2>
+{% extends "base.html" %}
+{% block content %}
 
-    {% for property in properties %}
-        <div style="background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
-            <h3>{{ property.name }}</h3>
-
-            {% if property.photo %}
-                <img src="{{ property.photo.url }}" alt="{{ property.name }}" style="max-width: 100%; border-radius: 6px; margin-top: 10px;">
-            {% endif %}
-
-            <p style="margin-top: 10px;">{{ property.description }}</p>
-        </div>
-    {% empty %}
-        <p>No properties available yet.</p>
-    {% endfor %}
+<div class="row mb-4">
+  <div class="col-md-8">
+    <h1 class="mb-3">Stable, Dignified Housing for Older Adults</h1>
+    <p class="lead">
+      Bowling Legacy connects mission-driven property owners with residents who need safe, long-term housing.
+    </p>
+  </div>
 </div>
 
+<h2 class="mb-3">Our Properties</h2>
 
-</body>
-</html>
+<div class="row">
+  {% for property in properties %}
+    <div class="col-md-4 mb-4">
+      <div class="card h-100 shadow-sm">
+
+        {% if property.photo %}
+          <img src="{{ property.photo.url }}" class="card-img-top" alt="{{ property.name }}">
+        {% endif %}
+
+        <div class="card-body">
+          <h5 class="card-title">{{ property.name }}</h5>
+          <p class="card-text">{{ property.description|truncatewords:20 }}</p>
+
+          <a href="#" class="btn btn-primary btn-sm">View Property</a>
+        </div>
+
+      </div>
+    </div>
+  {% empty %}
+    <p>No properties available yet.</p>
+  {% endfor %}
+</div>
+
+{% endblock %}
