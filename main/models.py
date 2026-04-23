@@ -1,6 +1,9 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
+# -----------------------------
+# Custom User Model (Multi‑Role)
+# -----------------------------
 class User(AbstractUser):
     ROLE_CHOICES = [
         ("tenant", "Tenant / Applicant"),
@@ -10,6 +13,19 @@ class User(AbstractUser):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="tenant")
 
 
+# -----------------------------
+# Basic Property Model (Phase 1)
+# -----------------------------
+# This will expand in Phase 2 with:
+# - Photo gallery
+# - Documents
+# - Slug
+# - Owner (landlord)
+# - Address
+# - Amenities
+# - Age restrictions
+# - Application link
+# -----------------------------
 class Property(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
@@ -17,3 +33,4 @@ class Property(models.Model):
 
     def __str__(self):
         return self.name
+
