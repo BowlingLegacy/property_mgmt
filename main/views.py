@@ -66,3 +66,10 @@ def home(request):
 def property_detail(request, pk):
     property_obj = get_object_or_404(Property, pk=pk)
     return render(request, "property_detail.html", {"property": property_obj})
+
+
+# -------------------------
+# Invite Code Entry Page
+# -------------------------
+def enter_invite_code(request):
+    return render(request, "enter_invite_code.html")
