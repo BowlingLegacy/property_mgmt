@@ -25,7 +25,9 @@
           <h5 class="card-title">{{ property.name }}</h5>
           <p class="card-text">{{ property.description|truncatewords:20 }}</p>
 
-          <a href="#" class="btn btn-primary btn-sm">View Property</a>
+          <a href="{% url 'property_detail' property.pk %}" class="btn btn-primary btn-sm">
+            View Property
+          </a>
         </div>
 
       </div>
