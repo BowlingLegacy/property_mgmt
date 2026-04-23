@@ -11,10 +11,10 @@ class User(AbstractUser):
         ("admin", "Platform Admin"),
     ]
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="tenant")
+invite_code = models.CharField(max_length=6, blank=True, null=True, unique=True)
 
 
 # -----------------------------
-# Basic Property Model (Phase 1)
 # -----------------------------
 # This will expand in Phase 2 with:
 # - Photo gallery
