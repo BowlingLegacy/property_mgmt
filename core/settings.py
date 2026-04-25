@@ -15,7 +15,7 @@ ALLOWED_HOSTS = [
 ]
 
 # ---------------------------------------------------------
-# CUSTOM USER MODEL (THIS WAS THE MISSING LINE)
+# CUSTOM USER MODEL
 # ---------------------------------------------------------
 AUTH_USER_MODEL = "main.User"
 
@@ -104,5 +104,11 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+# ---------------------------------------------------------
+# MEDIA FILES
+# ---------------------------------------------------------
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
