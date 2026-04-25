@@ -1,25 +1,18 @@
-from pathlib import Path
 import os
-
-# ---------------------------------------------------------
-# BASE SETTINGS
-# ---------------------------------------------------------
+from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "CHANGE-ME-IN-PRODUCTION")
+SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")
 
-DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"
+DEBUG = os.environ.get("DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = [
-    "*",  # Render injects its own hostname
+    "localhost",
+    "127.0.0.1",
+    "bowlinglegacy.com",
+    "www.bowlinglegacy.com",
 ]
-
-AUTH_USER_MODEL = "main.User"
-
-# ---------------------------------------------------------
-# INSTALLED APPS
-# ---------------------------------------------------------
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -28,12 +21,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "main.apps.MainConfig",
+    "main",
 ]
-
-# ---------------------------------------------------------
-# MIDDLEWARE
-# ---------------------------------------------------------
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -46,17 +35,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-# ---------------------------------------------------------
-# URLS / WSGI
-# ---------------------------------------------------------
-
 ROOT_URLCONF = "core.urls"
-
-WSGI_APPLICATION = "core.wsgi.application"
-
-# ---------------------------------------------------------
-# TEMPLATES
-# ---------------------------------------------------------
 
 TEMPLATES = [
     {
@@ -74,24 +53,22 @@ TEMPLATES = [
     },
 ]
 
-# ---------------------------------------------------------
-# DATABASE — POSTGRESQL (Render)
-# ---------------------------------------------------------
+WSGI_APPLICATION = "core.wsgi.application"
 
+# ⭐⭐⭐ FIXED: Render PostgreSQL with REQUIRED SSL ⭐⭐⭐
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("POSTGRES_DB", "bowlinglegacy"),
-        "USER": os.environ.get("POSTGRES_USER", "bowlinglegacy"),
-        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", ""),
-        "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
+        "NAME": os.environ.get("POSTGRES_DB"),
+        "USER": os.environ.get("POSTGRES_USER"),
+        "PASSWORD": os.environ.get("POSTGRES_PASSWORD"),
+        "HOST": os.environ.get("POSTGRES_HOST"),
         "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        "OPTIONS": {
+            "sslmode": "require",
+        },
     }
 }
-
-# ---------------------------------------------------------
-# PASSWORD VALIDATION
-# ---------------------------------------------------------
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -100,35 +77,14 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# ---------------------------------------------------------
-# INTERNATIONALIZATION
-# ---------------------------------------------------------
-
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
-# ---------------------------------------------------------
-# STATIC FILES
-# ---------------------------------------------------------
-
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_DIRS = [BASE_DIR / "static"]
 
-# Whitenoise: serve compressed static files
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-
-# ---------------------------------------------------------
-# MEDIA FILES
-# ---------------------------------------------------------
-
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
-
-# ---------------------------------------------------------
-# DEFAULT FIELD TYPE
-# ---------------------------------------------------------
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
