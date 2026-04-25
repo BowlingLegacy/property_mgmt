@@ -3,6 +3,3 @@ gunicorn
 whitenoise
 Pillow
 psycopg2==2.9.9
-libpq
-
-# force rebuild
