@@ -91,16 +91,19 @@
         {% for property in properties %}
         <div class="col-md-4">
             <div class="card property-card">
-                {% if property.image %}
-                <img src="{{ property.image.url }}" class="card-img-top" alt="{{ property.name }}">
+
+                {% if property.photo %}
+                    <img src="{{ property.photo.url }}" class="card-img-top" alt="{{ property.name }}">
                 {% else %}
-                <img src="{% static 'images/photo02.JPG' %}" class="card-img-top" alt="Property">
+                    <img src="{% static 'images/photo02.JPG' %}" class="card-img-top" alt="Property">
                 {% endif %}
+
                 <div class="card-body">
                     <h5 class="card-title">{{ property.name }}</h5>
-                    <p class="card-text text-muted">{{ property.address }}</p>
+                    <p class="card-text text-muted">{{ property.description|truncatewords:12 }}</p>
                     <a href="{% url 'property_detail' property.pk %}" class="btn btn-outline-primary">View Details</a>
                 </div>
+
             </div>
         </div>
         {% empty %}
@@ -119,3 +122,4 @@
 
 </body>
 </html>
+
