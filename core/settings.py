@@ -3,8 +3,8 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# SECURITY
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")
-
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = [
@@ -14,6 +14,14 @@ ALLOWED_HOSTS = [
     "www.bowlinglegacy.com",
 ]
 
+# ---------------------------------------------------------
+# CUSTOM USER MODEL (THIS WAS THE MISSING LINE)
+# ---------------------------------------------------------
+AUTH_USER_MODEL = "main.User"
+
+# ---------------------------------------------------------
+# APPLICATIONS
+# ---------------------------------------------------------
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -55,7 +63,9 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "core.wsgi.application"
 
-# ⭐⭐⭐ FIXED: Render PostgreSQL with REQUIRED SSL ⭐⭐⭐
+# ---------------------------------------------------------
+# DATABASE — RENDER POSTGRES WITH SSL REQUIRED
+# ---------------------------------------------------------
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -70,6 +80,9 @@ DATABASES = {
     }
 }
 
+# ---------------------------------------------------------
+# PASSWORD VALIDATION
+# ---------------------------------------------------------
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -77,14 +90,19 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
+# ---------------------------------------------------------
+# INTERNATIONALIZATION
+# ---------------------------------------------------------
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
+# ---------------------------------------------------------
+# STATIC FILES
+# ---------------------------------------------------------
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
