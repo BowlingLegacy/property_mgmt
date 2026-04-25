@@ -2,4 +2,5 @@ Django==5.0.3
 gunicorn
 whitenoise
 Pillow
+psycopg2-binary==2.9.9
 
