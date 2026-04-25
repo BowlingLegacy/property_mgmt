@@ -76,7 +76,17 @@ def enter_invite_code(request):
 
 
 # -------------------------
+# our creed page
+# -------------------------
+def creed(request):
+    return render(request, "creed.html")
+
+
+
+
+# -------------------------
 # Application Success Page
 # -------------------------
 def application_success(request):
     return render(request, "application_success.html")
+
