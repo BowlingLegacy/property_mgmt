@@ -2,6 +2,7 @@ from django.shortcuts import render, get_object_or_404
 from .models import Property
 
 def home(request):
+    # Homepage no longer needs property list, but keeping this is harmless.
     properties = Property.objects.all()
     return render(request, "home.html", {"properties": properties})
 
