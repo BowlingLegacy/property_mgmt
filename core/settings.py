@@ -117,5 +117,6 @@ MEDIA_ROOT = BASE_DIR / "media"
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
+DEBUG = os.environ.get("DEBUG", "False") == "True"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
