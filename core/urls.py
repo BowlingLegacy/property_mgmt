@@ -8,5 +8,5 @@ urlpatterns = [
     path("", include("main.urls")),
 ]
 
-# Serve uploaded media files (images)
+# ADD THIS LINE
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
