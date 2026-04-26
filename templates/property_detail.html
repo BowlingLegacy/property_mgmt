@@ -1,10 +1,52 @@
 {% extends "base.html" %}
 {% block content %}
 
+<style>
+  .main-property-photo {
+    border: 8px solid #fff;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    border-radius: 12px;
+  }
+
+  .gallery-photo {
+    border: 6px solid #fff;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+    border-radius: 8px;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    height: 220px;
+    width: 100%;
+    object-fit: cover;
+    background: white;
+  }
+
+  .gallery-photo:hover {
+    transform: scale(1.08) rotate(0deg);
+    box-shadow: 0 14px 35px rgba(0,0,0,0.4);
+    z-index: 5;
+    position: relative;
+  }
+
+  .tilt-left {
+    transform: rotate(-3deg);
+  }
+
+  .tilt-right {
+    transform: rotate(3deg);
+  }
+
+  .tilt-small {
+    transform: rotate(-1.5deg);
+  }
+</style>
+
 <h2 class="mb-3">{{ property.name }}</h2>
 
 {% if property.photo %}
-  <img src="{{ property.photo.url }}" class="img-fluid mb-4 rounded">
+  <img
+    src="{{ property.photo.url }}"
+    alt="{{ property.name }}"
+    class="img-fluid main-property-photo mb-4"
+  >
 {% endif %}
 
 <p class="lead">{{ property.description }}</p>
@@ -13,8 +55,12 @@
 
 <div class="row">
   {% for img in property.images.all %}
-    <div class="col-md-4 mb-3">
-      <img src="{{ img.image.url }}" class="img-fluid rounded shadow-sm">
+    <div class="col-md-4 mb-4">
+      <img
+        src="{{ img.image.url }}"
+        class="gallery-photo {% cycle 'tilt-left' 'tilt-right' 'tilt-small' %}"
+        alt="{{ img.caption|default:property.name }}"
+      >
     </div>
   {% empty %}
     <p class="text-muted">No additional photos yet.</p>
