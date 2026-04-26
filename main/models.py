@@ -1,7 +1,9 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
-
+# -----------------------------
+# Custom User Model
+# -----------------------------
 class User(AbstractUser):
     ROLE_CHOICES = [
         ("tenant", "Tenant / Applicant"),
@@ -16,6 +18,9 @@ class User(AbstractUser):
         return self.username
 
 
+# -----------------------------
+# Property Model (main photo)
+# -----------------------------
 class Property(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
@@ -25,16 +30,17 @@ class Property(models.Model):
         return self.name
 
 
-class HousingApplication(models.Model):
-    full_name = models.CharField(max_length=255)
-    phone = models.CharField(max_length=20)
-    email = models.EmailField()
-    age = models.PositiveIntegerField()
-    income_source = models.CharField(max_length=255)
-    monthly_income = models.DecimalField(max_digits=10, decimal_places=2)
-    housing_need = models.TextField()
-    additional_notes = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+# -----------------------------
+# Property Gallery Photos
+# -----------------------------
+class PropertyImage(models.Model):
+    property = models.ForeignKey(
+        Property,
+        on_delete=models.CASCADE,
+        related_name="images"
+    )
+    image = models.ImageField(upload_to="property_gallery/")
+    caption = models.CharField(max_length=255, blank=True)
 
     def __str__(self):
-        return self.full_name
+        return f"{self.property.name} Image"
