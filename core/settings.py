@@ -110,5 +110,11 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 # ---------------------------------------------------------
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+# ---------------------------------------------------------
+# logging
+# ---------------------------------------------------------
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
