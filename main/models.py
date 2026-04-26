@@ -1,9 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
-# -----------------------------
-# Custom User Model (Multi‑Role)
-# -----------------------------
+
 class User(AbstractUser):
     ROLE_CHOICES = [
         ("tenant", "Tenant / Applicant"),
@@ -18,9 +16,6 @@ class User(AbstractUser):
         return self.username
 
 
-# -----------------------------
-# Property Model
-# -----------------------------
 class Property(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
@@ -28,3 +23,18 @@ class Property(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class HousingApplication(models.Model):
+    full_name = models.CharField(max_length=255)
+    phone = models.CharField(max_length=20)
+    email = models.EmailField()
+    age = models.PositiveIntegerField()
+    income_source = models.CharField(max_length=255)
+    monthly_income = models.DecimalField(max_digits=10, decimal_places=2)
+    housing_need = models.TextField()
+    additional_notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.full_name
