@@ -2,31 +2,6 @@
 {% block content %}
 
 <style>
-  .price-box {
-    background: #1e3a5f;
-    color: white;
-    border-radius: 14px;
-    padding: 22px;
-    text-align: center;
-    margin-bottom: 18px;
-    box-shadow: 0 8px 22px rgba(0,0,0,0.18);
-  }
-
-  .price-box h2 {
-    margin: 0;
-    font-size: 2rem;
-    font-weight: 800;
-  }
-
-  .badge-box span {
-    display: inline-block;
-    background: #eef3f8;
-    padding: 7px 13px;
-    border-radius: 999px;
-    margin: 5px;
-    font-size: 0.9rem;
-  }
-
   .info-box {
     background: #f8f9fa;
     border-radius: 14px;
@@ -48,7 +23,6 @@
 
   .info-row span:first-child {
     font-weight: 700;
-    color: #444;
   }
 
   .main-property-photo {
@@ -64,39 +38,17 @@
     border: 6px solid white;
     border-radius: 10px;
     box-shadow: 0 6px 18px rgba(0,0,0,0.18);
-    transition: transform 0.25s ease, box-shadow 0.25s ease;
-    cursor: pointer;
-  }
-
-  .gallery img:hover {
-    transform: scale(1.06) rotate(-1deg);
-    box-shadow: 0 14px 32px rgba(0,0,0,0.30);
-  }
-
-  .apply-btn {
-    width: 100%;
-    border-radius: 999px;
-    padding: 12px;
-    font-weight: 700;
   }
 </style>
 
 <div class="row">
 
   <div class="col-md-7">
-
     <h2 class="mb-3">{{ property.name }}</h2>
 
     {% if property.photo %}
       <img src="{{ property.photo.url }}" class="img-fluid main-property-photo mb-4" alt="{{ property.name }}">
     {% endif %}
-
-    <div class="badge-box mb-3">
-      <span>55+ Housing</span>
-      <span>Sober Living</span>
-      <span>Recovery Friendly</span>
-      <span>Long-Term Housing</span>
-    </div>
 
     <p class="lead">{{ property.description }}</p>
 
@@ -105,28 +57,25 @@
     <div class="row gallery">
       {% for img in property.images.all %}
         <div class="col-md-4 mb-4">
-          <img src="{{ img.image.url }}" alt="{{ img.caption|default:property.name }}">
+          <img src="{{ img.image.url }}" alt="{{ property.name }}">
         </div>
       {% empty %}
         <p class="text-muted">No additional photos yet.</p>
       {% endfor %}
     </div>
-
   </div>
 
   <div class="col-md-5">
-
-    <div class="price-box">
-      <h2>Currently Full</h2>
+    <div class="alert alert-primary text-center">
+      <h3 class="mb-1">Currently Full</h3>
       <p class="mb-0">Join Waitlist for Availability</p>
     </div>
 
-    <a href="{% url 'enter_invite_code' %}" class="btn btn-primary apply-btn mb-3">
+    <a href="{% url 'enter_invite_code' %}" class="btn btn-primary w-100 mb-3">
       Apply / Join Waitlist
     </a>
 
     <div class="info-box">
-
       <h4 class="mb-3">Property Details</h4>
 
       <div class="info-row">
@@ -164,9 +113,7 @@
         <span>Utilities</span>
         <span>Shared power, gas, and trash — $55/month per unit</span>
       </div>
-
     </div>
-
   </div>
 
 </div>
