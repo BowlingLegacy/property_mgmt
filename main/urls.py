@@ -18,4 +18,5 @@ urlpatterns = [
     path("landlord-dashboard/", views.landlord_dashboard, name="landlord_dashboard"),
 
     path("property/<int:pk>/", views.property_detail, name="property_detail"),
+    path("journal/<int:pk>/", views.blog_detail, name="blog_detail"),
 ]
