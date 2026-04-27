@@ -5,38 +5,40 @@
   .price-box {
     background: #1e3a5f;
     color: white;
-    border-radius: 12px;
-    padding: 20px;
+    border-radius: 14px;
+    padding: 22px;
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 18px;
+    box-shadow: 0 8px 22px rgba(0,0,0,0.18);
   }
 
   .price-box h2 {
     margin: 0;
     font-size: 2rem;
-    font-weight: 700;
+    font-weight: 800;
   }
 
   .badge-box span {
     display: inline-block;
     background: #eef3f8;
-    padding: 6px 12px;
-    border-radius: 20px;
+    padding: 7px 13px;
+    border-radius: 999px;
     margin: 5px;
     font-size: 0.9rem;
   }
 
   .info-box {
     background: #f8f9fa;
-    border-radius: 12px;
-    padding: 20px;
+    border-radius: 14px;
+    padding: 22px;
     box-shadow: 0 6px 18px rgba(0,0,0,0.08);
   }
 
   .info-row {
     display: flex;
     justify-content: space-between;
-    padding: 10px 0;
+    gap: 18px;
+    padding: 11px 0;
     border-bottom: 1px solid #ddd;
   }
 
@@ -44,34 +46,51 @@
     border-bottom: none;
   }
 
+  .info-row span:first-child {
+    font-weight: 700;
+    color: #444;
+  }
+
+  .main-property-photo {
+    border: 8px solid #fff;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.25);
+    border-radius: 14px;
+  }
+
   .gallery img {
+    height: 210px;
+    width: 100%;
+    object-fit: cover;
+    border: 6px solid white;
+    border-radius: 10px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.18);
     transition: transform 0.25s ease, box-shadow 0.25s ease;
     cursor: pointer;
   }
 
   .gallery img:hover {
-    transform: scale(1.05) rotate(-1deg);
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    transform: scale(1.06) rotate(-1deg);
+    box-shadow: 0 14px 32px rgba(0,0,0,0.30);
   }
 
   .apply-btn {
     width: 100%;
-    margin-top: 15px;
+    border-radius: 999px;
+    padding: 12px;
+    font-weight: 700;
   }
 </style>
 
 <div class="row">
 
-  <!-- LEFT -->
   <div class="col-md-7">
 
     <h2 class="mb-3">{{ property.name }}</h2>
 
     {% if property.photo %}
-      <img src="{{ property.photo.url }}" class="img-fluid rounded shadow-sm mb-4">
+      <img src="{{ property.photo.url }}" class="img-fluid main-property-photo mb-4" alt="{{ property.name }}">
     {% endif %}
 
-    <!-- BADGES -->
     <div class="badge-box mb-3">
       <span>55+ Housing</span>
       <span>Sober Living</span>
@@ -85,8 +104,8 @@
 
     <div class="row gallery">
       {% for img in property.images.all %}
-        <div class="col-md-4 mb-3">
-          <img src="{{ img.image.url }}" class="img-fluid rounded shadow-sm">
+        <div class="col-md-4 mb-4">
+          <img src="{{ img.image.url }}" alt="{{ img.caption|default:property.name }}">
         </div>
       {% empty %}
         <p class="text-muted">No additional photos yet.</p>
@@ -95,21 +114,18 @@
 
   </div>
 
-  <!-- RIGHT -->
   <div class="col-md-5">
 
-    <!-- STATUS -->
     <div class="price-box">
       <h2>Currently Full</h2>
       <p class="mb-0">Join Waitlist for Availability</p>
     </div>
 
-    <!-- APPLY BUTTON -->
-    <a href="{% url 'enter_invite_code' %}" class="btn btn-primary apply-btn">
+    <a href="{% url 'enter_invite_code' %}" class="btn btn-primary apply-btn mb-3">
       Apply / Join Waitlist
     </a>
 
-    <div class="info-box mt-3">
+    <div class="info-box">
 
       <h4 class="mb-3">Property Details</h4>
 
@@ -140,13 +156,13 @@
       </div>
 
       <div class="info-row">
-        <span>Included</span>
-        <span>1 Gig WiFi, cable, DirecTV</span>
+        <span>Included Services</span>
+        <span>1 Gig WiFi, cable, and DirecTV included at no charge</span>
       </div>
 
       <div class="info-row">
         <span>Utilities</span>
-        <span>$55/month (shared)</span>
+        <span>Shared power, gas, and trash — $55/month per unit</span>
       </div>
 
     </div>
