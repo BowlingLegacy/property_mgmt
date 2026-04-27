@@ -51,3 +51,18 @@ class HousingApplication(models.Model):
 
     def __str__(self):
         return self.full_name
+
+
+# 🔥 BLOG / JOURNAL MODEL (THIS WAS MISSING)
+class BlogPost(models.Model):
+    title = models.CharField(max_length=255)
+    body = models.TextField()
+    image = models.ImageField(upload_to="blog_images/", blank=True, null=True)
+    published = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.title
