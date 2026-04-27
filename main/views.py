@@ -9,7 +9,10 @@ from .forms import HousingApplicationForm, SignUpForm, InviteCodeForm
 def home(request):
     properties = Property.objects.all()
     posts = BlogPost.objects.filter(published=True)[:3]
-    return render(request, "home.html", {"properties": properties, "posts": posts})
+    return render(request, "home.html", {
+        "properties": properties,
+        "posts": posts,
+    })
 
 
 def creed(request):
@@ -55,7 +58,11 @@ def tenant_dashboard(request):
 
 def property_detail(request, pk):
     property_obj = get_object_or_404(Property, pk=pk)
-    return render(request, "property_detail.html", {"property": property_obj})
+    gallery_images = property_obj.images.all()
+    return render(request, "property_detail.html", {
+        "property": property_obj,
+        "gallery_images": gallery_images,
+    })
 
 
 def signup(request):
