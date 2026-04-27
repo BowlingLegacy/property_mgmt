@@ -1,13 +1,15 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
-from .models import Property
+
+from .models import Property, BlogPost
 from .forms import HousingApplicationForm, SignUpForm, InviteCodeForm
 
 
 def home(request):
     properties = Property.objects.all()
-    return render(request, "home.html", {"properties": properties})
+    posts = BlogPost.objects.filter(published=True)[:3]
+    return render(request, "home.html", {"properties": properties, "posts": posts})
 
 
 def creed(request):
@@ -67,3 +69,8 @@ def signup(request):
         form = SignUpForm()
 
     return render(request, "signup.html", {"form": form})
+
+
+def blog_detail(request, pk):
+    post = get_object_or_404(BlogPost, pk=pk, published=True)
+    return render(request, "blog_detail.html", {"post": post})
