@@ -2,6 +2,30 @@
 {% block content %}
 
 <style>
+  .price-box {
+    background: #1e3a5f;
+    color: white;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+
+  .price-box h2 {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 700;
+  }
+
+  .badge-box span {
+    display: inline-block;
+    background: #eef3f8;
+    padding: 6px 12px;
+    border-radius: 20px;
+    margin: 5px;
+    font-size: 0.9rem;
+  }
+
   .info-box {
     background: #f8f9fa;
     border-radius: 12px;
@@ -20,11 +44,6 @@
     border-bottom: none;
   }
 
-  .label {
-    font-weight: 600;
-    color: #555;
-  }
-
   .gallery img {
     transition: transform 0.25s ease, box-shadow 0.25s ease;
     cursor: pointer;
@@ -34,11 +53,16 @@
     transform: scale(1.05) rotate(-1deg);
     box-shadow: 0 10px 25px rgba(0,0,0,0.2);
   }
+
+  .apply-btn {
+    width: 100%;
+    margin-top: 15px;
+  }
 </style>
 
 <div class="row">
 
-  <!-- LEFT SIDE -->
+  <!-- LEFT -->
   <div class="col-md-7">
 
     <h2 class="mb-3">{{ property.name }}</h2>
@@ -46,6 +70,14 @@
     {% if property.photo %}
       <img src="{{ property.photo.url }}" class="img-fluid rounded shadow-sm mb-4">
     {% endif %}
+
+    <!-- BADGES -->
+    <div class="badge-box mb-3">
+      <span>55+ Housing</span>
+      <span>Sober Living</span>
+      <span>Recovery Friendly</span>
+      <span>Long-Term Housing</span>
+    </div>
 
     <p class="lead">{{ property.description }}</p>
 
@@ -63,30 +95,41 @@
 
   </div>
 
-  <!-- RIGHT SIDE -->
+  <!-- RIGHT -->
   <div class="col-md-5">
 
-    <div class="info-box">
+    <!-- STATUS -->
+    <div class="price-box">
+      <h2>Currently Full</h2>
+      <p class="mb-0">Join Waitlist for Availability</p>
+    </div>
+
+    <!-- APPLY BUTTON -->
+    <a href="{% url 'enter_invite_code' %}" class="btn btn-primary apply-btn">
+      Apply / Join Waitlist
+    </a>
+
+    <div class="info-box mt-3">
 
       <h4 class="mb-3">Property Details</h4>
 
       <div class="info-row">
-        <span class="label">Address</span>
+        <span>Address</span>
         <span>{{ property.address|default:"N/A" }}</span>
       </div>
 
       <div class="info-row">
-        <span class="label">Unit Size</span>
+        <span>Unit Size</span>
         <span>{{ property.unit_size|default:"N/A" }}</span>
       </div>
 
       <div class="info-row">
-        <span class="label">Available Date</span>
+        <span>Available Date</span>
         <span>{{ property.available_date|date:"M d, Y"|default:"N/A" }}</span>
       </div>
 
       <div class="info-row">
-        <span class="label">Deposit</span>
+        <span>Deposit</span>
         <span>
           {% if property.deposit_amount %}
             ${{ property.deposit_amount }}
@@ -96,16 +139,14 @@
         </span>
       </div>
 
-      <!-- INCLUDED SERVICES -->
       <div class="info-row">
-        <span class="label">Included Services</span>
-        <span>1 Gig WiFi, cable, and DirecTV included at no charge</span>
+        <span>Included</span>
+        <span>1 Gig WiFi, cable, DirecTV</span>
       </div>
 
-      <!-- UTILITIES -->
       <div class="info-row">
-        <span class="label">Utilities</span>
-        <span>Shared utilities (power, gas, trash) — $55/month per unit</span>
+        <span>Utilities</span>
+        <span>$55/month (shared)</span>
       </div>
 
     </div>
