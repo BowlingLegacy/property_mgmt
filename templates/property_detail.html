@@ -2,18 +2,38 @@
 {% block content %}
 
 <style>
-  .info-box {
+  body {
+    font-family: Tahoma, sans-serif;
+  }
+
+  .property-hero-img {
+    width: 100%;
+    max-height: 430px;
+    object-fit: cover;
+    border-radius: 14px;
+    border: 6px solid white;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+  }
+
+  .detail-card {
     background: #f8f9fa;
     border-radius: 14px;
     padding: 22px;
     box-shadow: 0 6px 18px rgba(0,0,0,0.08);
   }
 
+  .status-box {
+    background: #1e3a5f;
+    color: white;
+    border-radius: 14px;
+    padding: 22px;
+    text-align: center;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  }
+
   .info-row {
-    display: flex;
-    justify-content: space-between;
-    gap: 18px;
-    padding: 11px 0;
+    display: block;
+    padding: 12px 0;
     border-bottom: 1px solid #ddd;
   }
 
@@ -21,99 +41,136 @@
     border-bottom: none;
   }
 
-  .info-row span:first-child {
+  .info-label {
     font-weight: 700;
+    color: #1e3a5f;
+    display: block;
+    margin-bottom: 4px;
   }
 
-  .main-property-photo {
-    border: 8px solid #fff;
-    box-shadow: 0 10px 28px rgba(0,0,0,0.25);
-    border-radius: 14px;
+  .badge-soft {
+    display: inline-block;
+    background: #eef3f8;
+    color: #1e3a5f;
+    padding: 7px 13px;
+    border-radius: 999px;
+    margin: 4px;
+    font-size: 0.9rem;
+    font-weight: 600;
   }
 
-  .gallery img {
+  .gallery-img {
     height: 210px;
     width: 100%;
     object-fit: cover;
     border: 6px solid white;
-    border-radius: 10px;
+    border-radius: 12px;
     box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }
+
+  .gallery-img:hover {
+    transform: scale(1.04);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.28);
+  }
+
+  .btn-rounded {
+    border-radius: 999px;
+    padding: 12px 20px;
+    font-weight: 700;
   }
 </style>
 
-<div class="row">
+<div class="container my-4">
 
-  <div class="col-md-7">
-    <h2 class="mb-3">{{ property.name }}</h2>
+  <div class="row g-4">
 
-    {% if property.photo %}
-      <img src="{{ property.photo.url }}" class="img-fluid main-property-photo mb-4" alt="{{ property.name }}">
-    {% endif %}
+    <div class="col-lg-8">
+      <h1 class="fw-bold mb-3">{{ property.name }}</h1>
 
-    <p class="lead">{{ property.description }}</p>
+      {% if property.photo %}
+        <img src="{{ property.photo.url }}" class="property-hero-img mb-4" alt="{{ property.name }}">
+      {% endif %}
 
-    <h4 class="mt-4">Gallery</h4>
+      <div class="mb-4">
+        <span class="badge-soft">55+ Housing</span>
+        <span class="badge-soft">Sober Living</span>
+        <span class="badge-soft">Recovery Friendly</span>
+        <span class="badge-soft">Long-Term Housing</span>
+      </div>
 
-    <div class="row gallery">
-      {% for img in property.images.all %}
-        <div class="col-md-4 mb-4">
-          <img src="{{ img.image.url }}" alt="{{ property.name }}">
+      <div class="detail-card mb-4">
+        <h3 class="fw-bold mb-3">About This Property</h3>
+        <p class="lead mb-0">{{ property.description }}</p>
+      </div>
+
+      <h3 class="fw-bold mt-4 mb-3">Gallery</h3>
+
+      <div class="row g-4">
+        {% for img in property.images.all %}
+          <div class="col-md-4">
+            <img src="{{ img.image.url }}" class="gallery-img" alt="{{ img.caption|default:property.name }}">
+          </div>
+        {% empty %}
+          <p class="text-muted">No additional photos yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+
+      <div class="status-box mb-3">
+        <h2 class="fw-bold mb-1">Currently Full</h2>
+        <p class="mb-0">Join Waitlist for Availability</p>
+      </div>
+
+      <a href="{% url 'enter_invite_code' %}" class="btn btn-primary btn-rounded w-100 mb-3">
+        Apply / Join Waitlist
+      </a>
+
+      <div class="detail-card">
+        <h3 class="fw-bold mb-3">Property Details</h3>
+
+        <div class="info-row">
+          <span class="info-label">Address</span>
+          <span>{{ property.address|default:"N/A" }}</span>
         </div>
-      {% empty %}
-        <p class="text-muted">No additional photos yet.</p>
-      {% endfor %}
+
+        <div class="info-row">
+          <span class="info-label">Unit Size</span>
+          <span>{{ property.unit_size|default:"N/A" }}</span>
+        </div>
+
+        <div class="info-row">
+          <span class="info-label">Available Date</span>
+          <span>{{ property.available_date|date:"M d, Y"|default:"N/A" }}</span>
+        </div>
+
+        <div class="info-row">
+          <span class="info-label">Deposit</span>
+          <span>
+            {% if property.deposit_amount %}
+              ${{ property.deposit_amount }}
+            {% else %}
+              N/A
+            {% endif %}
+          </span>
+        </div>
+
+        <div class="info-row">
+          <span class="info-label">Included Services</span>
+          <span>1 Gig WiFi, cable, and DirecTV included at no charge.</span>
+        </div>
+
+        <div class="info-row">
+          <span class="info-label">Utilities</span>
+          <span>Shared power, gas, and trash — $55/month per unit.</span>
+        </div>
+
+      </div>
+
     </div>
-  </div>
 
-  <div class="col-md-5">
-    <div class="alert alert-primary text-center">
-      <h3 class="mb-1">Currently Full</h3>
-      <p class="mb-0">Join Waitlist for Availability</p>
-    </div>
-
-    <a href="{% url 'enter_invite_code' %}" class="btn btn-primary w-100 mb-3">
-      Apply / Join Waitlist
-    </a>
-
-    <div class="info-box">
-      <h4 class="mb-3">Property Details</h4>
-
-      <div class="info-row">
-        <span>Address</span>
-        <span>{{ property.address|default:"N/A" }}</span>
-      </div>
-
-      <div class="info-row">
-        <span>Unit Size</span>
-        <span>{{ property.unit_size|default:"N/A" }}</span>
-      </div>
-
-      <div class="info-row">
-        <span>Available Date</span>
-        <span>{{ property.available_date|date:"M d, Y"|default:"N/A" }}</span>
-      </div>
-
-      <div class="info-row">
-        <span>Deposit</span>
-        <span>
-          {% if property.deposit_amount %}
-            ${{ property.deposit_amount }}
-          {% else %}
-            N/A
-          {% endif %}
-        </span>
-      </div>
-
-      <div class="info-row">
-        <span>Included Services</span>
-        <span>1 Gig WiFi, cable, and DirecTV included at no charge</span>
-      </div>
-
-      <div class="info-row">
-        <span>Utilities</span>
-        <span>Shared power, gas, and trash — $55/month per unit</span>
-      </div>
-    </div>
   </div>
 
 </div>
