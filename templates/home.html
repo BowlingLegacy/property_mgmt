@@ -11,12 +11,41 @@
 
     <style>
         body {
+            font-family: Tahoma, sans-serif;
             background: #ffffff;
         }
 
-        .navbar .btn {
+        /* BUTTON SYSTEM */
+        .btn {
             border-radius: 999px;
-            padding: 8px 18px;
+            border: 2px solid white;
+            font-weight: 600;
+            padding: 10px 20px;
+            transition: all 0.25s ease;
+            box-shadow: 0 4px 0 rgba(0,0,0,0.2);
+        }
+
+        .btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 rgba(0,0,0,0.2);
+        }
+
+        .btn-creed {
+            background: linear-gradient(135deg, #d4af37, #f5d76e);
+            color: #1e3a5f;
+        }
+
+        .btn-creed:hover {
+            background: linear-gradient(135deg, #c49b2f, #e6c55a);
+        }
+
+        .btn-portal {
+            background: #1e3a5f;
+            color: white;
+        }
+
+        .btn-portal:hover {
+            background: #16314f;
         }
 
         .hero {
@@ -28,27 +57,12 @@
             align-items: center;
             justify-content: center;
             color: white;
-            text-shadow: 0 3px 10px rgba(0,0,0,0.6);
-        }
-
-        .hero-content {
             text-align: center;
-            max-width: 900px;
-            padding: 0 20px;
-            animation: fadeUp 1s ease-out;
         }
 
         .hero h1 {
-            font-size: 2.8rem;
             font-weight: 800;
-        }
-
-        .hero p {
-            font-size: 1.25rem;
-        }
-
-        .section-card {
-            animation: fadeUp 0.9s ease-out;
+            font-size: 2.6rem;
         }
 
         .property-card {
@@ -68,38 +82,10 @@
             object-fit: cover;
         }
 
-        .journal-card {
-            border-radius: 16px;
-            box-shadow: 0 5px 18px rgba(0,0,0,0.08);
-            transition: transform 0.25s ease, box-shadow 0.25s ease;
-            overflow: hidden;
-        }
-
-        .journal-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 12px 28px rgba(0,0,0,0.16);
-        }
-
-        .journal-card img {
-            height: 180px;
-            object-fit: cover;
-        }
-
         .footer {
             background: #f8f9fa;
             padding: 25px 0;
             margin-top: 60px;
-        }
-
-        @keyframes fadeUp {
-            from {
-                opacity: 0;
-                transform: translateY(25px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
         }
     </style>
 </head>
@@ -110,54 +96,26 @@
     <div class="container">
         <a class="navbar-brand fw-bold" href="/">Bowling Legacy Housing</a>
 
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-
-        <div class="collapse navbar-collapse" id="navMenu">
-            <ul class="navbar-nav ms-auto align-items-lg-center gap-2">
-
-                <li class="nav-item">
-                    <a href="/creed/" class="btn btn-outline-dark">
-                        Our Creed
-                    </a>
-                </li>
-
-                <li class="nav-item">
-                    <a class="btn btn-primary" href="https://rentlogicapp.com">
-                        Tenant Portal
-                    </a>
-                </li>
-
-            </ul>
+        <div class="ms-auto d-flex gap-2">
+            <a href="/creed/" class="btn btn-creed">Our Creed</a>
+            <a href="https://rentlogicapp.com" class="btn btn-portal">Tenant Portal</a>
         </div>
     </div>
 </nav>
 
 <section class="hero">
-    <div class="hero-content">
+    <div>
         <h1>Affordable Sober Housing — Where Dignity and Safety Come First</h1>
         <p class="lead mt-3">Serving adults 55+ across Southern Oregon</p>
 
         <div class="mt-4">
-            <a href="{% url 'enter_invite_code' %}" class="btn btn-light btn-lg me-2">
+            <a href="{% url 'enter_invite_code' %}" class="btn btn-light me-2">
                 Apply With Invite Code
             </a>
-            <a href="/creed/" class="btn btn-outline-light btn-lg">
-                Read Our Creed
+            <a href="/creed/" class="btn btn-creed">
+                Our Creed
             </a>
         </div>
-    </div>
-</section>
-
-<section class="container my-5 section-card">
-    <div class="text-center mb-4">
-        <h2 class="fw-bold">Our Mission</h2>
-        <p class="text-muted fs-5">
-            Bowling Legacy provides long-term, dignified housing for adults 55+
-            at risk of homelessness — creating safe, sober, stable environments
-            built on respect, structure, and community.
-        </p>
     </div>
 </section>
 
@@ -170,16 +128,14 @@
             <div class="card property-card">
 
                 {% if property.photo %}
-                    <img src="{{ property.photo.url }}" class="card-img-top" alt="{{ property.name }}">
+                    <img src="{{ property.photo.url }}" class="card-img-top">
                 {% else %}
-                    <img src="{% static 'images/photo02.JPG' %}" class="card-img-top" alt="Property">
+                    <img src="{% static 'images/photo02.JPG' %}" class="card-img-top">
                 {% endif %}
 
                 <div class="card-body">
-                    <h5 class="card-title">{{ property.name }}</h5>
-                    <p class="card-text text-muted">
-                        {{ property.description|truncatewords:18 }}
-                    </p>
+                    <h5>{{ property.name }}</h5>
+                    <p class="text-muted">{{ property.description|truncatewords:18 }}</p>
                     <a href="{% url 'property_detail' property.pk %}" class="btn btn-outline-primary">
                         View Details
                     </a>
@@ -187,54 +143,13 @@
 
             </div>
         </div>
-        {% empty %}
-        <p class="text-muted">No properties available.</p>
-        {% endfor %}
-    </div>
-</section>
-
-<section class="container my-5">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold">Journal & Updates</h2>
-    </div>
-
-    <div class="row g-4">
-        {% for post in posts %}
-        <div class="col-md-4">
-            <div class="card journal-card h-100">
-
-                {% if post.image %}
-                    <img src="{{ post.image.url }}" class="card-img-top" alt="{{ post.title }}">
-                {% endif %}
-
-                <div class="card-body">
-                    <h5 class="card-title">{{ post.title }}</h5>
-                    <p class="text-muted small">{{ post.created_at|date:"M d, Y" }}</p>
-                    <p class="card-text">{{ post.body|truncatewords:22 }}</p>
-                    <a href="{% url 'blog_detail' post.pk %}" class="btn btn-outline-dark btn-sm">
-                        Read More
-                    </a>
-                </div>
-
-            </div>
-        </div>
-        {% empty %}
-        <p class="text-muted">No journal updates posted yet.</p>
         {% endfor %}
     </div>
 </section>
 
 <footer class="footer text-center">
-    <p class="mb-1">&copy; {{ year|default:2026 }} Bowling Legacy LLC — Medford, Oregon</p>
-    <p class="mb-1">
-        <a href="/creed/" class="text-decoration-none">Our Creed</a>
-    </p>
-    <p class="text-muted small">
-        Tenant experience powered by <a href="https://rentlogicapp.com">RentLogic</a>
-    </p>
+    <p>&copy; {{ year|default:2026 }} Bowling Legacy LLC — Medford, Oregon</p>
 </footer>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 </body>
 </html>
