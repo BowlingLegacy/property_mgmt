@@ -4,15 +4,15 @@
 <style>
   .info-box {
     background: #f8f9fa;
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 20px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
   }
 
   .info-row {
     display: flex;
     justify-content: space-between;
-    padding: 8px 0;
+    padding: 10px 0;
     border-bottom: 1px solid #ddd;
   }
 
@@ -24,9 +24,20 @@
     font-weight: 600;
     color: #555;
   }
+
+  .gallery img {
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    cursor: pointer;
+  }
+
+  .gallery img:hover {
+    transform: scale(1.05) rotate(-1deg);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  }
 </style>
 
 <div class="row">
+
   <!-- LEFT SIDE -->
   <div class="col-md-7">
 
@@ -40,7 +51,7 @@
 
     <h4 class="mt-4">Gallery</h4>
 
-    <div class="row">
+    <div class="row gallery">
       {% for img in property.images.all %}
         <div class="col-md-4 mb-3">
           <img src="{{ img.image.url }}" class="img-fluid rounded shadow-sm">
@@ -52,7 +63,7 @@
 
   </div>
 
-  <!-- RIGHT SIDE INFO PANEL -->
+  <!-- RIGHT SIDE -->
   <div class="col-md-5">
 
     <div class="info-box">
@@ -67,11 +78,6 @@
       <div class="info-row">
         <span class="label">Unit Size</span>
         <span>{{ property.unit_size|default:"N/A" }}</span>
-      </div>
-
-      <div class="info-row">
-        <span class="label">Cable Ready</span>
-        <span>{% if property.cable_ready %}Yes{% else %}No{% endif %}</span>
       </div>
 
       <div class="info-row">
@@ -90,14 +96,22 @@
         </span>
       </div>
 
+      <!-- INCLUDED SERVICES -->
+      <div class="info-row">
+        <span class="label">Included Services</span>
+        <span>1 Gig WiFi, cable, and DirecTV included at no charge</span>
+      </div>
+
+      <!-- UTILITIES -->
       <div class="info-row">
         <span class="label">Utilities</span>
-        <span>{{ property.utilities_cost|default:"N/A" }}</span>
+        <span>Shared utilities (power, gas, trash) — $55/month per unit</span>
       </div>
 
     </div>
 
   </div>
+
 </div>
 
 {% endblock %}
