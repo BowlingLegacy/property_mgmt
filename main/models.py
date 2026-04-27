@@ -19,38 +19,18 @@ class User(AbstractUser):
 class Property(models.Model):
     name = models.CharField(max_length=255)
     address = models.CharField(max_length=255, blank=True)
-
     description = models.TextField(blank=True)
-
-    photo = models.ImageField(upload_to="property_photos/", blank=True, null=True)
-
-    unit_size = models.CharField(max_length=100, blank=True)
-    cable_ready = models.BooleanFielclass Property(models.Model):
-    name = models.CharField(max_length=255)
-    address = models.CharField(max_length=255, blank=True)
-
-    description = models.TextField(blank=True)
-
     photo = models.ImageField(upload_to="property_photos/", blank=True, null=True)
 
     unit_size = models.CharField(max_length=100, blank=True)
     cable_ready = models.BooleanField(default=True)
-
     available_date = models.DateField(blank=True, null=True)
     deposit_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-
-    utilities_cost = models.CharField(max_length=255, blank=True)
-
-    def __str__(self):
-        return self.named(default=True)
-
-    available_date = models.DateField(blank=True, null=True)
-    deposit_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-
     utilities_cost = models.CharField(max_length=255, blank=True)
 
     def __str__(self):
         return self.name
+
 
 class PropertyImage(models.Model):
     property = models.ForeignKey(
@@ -80,7 +60,6 @@ class HousingApplication(models.Model):
         return self.full_name
 
 
-# 🔥 BLOG / JOURNAL MODEL (THIS WAS MISSING)
 class BlogPost(models.Model):
     title = models.CharField(max_length=255)
     body = models.TextField()
