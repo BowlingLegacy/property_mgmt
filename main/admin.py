@@ -42,7 +42,14 @@ class PropertyImageAdmin(admin.ModelAdmin):
 @admin.register(HousingApplication)
 class HousingApplicationAdmin(admin.ModelAdmin):
     inlines = [ApplicantDocumentInline]
-    list_display = ("full_name", "email", "phone", "property", "created_at", "print_application_link")
+    list_display = (
+        "full_name",
+        "email",
+        "phone",
+        "property",
+        "created_at",
+        "print_application_link",
+    )
     search_fields = ("full_name", "email", "phone")
     list_filter = ("property", "created_at")
     readonly_fields = ("print_application_link",)
@@ -50,7 +57,7 @@ class HousingApplicationAdmin(admin.ModelAdmin):
     def print_application_link(self, obj):
         if obj.pk:
             url = reverse("printable_application", args=[obj.pk])
-            return format_html('<a href="{}" target="_blank">Print Application</a>', url)
+            return format_html('<a href="{}" target="_blank">Print / Save Application as PDF</a>', url)
         return "Save application first"
 
     print_application_link.short_description = "Printable Application"
