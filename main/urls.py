@@ -19,4 +19,6 @@ urlpatterns = [
 
     path("property/<int:pk>/", views.property_detail, name="property_detail"),
     path("journal/<int:pk>/", views.blog_detail, name="blog_detail"),
+    
+    path("application/<int:pk>/print/", views.printable_application, name="printable_application"),
 ]
