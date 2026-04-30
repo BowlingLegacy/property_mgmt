@@ -143,8 +143,9 @@ class ApplicantDocument(models.Model):
     ]
 
     STATUS_CHOICES = [
-        ("draft", "Draft"),
+        ("draft", "Draft / Uploaded"),
         ("sent", "Sent to Applicant"),
+        ("review", "Under Review"),
         ("signed", "Signed / Completed"),
         ("locked", "Locked (Final)"),
     ]
@@ -161,21 +162,16 @@ class ApplicantDocument(models.Model):
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")
 
+    needs_signature = models.BooleanField(default=False)
+    needs_initials = models.BooleanField(default=False)
+
+    signed_at = models.DateTimeField(blank=True, null=True)
+    submitted_at = models.DateTimeField(blank=True, null=True)
+
+    locked = models.BooleanField(default=False)
+    landlord_notified = models.BooleanField(default=False)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.name} ({self.application.full_name})"
-
-
-class BlogPost(models.Model):
-    title = models.CharField(max_length=255)
-    body = models.TextField()
-    image = models.ImageField(upload_to="blog_images/", blank=True, null=True)
-    published = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["-created_at"]
-
-    def __str__(self):
-        return self.title
