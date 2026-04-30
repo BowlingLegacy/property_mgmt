@@ -176,7 +176,7 @@ class ApplicantDocument(models.Model):
     def __str__(self):
         return f"{self.name} ({self.application.full_name})"
 
-    class BlogPost(models.Model):
+ class BlogPost(models.Model):
     title = models.CharField(max_length=255)
     body = models.TextField()
     image = models.ImageField(upload_to="blog_images/", blank=True, null=True)
