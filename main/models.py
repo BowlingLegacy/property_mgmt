@@ -27,6 +27,24 @@ class Property(models.Model):
     available_date = models.DateField(blank=True, null=True)
     deposit_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     utilities_cost = models.CharField(max_length=255, blank=True)
+AVAILABILITY_CHOICES = [
+    ("available", "Available Now"),
+    ("waitlist", "Waitlist Open"),
+    ("full", "Currently Full"),
+]
+
+availability_status = models.CharField(
+    max_length=20,
+    choices=AVAILABILITY_CHOICES,
+    default="full"
+)
+
+availability_message = models.CharField(
+    max_length=255,
+    default="Join Waitlist for Availability"
+)
+
+    
 
     def __str__(self):
         return self.name
