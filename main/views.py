@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 
-from .models import Property, BlogPost, HousingApplication
+from .models import Property, BlogPost, HousingApplication, ApplicantDocument
 from .forms import HousingApplicationForm, SignUpForm, InviteCodeForm
 
 
@@ -36,6 +36,16 @@ def apply(request):
                     pass
 
             application.save()
+
+            ApplicantDocument.objects.create(
+                application=application,
+                document_type="application_pdf",
+                name=f"{application.full_name} Application",
+                file="",
+                status="locked",
+                locked=True,
+            )
+
             return redirect("apply_success")
     else:
         form = HousingApplicationForm()
