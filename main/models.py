@@ -1,6 +1,18 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
+class BlogPost(models.Model):
+    title = models.CharField(max_length=255)
+    body = models.TextField()
+    image = models.ImageField(upload_to="blog_images/", blank=True, null=True)
+    published = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.title
 
 class User(AbstractUser):
     ROLE_CHOICES = [
@@ -175,17 +187,3 @@ class ApplicantDocument(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.application.full_name})"
-
- class BlogPost(models.Model):
-    title = models.CharField(max_length=255)
-    body = models.TextField()
-    image = models.ImageField(upload_to="blog_images/", blank=True, null=True)
-    published = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["-created_at"]
-
-    def __str__(self):
-        return self.title
-
