@@ -23,13 +23,12 @@ def apply(request):
     property_id = request.GET.get("property")
 
     if request.method == "POST":
-        form = HousingApplicationForm(request.POST)
+        form = HousingApplicationForm(request.POST, request.FILES)
 
         if form.is_valid():
             application = form.save(commit=False)
 
-            # Attach application to a property if the link included ?property=1
-            if property_id and hasattr(application, "property"):
+            if property_id:
                 try:
                     property_obj = Property.objects.get(id=property_id)
                     application.property = property_obj
