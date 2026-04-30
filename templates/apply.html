@@ -2,23 +2,250 @@
 <html>
 <head>
     <title>Housing Application</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
     <style>
-        body { font-family: Arial, sans-serif; background: #fafafa; padding: 40px; }
-        .container { max-width: 700px; margin: auto; background: white; padding: 30px; border-radius: 8px; }
-        h1 { color: #4a6fa5; }
-        label { font-weight: bold; }
-        button { background: #4a6fa5; color: white; padding: 10px 20px; border: none; border-radius: 5px; }
+        body {
+            font-family: Tahoma, sans-serif;
+            background: #f2efe8;
+            padding: 30px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: white;
+            padding: 35px;
+            border-radius: 14px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+        }
+
+        h1, h2 {
+            color: #1e3a5f;
+        }
+
+        .notice {
+            background: #fff8df;
+            border-left: 6px solid #d4af37;
+            padding: 18px;
+            margin-bottom: 25px;
+            line-height: 1.6;
+        }
+
+        .notice strong {
+            color: #1e3a5f;
+        }
+
+        label {
+            font-weight: bold;
+            display: block;
+            margin-top: 14px;
+            color: #333;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            padding: 11px;
+            margin-top: 5px;
+            border: 1px solid #bbb;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+
+        input[type="checkbox"] {
+            width: auto;
+            margin-right: 8px;
+        }
+
+        .checkbox-row label {
+            display: inline;
+            font-weight: normal;
+        }
+
+        button {
+            margin-top: 25px;
+            background: #1e3a5f;
+            color: white;
+            padding: 14px 26px;
+            border: 2px solid white;
+            border-radius: 999px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 0 rgba(0,0,0,0.25);
+        }
+
+        .section {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #eee;
+        }
+
+        .help-text {
+            color: #666;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .errorlist {
+            color: red;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>Housing Application</h1>
-    <p>Please complete the form below. We review every application with care and dignity.</p>
 
-    <form method="POST">
+    <div class="notice">
+        <p>
+            Bowling Legacy Housing provides sober, structured, respectful housing.
+            No drugs or alcohol may be brought onto the property or consumed while a resident.
+        </p>
+
+        <p>
+            We do not require attendance at recovery meetings, but we fully support residents who attend.
+        </p>
+
+        <p>
+            Our primary house rule is:
+            <strong><u>Unconditional regard for others.</u></strong>
+        </p>
+
+        <p>
+            Questions about recovery, parole, or felony history help us understand housing barriers,
+            support needs, and whether Bowling Legacy may be a good fit. A felony history does not
+            automatically disqualify an applicant.
+        </p>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data">
         {% csrf_token %}
-        {{ form.as_p }}
+
+        <div class="section">
+            <h2>Personal Information</h2>
+            {{ form.full_name.label_tag }} {{ form.full_name }}
+            {{ form.phone.label_tag }} {{ form.phone }}
+            {{ form.email.label_tag }} {{ form.email }}
+            {{ form.age.label_tag }} {{ form.age }}
+        </div>
+
+        <div class="section">
+            <h2>Address History</h2>
+            {{ form.current_address.label_tag }} {{ form.current_address }}
+            {{ form.current_address_length.label_tag }} {{ form.current_address_length }}
+
+            {{ form.previous_address_1.label_tag }} {{ form.previous_address_1 }}
+            {{ form.previous_address_1_length.label_tag }} {{ form.previous_address_1_length }}
+
+            {{ form.previous_address_2.label_tag }} {{ form.previous_address_2 }}
+            {{ form.previous_address_2_length.label_tag }} {{ form.previous_address_2_length }}
+
+            {{ form.previous_address_3.label_tag }} {{ form.previous_address_3 }}
+            {{ form.previous_address_3_length.label_tag }} {{ form.previous_address_3_length }}
+        </div>
+
+        <div class="section">
+            <h2>Identification</h2>
+            {{ form.drivers_license_number.label_tag }} {{ form.drivers_license_number }}
+
+            <div class="checkbox-row">
+                {{ form.has_valid_odl }}
+                <label for="{{ form.has_valid_odl.id_for_label }}">Valid Oregon Driver License?</label>
+            </div>
+
+            {{ form.oregon_id_number.label_tag }} {{ form.oregon_id_number }}
+            {{ form.id_upload.label_tag }} {{ form.id_upload }}
+        </div>
+
+        <div class="section">
+            <h2>Income / Employment</h2>
+            {{ form.income_source.label_tag }} {{ form.income_source }}
+            {{ form.monthly_income.label_tag }} {{ form.monthly_income }}
+            {{ form.employer_name.label_tag }} {{ form.employer_name }}
+            {{ form.employment_length.label_tag }} {{ form.employment_length }}
+        </div>
+
+        <div class="section">
+            <h2>Housing Background</h2>
+            {{ form.previous_evictions.label_tag }} {{ form.previous_evictions }}
+            {{ form.housing_need.label_tag }} {{ form.housing_need }}
+        </div>
+
+        <div class="section">
+            <h2>Recovery / Support Information</h2>
+
+            <div class="checkbox-row">
+                {{ form.in_recovery }}
+                <label for="{{ form.in_recovery.id_for_label }}">Are you in recovery?</label>
+            </div>
+
+            {{ form.drug_of_choice.label_tag }} {{ form.drug_of_choice }}
+        </div>
+
+        <div class="section">
+            <h2>Justice System Information</h2>
+
+            <p class="help-text">
+                Bowling Legacy Housing exists to support people who often face barriers to stable housing.
+                Felony history, parole status, or past incarceration are not automatic disqualifiers.
+                This information helps us understand support needs and housing barriers.
+            </p>
+
+            <div class="checkbox-row">
+                {{ form.on_parole }}
+                <label for="{{ form.on_parole.id_for_label }}">
+                    Currently on parole? This does not automatically impact tenancy.
+                </label>
+            </div>
+
+            {{ form.parole_officer_name.label_tag }} {{ form.parole_officer_name }}
+            {{ form.parole_officer_phone.label_tag }} {{ form.parole_officer_phone }}
+
+            {{ form.felony_history.label_tag }} {{ form.felony_history }}
+
+            <div class="checkbox-row">
+                {{ form.odoc_time_served }}
+                <label for="{{ form.odoc_time_served.id_for_label }}">Served time with ODOC?</label>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>References Optional</h2>
+
+            {{ form.reference_1_name.label_tag }} {{ form.reference_1_name }}
+            {{ form.reference_1_phone.label_tag }} {{ form.reference_1_phone }}
+            {{ form.reference_1_relationship.label_tag }} {{ form.reference_1_relationship }}
+            {{ form.reference_1_type.label_tag }} {{ form.reference_1_type }}
+
+            {{ form.reference_2_name.label_tag }} {{ form.reference_2_name }}
+            {{ form.reference_2_phone.label_tag }} {{ form.reference_2_phone }}
+            {{ form.reference_2_relationship.label_tag }} {{ form.reference_2_relationship }}
+            {{ form.reference_2_type.label_tag }} {{ form.reference_2_type }}
+        </div>
+
+        <div class="section">
+            <h2>Additional Notes</h2>
+            {{ form.additional_notes.label_tag }} {{ form.additional_notes }}
+        </div>
+
+        <div class="section">
+            <h2>Applicant Acknowledgment</h2>
+
+            <div class="checkbox-row">
+                {{ form.sobriety_acknowledgment }}
+                <label for="{{ form.sobriety_acknowledgment.id_for_label }}">
+                    I understand this is a sober housing environment and that drugs or alcohol are not allowed on the property.
+                </label>
+            </div>
+
+            <div class="checkbox-row">
+                {{ form.unconditional_regard_acknowledgment }}
+                <label for="{{ form.unconditional_regard_acknowledgment.id_for_label }}">
+                    I understand that the primary house rule is <strong><u>Unconditional regard for others.</u></strong>
+                </label>
+            </div>
+        </div>
+
         <button type="submit">Submit Application</button>
     </form>
 </div>
