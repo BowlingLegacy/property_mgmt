@@ -9,8 +9,17 @@ class PropertyImageInline(admin.TabularInline):
 
 class ApplicantDocumentInline(admin.TabularInline):
     model = ApplicantDocument
-    extra = 1
-    fields = ("name", "document_type", "file", "status", "created_at")
+    extra = 0
+    fields = (
+        "name",
+        "document_type",
+        "file",
+        "status",
+        "needs_signature",
+        "needs_initials",
+        "locked",
+        "created_at",
+    )
     readonly_fields = ("created_at",)
 
 
