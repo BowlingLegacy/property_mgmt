@@ -161,8 +161,8 @@
         <div class="col-lg-4">
 
             <div class="status-box mb-3">
-                <h2 class="fw-bold mb-1">Currently Full</h2>
-                <p class="mb-0">Join Waitlist for Availability</p>
+                <h2 class="fw-bold mb-1">{{ property.get_availability_status_display }} </h2>
+                <p class="mb-0"> {{ property.availability_message }} </p>
             </div>
 
             <a href="{% url 'apply' %}" class="btn btn-primary btn-pill w-100 mb-3">
