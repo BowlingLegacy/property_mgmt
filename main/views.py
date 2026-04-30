@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 
-from .models import Property, BlogPost
+from .models import Property, BlogPost, HousingApplication
 from .forms import HousingApplicationForm, SignUpForm, InviteCodeForm
 
 
@@ -45,6 +45,13 @@ def apply(request):
 
 def apply_success(request):
     return render(request, "apply_success.html")
+
+
+def printable_application(request, pk):
+    application = get_object_or_404(HousingApplication, pk=pk)
+    return render(request, "printable_application.html", {
+        "application": application,
+    })
 
 
 def enter_invite_code(request):
