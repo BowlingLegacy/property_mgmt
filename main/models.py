@@ -89,37 +89,26 @@ class HousingApplication(models.Model):
     previous_address_3_length = models.CharField(max_length=100, blank=True)
 
     drivers_license_number = models.CharField("Oregon Driver License Number", max_length=100, blank=True)
-    has_valid_odl = models.BooleanField("Is this Oregon Driver License valid?", default=False)
-    oregon_id_number = models.CharField("Oregon ID Number if no ODL", max_length=100, blank=True)
-    id_upload = models.FileField(
-        "Upload photo of ID or Driver License",
-        upload_to="application_ids/",
-        blank=True,
-        null=True
-    )
+    has_valid_odl = models.BooleanField(default=False)
+    oregon_id_number = models.CharField(max_length=100, blank=True)
+    id_upload = models.FileField(upload_to="application_ids/", blank=True, null=True)
 
     income_source = models.CharField(max_length=255)
     monthly_income = models.DecimalField(max_digits=10, decimal_places=2)
     employer_name = models.CharField(max_length=255, blank=True)
     employment_length = models.CharField(max_length=100, blank=True)
 
-    previous_evictions = models.TextField("Any previous evictions? Please explain.", blank=True)
+    previous_evictions = models.TextField(blank=True)
 
-    in_recovery = models.BooleanField("Are you in recovery?", default=False)
+    in_recovery = models.BooleanField(default=False)
     drug_of_choice = models.CharField(max_length=255, blank=True)
 
-    on_parole = models.BooleanField(
-        "Are you currently on parole? This does not automatically impact tenancy.",
-        default=False
-    )
+    on_parole = models.BooleanField(default=False)
     parole_officer_name = models.CharField(max_length=255, blank=True)
     parole_officer_phone = models.CharField(max_length=50, blank=True)
 
-    felony_history = models.TextField(
-        "Felony history, if any. This does not disqualify you; it helps us understand housing barriers and support needs.",
-        blank=True
-    )
-    odoc_time_served = models.BooleanField("Have you served time with ODOC?", default=False)
+    felony_history = models.TextField(blank=True)
+    odoc_time_served = models.BooleanField(default=False)
 
     reference_1_name = models.CharField(max_length=255, blank=True)
     reference_1_phone = models.CharField(max_length=50, blank=True)
@@ -141,6 +130,41 @@ class HousingApplication(models.Model):
 
     def __str__(self):
         return self.full_name
+
+
+# 🔥 NEW: DOCUMENT SYSTEM
+class ApplicantDocument(models.Model):
+    DOCUMENT_TYPE_CHOICES = [
+        ("lease", "Lease Agreement"),
+        ("application_pdf", "Application PDF"),
+        ("id", "Identification"),
+        ("onboarding", "Onboarding Document"),
+        ("other", "Other"),
+    ]
+
+    STATUS_CHOICES = [
+        ("draft", "Draft"),
+        ("sent", "Sent to Applicant"),
+        ("signed", "Signed / Completed"),
+        ("locked", "Locked (Final)"),
+    ]
+
+    application = models.ForeignKey(
+        HousingApplication,
+        on_delete=models.CASCADE,
+        related_name="documents"
+    )
+
+    document_type = models.CharField(max_length=50, choices=DOCUMENT_TYPE_CHOICES)
+    file = models.FileField(upload_to="applicant_documents/")
+    name = models.CharField(max_length=255)
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.application.full_name})"
 
 
 class BlogPost(models.Model):
