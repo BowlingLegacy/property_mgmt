@@ -13,9 +13,16 @@ class PropertyAdmin(admin.ModelAdmin):
     list_display = ("name", "address")
 
 
+@admin.register(PropertyImage)
+class PropertyImageAdmin(admin.ModelAdmin):
+    list_display = ("property", "caption")
+
+
 @admin.register(HousingApplication)
 class HousingApplicationAdmin(admin.ModelAdmin):
-    list_display = ("full_name", "email", "created_at")
+    list_display = ("full_name", "email", "phone", "property", "created_at")
+    search_fields = ("full_name", "email", "phone")
+    list_filter = ("property", "created_at")
 
 
 @admin.register(BlogPost)
