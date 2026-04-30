@@ -20,10 +20,23 @@ def creed(request):
 
 
 def apply(request):
+    property_id = request.GET.get("property")
+
     if request.method == "POST":
         form = HousingApplicationForm(request.POST)
+
         if form.is_valid():
-            form.save()
+            application = form.save(commit=False)
+
+            # Attach application to a property if the link included ?property=1
+            if property_id and hasattr(application, "property"):
+                try:
+                    property_obj = Property.objects.get(id=property_id)
+                    application.property = property_obj
+                except Property.DoesNotExist:
+                    pass
+
+            application.save()
             return redirect("apply_success")
     else:
         form = HousingApplicationForm()
@@ -59,6 +72,7 @@ def tenant_dashboard(request):
 def property_detail(request, pk):
     property_obj = get_object_or_404(Property, pk=pk)
     gallery_images = property_obj.images.all()
+
     return render(request, "property_detail.html", {
         "property": property_obj,
         "gallery_images": gallery_images,
@@ -68,6 +82,7 @@ def property_detail(request, pk):
 def signup(request):
     if request.method == "POST":
         form = SignUpForm(request.POST)
+
         if form.is_valid():
             user = form.save()
             login(request, user)
