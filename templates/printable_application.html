@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Application - {{ application.full_name }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            line-height: 1.5;
+        }
+
+        h1, h2 {
+            margin-bottom: 5px;
+        }
+
+        .section {
+            margin-top: 25px;
+            border-top: 2px solid #000;
+            padding-top: 10px;
+        }
+
+        .field {
+            margin-bottom: 8px;
+        }
+
+        .label {
+            font-weight: bold;
+        }
+
+        .print-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: black;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        @media print {
+            .print-btn {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<button class="print-btn" onclick="window.print()">Print</button>
+
+<h1>Housing Application</h1>
+<p><strong>Date Submitted:</strong> {{ application.created_at }}</p>
+
+<div class="section">
+    <h2>Personal Information</h2>
+    <div class="field"><span class="label">Name:</span> {{ application.full_name }}</div>
+    <div class="field"><span class="label">Phone:</span> {{ application.phone }}</div>
+    <div class="field"><span class="label">Email:</span> {{ application.email }}</div>
+    <div class="field"><span class="label">Age:</span> {{ application.age }}</div>
+</div>
+
+<div class="section">
+    <h2>Address History</h2>
+    <div class="field"><span class="label">Current:</span> {{ application.current_address }} ({{ application.current_address_length }})</div>
+    <div class="field">{{ application.previous_address_1 }} ({{ application.previous_address_1_length }})</div>
+    <div class="field">{{ application.previous_address_2 }} ({{ application.previous_address_2_length }})</div>
+    <div class="field">{{ application.previous_address_3 }} ({{ application.previous_address_3_length }})</div>
+</div>
+
+<div class="section">
+    <h2>Identification</h2>
+    <div class="field"><span class="label">DL #:</span> {{ application.drivers_license_number }}</div>
+    <div class="field"><span class="label">Valid:</span> {{ application.has_valid_odl }}</div>
+    <div class="field"><span class="label">OR ID:</span> {{ application.oregon_id_number }}</div>
+</div>
+
+<div class="section">
+    <h2>Employment</h2>
+    <div class="field"><span class="label">Income Source:</span> {{ application.income_source }}</div>
+    <div class="field"><span class="label">Monthly Income:</span> {{ application.monthly_income }}</div>
+    <div class="field"><span class="label">Employer:</span> {{ application.employer_name }}</div>
+    <div class="field"><span class="label">Length:</span> {{ application.employment_length }}</div>
+</div>
+
+<div class="section">
+    <h2>Background</h2>
+    <div class="field"><span class="label">Evictions:</span> {{ application.previous_evictions }}</div>
+    <div class="field"><span class="label">Felony:</span> {{ application.felony_history }}</div>
+</div>
+
+<div class="section">
+    <h2>Recovery</h2>
+    <div class="field"><span class="label">In Recovery:</span> {{ application.in_recovery }}</div>
+    <div class="field"><span class="label">DOC:</span> {{ application.drug_of_choice }}</div>
+</div>
+
+<div class="section">
+    <h2>Notes</h2>
+    <div class="field">{{ application.housing_need }}</div>
+    <div class="field">{{ application.additional_notes }}</div>
+</div>
+
+</body>
+</html>
