@@ -155,6 +155,7 @@ class ApplicantDocument(models.Model):
     ]
 
     STATUS_CHOICES = [
+        status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="uploaded")
     ("uploaded", "Uploaded"),
     ("needs_completion", "Needs Completion"),
     ("needs_signature", "Needs Signature"),
