@@ -135,8 +135,11 @@
             }
 
             .journal-body {
-                max-height: 300px;
-                font-size: 1rem;
+                max-height: 360px;
+                overflow-y: auto;
+                padding-right: 10px;
+                line-height: 1.7;
+                font-size: 1.05rem;
             }
         }
     </style>
@@ -230,7 +233,7 @@
             <p class="text-muted small">{{ post.created_at }}</p>
 
             <div class="journal-body">
-                {{ post.body|linebreaks }}
+                {{ post.body|linebreaksbr }}
             </div>
         </article>
         {% empty %}
