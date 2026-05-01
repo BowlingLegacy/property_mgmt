@@ -172,6 +172,38 @@
     </div>
 </section>
 
+<section class="container my-5">
+    <h2 class="fw-bold mb-4">Journal & Updates</h2>
+
+    <div class="row g-4">
+        {% for post in posts %}
+        <div class="col-md-4">
+            <div class="card property-card">
+
+                {% if post.image %}
+                    <img src="{{ post.image.url }}" class="card-img-top" alt="{{ post.title }}">
+                {% endif %}
+
+                <div class="card-body">
+                    <h5 class="card-title">{{ post.title }}</h5>
+
+                    <p class="card-text text-muted">
+                        {{ post.body|truncatewords:20 }}
+                    </p>
+
+                    <a href="{% url 'blog_detail' post.pk %}" class="btn btn-outline-primary">
+                        Read More
+                    </a>
+                </div>
+
+            </div>
+        </div>
+        {% empty %}
+        <p class="text-muted">No updates yet.</p>
+        {% endfor %}
+    </div>
+</section>
+
 <footer class="footer text-center">
     <p class="mb-1">&copy; {{ year|default:2026 }} Bowling Legacy LLC — Medford, Oregon</p>
     <p class="text-muted small">
