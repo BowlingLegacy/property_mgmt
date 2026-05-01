@@ -18,24 +18,14 @@ class ApplicantDocumentInline(admin.TabularInline):
     fields = (
         "name",
         "document_type",
-        "file_link",
+        "file",
         "status",
-        "locked",
-        "signed_at",
-        "submitted_at",
+        "needs_signature",
+        "needs_initials",
         "created_at",
     )
 
-    readonly_fields = (
-        "name",
-        "document_type",
-        "file_link",
-        "status",
-        "locked",
-        "signed_at",
-        "submitted_at",
-        "created_at",
-    )
+    readonly_fields = ("created_at",)
 
     def file_link(self, obj):
         if obj.file:
