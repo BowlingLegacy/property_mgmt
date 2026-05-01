@@ -1,7 +1,21 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from .models import HousingApplication, User
+from .models import BlogComment
 
+class BlogCommentForm(forms.ModelForm):
+    class Meta:
+        model = BlogComment
+        fields = ["name", "email", "comment"]
+        widgets = {
+            "name": forms.TextInput(attrs={"class": "form-control"}),
+            "email": forms.EmailInput(attrs={"class": "form-control"}),
+            "comment": forms.Textarea(attrs={
+                "class": "form-control",
+                "rows": 3,
+                "placeholder": "Write your comment..."
+            }),
+        }
 
 class HousingApplicationForm(forms.ModelForm):
     class Meta:
