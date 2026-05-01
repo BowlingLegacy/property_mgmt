@@ -1,6 +1,9 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
 from main import views
+from django.urls import path
+from . import views
+
 
 urlpatterns = [
     path("", views.home, name="home"),
@@ -21,4 +24,5 @@ urlpatterns = [
     path("journal/<int:pk>/", views.blog_detail, name="blog_detail"),
     
     path("application/<int:pk>/print/", views.printable_application, name="printable_application"),
+    path("blog/<int:post_id>/comment/", views.add_blog_comment, name="add_blog_comment"),
 ]
