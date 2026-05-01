@@ -12,6 +12,22 @@ from reportlab.pdfgen import canvas
 from .models import Property, BlogPost, HousingApplication, ApplicantDocument
 from .forms import HousingApplicationForm, SignUpForm, InviteCodeForm
 
+from django.shortcuts import redirect, get_object_or_404
+from .models import BlogPost
+from .forms import BlogCommentForm
+
+def add_blog_comment(request, post_id):
+    post = get_object_or_404(BlogPost, id=post_id)
+
+    if request.method == "POST":
+        form = BlogCommentForm(request.POST)
+        if form.is_valid():
+            comment = form.save(commit=False)
+            comment.post = post
+            comment.approved = False
+            comment.save()
+
+    return redirect("home")
 
 def create_application_pdf(application):
     buffer = BytesIO()
