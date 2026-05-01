@@ -3,10 +3,10 @@ from django.contrib.auth.models import AbstractUser
 
 class BlogComment(models.Model):
     post = models.ForeignKey(
-        BlogPost,
+        "BlogPost",
         on_delete=models.CASCADE,
         related_name="comments"
-    )
+)
     name = models.CharField(max_length=100)
     email = models.EmailField(blank=True)
     comment = models.TextField()
