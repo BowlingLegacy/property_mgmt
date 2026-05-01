@@ -25,4 +25,5 @@ urlpatterns = [
     
     path("application/<int:pk>/print/", views.printable_application, name="printable_application"),
     path("blog/<int:post_id>/comment/", views.add_blog_comment, name="add_blog_comment"),
+    path("comment/<int:pk>/", views.add_comment, name="add_comment"),
 ]
