@@ -155,12 +155,13 @@ class ApplicantDocument(models.Model):
     ]
 
     STATUS_CHOICES = [
-        ("draft", "Draft / Uploaded"),
-        ("sent", "Sent to Applicant"),
-        ("review", "Under Review"),
-        ("signed", "Signed / Completed"),
-        ("locked", "Locked (Final)"),
-    ]
+    ("uploaded", "Uploaded"),
+    ("needs_completion", "Needs Completion"),
+    ("needs_signature", "Needs Signature"),
+    ("completed", "Completed"),
+    ("locked", "Locked Final"),
+    ("needs_correction", "Needs Correction"),
+]
 
     application = models.ForeignKey(
         HousingApplication,
