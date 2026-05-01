@@ -34,18 +34,8 @@
             color: #1e3a5f;
         }
 
-        .btn-creed:hover {
-            background: linear-gradient(135deg, #c49b2f, #e6c55a);
-            color: #1e3a5f;
-        }
-
         .btn-portal {
             background: #1e3a5f;
-            color: white;
-        }
-
-        .btn-portal:hover {
-            background: #16314f;
             color: white;
         }
 
@@ -55,7 +45,7 @@
                 url("{% static 'images/photo02.JPG' %}");
             background-size: cover;
             background-position: center;
-            height: 460px;
+            min-height: 420px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -77,12 +67,6 @@
             border-radius: 16px;
             overflow: hidden;
             box-shadow: 0 6px 18px rgba(0,0,0,0.12);
-            transition: transform 0.25s ease, box-shadow 0.25s ease;
-        }
-
-        .property-card:hover {
-            transform: translateY(-6px);
-            box-shadow: 0 14px 30px rgba(0,0,0,0.20);
         }
 
         .property-card img {
@@ -90,10 +74,70 @@
             object-fit: cover;
         }
 
+        .journal-wrap {
+            background: #f8f9fa;
+            padding: 45px 0;
+            margin-top: 50px;
+        }
+
+        .journal-post {
+            background: white;
+            border-radius: 16px;
+            padding: 28px;
+            margin-bottom: 24px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.10);
+        }
+
+        .journal-body {
+            max-height: 360px;
+            overflow-y: auto;
+            padding-right: 10px;
+            line-height: 1.7;
+            font-size: 1.05rem;
+        }
+
+        .journal-img {
+            max-height: 260px;
+            object-fit: cover;
+            width: 100%;
+            border-radius: 12px;
+            margin-bottom: 18px;
+        }
+
         .footer {
             background: #f8f9fa;
             padding: 25px 0;
-            margin-top: 60px;
+        }
+
+        @media (max-width: 768px) {
+            .navbar .container {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .hero {
+                min-height: 260px;
+                background-position: center top;
+            }
+
+            .hero h1 {
+                font-size: 1.65rem;
+            }
+
+            .hero .lead {
+                font-size: 1rem;
+            }
+
+            .hero .btn {
+                display: block;
+                width: 100%;
+                margin: 8px 0;
+            }
+
+            .journal-body {
+                max-height: 300px;
+                font-size: 1rem;
+            }
         }
     </style>
 </head>
@@ -172,32 +216,23 @@
     </div>
 </section>
 
-<section class="container my-5">
-    <h2 class="fw-bold mb-4">Journal & Updates</h2>
+<section class="journal-wrap">
+    <div class="container-fluid px-4 px-md-5">
+        <h2 class="fw-bold mb-4">Journal & Updates</h2>
 
-    <div class="row g-4">
         {% for post in posts %}
-        <div class="col-md-4">
-            <div class="card property-card">
+        <article class="journal-post">
+            {% if post.image %}
+                <img src="{{ post.image.url }}" class="journal-img" alt="{{ post.title }}">
+            {% endif %}
 
-                {% if post.image %}
-                    <img src="{{ post.image.url }}" class="card-img-top" alt="{{ post.title }}">
-                {% endif %}
+            <h3 class="fw-bold">{{ post.title }}</h3>
+            <p class="text-muted small">{{ post.created_at }}</p>
 
-                <div class="card-body">
-                    <h5 class="card-title">{{ post.title }}</h5>
-
-                    <p class="card-text text-muted">
-                        {{ post.body|truncatewords:20 }}
-                    </p>
-
-                    <a href="{% url 'blog_detail' post.pk %}" class="btn btn-outline-primary">
-                        Read More
-                    </a>
-                </div>
-
+            <div class="journal-body">
+                {{ post.body|linebreaks }}
             </div>
-        </div>
+        </article>
         {% empty %}
         <p class="text-muted">No updates yet.</p>
         {% endfor %}
