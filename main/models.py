@@ -18,7 +18,7 @@ class BlogComment(models.Model):
 
     def __str__(self):
         return f"Comment by {self.name} on {self.post.title}"
-
+        
 class User(AbstractUser):
     ROLE_CHOICES = [
         ("tenant", "Tenant / Applicant"),
