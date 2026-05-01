@@ -3,7 +3,7 @@ from django.urls import reverse
 from django.utils.html import format_html
 
 from .models import Property, PropertyImage, HousingApplication, ApplicantDocument, BlogPost
-
+from .models import BlogComment
 
 class PropertyImageInline(admin.TabularInline):
     model = PropertyImage
@@ -46,6 +46,17 @@ class PropertyAdmin(admin.ModelAdmin):
 class PropertyImageAdmin(admin.ModelAdmin):
     list_display = ("property", "caption")
 
+@admin.register(BlogComment)
+class BlogCommentAdmin(admin.ModelAdmin):
+    list_display = ("name", "post", "approved", "created_at")
+    list_filter = ("approved", "created_at")
+    search_fields = ("name", "email", "comment")
+    actions = ["approve_comments"]
+
+    def approve_comments(self, request, queryset):
+        queryset.update(approved=True)
+
+    approve_comments.short_description = "Approve selected comments"
 
 @admin.register(HousingApplication)
 class HousingApplicationAdmin(admin.ModelAdmin):
