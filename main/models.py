@@ -1,18 +1,23 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
-class BlogPost(models.Model):
-    title = models.CharField(max_length=255)
-    body = models.TextField()
-    image = models.ImageField(upload_to="blog_images/", blank=True, null=True)
-    published = models.BooleanField(default=True)
+class BlogComment(models.Model):
+    post = models.ForeignKey(
+        BlogPost,
+        on_delete=models.CASCADE,
+        related_name="comments"
+    )
+    name = models.CharField(max_length=100)
+    email = models.EmailField(blank=True)
+    comment = models.TextField()
+    approved = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["-created_at"]
 
     def __str__(self):
-        return self.title
+        return f"Comment by {self.name} on {self.post.title}"
 
 class User(AbstractUser):
     ROLE_CHOICES = [
