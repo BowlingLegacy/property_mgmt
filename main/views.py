@@ -1,9 +1,59 @@
+from io import BytesIO
+
+from django.core.files.base import ContentFile
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+
 from .models import Property, BlogPost, HousingApplication, ApplicantDocument
 from .forms import HousingApplicationForm, SignUpForm, InviteCodeForm
+
+
+def create_application_pdf(application):
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
+
+    y = 750
+
+    def line(text):
+        nonlocal y
+        p.drawString(50, y, str(text))
+        y -= 18
+
+    p.setFont("Helvetica-Bold", 16)
+    line("Painted Lady Inn - Housing Application")
+    p.setFont("Helvetica", 10)
+    line(f"Applicant: {application.full_name}")
+    line(f"Phone: {application.phone}")
+    line(f"Email: {application.email}")
+    line(f"Age: {application.age}")
+    line("")
+    line(f"Current Address: {application.current_address}")
+    line(f"Length at Address: {application.current_address_length}")
+    line("")
+    line(f"Income Source: {application.income_source}")
+    line(f"Monthly Income: {application.monthly_income}")
+    line(f"Employer: {application.employer_name}")
+    line(f"Employment Length: {application.employment_length}")
+    line("")
+    line(f"Previous Evictions: {application.previous_evictions}")
+    line(f"In Recovery: {application.in_recovery}")
+    line(f"Drug of Choice: {application.drug_of_choice}")
+    line(f"On Parole: {application.on_parole}")
+    line(f"Parole Officer: {application.parole_officer_name}")
+    line(f"Felony History: {application.felony_history}")
+    line("")
+    line(f"Housing Need: {application.housing_need}")
+    line(f"Additional Notes: {application.additional_notes}")
+
+    p.showPage()
+    p.save()
+
+    buffer.seek(0)
+    return buffer
 
 
 def home(request):
@@ -37,13 +87,21 @@ def apply(request):
 
             application.save()
 
-            ApplicantDocument.objects.create(
+            pdf_buffer = create_application_pdf(application)
+            filename = f"application_{application.id}_{application.full_name.replace(' ', '_')}.pdf"
+
+            document = ApplicantDocument(
                 application=application,
                 document_type="application_pdf",
-                name=f"{application.full_name} Application",
-                file="",
+                name=f"{application.full_name} Application PDF",
                 status="locked",
                 locked=True,
+            )
+
+            document.file.save(
+                filename,
+                ContentFile(pdf_buffer.read()),
+                save=True
             )
 
             return redirect("apply_success")
