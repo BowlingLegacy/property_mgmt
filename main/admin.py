@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.utils.html import format_html
+
 from .models import (
     Property,
     PropertyImage,
@@ -69,6 +71,7 @@ class HousingApplicationAdmin(admin.ModelAdmin):
 
     readonly_fields = (
         "created_at",
+        "id_upload_link",
     )
 
     fieldsets = (
@@ -81,28 +84,13 @@ class HousingApplicationAdmin(admin.ModelAdmin):
                 "age",
             )
         }),
-        ("Current Address", {
-            "fields": (
-                "current_address",
-                "current_address_length",
-            )
-        }),
-        ("Previous Addresses", {
-            "fields": (
-                "previous_address_1",
-                "previous_address_1_length",
-                "previous_address_2",
-                "previous_address_2_length",
-                "previous_address_3",
-                "previous_address_3_length",
-            )
-        }),
         ("Identification", {
             "fields": (
                 "drivers_license_number",
                 "has_valid_odl",
                 "oregon_id_number",
                 "id_upload",
+                "id_upload_link",
             )
         }),
         ("Income / Employment", {
@@ -126,7 +114,26 @@ class HousingApplicationAdmin(admin.ModelAdmin):
                 "odoc_time_served",
             )
         }),
+        ("Current Address", {
+            "classes": ("collapse",),
+            "fields": (
+                "current_address",
+                "current_address_length",
+            )
+        }),
+        ("Previous Addresses", {
+            "classes": ("collapse",),
+            "fields": (
+                "previous_address_1",
+                "previous_address_1_length",
+                "previous_address_2",
+                "previous_address_2_length",
+                "previous_address_3",
+                "previous_address_3_length",
+            )
+        }),
         ("References", {
+            "classes": ("collapse",),
             "fields": (
                 "reference_1_name",
                 "reference_1_phone",
@@ -145,6 +152,7 @@ class HousingApplicationAdmin(admin.ModelAdmin):
             )
         }),
         ("Notes / System", {
+            "classes": ("collapse",),
             "fields": (
                 "additional_notes",
                 "created_at",
@@ -152,12 +160,22 @@ class HousingApplicationAdmin(admin.ModelAdmin):
         }),
     )
 
+    def id_upload_link(self, obj):
+        if obj and obj.id_upload:
+            return format_html(
+                '<a href="{}" target="_blank">View uploaded ID / ODL</a>',
+                obj.id_upload.url
+            )
+        return "No ID uploaded"
+
+    id_upload_link.short_description = "Uploaded ID / ODL"
+
     def has_delete_permission(self, request, obj=None):
         return False
 
     def get_readonly_fields(self, request, obj=None):
         if obj:
-            return [field.name for field in self.model._meta.fields]
+            return [field.name for field in self.model._meta.fields] + ["id_upload_link"]
         return self.readonly_fields
 
 
