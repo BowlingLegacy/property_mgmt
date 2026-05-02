@@ -1,12 +1,23 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
+
+class BlogPost(models.Model):
+    title = models.CharField(max_length=255)
+    body = models.TextField()
+    image = models.ImageField(upload_to="blog_images/", blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title
+
+
 class BlogComment(models.Model):
     post = models.ForeignKey(
         "BlogPost",
         on_delete=models.CASCADE,
         related_name="comments"
-)
+    )
     name = models.CharField(max_length=100)
     email = models.EmailField(blank=True)
     comment = models.TextField()
@@ -18,7 +29,8 @@ class BlogComment(models.Model):
 
     def __str__(self):
         return f"Comment by {self.name} on {self.post.title}"
-        
+
+
 class User(AbstractUser):
     ROLE_CHOICES = [
         ("tenant", "Tenant / Applicant"),
@@ -105,7 +117,11 @@ class HousingApplication(models.Model):
     previous_address_3 = models.CharField(max_length=255, blank=True)
     previous_address_3_length = models.CharField(max_length=100, blank=True)
 
-    drivers_license_number = models.CharField("Oregon Driver License Number", max_length=100, blank=True)
+    drivers_license_number = models.CharField(
+        "Oregon Driver License Number",
+        max_length=100,
+        blank=True
+    )
     has_valid_odl = models.BooleanField(default=False)
     oregon_id_number = models.CharField(max_length=100, blank=True)
     id_upload = models.FileField(upload_to="application_ids/", blank=True, null=True)
@@ -149,7 +165,6 @@ class HousingApplication(models.Model):
         return self.full_name
 
 
-# 🔥 NEW: DOCUMENT SYSTEM
 class ApplicantDocument(models.Model):
     DOCUMENT_TYPE_CHOICES = [
         ("lease", "Lease Agreement"),
@@ -160,13 +175,13 @@ class ApplicantDocument(models.Model):
     ]
 
     STATUS_CHOICES = [
-    ("uploaded", "Uploaded"),
-    ("needs_completion", "Needs Completion"),
-    ("needs_signature", "Needs Signature"),
-    ("completed", "Completed"),
-    ("locked", "Locked Final"),
-    ("needs_correction", "Needs Correction"),
-]
+        ("uploaded", "Uploaded"),
+        ("needs_completion", "Needs Completion"),
+        ("needs_signature", "Needs Signature"),
+        ("completed", "Completed"),
+        ("locked", "Locked Final"),
+        ("needs_correction", "Needs Correction"),
+    ]
 
     application = models.ForeignKey(
         HousingApplication,
@@ -174,11 +189,21 @@ class ApplicantDocument(models.Model):
         related_name="documents"
     )
 
-    document_type = models.CharField(max_length=50, choices=DOCUMENT_TYPE_CHOICES)
+    document_type = models.CharField(
+        max_length=50,
+        choices=DOCUMENT_TYPE_CHOICES,
+        default="other"
+    )
+
     file = models.FileField(upload_to="applicant_documents/")
     name = models.CharField(max_length=255)
 
-    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="uploaded")
+    status = models.CharField(
+        max_length=30,
+        choices=STATUS_CHOICES,
+        default="uploaded",
+        blank=True
+    )
 
     needs_signature = models.BooleanField(default=False)
     needs_initials = models.BooleanField(default=False)
@@ -190,6 +215,20 @@ class ApplicantDocument(models.Model):
     landlord_notified = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if self.status in ["completed", "locked"]:
+            self.locked = True
+
+        if self.locked:
+            self.status = "locked"
+
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if self.locked:
+            return
+        super().delete(*args, **kwargs)
 
     def __str__(self):
         return f"{self.name} ({self.application.full_name})"
