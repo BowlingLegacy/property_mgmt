@@ -19,8 +19,16 @@ urlpatterns = [
 
     path("property/<int:pk>/", views.property_detail, name="property_detail"),
     path("journal/<int:pk>/", views.blog_detail, name="blog_detail"),
-    
+
     path("application/<int:pk>/print/", views.printable_application, name="printable_application"),
+
+    # BLOG COMMENTS
     path("blog/<int:post_id>/comment/", views.add_blog_comment, name="add_blog_comment"),
-    
+
+    # 🔥 RENT PAYMENTS
+    path("pay/<int:application_id>/", views.create_checkout_session, name="pay_rent"),
+    path("payment-success/", views.payment_success, name="payment_success"),
+
+    # 🔐 STRIPE WEBHOOK
+    path("stripe/webhook/", views.stripe_webhook, name="stripe_webhook"),
 ]
