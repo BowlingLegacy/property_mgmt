@@ -3,7 +3,9 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# ---------------------------------------------------------
 # SECURITY
+# ---------------------------------------------------------
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 
@@ -13,6 +15,13 @@ ALLOWED_HOSTS = [
     "bowlinglegacy.com",
     "www.bowlinglegacy.com",
 ]
+
+# ---------------------------------------------------------
+# STRIPE
+# ---------------------------------------------------------
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
+STRIPE_PUBLIC_KEY = os.environ.get("STRIPE_PUBLIC_KEY", "")
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 
 # ---------------------------------------------------------
 # CUSTOM USER MODEL
@@ -111,12 +120,11 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 # ---------------------------------------------------------
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
 # ---------------------------------------------------------
-# logging
+# LOGGING
 # ---------------------------------------------------------
 import logging
 logging.basicConfig(level=logging.DEBUG)
-
-DEBUG = os.environ.get("DEBUG", "False") == "True"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
