@@ -132,10 +132,8 @@ def create_checkout_session(request, application_id, payment_type="rent"):
 
     if payment_type == "rent":
         base_rent_amount = application.balance if application.balance > 0 else application.monthly_rent
-        late_fee_amount = Decimal("0.00")
-
-        description = "Rent Payment"
         amount = base_rent_amount
+        description = "Rent Payment"
 
         if today.day > 5 and base_rent_amount > 0:
             late_fee_already_paid = Payment.objects.filter(
@@ -148,8 +146,7 @@ def create_checkout_session(request, application_id, payment_type="rent"):
             ).exists()
 
             if not late_fee_already_paid:
-                late_fee_amount = LATE_FEE_AMOUNT
-                amount = base_rent_amount + late_fee_amount
+                amount = base_rent_amount + LATE_FEE_AMOUNT
                 description = "Rent Payment including $25 late fee"
 
     elif payment_type == "deposit":
@@ -162,14 +159,10 @@ def create_checkout_session(request, application_id, payment_type="rent"):
         description = "Shared Utilities Payment"
 
     else:
-        return JsonResponse({
-            "error": "Invalid payment type."
-        }, status=400)
+        return JsonResponse({"error": "Invalid payment type."}, status=400)
 
     if amount <= 0:
-        return JsonResponse({
-            "error": "No balance due for this payment type."
-        }, status=400)
+        return JsonResponse({"error": "No balance due for this payment type."}, status=400)
 
     stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -186,18 +179,16 @@ def create_checkout_session(request, application_id, payment_type="rent"):
     session = stripe.checkout.Session.create(
         payment_method_types=["card"],
         mode="payment",
-        line_items=[
-            {
-                "price_data": {
-                    "currency": "usd",
-                    "product_data": {
-                        "name": f"{description} - {application.full_name}",
-                    },
-                    "unit_amount": int(amount * Decimal("100")),
+        line_items=[{
+            "price_data": {
+                "currency": "usd",
+                "product_data": {
+                    "name": f"{description} - {application.full_name}",
                 },
-                "quantity": 1,
-            }
-        ],
+                "unit_amount": int(amount * 100),
+            },
+            "quantity": 1,
+        }],
         success_url=f"{domain}/payment-success/",
         cancel_url=f"{domain}/tenant-dashboard/",
         metadata={
@@ -224,85 +215,73 @@ def stripe_webhook(request):
     endpoint_secret = settings.STRIPE_WEBHOOK_SECRET
 
     try:
-        event = stripe.Webhook.construct_event(
-            payload,
-            sig_header,
-            endpoint_secret
-        )
+        event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
     except Exception:
         return HttpResponse(status=400)
 
-    if event["type"] == "checkout.session.completed":
-        session = event["data"]["object"]
-        metadata = session.metadata
+    if event["type"] != "checkout.session.completed":
+        return HttpResponse(status=200)
 
-        payment_id = metadata.get("payment_id") if metadata else None
+    session = event["data"]["object"]
 
-        if payment_id:
-            payment = Payment.objects.filter(id=payment_id).first()
+    metadata = session["metadata"] if "metadata" in session else {}
 
-            if payment and payment.status != "completed":
-                payment.status = "completed"
-                payment.stripe_payment_intent = session.payment_intent or ""
-                payment.save()
+    payment_id = metadata["payment_id"] if "payment_id" in metadata else None
 
-                application = payment.application
+    if not payment_id:
+        return HttpResponse(status=200)
 
-                if payment.payment_type == "rent":
-                    amount_to_apply_to_rent_balance = payment.amount
+    payment = Payment.objects.filter(id=payment_id).first()
+    if not payment or payment.status == "completed":
+        return HttpResponse(status=200)
 
-                    if "late fee" in payment.description.lower():
-                        amount_to_apply_to_rent_balance = max(
-                            Decimal("0.00"),
-                            payment.amount - LATE_FEE_AMOUNT
-                        )
+    application = payment.application
 
-                    application.balance = max(
-                        Decimal("0.00"),
-                        application.balance - amount_to_apply_to_rent_balance
-                    )
+    payment.status = "completed"
+    payment.stripe_payment_intent = session["payment_intent"] if "payment_intent" in session else ""
+    payment.save()
 
-                elif payment.payment_type == "deposit":
-                    application.deposit_paid = min(
-                        application.deposit_required,
-                        application.deposit_paid + payment.amount
-                    )
+    if payment.payment_type == "rent":
+        rent_amount = payment.amount
 
-                elif payment.payment_type == "utility":
-                    application.utility_balance = max(
-                        Decimal("0.00"),
-                        application.utility_balance - payment.amount
-                    )
+        if "late fee" in payment.description.lower():
+            rent_amount = max(Decimal("0.00"), payment.amount - LATE_FEE_AMOUNT)
 
-                application.save()
+        application.balance = max(Decimal("0.00"), application.balance - rent_amount)
 
-                owner_email = "BowlingLegacyLLC@outlook.com"
-                if application.property and application.property.owner_email:
-                    owner_email = application.property.owner_email
+    elif payment.payment_type == "deposit":
+        application.deposit_paid = min(
+            application.deposit_required,
+            application.deposit_paid + payment.amount
+        )
 
-                send_mail(
-                    subject="Resident Payment Received",
-                    message=f"""
+    elif payment.payment_type == "utility":
+        application.utility_balance = max(
+            Decimal("0.00"),
+            application.utility_balance - payment.amount
+        )
+
+    application.save()
+
+    owner_email = "BowlingLegacyLLC@outlook.com"
+    if application.property and application.property.owner_email:
+        owner_email = application.property.owner_email
+
+    send_mail(
+        subject="Resident Payment Received",
+        message=f"""
 Payment received from {application.full_name}
 
-Payment Type: {payment.get_payment_type_display()}
-Description: {payment.description}
-Amount Paid: ${payment.amount}
-
-Property: {application.property}
-Room / Unit: {application.space_type} {application.space_label}
+Type: {payment.get_payment_type_display()}
+Amount: ${payment.amount}
 
 Rent Balance: ${application.balance}
-Deposit Required: ${application.deposit_required}
 Deposit Paid: ${application.deposit_paid}
 Utilities Balance: ${application.utility_balance}
-
-Payment Status: {payment.status}
-Stripe Session: {payment.stripe_session_id}
 """,
-                    from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
-                    recipient_list=[owner_email],
-                    fail_silently=True,
-                )
+        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+        recipient_list=[owner_email],
+        fail_silently=True,
+    )
 
     return HttpResponse(status=200)
