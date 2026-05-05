@@ -44,32 +44,95 @@
             </div>
         </div>
 
-        <div class="card shadow-sm mb-4">
-            <div class="card-body">
-                <h4 class="fw-bold mb-3">Rent Balance</h4>
+        <div class="row">
 
-                <p class="fs-5 mb-1">
-                    <strong>Monthly Rent:</strong> ${{ application.monthly_rent }}
-                </p>
+            <div class="col-md-4 mb-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <h4 class="fw-bold mb-3">Rent</h4>
 
-                <p class="fs-5 mb-1">
-                    <strong>Current Balance:</strong> ${{ application.balance }}
-                </p>
+                        <p class="fs-5 mb-1">
+                            <strong>Monthly Rent:</strong> ${{ application.monthly_rent }}
+                        </p>
 
-                <p class="text-muted">
-                    Rent due day: {{ application.rent_due_day }}
-                </p>
+                        <p class="fs-5 mb-1">
+                            <strong>Rent Balance:</strong> ${{ application.balance }}
+                        </p>
 
-                {% if application.balance > 0 %}
-                    <button id="pay-rent-button" class="btn btn-primary btn-lg">
-                        Pay Rent
-                    </button>
-                {% else %}
-                    <div class="alert alert-success mt-3 mb-0">
-                        <strong>No balance due.</strong>
+                        <p class="text-muted">
+                            Due: {{ application.rent_due_day }}st of each month<br>
+                            Late fee: $25 after the 5th
+                        </p>
+
+                        {% if application.balance > 0 %}
+                            <button id="pay-rent-button" class="btn btn-primary w-100">
+                                Pay Rent
+                            </button>
+                        {% else %}
+                            <div class="alert alert-success mb-0">
+                                <strong>No rent balance due.</strong>
+                            </div>
+                        {% endif %}
                     </div>
-                {% endif %}
+                </div>
             </div>
+
+            <div class="col-md-4 mb-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <h4 class="fw-bold mb-3">Deposit</h4>
+
+                        <p class="fs-5 mb-1">
+                            <strong>Required:</strong> ${{ application.deposit_required }}
+                        </p>
+
+                        <p class="fs-5 mb-1">
+                            <strong>Paid:</strong> ${{ application.deposit_paid }}
+                        </p>
+
+                        {% if application.deposit_paid < application.deposit_required %}
+                            <button id="pay-deposit-button" class="btn btn-warning w-100">
+                                Pay Deposit
+                            </button>
+                        {% else %}
+                            <div class="alert alert-success mb-0">
+                                <strong>Deposit paid in full.</strong>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4 mb-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <h4 class="fw-bold mb-3">Utilities</h4>
+
+                        <p class="fs-5 mb-1">
+                            <strong>Monthly Utilities:</strong> ${{ application.utility_monthly }}
+                        </p>
+
+                        <p class="fs-5 mb-1">
+                            <strong>Utility Balance:</strong> ${{ application.utility_balance }}
+                        </p>
+
+                        <p class="text-muted">
+                            Due on the 15th of each month.
+                        </p>
+
+                        {% if application.utility_balance > 0 %}
+                            <button id="pay-utility-button" class="btn btn-info w-100">
+                                Pay Utilities
+                            </button>
+                        {% else %}
+                            <div class="alert alert-success mb-0">
+                                <strong>No utility balance due.</strong>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
         </div>
 
         <div class="card shadow-sm mb-4">
@@ -82,24 +145,20 @@
                             <thead>
                                 <tr>
                                     <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
                                     <th>Amount</th>
                                     <th>Status</th>
-                                    <th>Stripe Session</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for payment in payments %}
                                     <tr>
                                         <td>{{ payment.created_at }}</td>
+                                        <td>{{ payment.get_payment_type_display }}</td>
+                                        <td>{{ payment.description }}</td>
                                         <td>${{ payment.amount }}</td>
                                         <td>{{ payment.get_status_display }}</td>
-                                        <td>
-                                            {% if payment.stripe_session_id %}
-                                                {{ payment.stripe_session_id }}
-                                            {% else %}
-                                                —
-                                            {% endif %}
-                                        </td>
                                     </tr>
                                 {% endfor %}
                             </tbody>
@@ -139,20 +198,25 @@
 
         <script>
             const stripe = Stripe("{{ stripe_public_key }}");
-            const payButton = document.getElementById("pay-rent-button");
 
-            if (payButton) {
-                payButton.addEventListener("click", function () {
-                    payButton.disabled = true;
-                    payButton.innerText = "Opening checkout...";
+            function startCheckout(buttonId, paymentUrl, originalText) {
+                const button = document.getElementById(buttonId);
 
-                    fetch("{% url 'pay_rent' application.id %}")
+                if (!button) {
+                    return;
+                }
+
+                button.addEventListener("click", function () {
+                    button.disabled = true;
+                    button.innerText = "Opening checkout...";
+
+                    fetch(paymentUrl)
                         .then(response => response.json())
                         .then(data => {
                             if (data.error) {
                                 alert(data.error);
-                                payButton.disabled = false;
-                                payButton.innerText = "Pay Rent";
+                                button.disabled = false;
+                                button.innerText = originalText;
                                 return;
                             }
 
@@ -162,11 +226,29 @@
                         })
                         .catch(error => {
                             alert("Unable to start payment. Please try again.");
-                            payButton.disabled = false;
-                            payButton.innerText = "Pay Rent";
+                            button.disabled = false;
+                            button.innerText = originalText;
                         });
                 });
             }
+
+            startCheckout(
+                "pay-rent-button",
+                "{% url 'pay_by_type' application.id 'rent' %}",
+                "Pay Rent"
+            );
+
+            startCheckout(
+                "pay-deposit-button",
+                "{% url 'pay_by_type' application.id 'deposit' %}",
+                "Pay Deposit"
+            );
+
+            startCheckout(
+                "pay-utility-button",
+                "{% url 'pay_by_type' application.id 'utility' %}",
+                "Pay Utilities"
+            );
         </script>
 
     {% else %}
