@@ -47,6 +47,8 @@ class Property(models.Model):
     description = models.TextField(blank=True)
     photo = models.ImageField(upload_to="property_photos/", blank=True, null=True)
 
+    owner_email = models.EmailField(blank=True)
+
     unit_size = models.CharField(max_length=100, blank=True)
     cable_ready = models.BooleanField(default=True)
     available_date = models.DateField(blank=True, null=True)
@@ -104,6 +106,12 @@ class HousingApplication(models.Model):
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     rent_due_day = models.IntegerField(default=1)
 
+    deposit_required = models.DecimalField(max_digits=10, decimal_places=2, default=450.00)
+    deposit_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+
+    utility_monthly = models.DecimalField(max_digits=10, decimal_places=2, default=66.00)
+    utility_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+
     current_address = models.CharField(max_length=255, blank=True)
     current_address_length = models.CharField(max_length=100, blank=True)
 
@@ -155,6 +163,10 @@ class HousingApplication(models.Model):
     unconditional_regard_acknowledgment = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def deposit_balance(self):
+        remaining = self.deposit_required - self.deposit_paid
+        return max(remaining, 0)
 
     def __str__(self):
         return self.full_name
@@ -241,11 +253,22 @@ class Payment(models.Model):
         ("failed", "Failed"),
     ]
 
+    PAYMENT_TYPE_CHOICES = [
+        ("rent", "Rent"),
+        ("deposit", "Deposit"),
+        ("utility", "Utilities"),
+        ("late_fee", "Late Fee"),
+        ("other", "Other"),
+    ]
+
     application = models.ForeignKey(
         HousingApplication,
         on_delete=models.CASCADE,
         related_name="payments",
     )
+
+    payment_type = models.CharField(max_length=30, choices=PAYMENT_TYPE_CHOICES, default="rent")
+    description = models.CharField(max_length=255, blank=True)
 
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
@@ -256,4 +279,4 @@ class Payment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.application.full_name} - ${self.amount} - {self.status}"
+        return f"{self.application.full_name} - {self.get_payment_type_display()} - ${self.amount} - {self.status}"
