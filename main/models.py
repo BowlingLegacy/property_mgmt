@@ -17,11 +17,7 @@ class BlogPost(models.Model):
 
 
 class BlogComment(models.Model):
-    post = models.ForeignKey(
-        "BlogPost",
-        on_delete=models.CASCADE,
-        related_name="comments"
-    )
+    post = models.ForeignKey("BlogPost", on_delete=models.CASCADE, related_name="comments")
     name = models.CharField(max_length=100)
     email = models.EmailField(blank=True)
     comment = models.TextField()
@@ -75,27 +71,15 @@ class Property(models.Model):
         ("full", "Currently Full"),
     ]
 
-    availability_status = models.CharField(
-        max_length=20,
-        choices=AVAILABILITY_CHOICES,
-        default="full"
-    )
-
-    availability_message = models.CharField(
-        max_length=255,
-        default="Join Waitlist for Availability"
-    )
+    availability_status = models.CharField(max_length=20, choices=AVAILABILITY_CHOICES, default="full")
+    availability_message = models.CharField(max_length=255, default="Join Waitlist for Availability")
 
     def __str__(self):
         return self.name
 
 
 class PropertyImage(models.Model):
-    property = models.ForeignKey(
-        Property,
-        on_delete=models.CASCADE,
-        related_name="images"
-    )
+    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name="images")
     image = models.ImageField(upload_to="property_gallery/")
     caption = models.CharField(max_length=255, blank=True)
 
@@ -108,25 +92,22 @@ class PropertyImage(models.Model):
 # -----------------------
 
 class HousingApplication(models.Model):
-    property = models.ForeignKey(
-        Property,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="applications"
-    )
+    property = models.ForeignKey(Property, on_delete=models.SET_NULL, null=True, blank=True, related_name="applications")
 
     full_name = models.CharField(max_length=255)
     phone = models.CharField(max_length=20)
     email = models.EmailField()
     age = models.PositiveIntegerField()
 
-    # RENT SYSTEM (NEW)
+    # 🔥 NEW SPACE TRACKING
+    space_type = models.CharField(max_length=50, blank=True)
+    space_label = models.CharField(max_length=50, blank=True)
+
+    # RENT SYSTEM
     monthly_rent = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     rent_due_day = models.IntegerField(default=1)
 
-    # ADDRESS
     current_address = models.CharField(max_length=255, blank=True)
     current_address_length = models.CharField(max_length=100, blank=True)
 
@@ -139,13 +120,11 @@ class HousingApplication(models.Model):
     previous_address_3 = models.CharField(max_length=255, blank=True)
     previous_address_3_length = models.CharField(max_length=100, blank=True)
 
-    # ID
     drivers_license_number = models.CharField(max_length=100, blank=True)
     has_valid_odl = models.BooleanField(default=False)
     oregon_id_number = models.CharField(max_length=100, blank=True)
     id_upload = models.FileField(upload_to="application_ids/", blank=True, null=True)
 
-    # INCOME
     income_source = models.CharField(max_length=255)
     monthly_income = models.DecimalField(max_digits=10, decimal_places=2)
     employer_name = models.CharField(max_length=255, blank=True)
@@ -153,7 +132,6 @@ class HousingApplication(models.Model):
 
     previous_evictions = models.TextField(blank=True)
 
-    # BACKGROUND
     in_recovery = models.BooleanField(default=False)
     drug_of_choice = models.CharField(max_length=255, blank=True)
 
@@ -164,7 +142,6 @@ class HousingApplication(models.Model):
     felony_history = models.TextField(blank=True)
     odoc_time_served = models.BooleanField(default=False)
 
-    # REFERENCES
     reference_1_name = models.CharField(max_length=255, blank=True)
     reference_1_phone = models.CharField(max_length=50, blank=True)
     reference_1_relationship = models.CharField(max_length=255, blank=True)
@@ -175,7 +152,6 @@ class HousingApplication(models.Model):
     reference_2_relationship = models.CharField(max_length=255, blank=True)
     reference_2_type = models.CharField(max_length=100, blank=True)
 
-    # NOTES
     housing_need = models.TextField()
     additional_notes = models.TextField(blank=True)
 
@@ -186,115 +162,3 @@ class HousingApplication(models.Model):
 
     def __str__(self):
         return self.full_name
-
-
-# -----------------------
-# DOCUMENT SYSTEM
-# -----------------------
-
-class ApplicantDocument(models.Model):
-    DOCUMENT_TYPE_CHOICES = [
-        ("lease", "Lease Agreement"),
-        ("application_pdf", "Application PDF"),
-        ("id", "Identification"),
-        ("onboarding", "Onboarding Document"),
-        ("other", "Other"),
-    ]
-
-    STATUS_CHOICES = [
-        ("uploaded", "Uploaded"),
-        ("needs_completion", "Needs Completion"),
-        ("needs_signature", "Needs Signature"),
-        ("completed", "Completed"),
-        ("locked", "Locked Final"),
-        ("needs_correction", "Needs Correction"),
-    ]
-
-    application = models.ForeignKey(
-        HousingApplication,
-        on_delete=models.CASCADE,
-        related_name="documents"
-    )
-
-    document_type = models.CharField(max_length=50, choices=DOCUMENT_TYPE_CHOICES, default="other")
-
-    file = models.FileField(upload_to="applicant_documents/")
-    name = models.CharField(max_length=255)
-
-    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="uploaded", blank=True)
-
-    needs_signature = models.BooleanField(default=False)
-    needs_initials = models.BooleanField(default=False)
-
-    signed_at = models.DateTimeField(blank=True, null=True)
-    submitted_at = models.DateTimeField(blank=True, null=True)
-
-    locked = models.BooleanField(default=False)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def save(self, *args, **kwargs):
-        if self.status in ["completed", "locked"]:
-            self.locked = True
-
-        if self.locked:
-            self.status = "locked"
-
-        super().save(*args, **kwargs)
-
-    def delete(self, *args, **kwargs):
-        if self.locked:
-            return
-        super().delete(*args, **kwargs)
-
-    def __str__(self):
-        return f"{self.name} ({self.application.full_name})"
-
-
-# -----------------------
-# RENT HISTORY
-# -----------------------
-
-class RentHistory(models.Model):
-    application = models.ForeignKey(
-        HousingApplication,
-        on_delete=models.CASCADE,
-        related_name="rent_history"
-    )
-
-    rent_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    effective_date = models.DateField()
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.application.full_name} - ${self.rent_amount}"
-
-
-# -----------------------
-# PAYMENTS
-# -----------------------
-
-class Payment(models.Model):
-    STATUS_CHOICES = [
-        ("pending", "Pending"),
-        ("completed", "Completed"),
-        ("failed", "Failed"),
-    ]
-
-    application = models.ForeignKey(
-        HousingApplication,
-        on_delete=models.CASCADE,
-        related_name="payments"
-    )
-
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
-
-    stripe_session_id = models.CharField(max_length=255, blank=True)
-    stripe_payment_intent = models.CharField(max_length=255, blank=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.application.full_name} - ${self.amount} - {self.status}"
