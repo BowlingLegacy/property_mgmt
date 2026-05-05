@@ -164,7 +164,9 @@
 
         <div class="d-flex gap-2">
             <a href="/creed/" class="btn btn-creed btn-pill">Our Creed</a>
-            <a href="https://rentlogicapp.com" class="btn btn-portal btn-pill">Tenant Portal</a>
+            <a href="{% url 'login' %}?next={% url 'tenant_dashboard' %}" class="btn btn-portal btn-pill">
+    Tenant Portal
+</a>
         </div>
     </div>
 </nav>
