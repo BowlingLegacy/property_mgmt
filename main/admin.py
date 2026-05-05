@@ -78,6 +78,8 @@ class HousingApplicationAdmin(admin.ModelAdmin):
     list_display = (
         "full_name",
         "property",
+        "space_type",
+        "space_label",
         "email",
         "phone",
         "monthly_rent",
@@ -90,10 +92,13 @@ class HousingApplicationAdmin(admin.ModelAdmin):
         "full_name",
         "email",
         "phone",
+        "space_type",
+        "space_label",
     )
 
     list_filter = (
         "property",
+        "space_type",
         "created_at",
     )
 
@@ -105,6 +110,8 @@ class HousingApplicationAdmin(admin.ModelAdmin):
         ("Resident Profile", {
             "fields": (
                 "property",
+                "space_type",
+                "space_label",
                 "full_name",
                 "phone",
                 "email",
