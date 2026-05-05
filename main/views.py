@@ -1,8 +1,9 @@
+from collections import OrderedDict
 from decimal import Decimal
 
 import stripe
 from django.conf import settings
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.mail import send_mail
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
@@ -81,6 +82,73 @@ def landlord_dashboard(request):
         "applications": applications,
         "properties": properties,
         "payments": payments,
+    })
+
+
+def staff_required(user):
+    return user.is_authenticated and (user.is_staff or user.is_superuser)
+
+
+@login_required
+@user_passes_test(staff_required)
+def payment_log(request):
+    completed_payments = (
+        Payment.objects
+        .filter(status="completed")
+        .select_related("application", "application__property")
+        .order_by(
+            "application__property__name",
+            "-created_at",
+            "application__space_label",
+            "application__full_name",
+        )
+    )
+
+    grouped = OrderedDict()
+
+    for payment in completed_payments:
+        application = payment.application
+        property_name = "No Property Assigned"
+
+        if application.property:
+            property_name = application.property.name
+
+        month_label = timezone.localtime(payment.created_at).strftime("%B %Y")
+
+        if property_name not in grouped:
+            grouped[property_name] = OrderedDict()
+
+        if month_label not in grouped[property_name]:
+            grouped[property_name][month_label] = []
+
+        grouped[property_name][month_label].append(payment)
+
+    payment_log_data = []
+
+    for property_name, months in grouped.items():
+        month_data = []
+
+        for month_label, payments in months.items():
+            payments_sorted = sorted(
+                payments,
+                key=lambda p: (
+                    (p.application.space_label or p.application.space_type or "").lower(),
+                    p.application.full_name.lower(),
+                )
+            )
+
+            month_data.append({
+                "month_label": month_label,
+                "payments": payments_sorted,
+            })
+
+        payment_log_data.append({
+            "property_name": property_name,
+            "months": month_data,
+        })
+
+    return render(request, "payment_log.html", {
+        "payment_log": payment_log_data,
     })
 
 
@@ -225,7 +293,6 @@ def stripe_webhook(request):
     session = event["data"]["object"]
 
     metadata = session["metadata"] if "metadata" in session else {}
-
     payment_id = metadata["payment_id"] if "payment_id" in metadata else None
 
     if not payment_id:
