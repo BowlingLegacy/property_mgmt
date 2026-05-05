@@ -18,6 +18,10 @@ from .models import Property, BlogPost, HousingApplication, Payment
 LATE_FEE_AMOUNT = Decimal("25.00")
 
 
+# =========================
+# BASIC PAGES
+# =========================
+
 def home(request):
     properties = Property.objects.all()
     posts = BlogPost.objects.all().order_by("-created_at")[:5]
@@ -62,6 +66,10 @@ def signup(request):
     return render(request, "signup.html")
 
 
+# =========================
+# DASHBOARDS
+# =========================
+
 @login_required
 def tenant_dashboard(request):
     request.session.set_expiry(0)
@@ -94,6 +102,10 @@ def landlord_dashboard(request):
     })
 
 
+# =========================
+# PAYMENT LOG
+# =========================
+
 def staff_required(user):
     return user.is_authenticated and (user.is_staff or user.is_superuser)
 
@@ -117,20 +129,11 @@ def payment_log(request):
 
     for payment in completed_payments:
         application = payment.application
-        property_name = "No Property Assigned"
-
-        if application.property:
-            property_name = application.property.name
+        property_name = application.property.name if application.property else "No Property"
 
         month_label = timezone.localtime(payment.created_at).strftime("%B %Y")
 
-        if property_name not in grouped:
-            grouped[property_name] = OrderedDict()
-
-        if month_label not in grouped[property_name]:
-            grouped[property_name][month_label] = []
-
-        grouped[property_name][month_label].append(payment)
+        grouped.setdefault(property_name, {}).setdefault(month_label, []).append(payment)
 
     payment_log_data = []
 
@@ -141,7 +144,7 @@ def payment_log(request):
             payments_sorted = sorted(
                 payments,
                 key=lambda p: (
-                    (p.application.space_label or p.application.space_type or "").lower(),
+                    (p.application.space_label or "").lower(),
                     p.application.full_name.lower(),
                 )
             )
@@ -161,22 +164,26 @@ def payment_log(request):
     })
 
 
-def property_detail(request, pk):
-    property_obj = get_object_or_404(Property, pk=pk)
-
-    return render(request, "property_detail.html", {
-        "property": property_obj,
-    })
-
+# =========================
+# PROPERTY / BLOG
+# =========================
 
 def property_detail(request, pk):
     property_obj = get_object_or_404(Property, pk=pk)
 
-    gallery_images = property_obj.images.all()  # ← THIS FIXES GALLERY
+    gallery_images = property_obj.images.all()
 
     return render(request, "property_detail.html", {
         "property": property_obj,
         "gallery_images": gallery_images,
+    })
+
+
+def blog_detail(request, pk):
+    post = get_object_or_404(BlogPost, pk=pk)
+
+    return render(request, "blog_detail.html", {
+        "post": post,
     })
 
 
@@ -202,6 +209,10 @@ def printable_application(request, pk):
     })
 
 
+# =========================
+# STRIPE PAYMENTS
+# =========================
+
 @login_required
 def create_checkout_session(request, application_id, payment_type="rent"):
     application = get_object_or_404(HousingApplication, id=application_id)
@@ -211,38 +222,35 @@ def create_checkout_session(request, application_id, payment_type="rent"):
     description = ""
 
     if payment_type == "rent":
-        base_rent_amount = application.balance if application.balance > 0 else application.monthly_rent
-        amount = base_rent_amount
+        base = application.balance if application.balance > 0 else application.monthly_rent
+        amount = base
         description = "Rent Payment"
 
-        if today.day >= 5 and base_rent_amount > 0:
-            late_fee_already_paid = Payment.objects.filter(
+        if today.day >= 5 and base > 0:
+            late_fee_paid = Payment.objects.filter(
                 application=application,
-                payment_type="rent",
                 description__icontains="late fee",
                 status="completed",
                 created_at__month=today.month,
-                created_at__year=today.year,
             ).exists()
 
-            if not late_fee_already_paid:
-                amount = base_rent_amount + LATE_FEE_AMOUNT
+            if not late_fee_paid:
+                amount += LATE_FEE_AMOUNT
                 description = "Rent Payment including $25 late fee"
 
     elif payment_type == "deposit":
-        amount = application.deposit_required - application.deposit_paid
-        amount = max(amount, Decimal("0.00"))
+        amount = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
         description = "Deposit Payment"
 
     elif payment_type == "utility":
-        amount = application.utility_balance if application.utility_balance > 0 else application.utility_monthly
-        description = "Shared Utilities Payment"
+        amount = application.utility_balance or application.utility_monthly
+        description = "Utilities Payment"
 
     else:
-        return JsonResponse({"error": "Invalid payment type."}, status=400)
+        return JsonResponse({"error": "Invalid type"}, status=400)
 
     if amount <= 0:
-        return JsonResponse({"error": "No balance due for this payment type."}, status=400)
+        return JsonResponse({"error": "No balance due"}, status=400)
 
     stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -254,28 +262,20 @@ def create_checkout_session(request, application_id, payment_type="rent"):
         status="pending",
     )
 
-    domain = request.build_absolute_uri("/").rstrip("/")
-
     session = stripe.checkout.Session.create(
         payment_method_types=["card"],
         mode="payment",
         line_items=[{
             "price_data": {
                 "currency": "usd",
-                "product_data": {
-                    "name": f"{description} - {application.full_name}",
-                },
+                "product_data": {"name": description},
                 "unit_amount": int(amount * 100),
             },
             "quantity": 1,
         }],
-        success_url=f"{domain}/payment-success/",
-        cancel_url=f"{domain}/tenant-dashboard/",
-        metadata={
-            "payment_id": str(payment.id),
-            "application_id": str(application.id),
-            "payment_type": payment_type,
-        },
+        success_url=request.build_absolute_uri("/payment-success/"),
+        cancel_url=request.build_absolute_uri("/tenant-dashboard/"),
+        metadata={"payment_id": str(payment.id)},
     )
 
     payment.stripe_session_id = session.id
@@ -291,11 +291,10 @@ def payment_success(request):
 @csrf_exempt
 def stripe_webhook(request):
     payload = request.body
-    sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
-    endpoint_secret = settings.STRIPE_WEBHOOK_SECRET
+    sig = request.META.get("HTTP_STRIPE_SIGNATURE")
 
     try:
-        event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
+        event = stripe.Webhook.construct_event(payload, sig, settings.STRIPE_WEBHOOK_SECRET)
     except Exception:
         return HttpResponse(status=400)
 
@@ -303,64 +302,28 @@ def stripe_webhook(request):
         return HttpResponse(status=200)
 
     session = event["data"]["object"]
-
-    metadata = session["metadata"] if "metadata" in session else {}
-    payment_id = metadata["payment_id"] if "payment_id" in metadata else None
-
-    if not payment_id:
-        return HttpResponse(status=200)
+    payment_id = session["metadata"].get("payment_id")
 
     payment = Payment.objects.filter(id=payment_id).first()
     if not payment or payment.status == "completed":
         return HttpResponse(status=200)
 
     application = payment.application
-
     payment.status = "completed"
-    payment.stripe_payment_intent = session["payment_intent"] if "payment_intent" in session else ""
     payment.save()
 
     if payment.payment_type == "rent":
-        rent_amount = payment.amount
-
+        reduction = payment.amount
         if "late fee" in payment.description.lower():
-            rent_amount = max(Decimal("0.00"), payment.amount - LATE_FEE_AMOUNT)
-
-        application.balance = max(Decimal("0.00"), application.balance - rent_amount)
+            reduction -= LATE_FEE_AMOUNT
+        application.balance = max(0, application.balance - reduction)
 
     elif payment.payment_type == "deposit":
-        application.deposit_paid = min(
-            application.deposit_required,
-            application.deposit_paid + payment.amount
-        )
+        application.deposit_paid += payment.amount
 
     elif payment.payment_type == "utility":
-        application.utility_balance = max(
-            Decimal("0.00"),
-            application.utility_balance - payment.amount
-        )
+        application.utility_balance = max(0, application.utility_balance - payment.amount)
 
     application.save()
-
-    owner_email = "BowlingLegacyLLC@outlook.com"
-    if application.property and application.property.owner_email:
-        owner_email = application.property.owner_email
-
-    send_mail(
-        subject="Resident Payment Received",
-        message=f"""
-Payment received from {application.full_name}
-
-Type: {payment.get_payment_type_display()}
-Amount: ${payment.amount}
-
-Rent Balance: ${application.balance}
-Deposit Paid: ${application.deposit_paid}
-Utilities Balance: ${application.utility_balance}
-""",
-        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
-        recipient_list=[owner_email],
-        fail_silently=True,
-    )
 
     return HttpResponse(status=200)
