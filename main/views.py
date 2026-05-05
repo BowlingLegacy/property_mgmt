@@ -169,11 +169,14 @@ def property_detail(request, pk):
     })
 
 
-def blog_detail(request, pk):
-    post = get_object_or_404(BlogPost, pk=pk)
+def property_detail(request, pk):
+    property_obj = get_object_or_404(Property, pk=pk)
 
-    return render(request, "blog_detail.html", {
-        "post": post,
+    gallery_images = property_obj.images.all()  # ← THIS FIXES GALLERY
+
+    return render(request, "property_detail.html", {
+        "property": property_obj,
+        "gallery_images": gallery_images,
     })
 
 
