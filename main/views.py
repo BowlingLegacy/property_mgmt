@@ -1,4 +1,3 @@
-import json
 from decimal import Decimal
 
 import stripe
@@ -56,6 +55,7 @@ def tenant_dashboard(request):
 
     return render(request, "tenant_dashboard.html", {
         "application": application,
+        "stripe_public_key": settings.STRIPE_PUBLIC_KEY,
     })
 
 
@@ -149,8 +149,8 @@ def create_checkout_session(request, application_id):
         success_url=f"{domain}/payment-success/",
         cancel_url=f"{domain}/tenant-dashboard/",
         metadata={
-            "payment_id": payment.id,
-            "application_id": application.id,
+            "payment_id": str(payment.id),
+            "application_id": str(application.id),
         },
     )
 
