@@ -121,7 +121,8 @@ class PropertyImageInline(admin.TabularInline):
 @admin.register(Property)
 class PropertyAdmin(admin.ModelAdmin):
     inlines = [PropertyImageInline]
-    list_display = ("name", "availability_status", "available_date")
+    list_display = ("name", "availability_status", "available_date", "owner_email")
+    search_fields = ("name", "address", "owner_email")
 
 
 class ApplicantDocumentInline(admin.TabularInline):
@@ -133,19 +134,57 @@ class ApplicantDocumentInline(admin.TabularInline):
 class PaymentInline(admin.TabularInline):
     model = Payment
     extra = 0
+    can_delete = False
+
     readonly_fields = (
+        "payment_type",
+        "description",
         "amount",
         "status",
         "stripe_session_id",
         "stripe_payment_intent",
         "created_at",
     )
-    can_delete = False
+
+    fields = (
+        "payment_type",
+        "description",
+        "amount",
+        "status",
+        "stripe_session_id",
+        "stripe_payment_intent",
+        "created_at",
+    )
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 class RentHistoryInline(admin.TabularInline):
     model = RentHistory
     extra = 0
+    can_delete = False
+
+    readonly_fields = (
+        "rent_amount",
+        "effective_date",
+        "created_at",
+    )
+
+    fields = (
+        "rent_amount",
+        "effective_date",
+        "created_at",
+    )
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(HousingApplication)
@@ -165,6 +204,10 @@ class HousingApplicationAdmin(admin.ModelAdmin):
         "phone",
         "monthly_rent",
         "balance",
+        "utility_monthly",
+        "utility_balance",
+        "deposit_required",
+        "deposit_paid",
         "rent_due_day",
         "created_at",
     )
@@ -199,6 +242,7 @@ class HousingApplicationAdmin(admin.ModelAdmin):
                 "age",
             )
         }),
+
         ("Rent Setup", {
             "fields": (
                 "monthly_rent",
@@ -206,6 +250,21 @@ class HousingApplicationAdmin(admin.ModelAdmin):
                 "rent_due_day",
             )
         }),
+
+        ("Deposit Setup", {
+            "fields": (
+                "deposit_required",
+                "deposit_paid",
+            )
+        }),
+
+        ("Utilities Setup", {
+            "fields": (
+                "utility_monthly",
+                "utility_balance",
+            )
+        }),
+
         ("Identification", {
             "fields": (
                 "drivers_license_number",
@@ -214,6 +273,7 @@ class HousingApplicationAdmin(admin.ModelAdmin):
                 "id_upload",
             )
         }),
+
         ("Income / Employment", {
             "fields": (
                 "income_source",
@@ -222,6 +282,7 @@ class HousingApplicationAdmin(admin.ModelAdmin):
                 "employment_length",
             )
         }),
+
         ("Housing / Recovery / Background", {
             "fields": (
                 "housing_need",
@@ -235,6 +296,7 @@ class HousingApplicationAdmin(admin.ModelAdmin):
                 "odoc_time_served",
             )
         }),
+
         ("Current Address", {
             "classes": ("collapse",),
             "fields": (
@@ -242,6 +304,7 @@ class HousingApplicationAdmin(admin.ModelAdmin):
                 "current_address_length",
             )
         }),
+
         ("Previous Addresses", {
             "classes": ("collapse",),
             "fields": (
@@ -253,6 +316,7 @@ class HousingApplicationAdmin(admin.ModelAdmin):
                 "previous_address_3_length",
             )
         }),
+
         ("References", {
             "classes": ("collapse",),
             "fields": (
@@ -266,12 +330,14 @@ class HousingApplicationAdmin(admin.ModelAdmin):
                 "reference_2_type",
             )
         }),
+
         ("Acknowledgments", {
             "fields": (
                 "sobriety_acknowledgment",
                 "unconditional_regard_acknowledgment",
             )
         }),
+
         ("Notes / System", {
             "fields": (
                 "additional_notes",
@@ -302,12 +368,54 @@ class BlogCommentAdmin(admin.ModelAdmin):
 
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
-    list_display = ("application", "amount", "status", "created_at")
-    list_filter = ("status", "created_at")
-    search_fields = ("application__full_name", "application__email", "stripe_session_id")
+    list_display = (
+        "application",
+        "payment_type",
+        "description",
+        "amount",
+        "status",
+        "created_at",
+    )
+
+    list_filter = (
+        "payment_type",
+        "status",
+        "created_at",
+    )
+
+    search_fields = (
+        "application__full_name",
+        "application__email",
+        "stripe_session_id",
+        "description",
+    )
+
+    readonly_fields = (
+        "application",
+        "payment_type",
+        "description",
+        "amount",
+        "status",
+        "stripe_session_id",
+        "stripe_payment_intent",
+        "created_at",
+    )
+
+    def has_add_permission(self, request):
+        return False
 
 
 @admin.register(RentHistory)
 class RentHistoryAdmin(admin.ModelAdmin):
     list_display = ("application", "rent_amount", "effective_date", "created_at")
     search_fields = ("application__full_name", "application__email")
+
+    readonly_fields = (
+        "application",
+        "rent_amount",
+        "effective_date",
+        "created_at",
+    )
+
+    def has_add_permission(self, request):
+        return False
