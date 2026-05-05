@@ -135,7 +135,7 @@ def create_checkout_session(request, application_id, payment_type="rent"):
         amount = base_rent_amount
         description = "Rent Payment"
 
-        if today.day > 5 and base_rent_amount > 0:
+        if today.day >= 5 and base_rent_amount > 0:
             late_fee_already_paid = Payment.objects.filter(
                 application=application,
                 payment_type="rent",
