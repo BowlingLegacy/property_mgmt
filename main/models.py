@@ -23,6 +23,18 @@ class Property(models.Model):
     def __str__(self):
         return self.name
 
+class PropertyImage(models.Model):
+    property = models.ForeignKey(
+        Property,
+        on_delete=models.CASCADE,
+        related_name="images"
+    )
+    image = models.ImageField(upload_to="property_gallery/")
+    caption = models.CharField(max_length=255, blank=True)
+
+    def __str__(self):
+        return f"{self.property.name} Image"
+
 
 class HousingApplication(models.Model):
     property = models.ForeignKey(Property, on_delete=models.SET_NULL, null=True, blank=True)
