@@ -13,6 +13,9 @@ from .forms import BlogCommentForm, HousingApplicationForm
 from .models import Property, BlogPost, HousingApplication, Payment
 
 
+LATE_FEE_AMOUNT = Decimal("25.00")
+
+
 def home(request):
     properties = Property.objects.all()
     posts = BlogPost.objects.all().order_by("-created_at")[:5]
@@ -128,12 +131,26 @@ def create_checkout_session(request, application_id, payment_type="rent"):
     description = ""
 
     if payment_type == "rent":
-        amount = application.balance if application.balance > 0 else application.monthly_rent
-        description = "Rent Payment"
+        base_rent_amount = application.balance if application.balance > 0 else application.monthly_rent
+        late_fee_amount = Decimal("0.00")
 
-        if today.day > 5:
-            amount += Decimal("25.00")
-            description = "Rent Payment including $25 late fee"
+        description = "Rent Payment"
+        amount = base_rent_amount
+
+        if today.day > 5 and base_rent_amount > 0:
+            late_fee_already_paid = Payment.objects.filter(
+                application=application,
+                payment_type="rent",
+                description__icontains="late fee",
+                status="completed",
+                created_at__month=today.month,
+                created_at__year=today.year,
+            ).exists()
+
+            if not late_fee_already_paid:
+                late_fee_amount = LATE_FEE_AMOUNT
+                amount = base_rent_amount + late_fee_amount
+                description = "Rent Payment including $25 late fee"
 
     elif payment_type == "deposit":
         amount = application.deposit_required - application.deposit_paid
@@ -232,9 +249,17 @@ def stripe_webhook(request):
                 application = payment.application
 
                 if payment.payment_type == "rent":
+                    amount_to_apply_to_rent_balance = payment.amount
+
+                    if "late fee" in payment.description.lower():
+                        amount_to_apply_to_rent_balance = max(
+                            Decimal("0.00"),
+                            payment.amount - LATE_FEE_AMOUNT
+                        )
+
                     application.balance = max(
                         Decimal("0.00"),
-                        application.balance - payment.amount
+                        application.balance - amount_to_apply_to_rent_balance
                     )
 
                 elif payment.payment_type == "deposit":
