@@ -3,6 +3,7 @@ from decimal import Decimal
 import stripe
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.core.mail import send_mail
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
@@ -51,10 +52,17 @@ def signup(request):
 
 @login_required
 def tenant_dashboard(request):
-    application = HousingApplication.objects.filter(email=request.user.email).first()
+    application = HousingApplication.objects.filter(
+        email=request.user.email
+    ).first()
+
+    payments = []
+    if application:
+        payments = application.payments.all().order_by("-created_at")
 
     return render(request, "tenant_dashboard.html", {
         "application": application,
+        "payments": payments,
         "stripe_public_key": settings.STRIPE_PUBLIC_KEY,
     })
 
@@ -118,7 +126,7 @@ def create_checkout_session(request, application_id):
 
     if amount <= 0:
         return JsonResponse({
-            "error": "No rent balance or monthly rent amount is set for this resident."
+            "error": "No balance due."
         }, status=400)
 
     stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -176,16 +184,14 @@ def stripe_webhook(request):
             sig_header,
             endpoint_secret
         )
-    except ValueError:
-        return HttpResponse(status=400)
-    except stripe.error.SignatureVerificationError:
+    except Exception:
         return HttpResponse(status=400)
 
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
-
         metadata = session.metadata
-        payment_id = metadata.payment_id if metadata and hasattr(metadata, "payment_id") else None
+
+        payment_id = metadata.get("payment_id") if metadata else None
 
         if payment_id:
             payment = Payment.objects.filter(id=payment_id).first()
@@ -196,10 +202,29 @@ def stripe_webhook(request):
                 payment.save()
 
                 application = payment.application
+
                 application.balance = max(
                     Decimal("0.00"),
                     application.balance - payment.amount
                 )
                 application.save()
+
+                send_mail(
+                    subject="Rent Payment Received",
+                    message=f"""
+Payment received from {application.full_name}
+
+Amount Paid: ${payment.amount}
+Property: {application.property}
+Room / Unit: {application.space_type} {application.space_label}
+New Balance: ${application.balance}
+
+Payment Status: {payment.status}
+Stripe Session: {payment.stripe_session_id}
+""",
+                    from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+                    recipient_list=["BowlingLegacyLLC@outlook.com"],
+                    fail_silently=True,
+                )
 
     return HttpResponse(status=200)
