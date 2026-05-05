@@ -183,14 +183,16 @@ def stripe_webhook(request):
 
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
-        payment_id = session.get("metadata", {}).get("payment_id")
+
+        metadata = session.metadata
+        payment_id = metadata.payment_id if metadata and hasattr(metadata, "payment_id") else None
 
         if payment_id:
             payment = Payment.objects.filter(id=payment_id).first()
 
             if payment and payment.status != "completed":
                 payment.status = "completed"
-                payment.stripe_payment_intent = session.get("payment_intent", "")
+                payment.stripe_payment_intent = session.payment_intent or ""
                 payment.save()
 
                 application = payment.application
