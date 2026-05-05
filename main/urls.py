@@ -16,6 +16,7 @@ urlpatterns = [
 
     path("tenant-dashboard/", views.tenant_dashboard, name="tenant_dashboard"),
     path("landlord-dashboard/", views.landlord_dashboard, name="landlord_dashboard"),
+    path("payment-log/", views.payment_log, name="payment_log"),
 
     path("property/<int:pk>/", views.property_detail, name="property_detail"),
     path("journal/<int:pk>/", views.blog_detail, name="blog_detail"),
