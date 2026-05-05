@@ -1,14 +1,35 @@
 from django.contrib import admin
-from django.utils.html import format_html
+from django.contrib.auth.admin import UserAdmin
 
 from .models import (
+    User,
     Property,
     PropertyImage,
     HousingApplication,
     ApplicantDocument,
     BlogPost,
     BlogComment,
+    RentHistory,
+    Payment,
 )
+
+
+@admin.register(User)
+class CustomUserAdmin(UserAdmin):
+    fieldsets = UserAdmin.fieldsets + (
+        ("RentLogic Profile", {
+            "fields": ("role", "invite_code"),
+        }),
+    )
+
+    add_fieldsets = UserAdmin.add_fieldsets + (
+        ("RentLogic Profile", {
+            "fields": ("email", "role", "invite_code"),
+        }),
+    )
+
+    list_display = ("username", "email", "role", "is_staff", "is_active")
+    search_fields = ("username", "email")
 
 
 class PropertyImageInline(admin.TabularInline):
@@ -27,34 +48,41 @@ class ApplicantDocumentInline(admin.TabularInline):
     extra = 0
     can_delete = False
 
-    fields = (
-        "name",
-        "document_type",
-        "file",
-        "status",
-        "needs_signature",
-        "needs_initials",
-        "signed_at",
-        "submitted_at",
-        "locked",
-        "created_at",
-    )
 
+class PaymentInline(admin.TabularInline):
+    model = Payment
+    extra = 0
     readonly_fields = (
-        "locked",
+        "amount",
+        "status",
+        "stripe_session_id",
+        "stripe_payment_intent",
         "created_at",
     )
+    can_delete = False
+
+
+class RentHistoryInline(admin.TabularInline):
+    model = RentHistory
+    extra = 0
 
 
 @admin.register(HousingApplication)
 class HousingApplicationAdmin(admin.ModelAdmin):
-    inlines = [ApplicantDocumentInline]
+    inlines = [
+        ApplicantDocumentInline,
+        PaymentInline,
+        RentHistoryInline,
+    ]
 
     list_display = (
         "full_name",
         "property",
         "email",
         "phone",
+        "monthly_rent",
+        "balance",
+        "rent_due_day",
         "created_at",
     )
 
@@ -71,7 +99,6 @@ class HousingApplicationAdmin(admin.ModelAdmin):
 
     readonly_fields = (
         "created_at",
-        "id_upload_link",
     )
 
     fieldsets = (
@@ -84,13 +111,19 @@ class HousingApplicationAdmin(admin.ModelAdmin):
                 "age",
             )
         }),
+        ("Rent Setup", {
+            "fields": (
+                "monthly_rent",
+                "balance",
+                "rent_due_day",
+            )
+        }),
         ("Identification", {
             "fields": (
                 "drivers_license_number",
                 "has_valid_odl",
                 "oregon_id_number",
                 "id_upload",
-                "id_upload_link",
             )
         }),
         ("Income / Employment", {
@@ -152,31 +185,12 @@ class HousingApplicationAdmin(admin.ModelAdmin):
             )
         }),
         ("Notes / System", {
-            "classes": ("collapse",),
             "fields": (
                 "additional_notes",
                 "created_at",
             )
         }),
     )
-
-    def id_upload_link(self, obj):
-        if obj and obj.id_upload:
-            return format_html(
-                '<a href="{}" target="_blank">View uploaded ID / ODL</a>',
-                obj.id_upload.url
-            )
-        return "No ID uploaded"
-
-    id_upload_link.short_description = "Uploaded ID / ODL"
-
-    def has_delete_permission(self, request, obj=None):
-        return False
-
-    def get_readonly_fields(self, request, obj=None):
-        if obj:
-            return [field.name for field in self.model._meta.fields] + ["id_upload_link"]
-        return self.readonly_fields
 
 
 @admin.register(BlogPost)
@@ -196,3 +210,16 @@ class BlogCommentAdmin(admin.ModelAdmin):
         queryset.update(approved=True)
 
     approve_comments.short_description = "Approve selected comments"
+
+
+@admin.register(Payment)
+class PaymentAdmin(admin.ModelAdmin):
+    list_display = ("application", "amount", "status", "created_at")
+    list_filter = ("status", "created_at")
+    search_fields = ("application__full_name", "application__email", "stripe_session_id")
+
+
+@admin.register(RentHistory)
+class RentHistoryAdmin(admin.ModelAdmin):
+    list_display = ("application", "rent_amount", "effective_date", "created_at")
+    search_fields = ("application__full_name", "application__email")
