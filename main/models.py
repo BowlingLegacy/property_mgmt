@@ -66,17 +66,72 @@ class HousingApplication(models.Model):
     full_name = models.CharField(max_length=255)
     phone = models.CharField(max_length=20)
     email = models.EmailField()
-    age = models.IntegerField()
+    age = models.PositiveIntegerField()
 
+    # SPACE
     space_type = models.CharField(max_length=50, blank=True)
     space_label = models.CharField(max_length=50, blank=True)
 
-    monthly_rent = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    # RENT
+    monthly_rent = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     rent_due_day = models.IntegerField(default=1)
+
+    # ADD BACK ALL REQUIRED FIELDS
+    current_address = models.CharField(max_length=255, blank=True)
+    current_address_length = models.CharField(max_length=100, blank=True)
+
+    previous_address_1 = models.CharField(max_length=255, blank=True)
+    previous_address_1_length = models.CharField(max_length=100, blank=True)
+
+    previous_address_2 = models.CharField(max_length=255, blank=True)
+    previous_address_2_length = models.CharField(max_length=100, blank=True)
+
+    previous_address_3 = models.CharField(max_length=255, blank=True)
+    previous_address_3_length = models.CharField(max_length=100, blank=True)
+
+    drivers_license_number = models.CharField(max_length=100, blank=True)
+    has_valid_odl = models.BooleanField(default=False)
+    oregon_id_number = models.CharField(max_length=100, blank=True)
+    id_upload = models.FileField(upload_to="application_ids/", blank=True, null=True)
+
+    income_source = models.CharField(max_length=255)
+    monthly_income = models.DecimalField(max_digits=10, decimal_places=2)
+    employer_name = models.CharField(max_length=255, blank=True)
+    employment_length = models.CharField(max_length=100, blank=True)
+
+    previous_evictions = models.TextField(blank=True)
+
+    in_recovery = models.BooleanField(default=False)
+    drug_of_choice = models.CharField(max_length=255, blank=True)
+
+    on_parole = models.BooleanField(default=False)
+    parole_officer_name = models.CharField(max_length=255, blank=True)
+    parole_officer_phone = models.CharField(max_length=50, blank=True)
+
+    felony_history = models.TextField(blank=True)
+    odoc_time_served = models.BooleanField(default=False)
+
+    reference_1_name = models.CharField(max_length=255, blank=True)
+    reference_1_phone = models.CharField(max_length=50, blank=True)
+    reference_1_relationship = models.CharField(max_length=255, blank=True)
+    reference_1_type = models.CharField(max_length=100, blank=True)
+
+    reference_2_name = models.CharField(max_length=255, blank=True)
+    reference_2_phone = models.CharField(max_length=50, blank=True)
+    reference_2_relationship = models.CharField(max_length=255, blank=True)
+    reference_2_type = models.CharField(max_length=100, blank=True)
+
+    housing_need = models.TextField()
+    additional_notes = models.TextField(blank=True)
+
+    sobriety_acknowledgment = models.BooleanField(default=False)
+    unconditional_regard_acknowledgment = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return self.full_name
 
 # -----------------------
 # DOCUMENTS
