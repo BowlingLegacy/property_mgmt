@@ -128,3 +128,7 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+LOGIN_URL = "/login/"
+LOGIN_REDIRECT_URL = "/tenant-dashboard/"
+LOGOUT_REDIRECT_URL = "/"
+
