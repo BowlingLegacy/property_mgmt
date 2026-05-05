@@ -6,6 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
 from .forms import BlogCommentForm, HousingApplicationForm
@@ -119,20 +120,46 @@ def printable_application(request, pk):
 
 
 @login_required
-def create_checkout_session(request, application_id):
+def create_checkout_session(request, application_id, payment_type="rent"):
     application = get_object_or_404(HousingApplication, id=application_id)
 
-    amount = application.balance if application.balance > 0 else application.monthly_rent
+    today = timezone.localdate()
+    amount = Decimal("0.00")
+    description = ""
+
+    if payment_type == "rent":
+        amount = application.balance if application.balance > 0 else application.monthly_rent
+        description = "Rent Payment"
+
+        if today.day > 5:
+            amount += Decimal("25.00")
+            description = "Rent Payment including $25 late fee"
+
+    elif payment_type == "deposit":
+        amount = application.deposit_required - application.deposit_paid
+        amount = max(amount, Decimal("0.00"))
+        description = "Deposit Payment"
+
+    elif payment_type == "utility":
+        amount = application.utility_balance if application.utility_balance > 0 else application.utility_monthly
+        description = "Shared Utilities Payment"
+
+    else:
+        return JsonResponse({
+            "error": "Invalid payment type."
+        }, status=400)
 
     if amount <= 0:
         return JsonResponse({
-            "error": "No balance due."
+            "error": "No balance due for this payment type."
         }, status=400)
 
     stripe.api_key = settings.STRIPE_SECRET_KEY
 
     payment = Payment.objects.create(
         application=application,
+        payment_type=payment_type,
+        description=description,
         amount=amount,
         status="pending",
     )
@@ -147,7 +174,7 @@ def create_checkout_session(request, application_id):
                 "price_data": {
                     "currency": "usd",
                     "product_data": {
-                        "name": f"Rent Payment - {application.full_name}",
+                        "name": f"{description} - {application.full_name}",
                     },
                     "unit_amount": int(amount * Decimal("100")),
                 },
@@ -159,6 +186,7 @@ def create_checkout_session(request, application_id):
         metadata={
             "payment_id": str(payment.id),
             "application_id": str(application.id),
+            "payment_type": payment_type,
         },
     )
 
@@ -203,27 +231,52 @@ def stripe_webhook(request):
 
                 application = payment.application
 
-                application.balance = max(
-                    Decimal("0.00"),
-                    application.balance - payment.amount
-                )
+                if payment.payment_type == "rent":
+                    application.balance = max(
+                        Decimal("0.00"),
+                        application.balance - payment.amount
+                    )
+
+                elif payment.payment_type == "deposit":
+                    application.deposit_paid = min(
+                        application.deposit_required,
+                        application.deposit_paid + payment.amount
+                    )
+
+                elif payment.payment_type == "utility":
+                    application.utility_balance = max(
+                        Decimal("0.00"),
+                        application.utility_balance - payment.amount
+                    )
+
                 application.save()
 
+                owner_email = "BowlingLegacyLLC@outlook.com"
+                if application.property and application.property.owner_email:
+                    owner_email = application.property.owner_email
+
                 send_mail(
-                    subject="Rent Payment Received",
+                    subject="Resident Payment Received",
                     message=f"""
 Payment received from {application.full_name}
 
+Payment Type: {payment.get_payment_type_display()}
+Description: {payment.description}
 Amount Paid: ${payment.amount}
+
 Property: {application.property}
 Room / Unit: {application.space_type} {application.space_label}
-New Balance: ${application.balance}
+
+Rent Balance: ${application.balance}
+Deposit Required: ${application.deposit_required}
+Deposit Paid: ${application.deposit_paid}
+Utilities Balance: ${application.utility_balance}
 
 Payment Status: {payment.status}
 Stripe Session: {payment.stripe_session_id}
 """,
                     from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
-                    recipient_list=["BowlingLegacyLLC@outlook.com"],
+                    recipient_list=[owner_email],
                     fail_silently=True,
                 )
 
