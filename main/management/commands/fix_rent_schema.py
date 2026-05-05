@@ -3,7 +3,7 @@ from django.db import connection
 
 
 class Command(BaseCommand):
-    help = "Repairs missing rent/payment database fields after migration reset"
+    help = "Repairs missing rent/payment/space database fields after migration reset"
 
     def handle(self, *args, **kwargs):
         sql = """
@@ -15,6 +15,12 @@ class Command(BaseCommand):
 
         ALTER TABLE main_housingapplication
         ADD COLUMN IF NOT EXISTS rent_due_day integer NOT NULL DEFAULT 1;
+
+        ALTER TABLE main_housingapplication
+        ADD COLUMN IF NOT EXISTS space_type varchar(50) NOT NULL DEFAULT '';
+
+        ALTER TABLE main_housingapplication
+        ADD COLUMN IF NOT EXISTS space_label varchar(50) NOT NULL DEFAULT '';
 
         CREATE TABLE IF NOT EXISTS main_payment (
             id BIGSERIAL PRIMARY KEY,
@@ -44,4 +50,4 @@ class Command(BaseCommand):
         with connection.cursor() as cursor:
             cursor.execute(sql)
 
-        self.stdout.write(self.style.SUCCESS("Rent/payment schema repaired successfully."))
+        self.stdout.write(self.style.SUCCESS("Rent/payment/space schema repaired successfully."))
