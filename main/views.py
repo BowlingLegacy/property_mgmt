@@ -3,6 +3,7 @@ from decimal import Decimal
 
 import stripe
 from django.conf import settings
+from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.mail import send_mail
 from django.http import JsonResponse, HttpResponse
@@ -25,6 +26,12 @@ def home(request):
         "properties": properties,
         "posts": posts,
     })
+
+
+def logout_view(request):
+    logout(request)
+    request.session.flush()
+    return redirect("login")
 
 
 def creed(request):
@@ -57,6 +64,8 @@ def signup(request):
 
 @login_required
 def tenant_dashboard(request):
+    request.session.set_expiry(0)
+
     application = HousingApplication.objects.filter(
         email=request.user.email
     ).first()
