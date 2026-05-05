@@ -17,8 +17,16 @@ from .models import (
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):
     fieldsets = UserAdmin.fieldsets + (
-        ("RentLogic Profile", {
-            "fields": ("role", "invite_code"),
+        ("RentLogic Resident File", {
+            "fields": (
+                "role",
+                "invite_code",
+                "linked_resident_profile",
+                "resident_property",
+                "resident_unit",
+                "resident_monthly_rent",
+                "resident_balance",
+            ),
         }),
     )
 
@@ -28,8 +36,81 @@ class CustomUserAdmin(UserAdmin):
         }),
     )
 
-    list_display = ("username", "email", "role", "is_staff", "is_active")
+    readonly_fields = (
+        "linked_resident_profile",
+        "resident_property",
+        "resident_unit",
+        "resident_monthly_rent",
+        "resident_balance",
+    )
+
+    list_display = (
+        "username",
+        "email",
+        "role",
+        "resident_unit",
+        "resident_balance",
+        "is_staff",
+        "is_active",
+    )
+
     search_fields = ("username", "email")
+
+    def get_resident_profile(self, obj):
+        if not obj or not obj.email:
+            return None
+        return HousingApplication.objects.filter(email=obj.email).first()
+
+    def linked_resident_profile(self, obj):
+        profile = self.get_resident_profile(obj)
+        if not profile:
+            return "No resident profile found by email match."
+        return profile.full_name
+
+    linked_resident_profile.short_description = "Linked Resident Profile"
+
+    def resident_property(self, obj):
+        profile = self.get_resident_profile(obj)
+        if not profile or not profile.property:
+            return "—"
+        return profile.property.name
+
+    resident_property.short_description = "Property"
+
+    def resident_unit(self, obj):
+        profile = self.get_resident_profile(obj)
+        if not profile:
+            return "—"
+
+        unit_parts = []
+        if profile.space_type:
+            unit_parts.append(profile.space_type)
+        if profile.space_label:
+            unit_parts.append(profile.space_label)
+
+        return " ".join(unit_parts) if unit_parts else "—"
+
+    resident_unit.short_description = "Room / Unit"
+
+    def resident_monthly_rent(self, obj):
+        profile = self.get_resident_profile(obj)
+        if not profile:
+            return "—"
+        return f"${profile.monthly_rent}"
+
+    resident_monthly_rent.short_description = "Monthly Rent"
+
+    def resident_balance(self, obj):
+        profile = self.get_resident_profile(obj)
+        if not profile:
+            return "—"
+
+        if profile.balance <= 0:
+            return "No balance due"
+
+        return f"${profile.balance}"
+
+    resident_balance.short_description = "Current Balance"
 
 
 class PropertyImageInline(admin.TabularInline):
