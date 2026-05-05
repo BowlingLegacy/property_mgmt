@@ -1,31 +1,139 @@
-{% extends "base.html" %}
-{% block content %}
+{% load static %}
 
-<h2 class="mb-4">Tenant Dashboard</h2>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tenant Dashboard | RentLogic</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<div class="card shadow-sm">
-  <div class="card-body">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
 
-    <p class="lead">Welcome, {{ user.username }}.</p>
+<body class="bg-light">
 
-    <p>
-      This is your tenant portal. In future phases, this page will include:
-    </p>
+<nav class="navbar navbar-light bg-white shadow-sm">
+    <div class="container">
+        <a class="navbar-brand fw-bold" href="/">RentLogic</a>
+        <a href="{% url 'logout' %}" class="btn btn-outline-secondary btn-sm">Logout</a>
+    </div>
+</nav>
 
-    <ul>
-      <li>Your lease documents</li>
-      <li>Rent payment history</li>
-      <li>Maintenance requests</li>
-      <li>Messages from your landlord</li>
-      <li>Application status (if applicable)</li>
-    </ul>
+<div class="container my-5">
 
-    <p class="mt-3 text-muted">
-      Phase 1: This page is intentionally simple.  
-      Phase 2 will add full tenant functionality.
-    </p>
+    <h1 class="fw-bold mb-4">Tenant Dashboard</h1>
 
-  </div>
+    {% if application %}
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <h3 class="fw-bold">{{ application.full_name }}</h3>
+                <p class="text-muted mb-1">{{ application.email }}</p>
+                <p class="text-muted">{{ application.phone }}</p>
+
+                {% if application.property %}
+                    <p><strong>Property:</strong> {{ application.property.name }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <h4 class="fw-bold mb-3">Rent Balance</h4>
+
+                <p class="fs-5 mb-1">
+                    <strong>Monthly Rent:</strong>
+                    ${{ application.monthly_rent }}
+                </p>
+
+                <p class="fs-5 mb-1">
+                    <strong>Current Balance:</strong>
+                    ${{ application.balance }}
+                </p>
+
+                <p class="text-muted">
+                    Rent due day: {{ application.rent_due_day }}
+                </p>
+
+                {% if application.balance > 0 or application.monthly_rent > 0 %}
+                    <button id="pay-rent-button" class="btn btn-primary btn-lg">
+                        Pay Rent
+                    </button>
+                {% else %}
+                    <p class="alert alert-info mt-3">
+                        No rent balance has been set yet.
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h4 class="fw-bold mb-3">Documents</h4>
+
+                {% for document in application.documents.all %}
+                    <div class="border rounded p-3 mb-2 bg-white">
+                        <strong>{{ document.name }}</strong>
+                        <div class="text-muted small">
+                            Status: {{ document.get_status_display }}
+                        </div>
+
+                        {% if document.file %}
+                            <a href="{{ document.file.url }}" target="_blank" class="btn btn-outline-primary btn-sm mt-2">
+                                View / Download
+                            </a>
+                        {% endif %}
+                    </div>
+                {% empty %}
+                    <p class="text-muted">No documents are attached yet.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+    {% else %}
+
+        <div class="alert alert-warning">
+            No resident profile is connected to this account yet.
+        </div>
+
+    {% endif %}
+
 </div>
 
-{% endblock %}
+<script src="https://js.stripe.com/v3/"></script>
+
+<script>
+    const stripe = Stripe("{{ stripe_public_key }}");
+
+    const payButton = document.getElementById("pay-rent-button");
+
+    if (payButton) {
+        payButton.addEventListener("click", function () {
+            payButton.disabled = true;
+            payButton.innerText = "Opening checkout...";
+
+            fetch("{% url 'pay_rent' application.id %}")
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                        payButton.disabled = false;
+                        payButton.innerText = "Pay Rent";
+                        return;
+                    }
+
+                    return stripe.redirectToCheckout({
+                        sessionId: data.id
+                    });
+                })
+                .catch(error => {
+                    alert("Unable to start payment. Please try again.");
+                    payButton.disabled = false;
+                    payButton.innerText = "Pay Rent";
+                });
+        });
+    }
+</script>
+
+</body>
+</html>
