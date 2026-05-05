@@ -25,6 +25,8 @@ urlpatterns = [
     path("blog/<int:post_id>/comment/", views.add_blog_comment, name="add_blog_comment"),
 
     path("pay/<int:application_id>/", views.create_checkout_session, name="pay_rent"),
+    path("pay/<int:application_id>/<str:payment_type>/", views.create_checkout_session, name="pay_by_type"),
+
     path("payment-success/", views.payment_success, name="payment_success"),
     path("stripe/webhook/", views.stripe_webhook, name="stripe_webhook"),
 ]
