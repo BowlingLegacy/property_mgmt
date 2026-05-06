@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 
-from .models import HousingApplication, User, BlogComment
+from .models import HousingApplication, User, BlogComment, FinancialUpload
 
 
 class BlogCommentForm(forms.ModelForm):
@@ -22,6 +22,17 @@ class BlogCommentForm(forms.ModelForm):
                 "rows": 3,
                 "placeholder": "Write your comment...",
             }),
+        }
+
+
+class FinancialUploadForm(forms.ModelForm):
+    class Meta:
+        model = FinancialUpload
+        fields = ["name", "file", "notes"]
+        widgets = {
+            "name": forms.TextInput(attrs={"class": "form-control"}),
+            "file": forms.ClearableFileInput(attrs={"class": "form-control"}),
+            "notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
         }
 
 
