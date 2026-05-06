@@ -520,7 +520,86 @@ def printable_application(request, pk):
     return render(request, "printable_application.html", {
         "application": application,
     })
+    
+@login_required
+@user_passes_test(staff_required)
+def property_financials(request, property_name):
+    from django.db.models import Sum
+    from decimal import Decimal
 
+    # --- RESIDENT DATA ---
+    residents = HousingApplication.objects.filter(
+        property__name__iexact=property_name
+    )
+
+    total_units = residents.count()
+
+    total_rent = sum(r.monthly_rent for r in residents)
+    total_balance = sum(r.balance for r in residents)
+
+    total_utilities = sum(r.utility_monthly for r in residents)
+    utility_balance = sum(r.utility_balance for r in residents)
+
+    total_deposit_required = sum(r.deposit_required for r in residents)
+    total_deposit_paid = sum(r.deposit_paid for r in residents)
+
+    # --- PAYMENT DATA ---
+    payments = Payment.objects.filter(
+        application__property__name__iexact=property_name,
+        status="completed"
+    )
+
+    total_collected = payments.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+
+    # --- EXPENSE DATA ---
+    financial_entries = FinancialEntry.objects.filter(
+        property_name__iexact=property_name
+    )
+
+    operating_expenses = financial_entries.filter(
+        entry_type="operating_expense"
+    ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+
+    debt_service = financial_entries.filter(
+        entry_type="debt_service"
+    ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+
+    capital_expenses = financial_entries.filter(
+        entry_type="capital_expense"
+    ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+
+    # --- CALCULATIONS ---
+    noi = total_collected - operating_expenses
+    cash_flow = noi - debt_service
+
+    rent_collection_percent = 0
+    if total_rent > 0:
+        rent_collection_percent = round((total_collected / total_rent) * 100, 2)
+
+    return render(request, "property_financials.html", {
+        "property_name": property_name,
+
+        "total_units": total_units,
+        "total_rent": total_rent,
+        "total_balance": total_balance,
+
+        "total_utilities": total_utilities,
+        "utility_balance": utility_balance,
+
+        "total_deposit_required": total_deposit_required,
+        "total_deposit_paid": total_deposit_paid,
+
+        "total_collected": total_collected,
+
+        "operating_expenses": operating_expenses,
+        "debt_service": debt_service,
+        "capital_expenses": capital_expenses,
+
+        "noi": noi,
+        "cash_flow": cash_flow,
+
+        "rent_collection_percent": rent_collection_percent,
+    })
 
 @login_required
 def create_checkout_session(request, application_id, payment_type="rent"):
