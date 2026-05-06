@@ -22,10 +22,12 @@
 
             <div class="card shadow-sm">
                 <div class="card-body p-4">
-                    <h2 class="fw-bold mb-3">Login</h2>
+                    <h2 class="fw-bold mb-3">Tenant Portal Login</h2>
 
                     <form method="post">
                         {% csrf_token %}
+
+                        <input type="hidden" name="next" value="{{ request.GET.next|default:'/tenant-dashboard/' }}">
 
                         <div class="mb-3">
                             <label class="form-label">Username</label>
