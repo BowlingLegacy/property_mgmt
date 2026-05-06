@@ -280,3 +280,52 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"{self.application.full_name} - {self.get_payment_type_display()} - ${self.amount} - {self.status}"
+
+
+class FinancialUpload(models.Model):
+    file = models.FileField(upload_to="financial_uploads/")
+    name = models.CharField(max_length=255, default="Financial Upload")
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    parsed_at = models.DateTimeField(blank=True, null=True)
+    notes = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.uploaded_at.date()})"
+
+
+class FinancialEntry(models.Model):
+    ENTRY_TYPE_CHOICES = [
+        ("income", "Income"),
+        ("operating_expense", "Operating Expense"),
+        ("debt_service", "Debt Service"),
+        ("capital_expense", "Capital Expense"),
+        ("other", "Other"),
+    ]
+
+    upload = models.ForeignKey(
+        FinancialUpload,
+        on_delete=models.CASCADE,
+        related_name="entries",
+    )
+
+    property_name = models.CharField(max_length=255, blank=True, default="Painted Lady")
+    sheet_name = models.CharField(max_length=255)
+    row_number = models.IntegerField(default=0)
+
+    entry_date = models.DateField(blank=True, null=True)
+    month = models.IntegerField(blank=True, null=True)
+    year = models.IntegerField(blank=True, null=True)
+
+    entry_type = models.CharField(max_length=50, choices=ENTRY_TYPE_CHOICES, default="other")
+    category = models.CharField(max_length=255, blank=True)
+    description = models.TextField(blank=True)
+
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["year", "month", "entry_type", "category"]
+
+    def __str__(self):
+        return f"{self.get_entry_type_display()} - ${self.amount} - {self.sheet_name}"
