@@ -32,12 +32,11 @@ LATE_FEE_AMOUNT = Decimal("25.00")
 def money(value):
     if value is None:
         return Decimal("0.00")
-
     if isinstance(value, Decimal):
         return value
-
     try:
-        return Decimal(str(value)).quantize(Decimal("0.01"))
+        cleaned = str(value).replace("$", "").replace(",", "").strip()
+        return Decimal(cleaned).quantize(Decimal("0.01"))
     except (InvalidOperation, ValueError, TypeError):
         return Decimal("0.00")
 
@@ -46,50 +45,20 @@ def staff_required(user):
     return user.is_authenticated and (user.is_staff or user.is_superuser)
 
 
-def classify_financial_entry(sheet_name, category, description):
-    text = f"{sheet_name} {category} {description}".lower()
-
-    if "debt" in text or "mortgage" in text or "loan" in text or "principal" in text or "interest" in text:
-        return "debt_service"
-
-    if "capex" in text or "capital" in text or "improvement" in text or "renovation" in text:
-        return "capital_expense"
-
-    if "rent" in text or "income" in text or "revenue" in text or "deposit" in text:
-        return "income"
-
-    if "expense" in text or "repair" in text or "maintenance" in text or "utility" in text or "insurance" in text or "tax" in text:
-        return "operating_expense"
-
-    return "other"
-
-
 def extract_month_year(sheet_name, entry_date=None):
     month_names = {
-        "jan": 1,
-        "january": 1,
-        "feb": 2,
-        "february": 2,
-        "mar": 3,
-        "march": 3,
-        "apr": 4,
-        "april": 4,
+        "jan": 1, "january": 1,
+        "feb": 2, "february": 2,
+        "mar": 3, "march": 3,
+        "apr": 4, "april": 4,
         "may": 5,
-        "jun": 6,
-        "june": 6,
-        "jul": 7,
-        "july": 7,
-        "aug": 8,
-        "august": 8,
-        "sep": 9,
-        "sept": 9,
-        "september": 9,
-        "oct": 10,
-        "october": 10,
-        "nov": 11,
-        "november": 11,
-        "dec": 12,
-        "december": 12,
+        "jun": 6, "june": 6,
+        "jul": 7, "july": 7,
+        "aug": 8, "august": 8,
+        "sep": 9, "sept": 9, "september": 9,
+        "oct": 10, "october": 10,
+        "nov": 11, "november": 11,
+        "dec": 12, "december": 12,
     }
 
     if entry_date:
@@ -109,78 +78,121 @@ def extract_month_year(sheet_name, entry_date=None):
         if token.isdigit() and len(token) == 4:
             found_year = int(token)
             break
+        if token.isdigit() and len(token) == 2:
+            found_year = 2000 + int(token)
 
     return found_month, found_year
 
 
-def parse_date_cell(value):
-    if isinstance(value, datetime):
-        return value.date()
-
-    if isinstance(value, date):
-        return value
-
-    if isinstance(value, str):
-        cleaned = value.strip()
-        for fmt in ("%m/%d/%Y", "%m-%d-%Y", "%Y-%m-%d", "%m/%d/%y"):
-            try:
-                return datetime.strptime(cleaned, fmt).date()
-            except ValueError:
-                pass
-
-    return None
-
-
 def parse_excel_upload(upload):
-    from decimal import Decimal
-    from django.utils import timezone
-
     FinancialEntry.objects.filter(upload=upload).delete()
 
     workbook = openpyxl.load_workbook(upload.file.path, data_only=True)
     created = 0
 
+    month_sheet_names = [
+        "jan", "feb", "mar", "apr", "may", "jun",
+        "jul", "aug", "sep", "oct", "nov", "dec",
+    ]
+
+    receipt_month_rows = {
+        1: 13,
+        2: 25,
+        3: 37,
+        4: 49,
+        5: 61,
+        6: 73,
+        7: 85,
+        8: 97,
+        9: 120,
+        10: 132,
+        11: 144,
+        12: 156,
+    }
+
+    receipt_categories = {
+        "B": "Cleaning Supplies",
+        "E": "Maintenance Supplies",
+        "H": "Office Supplies",
+        "K": "Cable Supplies",
+        "N": "Pest Control",
+        "Q": "Account Fees",
+        "T": "Power",
+        "W": "Trash/Recycle",
+        "Z": "Gas",
+        "AC": "City of Medford",
+        "AF": "Communications",
+        "AI": "Internet",
+        "AL": "Entertainment",
+        "AO": "Keys & Locks/Website",
+        "AR": "Cleaning Labor",
+        "AU": "Maintenance Labor",
+        "AX": "Room Furnishings",
+        "BA": "Insurance",
+        "BD": "Water",
+        "BG": "Linen",
+        "BJ": "Food",
+        "BM": "Cable",
+        "BO": "Landscaping",
+        "BP": "Landscaping",
+    }
+
     for sheet_name in workbook.sheetnames:
         sheet = workbook[sheet_name]
+        sheet_lower = sheet_name.lower().strip()
 
-        # Skip non-month sheets
-        if not any(month in sheet_name.lower() for month in [
-            "jan", "feb", "mar", "apr", "may", "jun",
-            "jul", "aug", "sep", "oct", "nov", "dec"
-        ]):
+        # =========================
+        # RECEIPTS / OPERATING EXPENSES SHEET
+        # =========================
+        if "receipt" in sheet_lower or "recipt" in sheet_lower:
+            year = timezone.localdate().year
+
+            for month_number, row_number in receipt_month_rows.items():
+                for column_letter, category in receipt_categories.items():
+                    amount = money(sheet[f"{column_letter}{row_number}"].value)
+
+                    if amount <= 0:
+                        continue
+
+                    FinancialEntry.objects.create(
+                        upload=upload,
+                        property_name="Painted Lady",
+                        sheet_name=sheet_name,
+                        row_number=row_number,
+                        month=month_number,
+                        year=year,
+                        entry_type="operating_expense",
+                        category=category,
+                        description=f"{category} - {date(year, month_number, 1).strftime('%B')}",
+                        amount=amount,
+                    )
+                    created += 1
+
+            continue
+
+        # =========================
+        # MONTHLY RENT ROLL SHEETS
+        # =========================
+        if not any(month in sheet_lower for month in month_sheet_names):
             continue
 
         month, year = extract_month_year(sheet_name)
 
-        # --------------------------
-        # RESIDENT ROWS (3–21)
-        # --------------------------
-        for row in range(3, 22):
+        if not month:
+            continue
 
+        # Resident rows: 3 through 21
+        for row in range(3, 22):
             room = sheet[f"A{row}"].value
             tenant = sheet[f"B{row}"].value
 
-            rent_owed = sheet[f"E{row}"].value
-            rent_paid = sheet[f"F{row}"].value
-            under_over = sheet[f"G{row}"].value
-            deposit_paid = sheet[f"H{row}"].value
-            utilities_paid = sheet[f"J{row}"].value
-
-            # Skip empty rows
             if not tenant:
                 continue
 
-            def clean(value):
-                try:
-                    return Decimal(str(value)) if value else Decimal("0.00")
-                except:
-                    return Decimal("0.00")
+            rent_paid = money(sheet[f"F{row}"].value)
+            deposit_paid = money(sheet[f"H{row}"].value)
+            utilities_paid = money(sheet[f"J{row}"].value)
 
-            rent_paid = clean(rent_paid)
-            deposit_paid = clean(deposit_paid)
-            utilities_paid = clean(utilities_paid)
-
-            # ---- RENT PAYMENT ----
             if rent_paid > 0:
                 FinancialEntry.objects.create(
                     upload=upload,
@@ -196,7 +208,6 @@ def parse_excel_upload(upload):
                 )
                 created += 1
 
-            # ---- DEPOSIT ----
             if deposit_paid > 0:
                 FinancialEntry.objects.create(
                     upload=upload,
@@ -212,7 +223,6 @@ def parse_excel_upload(upload):
                 )
                 created += 1
 
-            # ---- UTILITIES ----
             if utilities_paid > 0:
                 FinancialEntry.objects.create(
                     upload=upload,
@@ -228,15 +238,7 @@ def parse_excel_upload(upload):
                 )
                 created += 1
 
-        # --------------------------
-        # DEBT SERVICE (Row 28, Col D)
-        # --------------------------
-        debt_service = sheet["D28"].value
-
-        try:
-            debt_service = Decimal(str(debt_service)) if debt_service else Decimal("0.00")
-        except:
-            debt_service = Decimal("0.00")
+        debt_service = money(sheet["D28"].value)
 
         if debt_service > 0:
             FinancialEntry.objects.create(
@@ -251,91 +253,6 @@ def parse_excel_upload(upload):
                 description=f"Debt Service - {sheet_name}",
                 amount=debt_service,
             )
-            created += 1
-
-    upload.parsed_at = timezone.now()
-    upload.save()
-
-    return created
-
-    workbook = openpyxl.load_workbook(upload.file.path, data_only=True)
-    created = 0
-
-    skip_sheets = {"receipts"}
-
-    for sheet_name in workbook.sheetnames:
-        sheet = workbook[sheet_name]
-
-        if sheet_name.strip().lower() in skip_sheets:
-            continue
-
-        header_row = None
-        headers = {}
-
-        for row_index, row in enumerate(sheet.iter_rows(min_row=1, max_row=min(sheet.max_row, 15)), start=1):
-            values = [cell.value for cell in row]
-            lowered = [str(v).strip().lower() if v is not None else "" for v in values]
-
-            if any("amount" in v for v in lowered) or any("paid" in v for v in lowered) or any("expense" in v for v in lowered):
-                header_row = row_index
-                for idx, value in enumerate(lowered):
-                    if value:
-                        headers[value] = idx
-                break
-
-        if not header_row:
-            continue
-
-        for row_number, row in enumerate(sheet.iter_rows(min_row=header_row + 1, values_only=True), start=header_row + 1):
-            if not row or not any(row):
-                continue
-
-            row_values = list(row)
-
-            def get_by_keywords(keywords):
-                for header, index in headers.items():
-                    if any(keyword in header for keyword in keywords):
-                        if index < len(row_values):
-                            return row_values[index]
-                return None
-
-            raw_date = get_by_keywords(["date"])
-            raw_category = get_by_keywords(["category", "type", "account"])
-            raw_description = get_by_keywords(["description", "memo", "vendor", "name", "resident"])
-            raw_amount = get_by_keywords(["amount", "paid", "expense", "payment", "debit", "credit"])
-
-            if raw_amount is None:
-                numeric_cells = [value for value in row_values if isinstance(value, (int, float, Decimal))]
-                if numeric_cells:
-                    raw_amount = numeric_cells[-1]
-
-            amount = money(raw_amount)
-
-            if amount == 0:
-                continue
-
-            entry_date = parse_date_cell(raw_date)
-            month, year = extract_month_year(sheet_name, entry_date)
-
-            category = str(raw_category).strip() if raw_category is not None else ""
-            description = str(raw_description).strip() if raw_description is not None else ""
-
-            entry_type = classify_financial_entry(sheet_name, category, description)
-
-            FinancialEntry.objects.create(
-                upload=upload,
-                property_name="Painted Lady",
-                sheet_name=sheet_name,
-                row_number=row_number,
-                entry_date=entry_date,
-                month=month,
-                year=year,
-                entry_type=entry_type,
-                category=category,
-                description=description,
-                amount=abs(amount),
-            )
-
             created += 1
 
     upload.parsed_at = timezone.now()
@@ -491,7 +408,6 @@ def rent_roll(request):
         completed_payments = resident.payments.filter(status="completed")
         rent_paid = completed_payments.filter(payment_type="rent").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
         utility_paid = completed_payments.filter(payment_type="utility").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-        deposit_paid = resident.deposit_paid
 
         rows.append({
             "property": resident.property.name if resident.property else "No Property",
@@ -504,7 +420,7 @@ def rent_roll(request):
             "utility_balance": resident.utility_balance,
             "utility_paid": utility_paid,
             "deposit_required": resident.deposit_required,
-            "deposit_paid": deposit_paid,
+            "deposit_paid": resident.deposit_paid,
         })
 
     return render(request, "rent_roll.html", {
@@ -528,6 +444,12 @@ def t12_report(request):
             .aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
         )
 
+        spreadsheet_income = (
+            financial_entries
+            .filter(month=month_number, entry_type="income")
+            .aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        )
+
         operating_expenses = (
             financial_entries
             .filter(month=month_number, entry_type="operating_expense")
@@ -546,13 +468,16 @@ def t12_report(request):
             .aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
         )
 
-        net_operating_income = online_income - operating_expenses
+        total_income = online_income + spreadsheet_income
+        net_operating_income = total_income - operating_expenses
         cash_flow_after_debt = net_operating_income - debt_service
 
         months.append({
             "month_number": month_number,
             "month_name": date(year, month_number, 1).strftime("%B"),
             "online_income": online_income,
+            "spreadsheet_income": spreadsheet_income,
+            "total_income": total_income,
             "operating_expenses": operating_expenses,
             "debt_service": debt_service,
             "capital_expenses": capital_expenses,
@@ -562,6 +487,8 @@ def t12_report(request):
 
     totals = {
         "online_income": sum((m["online_income"] for m in months), Decimal("0.00")),
+        "spreadsheet_income": sum((m["spreadsheet_income"] for m in months), Decimal("0.00")),
+        "total_income": sum((m["total_income"] for m in months), Decimal("0.00")),
         "operating_expenses": sum((m["operating_expenses"] for m in months), Decimal("0.00")),
         "debt_service": sum((m["debt_service"] for m in months), Decimal("0.00")),
         "capital_expenses": sum((m["capital_expenses"] for m in months), Decimal("0.00")),
@@ -676,6 +603,10 @@ def property_financials(request, property_name):
         property_name__iexact=property_name
     )
 
+    spreadsheet_income = financial_entries.filter(
+        entry_type="income"
+    ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+
     operating_expenses = financial_entries.filter(
         entry_type="operating_expense"
     ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
@@ -688,12 +619,13 @@ def property_financials(request, property_name):
         entry_type="capital_expense"
     ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
 
-    noi = total_collected - operating_expenses
+    total_income = total_collected + spreadsheet_income
+    noi = total_income - operating_expenses
     cash_flow = noi - debt_service
 
     rent_collection_percent = 0
     if total_rent > 0:
-        rent_collection_percent = round((total_collected / total_rent) * 100, 2)
+        rent_collection_percent = round((total_income / total_rent) * 100, 2)
 
     return render(request, "property_financials.html", {
         "property_name": property_name,
@@ -705,6 +637,8 @@ def property_financials(request, property_name):
         "total_deposit_required": total_deposit_required,
         "total_deposit_paid": total_deposit_paid,
         "total_collected": total_collected,
+        "spreadsheet_income": spreadsheet_income,
+        "total_income": total_income,
         "operating_expenses": operating_expenses,
         "debt_service": debt_service,
         "capital_expenses": capital_expenses,
@@ -826,6 +760,8 @@ def export_t12_csv(request):
     writer.writerow([
         "Month",
         "Online Income",
+        "Spreadsheet Income",
+        "Total Income",
         "Operating Expenses",
         "Debt Service",
         "Capital Expenses",
@@ -836,17 +772,27 @@ def export_t12_csv(request):
     year = timezone.localdate().year
     financial_entries = FinancialEntry.objects.filter(year=year)
 
-    total_online_income = Decimal("0.00")
-    total_operating_expenses = Decimal("0.00")
-    total_debt_service = Decimal("0.00")
-    total_capital_expenses = Decimal("0.00")
-    total_noi = Decimal("0.00")
-    total_cash_flow = Decimal("0.00")
+    totals = {
+        "online_income": Decimal("0.00"),
+        "spreadsheet_income": Decimal("0.00"),
+        "total_income": Decimal("0.00"),
+        "operating_expenses": Decimal("0.00"),
+        "debt_service": Decimal("0.00"),
+        "capital_expenses": Decimal("0.00"),
+        "noi": Decimal("0.00"),
+        "cash_flow": Decimal("0.00"),
+    }
 
     for month_number in range(1, 13):
         online_income = (
             Payment.objects
             .filter(status="completed", created_at__year=year, created_at__month=month_number)
+            .aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        )
+
+        spreadsheet_income = (
+            financial_entries
+            .filter(month=month_number, entry_type="income")
             .aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
         )
 
@@ -868,19 +814,24 @@ def export_t12_csv(request):
             .aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
         )
 
-        noi = online_income - operating_expenses
+        total_income = online_income + spreadsheet_income
+        noi = total_income - operating_expenses
         cash_flow = noi - debt_service
 
-        total_online_income += online_income
-        total_operating_expenses += operating_expenses
-        total_debt_service += debt_service
-        total_capital_expenses += capital_expenses
-        total_noi += noi
-        total_cash_flow += cash_flow
+        totals["online_income"] += online_income
+        totals["spreadsheet_income"] += spreadsheet_income
+        totals["total_income"] += total_income
+        totals["operating_expenses"] += operating_expenses
+        totals["debt_service"] += debt_service
+        totals["capital_expenses"] += capital_expenses
+        totals["noi"] += noi
+        totals["cash_flow"] += cash_flow
 
         writer.writerow([
             date(year, month_number, 1).strftime("%B"),
             online_income,
+            spreadsheet_income,
+            total_income,
             operating_expenses,
             debt_service,
             capital_expenses,
@@ -890,12 +841,14 @@ def export_t12_csv(request):
 
     writer.writerow([
         "Total",
-        total_online_income,
-        total_operating_expenses,
-        total_debt_service,
-        total_capital_expenses,
-        total_noi,
-        total_cash_flow,
+        totals["online_income"],
+        totals["spreadsheet_income"],
+        totals["total_income"],
+        totals["operating_expenses"],
+        totals["debt_service"],
+        totals["capital_expenses"],
+        totals["noi"],
+        totals["cash_flow"],
     ])
 
     return response
