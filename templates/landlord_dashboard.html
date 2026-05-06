@@ -1,71 +1,111 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h2 class="mb-4 fw-bold">Landlord Dashboard</h2>
+<style>
+.card-modern {
+    border-radius: 18px;
+    border: none;
+    transition: all 0.25s ease;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+}
 
-<div class="card shadow-sm mb-4">
+.card-modern:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 16px 36px rgba(0,0,0,0.20);
+}
+
+.card-blue { border-top: 6px solid #1e3a5f; background: #f0f5ff; }
+.card-gold { border-top: 6px solid #d4af37; background: #fff8df; }
+.card-green { border-top: 6px solid #198754; background: #ecfdf3; }
+.card-gray { border-top: 6px solid #6c757d; background: #f8f9fa; }
+
+.btn-modern {
+    border-radius: 999px;
+    font-weight: 700;
+}
+
+.btn-blue { background:#1e3a5f; color:white; }
+.btn-blue:hover { background:#16314f; color:white; }
+
+.btn-gold { background:#d4af37; color:#1e3a5f; }
+.btn-green { background:#198754; color:white; }
+.btn-gray { background:#6c757d; color:white; }
+
+</style>
+
+<h2 class="fw-bold mb-4" style="color:#1e3a5f;">Landlord Dashboard</h2>
+
+<div class="card shadow-sm mb-4" style="border-radius:18px;">
   <div class="card-body">
-    <p class="lead mb-1">Welcome, {{ user.username }}.</p>
-    <p class="text-muted mb-0">
-      Owner tools for payments, rent roll, financial reports, and uploads.
-    </p>
+    <p class="lead mb-1">Welcome, {{ user.username }}</p>
+    <p class="text-muted mb-0">Owner tools and reporting center</p>
   </div>
 </div>
 
 <div class="row g-4">
 
+  <!-- PAYMENT LOG -->
   <div class="col-md-4">
-    <div class="card shadow-sm h-100">
+    <div class="card card-modern card-blue h-100">
       <div class="card-body">
         <h5 class="fw-bold">Payment Log</h5>
-        <a href="{% url 'payment_log' %}" class="btn btn-primary w-100">Open</a>
+        <p class="text-muted">Track all payments</p>
+        <a href="{% url 'payment_log' %}" class="btn btn-modern btn-blue w-100">Open</a>
       </div>
     </div>
   </div>
 
+  <!-- RENT ROLL -->
   <div class="col-md-4">
-    <div class="card shadow-sm h-100">
+    <div class="card card-modern card-gold h-100">
       <div class="card-body">
         <h5 class="fw-bold">Rent Roll</h5>
-        <a href="{% url 'rent_roll' %}" class="btn btn-primary w-100">Open</a>
+        <p class="text-muted">Residents and balances</p>
+        <a href="{% url 'rent_roll' %}" class="btn btn-modern btn-green w-100">Open</a>
       </div>
     </div>
   </div>
 
+  <!-- T12 -->
   <div class="col-md-4">
-    <div class="card shadow-sm h-100">
+    <div class="card card-modern card-green h-100">
       <div class="card-body">
         <h5 class="fw-bold">T-12 Report</h5>
-        <a href="{% url 't12_report' %}" class="btn btn-primary w-100">Open</a>
+        <p class="text-muted">Financial performance</p>
+        <a href="{% url 't12_report' %}" class="btn btn-modern btn-gray w-100">Open</a>
       </div>
     </div>
   </div>
 
+  <!-- UPLOAD -->
   <div class="col-md-4">
-    <div class="card shadow-sm h-100">
+    <div class="card card-modern card-blue h-100">
       <div class="card-body">
         <h5 class="fw-bold">Financial Upload</h5>
-        <a href="{% url 'financial_upload' %}" class="btn btn-success w-100">Upload</a>
+        <p class="text-muted">Upload spreadsheets</p>
+        <a href="{% url 'financial_upload' %}" class="btn btn-modern btn-blue w-100">Upload</a>
       </div>
     </div>
   </div>
 
+  <!-- PROPERTY -->
   <div class="col-md-4">
-    <div class="card shadow-sm h-100">
+    <div class="card card-modern card-gold h-100">
       <div class="card-body">
         <h5 class="fw-bold">Property Financials</h5>
-        <a href="{% url 'property_financials' 'Painted Lady' %}" class="btn btn-warning w-100">
-          Open
-        </a>
+        <p class="text-muted">Performance dashboard</p>
+        <a href="{% url 'property_financials' 'Painted Lady' %}" class="btn btn-modern btn-green w-100">Open</a>
       </div>
     </div>
   </div>
 
+  <!-- ADMIN -->
   <div class="col-md-4">
-    <div class="card shadow-sm h-100">
+    <div class="card card-modern card-gray h-100">
       <div class="card-body">
         <h5 class="fw-bold">Admin</h5>
-        <a href="/admin/" class="btn btn-outline-secondary w-100">Open</a>
+        <p class="text-muted">System records</p>
+        <a href="/admin/" class="btn btn-modern btn-gray w-100">Open</a>
       </div>
     </div>
   </div>
