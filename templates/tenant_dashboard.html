@@ -11,7 +11,10 @@
         <p class="text-muted mb-1">{{ application.email }}</p>
         <p class="text-muted">{{ application.phone }}</p>
 
-        <p><strong>Property:</strong> {{ application.property.name }}</p>
+        {% if application.property %}
+            <p><strong>Property:</strong> {{ application.property.name }}</p>
+        {% endif %}
+
         <p><strong>Room:</strong> {{ application.space_type }} {{ application.space_label }}</p>
     </div>
 </div>
@@ -24,9 +27,9 @@
         <div class="card-body">
             <h5 class="fw-bold">Rent</h5>
             <p>Balance: ${{ application.balance }}</p>
-            <a href="{% url 'pay_by_type' application.id 'rent' %}" class="btn btn-primary w-100 rounded-pill">
+            <button id="pay-rent-button" class="btn btn-primary w-100 rounded-pill">
                 Pay Rent
-            </a>
+            </button>
         </div>
     </div>
 </div>
@@ -37,10 +40,11 @@
     <div class="card shadow-sm h-100" style="border-top:6px solid #d4af37; border-radius:18px;">
         <div class="card-body">
             <h5 class="fw-bold">Deposit</h5>
-            <p>Remaining: ${{ application.deposit_required|floatformat:2 }}</p>
-            <a href="{% url 'pay_by_type' application.id 'deposit' %}" class="btn btn-warning w-100 rounded-pill">
+            <p>Required: ${{ application.deposit_required }}</p>
+            <p>Paid: ${{ application.deposit_paid }}</p>
+            <button id="pay-deposit-button" class="btn btn-warning w-100 rounded-pill">
                 Pay Deposit
-            </a>
+            </button>
         </div>
     </div>
 </div>
@@ -52,9 +56,9 @@
         <div class="card-body">
             <h5 class="fw-bold">Utilities</h5>
             <p>Balance: ${{ application.utility_balance }}</p>
-            <a href="{% url 'pay_by_type' application.id 'utility' %}" class="btn btn-success w-100 rounded-pill">
+            <button id="pay-utility-button" class="btn btn-success w-100 rounded-pill">
                 Pay Utilities
-            </a>
+            </button>
         </div>
     </div>
 </div>
@@ -71,6 +75,7 @@
     <thead>
         <tr>
             <th>Type</th>
+            <th>Description</th>
             <th>Amount</th>
             <th>Date</th>
             <th>Status</th>
@@ -80,24 +85,88 @@
         {% for payment in payments %}
         <tr>
             <td>{{ payment.get_payment_type_display }}</td>
+            <td>{{ payment.description }}</td>
             <td>${{ payment.amount }}</td>
             <td>{{ payment.created_at }}</td>
             <td>{{ payment.get_status_display }}</td>
         </tr>
         {% empty %}
         <tr>
-            <td colspan="4">No payments yet</td>
+            <td colspan="5">No payments yet</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
 </div>
 
+<script src="https://js.stripe.com/v3/"></script>
+
+<script>
+    const stripe = Stripe("{{ stripe_public_key }}");
+
+    function startCheckout(buttonId, paymentUrl, originalText) {
+        const button = document.getElementById(buttonId);
+
+        if (!button) {
+            return;
+        }
+
+        button.addEventListener("click", function () {
+            button.disabled = true;
+            button.innerText = "Opening checkout...";
+
+            fetch(paymentUrl)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                        button.disabled = false;
+                        button.innerText = originalText;
+                        return;
+                    }
+
+                    return stripe.redirectToCheckout({
+                        sessionId: data.id
+                    });
+                })
+                .catch(error => {
+                    alert("Unable to start payment. Please try again.");
+                    button.disabled = false;
+                    button.innerText = originalText;
+                });
+        });
+    }
+
+    startCheckout(
+        "pay-rent-button",
+        "{% url 'pay_by_type' application.id 'rent' %}",
+        "Pay Rent"
+    );
+
+    startCheckout(
+        "pay-deposit-button",
+        "{% url 'pay_by_type' application.id 'deposit' %}",
+        "Pay Deposit"
+    );
+
+    startCheckout(
+        "pay-utility-button",
+        "{% url 'pay_by_type' application.id 'utility' %}",
+        "Pay Utilities"
+    );
+</script>
+
 {% else %}
 
 <div class="alert alert-warning">
-    No application found for this user.
+    No resident profile is connected to this login yet.
 </div>
+
+<p>
+    Your login email must match the email on the resident profile.
+</p>
+
+<a href="/" class="btn btn-primary">Return Home</a>
 
 {% endif %}
 
