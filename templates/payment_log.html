@@ -29,6 +29,13 @@
 
     <div class="mb-4">
         <h1 class="fw-bold">Payment Log</h1>
+
+        <div class="d-flex gap-2 mt-3">
+            <a href="{% url 'export_payment_log_csv' %}" class="btn btn-success">
+                Download CSV
+            </a>
+        </div>
+
         <p class="text-muted">
             Payments sorted by property, month, and room/unit letter.
         </p>
