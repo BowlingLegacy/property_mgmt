@@ -132,7 +132,131 @@ def parse_date_cell(value):
 
 
 def parse_excel_upload(upload):
+    from decimal import Decimal
+    from django.utils import timezone
+
     FinancialEntry.objects.filter(upload=upload).delete()
+
+    workbook = openpyxl.load_workbook(upload.file.path, data_only=True)
+    created = 0
+
+    for sheet_name in workbook.sheetnames:
+        sheet = workbook[sheet_name]
+
+        # Skip non-month sheets
+        if not any(month in sheet_name.lower() for month in [
+            "jan", "feb", "mar", "apr", "may", "jun",
+            "jul", "aug", "sep", "oct", "nov", "dec"
+        ]):
+            continue
+
+        month, year = extract_month_year(sheet_name)
+
+        # --------------------------
+        # RESIDENT ROWS (3–21)
+        # --------------------------
+        for row in range(3, 22):
+
+            room = sheet[f"A{row}"].value
+            tenant = sheet[f"B{row}"].value
+
+            rent_owed = sheet[f"E{row}"].value
+            rent_paid = sheet[f"F{row}"].value
+            under_over = sheet[f"G{row}"].value
+            deposit_paid = sheet[f"H{row}"].value
+            utilities_paid = sheet[f"J{row}"].value
+
+            # Skip empty rows
+            if not tenant:
+                continue
+
+            def clean(value):
+                try:
+                    return Decimal(str(value)) if value else Decimal("0.00")
+                except:
+                    return Decimal("0.00")
+
+            rent_paid = clean(rent_paid)
+            deposit_paid = clean(deposit_paid)
+            utilities_paid = clean(utilities_paid)
+
+            # ---- RENT PAYMENT ----
+            if rent_paid > 0:
+                FinancialEntry.objects.create(
+                    upload=upload,
+                    property_name="Painted Lady",
+                    sheet_name=sheet_name,
+                    row_number=row,
+                    month=month,
+                    year=year,
+                    entry_type="income",
+                    category="Rent Payment",
+                    description=f"{tenant} - Room {room}",
+                    amount=rent_paid,
+                )
+                created += 1
+
+            # ---- DEPOSIT ----
+            if deposit_paid > 0:
+                FinancialEntry.objects.create(
+                    upload=upload,
+                    property_name="Painted Lady",
+                    sheet_name=sheet_name,
+                    row_number=row,
+                    month=month,
+                    year=year,
+                    entry_type="income",
+                    category="Deposit Payment",
+                    description=f"{tenant} - Room {room}",
+                    amount=deposit_paid,
+                )
+                created += 1
+
+            # ---- UTILITIES ----
+            if utilities_paid > 0:
+                FinancialEntry.objects.create(
+                    upload=upload,
+                    property_name="Painted Lady",
+                    sheet_name=sheet_name,
+                    row_number=row,
+                    month=month,
+                    year=year,
+                    entry_type="income",
+                    category="Utility Payment",
+                    description=f"{tenant} - Room {room}",
+                    amount=utilities_paid,
+                )
+                created += 1
+
+        # --------------------------
+        # DEBT SERVICE (Row 28, Col D)
+        # --------------------------
+        debt_service = sheet["D28"].value
+
+        try:
+            debt_service = Decimal(str(debt_service)) if debt_service else Decimal("0.00")
+        except:
+            debt_service = Decimal("0.00")
+
+        if debt_service > 0:
+            FinancialEntry.objects.create(
+                upload=upload,
+                property_name="Painted Lady",
+                sheet_name=sheet_name,
+                row_number=28,
+                month=month,
+                year=year,
+                entry_type="debt_service",
+                category="Debt Service",
+                description=f"Debt Service - {sheet_name}",
+                amount=debt_service,
+            )
+            created += 1
+
+    upload.parsed_at = timezone.now()
+    upload.save()
+
+    return created
 
     workbook = openpyxl.load_workbook(upload.file.path, data_only=True)
     created = 0
