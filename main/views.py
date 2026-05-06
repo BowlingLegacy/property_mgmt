@@ -712,7 +712,7 @@ def create_checkout_session(request, application_id, payment_type="rent"):
     payment.stripe_session_id = session.id
     payment.save()
 
-    return JsonResponse({"id": session.id})
+    return redirect(session.url)
 
 
 def payment_success(request):
