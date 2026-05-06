@@ -23,6 +23,9 @@ urlpatterns = [
     path("financial-upload/", views.financial_upload, name="financial_upload"),
     path("financial-upload/<int:upload_id>/parse/", views.parse_financial_upload, name="parse_financial_upload"),
 
+    # 🔥 NEW
+    path("property-financials/<str:property_name>/", views.property_financials, name="property_financials"),
+
     path("property/<int:pk>/", views.property_detail, name="property_detail"),
     path("journal/<int:pk>/", views.blog_detail, name="blog_detail"),
 
