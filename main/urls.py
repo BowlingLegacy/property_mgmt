@@ -23,8 +23,11 @@ urlpatterns = [
     path("financial-upload/", views.financial_upload, name="financial_upload"),
     path("financial-upload/<int:upload_id>/parse/", views.parse_financial_upload, name="parse_financial_upload"),
 
-    # 🔥 NEW
     path("property-financials/<str:property_name>/", views.property_financials, name="property_financials"),
+
+    path("export/payment-log/", views.export_payment_log_csv, name="export_payment_log_csv"),
+    path("export/rent-roll/", views.export_rent_roll_csv, name="export_rent_roll_csv"),
+    path("export/t12/", views.export_t12_csv, name="export_t12_csv"),
 
     path("property/<int:pk>/", views.property_detail, name="property_detail"),
     path("journal/<int:pk>/", views.blog_detail, name="blog_detail"),
