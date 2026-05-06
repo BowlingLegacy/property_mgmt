@@ -16,7 +16,12 @@ urlpatterns = [
 
     path("tenant-dashboard/", views.tenant_dashboard, name="tenant_dashboard"),
     path("landlord-dashboard/", views.landlord_dashboard, name="landlord_dashboard"),
+
     path("payment-log/", views.payment_log, name="payment_log"),
+    path("rent-roll/", views.rent_roll, name="rent_roll"),
+    path("t12-report/", views.t12_report, name="t12_report"),
+    path("financial-upload/", views.financial_upload, name="financial_upload"),
+    path("financial-upload/<int:upload_id>/parse/", views.parse_financial_upload, name="parse_financial_upload"),
 
     path("property/<int:pk>/", views.property_detail, name="property_detail"),
     path("journal/<int:pk>/", views.blog_detail, name="blog_detail"),
