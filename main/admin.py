@@ -11,6 +11,8 @@ from .models import (
     BlogComment,
     RentHistory,
     Payment,
+    FinancialUpload,
+    FinancialEntry,
 )
 
 
@@ -414,6 +416,106 @@ class RentHistoryAdmin(admin.ModelAdmin):
         "application",
         "rent_amount",
         "effective_date",
+        "created_at",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+
+class FinancialEntryInline(admin.TabularInline):
+    model = FinancialEntry
+    extra = 0
+    can_delete = False
+
+    readonly_fields = (
+        "property_name",
+        "sheet_name",
+        "row_number",
+        "entry_date",
+        "month",
+        "year",
+        "entry_type",
+        "category",
+        "description",
+        "amount",
+        "created_at",
+    )
+
+    fields = readonly_fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(FinancialUpload)
+class FinancialUploadAdmin(admin.ModelAdmin):
+    inlines = [FinancialEntryInline]
+
+    list_display = (
+        "name",
+        "uploaded_at",
+        "parsed_at",
+        "entry_count",
+    )
+
+    readonly_fields = (
+        "uploaded_at",
+        "parsed_at",
+    )
+
+    search_fields = (
+        "name",
+        "notes",
+    )
+
+    def entry_count(self, obj):
+        return obj.entries.count()
+
+    entry_count.short_description = "Entries"
+
+
+@admin.register(FinancialEntry)
+class FinancialEntryAdmin(admin.ModelAdmin):
+    list_display = (
+        "property_name",
+        "entry_type",
+        "category",
+        "amount",
+        "month",
+        "year",
+        "sheet_name",
+    )
+
+    list_filter = (
+        "entry_type",
+        "year",
+        "month",
+        "sheet_name",
+    )
+
+    search_fields = (
+        "property_name",
+        "category",
+        "description",
+        "sheet_name",
+    )
+
+    readonly_fields = (
+        "upload",
+        "property_name",
+        "sheet_name",
+        "row_number",
+        "entry_date",
+        "month",
+        "year",
+        "entry_type",
+        "category",
+        "description",
+        "amount",
         "created_at",
     )
 
