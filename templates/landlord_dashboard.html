@@ -1,31 +1,81 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h2 class="mb-4">Landlord Dashboard</h2>
+<h2 class="mb-4 fw-bold">Landlord Dashboard</h2>
 
-<div class="card shadow-sm">
+<div class="card shadow-sm mb-4">
   <div class="card-body">
-
-    <p class="lead">Welcome, {{ user.username }}.</p>
-
-    <p>
-      This is your landlord portal. In future phases, this page will include:
+    <p class="lead mb-1">Welcome, {{ user.username }}.</p>
+    <p class="text-muted mb-0">
+      Owner tools for payments, rent roll, financial reports, uploads, and admin records.
     </p>
-
-    <ul>
-      <li>Manage your properties</li>
-      <li>Upload photos and documents</li>
-      <li>View and process tenant applications</li>
-      <li>Send notices and messages</li>
-      <li>Track rent payments and balances</li>
-    </ul>
-
-    <p class="mt-3 text-muted">
-      Phase 1: This page is intentionally simple.  
-      Phase 2 will add full landlord functionality.
-    </p>
-
   </div>
+</div>
+
+<div class="row g-4">
+
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="fw-bold">Payment Log</h5>
+        <p class="text-muted">View rent, deposit, and utility payments by property, month, and room.</p>
+        <a href="{% url 'payment_log' %}" class="btn btn-primary w-100">Open Payment Log</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="fw-bold">Rent Roll</h5>
+        <p class="text-muted">View residents, room letters, rents, balances, utilities, and deposits.</p>
+        <a href="{% url 'rent_roll' %}" class="btn btn-primary w-100">Open Rent Roll</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="fw-bold">T-12 Report</h5>
+        <p class="text-muted">Review income, operating expenses, debt service, NOI, and cash flow.</p>
+        <a href="{% url 't12_report' %}" class="btn btn-primary w-100">Open T-12</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="fw-bold">Financial Upload</h5>
+        <p class="text-muted">Upload and parse Excel files for receipts, expenses, and financial reporting.</p>
+        <a href="{% url 'financial_upload' %}" class="btn btn-success w-100">Upload Financials</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="fw-bold">Painted Lady Financials</h5>
+        <p class="text-muted">Property dashboard with income, expenses, debt service, NOI, and cash flow.</p>
+        <a href="{% url 'property_financials' 'Painted Lady' %}" class="btn btn-warning w-100">
+          Open Property Dashboard
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="fw-bold">Admin Records</h5>
+        <p class="text-muted">Manage resident files, payments, documents, properties, uploads, and blog posts.</p>
+        <a href="/admin/" class="btn btn-outline-secondary w-100">Open Admin</a>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 {% endblock %}
