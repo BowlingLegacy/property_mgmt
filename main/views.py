@@ -1,6 +1,7 @@
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict
 from datetime import datetime, date
 from decimal import Decimal, InvalidOperation
+import csv
 
 import openpyxl
 import stripe
@@ -520,14 +521,11 @@ def printable_application(request, pk):
     return render(request, "printable_application.html", {
         "application": application,
     })
-    
+
+
 @login_required
 @user_passes_test(staff_required)
 def property_financials(request, property_name):
-    from django.db.models import Sum
-    from decimal import Decimal
-
-    # --- RESIDENT DATA ---
     residents = HousingApplication.objects.filter(
         property__name__iexact=property_name
     )
@@ -543,7 +541,6 @@ def property_financials(request, property_name):
     total_deposit_required = sum(r.deposit_required for r in residents)
     total_deposit_paid = sum(r.deposit_paid for r in residents)
 
-    # --- PAYMENT DATA ---
     payments = Payment.objects.filter(
         application__property__name__iexact=property_name,
         status="completed"
@@ -551,7 +548,6 @@ def property_financials(request, property_name):
 
     total_collected = payments.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
 
-    # --- EXPENSE DATA ---
     financial_entries = FinancialEntry.objects.filter(
         property_name__iexact=property_name
     )
@@ -568,7 +564,6 @@ def property_financials(request, property_name):
         entry_type="capital_expense"
     ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
 
-    # --- CALCULATIONS ---
     noi = total_collected - operating_expenses
     cash_flow = noi - debt_service
 
@@ -578,28 +573,209 @@ def property_financials(request, property_name):
 
     return render(request, "property_financials.html", {
         "property_name": property_name,
-
         "total_units": total_units,
         "total_rent": total_rent,
         "total_balance": total_balance,
-
         "total_utilities": total_utilities,
         "utility_balance": utility_balance,
-
         "total_deposit_required": total_deposit_required,
         "total_deposit_paid": total_deposit_paid,
-
         "total_collected": total_collected,
-
         "operating_expenses": operating_expenses,
         "debt_service": debt_service,
         "capital_expenses": capital_expenses,
-
         "noi": noi,
         "cash_flow": cash_flow,
-
         "rent_collection_percent": rent_collection_percent,
     })
+
+
+@login_required
+@user_passes_test(staff_required)
+def export_payment_log_csv(request):
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = 'attachment; filename="payment_log.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow([
+        "Property",
+        "Month",
+        "Room / Unit",
+        "Resident",
+        "Payment Type",
+        "Description",
+        "Amount Paid",
+        "Rent Balance Owed",
+        "Utility Balance Owed",
+        "Deposit Paid",
+        "Date Paid",
+        "Time Paid",
+        "Status",
+    ])
+
+    payments = (
+        Payment.objects
+        .filter(status="completed")
+        .select_related("application", "application__property")
+        .order_by("application__property__name", "created_at", "application__space_label")
+    )
+
+    for payment in payments:
+        local_dt = timezone.localtime(payment.created_at)
+        application = payment.application
+
+        writer.writerow([
+            application.property.name if application.property else "No Property",
+            local_dt.strftime("%B %Y"),
+            application.space_label or application.space_type or "",
+            application.full_name,
+            payment.get_payment_type_display(),
+            payment.description,
+            payment.amount,
+            application.balance,
+            application.utility_balance,
+            application.deposit_paid,
+            local_dt.strftime("%Y-%m-%d"),
+            local_dt.strftime("%I:%M %p"),
+            payment.get_status_display(),
+        ])
+
+    return response
+
+
+@login_required
+@user_passes_test(staff_required)
+def export_rent_roll_csv(request):
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = 'attachment; filename="rent_roll.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow([
+        "Property",
+        "Room / Unit",
+        "Resident",
+        "Monthly Rent",
+        "Rent Paid",
+        "Rent Balance",
+        "Monthly Utilities",
+        "Utilities Paid",
+        "Utility Balance",
+        "Deposit Required",
+        "Deposit Paid",
+    ])
+
+    residents = (
+        HousingApplication.objects
+        .select_related("property")
+        .order_by("property__name", "space_label", "full_name")
+    )
+
+    for resident in residents:
+        completed_payments = resident.payments.filter(status="completed")
+        rent_paid = completed_payments.filter(payment_type="rent").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        utility_paid = completed_payments.filter(payment_type="utility").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+
+        writer.writerow([
+            resident.property.name if resident.property else "No Property",
+            resident.space_label or resident.space_type or "",
+            resident.full_name,
+            resident.monthly_rent,
+            rent_paid,
+            resident.balance,
+            resident.utility_monthly,
+            utility_paid,
+            resident.utility_balance,
+            resident.deposit_required,
+            resident.deposit_paid,
+        ])
+
+    return response
+
+
+@login_required
+@user_passes_test(staff_required)
+def export_t12_csv(request):
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = 'attachment; filename="t12_report.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow([
+        "Month",
+        "Online Income",
+        "Operating Expenses",
+        "Debt Service",
+        "Capital Expenses",
+        "NOI",
+        "Cash Flow After Debt",
+    ])
+
+    year = timezone.localdate().year
+    financial_entries = FinancialEntry.objects.filter(year=year)
+
+    total_online_income = Decimal("0.00")
+    total_operating_expenses = Decimal("0.00")
+    total_debt_service = Decimal("0.00")
+    total_capital_expenses = Decimal("0.00")
+    total_noi = Decimal("0.00")
+    total_cash_flow = Decimal("0.00")
+
+    for month_number in range(1, 13):
+        online_income = (
+            Payment.objects
+            .filter(status="completed", created_at__year=year, created_at__month=month_number)
+            .aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        )
+
+        operating_expenses = (
+            financial_entries
+            .filter(month=month_number, entry_type="operating_expense")
+            .aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        )
+
+        debt_service = (
+            financial_entries
+            .filter(month=month_number, entry_type="debt_service")
+            .aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        )
+
+        capital_expenses = (
+            financial_entries
+            .filter(month=month_number, entry_type="capital_expense")
+            .aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        )
+
+        noi = online_income - operating_expenses
+        cash_flow = noi - debt_service
+
+        total_online_income += online_income
+        total_operating_expenses += operating_expenses
+        total_debt_service += debt_service
+        total_capital_expenses += capital_expenses
+        total_noi += noi
+        total_cash_flow += cash_flow
+
+        writer.writerow([
+            date(year, month_number, 1).strftime("%B"),
+            online_income,
+            operating_expenses,
+            debt_service,
+            capital_expenses,
+            noi,
+            cash_flow,
+        ])
+
+    writer.writerow([
+        "Total",
+        total_online_income,
+        total_operating_expenses,
+        total_debt_service,
+        total_capital_expenses,
+        total_noi,
+        total_cash_flow,
+    ])
+
+    return response
+
 
 @login_required
 def create_checkout_session(request, application_id, payment_type="rent"):
