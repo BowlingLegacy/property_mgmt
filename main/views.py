@@ -162,48 +162,28 @@ def enter_invite_code(request):
 
 @login_required
 def tenant_dashboard(request):
-
     request.session.set_expiry(0)
 
-    application = getattr(
-        request.user,
-        "resident_profile",
-        None
-    )
+    application = getattr(request.user, "resident_profile", None)
 
     payments = []
+    total_due = Decimal("0.00")
 
     if application:
         payments = application.payments.all().order_by("-created_at")
 
+        rent_due = application.balance if application.balance > 0 else Decimal("0.00")
+        deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
+        utility_due = application.utility_balance if application.utility_balance > 0 else Decimal("0.00")
+
+        total_due = rent_due + deposit_due + utility_due
+
     return render(request, "tenant_dashboard.html", {
         "application": application,
         "payments": payments,
+        "total_due": total_due,
         "stripe_public_key": settings.STRIPE_PUBLIC_KEY,
     })
-
-
-# =========================================================
-# LANDLORD DASHBOARD
-# =========================================================
-
-@login_required
-@user_passes_test(staff_required)
-def landlord_dashboard(request):
-
-    applications = HousingApplication.objects.all().order_by("-created_at")
-
-    properties = Property.objects.all()
-
-    payments = Payment.objects.all().order_by("-created_at")[:25]
-
-    return render(request, "landlord_dashboard.html", {
-        "applications": applications,
-        "properties": properties,
-        "payments": payments,
-    })
-
-
 # =========================================================
 # PAYMENT LOG
 # =========================================================
@@ -809,6 +789,14 @@ def create_checkout_session(
 
         description = "Utility Payment"
 
+   elif payment_type == "total":
+        rent_due = application.balance if application.balance > 0 else Decimal("0.00")
+        deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
+        utility_due = application.utility_balance if application.utility_balance > 0 else Decimal("0.00")
+
+        amount = rent_due + deposit_due + utility_due
+        description = "Combined Payment - Total Due"
+        payment_type = "other"
     else:
         return JsonResponse({
             "error": "Invalid payment type"
@@ -939,7 +927,22 @@ def stripe_webhook(request):
             Decimal("0.00"),
             application.utility_balance - payment.amount
         )
+    elif payment.payment_type == "other" and "combined" in payment.description.lower():
+        remaining = payment.amount
 
+        rent_due = application.balance if application.balance > 0 else Decimal("0.00")
+        rent_paid = min(rent_due, remaining)
+        application.balance = max(Decimal("0.00"), application.balance - rent_paid)
+        remaining -= rent_paid
+
+        deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
+        deposit_paid = min(deposit_due, remaining)
+        application.deposit_paid += deposit_paid
+        remaining -= deposit_paid
+
+        utility_due = application.utility_balance if application.utility_balance > 0 else Decimal("0.00")
+        utility_paid = min(utility_due, remaining)
+        application.utility_balance = max(Decimal("0.00"), application.utility_balance - utility_paid)
     application.save()
 
     owner_email = "BowlingLegacyLLC@outlook.com"
