@@ -69,15 +69,23 @@
                 <p class="mb-1"><strong>Room / Space:</strong> {{ application.space_type }} {{ application.space_label }}</p>
                 <p class="mb-0"><strong>Status:</strong> Active Resident File</p>
             </div>
+<div class="col-md-3">
 
-            <div class="col-md-3">
-                <a href="#resident-inbox" class="btn btn-gold w-100 rounded-pill mb-2">
-                    ✉ Open Inbox
-                </a>
-                <a href="#payment-history" class="btn btn-outline-primary w-100 rounded-pill">
-                    Payment History
-                </a>
-            </div>
+    <button
+        class="btn btn-gold w-100 rounded-pill mb-2"
+        data-bs-toggle="modal"
+        data-bs-target="#messageModal">
+
+        ✉ Request / Message
+    </button>
+
+    <a href="/"
+       class="btn btn-outline-primary w-100 rounded-pill">
+
+        Return Home
+    </a>
+
+</div>
 
         </div>
     </div>
