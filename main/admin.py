@@ -16,80 +16,109 @@ from .models import (
 )
 
 
-# =========================
-# USER ADMIN
-# =========================
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):
-    fieldsets = UserAdmin.fieldsets + (
-        ("RentLogic Resident File", {
+    fieldsets = (
+        ("Login", {
             "fields": (
+                "username",
+                "password",
+                "email",
                 "role",
                 "invite_code",
+                "is_active",
+            )
+        }),
+        ("Resident Link", {
+            "fields": (
                 "linked_resident_profile",
                 "resident_property",
                 "resident_unit",
                 "resident_monthly_rent",
                 "resident_balance",
+            )
+        }),
+        ("Important Dates", {
+            "fields": (
+                "last_login",
+                "date_joined",
+            )
+        }),
+    )
+
+    add_fieldsets = (
+        ("Create Login Account", {
+            "classes": ("wide",),
+            "fields": (
+                "username",
+                "email",
+                "role",
+                "password1",
+                "password2",
             ),
         }),
     )
 
-    add_fieldsets = UserAdmin.add_fieldsets + (
-        ("RentLogic Profile", {
-            "fields": ("email", "role", "invite_code"),
-        }),
-    )
-
     readonly_fields = (
+        "invite_code",
         "linked_resident_profile",
         "resident_property",
         "resident_unit",
         "resident_monthly_rent",
         "resident_balance",
+        "last_login",
+        "date_joined",
     )
 
     list_display = (
         "username",
         "email",
         "role",
+        "invite_code",
         "resident_unit",
         "resident_balance",
-        "is_staff",
         "is_active",
     )
 
-    search_fields = ("username", "email")
+    list_filter = (
+        "role",
+        "is_active",
+    )
+
+    search_fields = (
+        "username",
+        "email",
+        "invite_code",
+    )
+
+    ordering = ("username",)
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.exclude(is_superuser=True)
 
     def get_resident_profile(self, obj):
-        if not obj or not obj.email:
+        if not obj:
             return None
-        return HousingApplication.objects.filter(email=obj.email).first()
+        return getattr(obj, "resident_profile", None)
 
     def linked_resident_profile(self, obj):
         profile = self.get_resident_profile(obj)
-        if not profile:
-            return "No resident profile found"
-        return profile.full_name
+        return profile.full_name if profile else "No resident file linked"
 
     def resident_property(self, obj):
         profile = self.get_resident_profile(obj)
-        if not profile or not profile.property:
-            return "—"
-        return profile.property.name
+        if profile and profile.property:
+            return profile.property.name
+        return "—"
 
     def resident_unit(self, obj):
         profile = self.get_resident_profile(obj)
         if not profile:
             return "—"
-
-        parts = []
-        if profile.space_type:
-            parts.append(profile.space_type)
-        if profile.space_label:
-            parts.append(profile.space_label)
-
-        return " ".join(parts) if parts else "—"
+        return f"{profile.space_type} {profile.space_label}".strip() or "—"
 
     def resident_monthly_rent(self, obj):
         profile = self.get_resident_profile(obj)
@@ -101,10 +130,19 @@ class CustomUserAdmin(UserAdmin):
             return "—"
         return "No balance due" if profile.balance <= 0 else f"${profile.balance}"
 
+    def save_model(self, request, obj, form, change):
+        if obj.role == "tenant":
+            obj.is_staff = False
+            obj.is_superuser = False
 
-# =========================
-# PROPERTY ADMIN
-# =========================
+        elif obj.role in ["landlord", "assistant", "admin"]:
+            obj.is_staff = True
+            if obj.role != "admin":
+                obj.is_superuser = False
+
+        super().save_model(request, obj, form, change)
+
+
 class PropertyImageInline(admin.TabularInline):
     model = PropertyImage
     extra = 0
@@ -116,13 +154,27 @@ class PropertyAdmin(admin.ModelAdmin):
     list_display = ("name", "availability_status", "available_date", "owner_email")
 
 
-# =========================
-# APPLICATION ADMIN
-# =========================
 class ApplicantDocumentInline(admin.TabularInline):
     model = ApplicantDocument
     extra = 0
     can_delete = False
+
+    fields = (
+        "name",
+        "document_type",
+        "file",
+        "status",
+        "needs_signature",
+        "signed_at",
+        "locked",
+    )
+
+    readonly_fields = (
+        "signed_at",
+        "submitted_at",
+        "locked",
+        "created_at",
+    )
 
 
 class PaymentInline(admin.TabularInline):
@@ -137,6 +189,8 @@ class PaymentInline(admin.TabularInline):
         "status",
         "created_at",
     )
+
+    fields = readonly_fields
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -153,6 +207,8 @@ class RentHistoryInline(admin.TabularInline):
         "created_at",
     )
 
+    fields = readonly_fields
+
     def has_add_permission(self, request, obj=None):
         return False
 
@@ -167,6 +223,7 @@ class HousingApplicationAdmin(admin.ModelAdmin):
 
     list_display = (
         "full_name",
+        "user",
         "property",
         "space_label",
         "monthly_rent",
@@ -175,10 +232,114 @@ class HousingApplicationAdmin(admin.ModelAdmin):
         "deposit_paid",
     )
 
+    list_filter = (
+        "property",
+        "space_type",
+    )
 
-# =========================
-# BLOG
-# =========================
+    search_fields = (
+        "full_name",
+        "phone",
+        "email",
+        "space_label",
+        "user__username",
+        "user__invite_code",
+    )
+
+    fieldsets = (
+        ("Resident File Link", {
+            "fields": (
+                "user",
+                "property",
+                "space_type",
+                "space_label",
+            )
+        }),
+        ("Resident Information", {
+            "fields": (
+                "full_name",
+                "phone",
+                "email",
+                "age",
+            )
+        }),
+        ("Rent / Deposit / Utilities", {
+            "fields": (
+                "monthly_rent",
+                "balance",
+                "rent_due_day",
+                "deposit_required",
+                "deposit_paid",
+                "utility_monthly",
+                "utility_balance",
+            )
+        }),
+        ("Address History", {
+            "fields": (
+                "current_address",
+                "current_address_length",
+                "previous_address_1",
+                "previous_address_1_length",
+                "previous_address_2",
+                "previous_address_2_length",
+                "previous_address_3",
+                "previous_address_3_length",
+            )
+        }),
+        ("Identification", {
+            "fields": (
+                "drivers_license_number",
+                "has_valid_odl",
+                "oregon_id_number",
+                "id_upload",
+            )
+        }),
+        ("Income", {
+            "fields": (
+                "income_source",
+                "monthly_income",
+                "employer_name",
+                "employment_length",
+            )
+        }),
+        ("Background / Recovery / Notes", {
+            "fields": (
+                "previous_evictions",
+                "in_recovery",
+                "drug_of_choice",
+                "on_parole",
+                "parole_officer_name",
+                "parole_officer_phone",
+                "felony_history",
+                "odoc_time_served",
+                "housing_need",
+                "additional_notes",
+            )
+        }),
+        ("References", {
+            "fields": (
+                "reference_1_name",
+                "reference_1_phone",
+                "reference_1_relationship",
+                "reference_1_type",
+                "reference_2_name",
+                "reference_2_phone",
+                "reference_2_relationship",
+                "reference_2_type",
+            )
+        }),
+        ("Acknowledgments", {
+            "fields": (
+                "sobriety_acknowledgment",
+                "unconditional_regard_acknowledgment",
+                "created_at",
+            )
+        }),
+    )
+
+    readonly_fields = ("created_at",)
+
+
 @admin.register(BlogPost)
 class BlogPostAdmin(admin.ModelAdmin):
     list_display = ("title", "created_at")
@@ -190,9 +351,6 @@ class BlogCommentAdmin(admin.ModelAdmin):
     list_filter = ("approved",)
 
 
-# =========================
-# PAYMENTS
-# =========================
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
     list_display = (
@@ -206,8 +364,11 @@ class PaymentAdmin(admin.ModelAdmin):
     readonly_fields = (
         "application",
         "payment_type",
+        "description",
         "amount",
         "status",
+        "stripe_session_id",
+        "stripe_payment_intent",
         "created_at",
     )
 
@@ -217,9 +378,6 @@ class RentHistoryAdmin(admin.ModelAdmin):
     list_display = ("application", "rent_amount", "effective_date")
 
 
-# =========================
-# FINANCIALS
-# =========================
 class FinancialEntryInline(admin.TabularInline):
     model = FinancialEntry
     extra = 0
@@ -234,6 +392,8 @@ class FinancialEntryInline(admin.TabularInline):
         "sheet_name",
         "row_number",
     )
+
+    fields = readonly_fields
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -252,7 +412,6 @@ class FinancialUploadAdmin(admin.ModelAdmin):
 
 @admin.register(FinancialEntry)
 class FinancialEntryAdmin(admin.ModelAdmin):
-
     list_display = (
         "category",
         "description",
@@ -273,6 +432,7 @@ class FinancialEntryAdmin(admin.ModelAdmin):
     search_fields = (
         "description",
         "category",
+        "sheet_name",
     )
 
     ordering = (
