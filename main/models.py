@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
-
+import random
+import string
 
 class BlogPost(models.Model):
     title = models.CharField(max_length=255)
@@ -27,6 +28,8 @@ class BlogComment(models.Model):
         return f"Comment by {self.name} on {self.post.title}"
 
 
+
+
 class User(AbstractUser):
     ROLE_CHOICES = [
         ("tenant", "Tenant / Applicant"),
@@ -36,6 +39,17 @@ class User(AbstractUser):
 
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="tenant")
     invite_code = models.CharField(max_length=6, blank=True, null=True, unique=True)
+
+    def save(self, *args, **kwargs):
+        if not self.invite_code:
+            self.invite_code = self.generate_unique_code()
+        super().save(*args, **kwargs)
+
+    def generate_unique_code(self):
+        while True:
+            code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            if not User.objects.filter(invite_code=code).exists():
+                return code
 
     def __str__(self):
         return self.username
