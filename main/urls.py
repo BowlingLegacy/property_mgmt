@@ -41,4 +41,5 @@ urlpatterns = [
 
     path("payment-success/", views.payment_success, name="payment_success"),
     path("stripe/webhook/", views.stripe_webhook, name="stripe_webhook"),
+    path("resident-message/submit/", views.submit_resident_message, name="submit_resident_message"),
 ]
