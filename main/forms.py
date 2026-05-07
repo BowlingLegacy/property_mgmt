@@ -1,7 +1,13 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 
-from .models import HousingApplication, User, BlogComment, FinancialUpload
+from .models import (
+    HousingApplication,
+    User,
+    BlogComment,
+    FinancialUpload,
+    ResidentMessage,
+)
 
 
 class BlogCommentForm(forms.ModelForm):
@@ -33,6 +39,24 @@ class FinancialUploadForm(forms.ModelForm):
             "name": forms.TextInput(attrs={"class": "form-control"}),
             "file": forms.ClearableFileInput(attrs={"class": "form-control"}),
             "notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+        }
+
+
+class ResidentMessageForm(forms.ModelForm):
+    class Meta:
+        model = ResidentMessage
+        fields = ["message_type", "subject", "message"]
+        widgets = {
+            "message_type": forms.Select(attrs={"class": "form-select"}),
+            "subject": forms.TextInput(attrs={
+                "class": "form-control",
+                "placeholder": "Subject",
+            }),
+            "message": forms.Textarea(attrs={
+                "class": "form-control",
+                "rows": 5,
+                "placeholder": "Write your request or message here...",
+            }),
         }
 
 
@@ -108,14 +132,11 @@ class HousingApplicationForm(forms.ModelForm):
             "employment_length": forms.TextInput(attrs={"class": "form-control"}),
 
             "previous_evictions": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
-
             "in_recovery": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "drug_of_choice": forms.TextInput(attrs={"class": "form-control"}),
-
             "on_parole": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "parole_officer_name": forms.TextInput(attrs={"class": "form-control"}),
             "parole_officer_phone": forms.TextInput(attrs={"class": "form-control"}),
-
             "felony_history": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
             "odoc_time_served": forms.CheckboxInput(attrs={"class": "form-check-input"}),
 
@@ -131,7 +152,6 @@ class HousingApplicationForm(forms.ModelForm):
 
             "housing_need": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
             "additional_notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
-
             "sobriety_acknowledgment": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "unconditional_regard_acknowledgment": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
