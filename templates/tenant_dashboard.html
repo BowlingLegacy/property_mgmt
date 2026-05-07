@@ -16,29 +16,21 @@
         box-shadow: 0 8px 22px rgba(0,0,0,0.22);
     }
 
-    .resident-card {
+    .resident-card,
+    .pay-card,
+    .inbox-card {
         border-radius: 22px;
         border: none;
+        box-shadow: 0 8px 22px rgba(0,0,0,0.12);
+    }
+
+    .resident-card {
         background: linear-gradient(135deg, #f8fbff, #ffffff);
-        box-shadow: 0 10px 28px rgba(0,0,0,0.12);
     }
 
     .inbox-card {
-        border-radius: 20px;
-        border: none;
         background: #fff8df;
         border-top: 6px solid #d4af37;
-        box-shadow: 0 8px 22px rgba(0,0,0,0.12);
-    }
-
-    .pay-card {
-        border-radius: 18px;
-        border: none;
-        box-shadow: 0 8px 22px rgba(0,0,0,0.12);
-    }
-
-    .mail-icon {
-        font-size: 2.5rem;
     }
 </style>
 
@@ -66,26 +58,25 @@
                     <p class="mb-1"><strong>Property:</strong> {{ application.property.name }}</p>
                 {% endif %}
 
-                <p class="mb-1"><strong>Room / Space:</strong> {{ application.space_type }} {{ application.space_label }}</p>
+                <p class="mb-1">
+                    <strong>Room / Space:</strong>
+                    {{ application.space_type }} {{ application.space_label }}
+                </p>
+
                 <p class="mb-0"><strong>Status:</strong> Active Resident File</p>
             </div>
-<div class="col-md-3">
 
-    <button
-        class="btn btn-gold w-100 rounded-pill mb-2"
-        data-bs-toggle="modal"
-        data-bs-target="#messageModal">
+            <div class="col-md-3">
+                <button class="btn btn-gold w-100 rounded-pill mb-2"
+                        data-bs-toggle="modal"
+                        data-bs-target="#messageModal">
+                    ✉ Request / Message
+                </button>
 
-        ✉ Request / Message
-    </button>
-
-    <a href="/"
-       class="btn btn-outline-primary w-100 rounded-pill">
-
-        Return Home
-    </a>
-
-</div>
+                <a href="/" class="btn btn-outline-primary w-100 rounded-pill">
+                    Return Home
+                </a>
+            </div>
 
         </div>
     </div>
@@ -93,48 +84,54 @@
 
 <div class="row g-4 mb-5">
 
-{% if application.balance > 0 %}
-<div class="col-md-4">
-    <div class="card pay-card h-100" style="border-top:6px solid #1e3a5f;">
-        <div class="card-body">
-            <h5 class="fw-bold">Rent Due</h5>
-            <p class="fs-5">Balance: ${{ application.balance }}</p>
-            <a href="{% url 'pay_by_type' application.id 'rent' %}" class="btn btn-primary w-100 rounded-pill">
-                Pay Rent
-            </a>
+    {% if application.balance > 0 %}
+    <div class="col-md-4">
+        <div class="card pay-card h-100" style="border-top:6px solid #1e3a5f;">
+            <div class="card-body">
+                <h5 class="fw-bold">Rent Due</h5>
+                <p class="fs-5">Balance: ${{ application.balance }}</p>
+                <a href="{% url 'pay_by_type' application.id 'rent' %}"
+                   class="btn btn-primary w-100 rounded-pill">
+                    Pay Rent
+                </a>
+            </div>
         </div>
     </div>
-</div>
-{% endif %}
+    {% endif %}
 
-{% if application.deposit_paid < application.deposit_required %}
-<div class="col-md-4">
-    <div class="card pay-card h-100" style="border-top:6px solid #d4af37;">
-        <div class="card-body">
-            <h5 class="fw-bold">Deposit Due</h5>
-            <p class="mb-1">Required: ${{ application.deposit_required }}</p>
-            <p>Paid: ${{ application.deposit_paid }}</p>
-            <a href="{% url 'pay_by_type' application.id 'deposit' %}" class="btn btn-warning w-100 rounded-pill">
-                Pay Deposit
-            </a>
+    {% if application.deposit_paid < application.deposit_required %}
+    <div class="col-md-4">
+        <div class="card pay-card h-100" style="border-top:6px solid #d4af37;">
+            <div class="card-body">
+                <h5 class="fw-bold">Deposit Due</h5>
+                <p class="mb-1">Required: ${{ application.deposit_required }}</p>
+                <p>Paid: ${{ application.deposit_paid }}</p>
+                <a href="{% url 'pay_by_type' application.id 'deposit' %}"
+                   class="btn btn-warning w-100 rounded-pill">
+                    Pay Deposit
+                </a>
+            </div>
         </div>
     </div>
-</div>
-{% endif %}
+    {% endif %}
 
-{% if application.utility_balance > 0 %}
-<div class="col-md-4">
-    <div class="card pay-card h-100" style="border-top:6px solid #198754;">
-        <div class="card-body">
-            <h5 class="fw-bold">Utilities Due</h5>
-            <p class="fs-5">Balance: ${{ application.utility_balance }}</p>
-            <a href="{% url 'pay_by_type' application.id 'utility' %}" class="btn btn-success w-100 rounded-pill">
-                Pay Utilities
-            </a>
+    {% if application.utility_balance > 0 %}
+    <div class="col-md-4">
+        <div class="card pay-card h-100" style="border-top:6px solid #198754;">
+            <div class="card-body">
+                <h5 class="fw-bold">Utilities Due</h5>
+                <p class="fs-5">Balance: ${{ application.utility_balance }}</p>
+                <a href="{% url 'pay_by_type' application.id 'utility' %}"
+                   class="btn btn-success w-100 rounded-pill">
+                    Pay Utilities
+                </a>
+            </div>
         </div>
     </div>
+    {% endif %}
+
 </div>
-{% endif %}
+
 {% if total_due > 0 %}
 <div class="card shadow-sm my-5" style="border-radius:22px; border-top:8px solid #1e3a5f;">
     <div class="card-body text-center p-5">
@@ -152,30 +149,27 @@
     </div>
 </div>
 {% endif %}
-</div>
 
 <div id="resident-inbox" class="card inbox-card mb-5">
     <div class="card-body p-4">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
-            <div>
-                <h4 class="fw-bold mb-1">✉ Resident Inbox</h4>
-                <p class="text-muted mb-0">
-                    Applications, leases, onboarding documents, messages, and resident file documents.
-                </p>
-            </div>
-        </div>
+
+        <h4 class="fw-bold mb-1">✉ Resident Inbox</h4>
+        <p class="text-muted">
+            Applications, leases, onboarding documents, messages, requests, and resident file records.
+        </p>
 
         <div class="table-responsive">
             <table class="table table-hover align-middle bg-white">
                 <thead>
                     <tr>
-                        <th>Document</th>
+                        <th>Item</th>
                         <th>Type</th>
                         <th>Status</th>
-                        <th>Uploaded</th>
+                        <th>Date / Time</th>
                         <th>Open</th>
                     </tr>
                 </thead>
+
                 <tbody>
                     {% for document in application.documents.all %}
                     <tr>
@@ -185,7 +179,9 @@
                         <td>{{ document.created_at }}</td>
                         <td>
                             {% if document.file %}
-                                <a href="{{ document.file.url }}" class="btn btn-sm btn-primary rounded-pill" target="_blank">
+                                <a href="{{ document.file.url }}"
+                                   class="btn btn-sm btn-primary rounded-pill"
+                                   target="_blank">
                                     Open
                                 </a>
                             {% else %}
@@ -193,52 +189,112 @@
                             {% endif %}
                         </td>
                     </tr>
-                    {% empty %}
+                    {% endfor %}
+
+                    {% for resident_message in resident_messages %}
                     <tr>
-                        <td colspan="5" class="text-muted">
-                            No documents are currently in your inbox.
+                        <td>{{ resident_message.subject }}</td>
+                        <td>{{ resident_message.get_message_type_display }}</td>
+                        <td>{{ resident_message.get_status_display }}</td>
+                        <td>{{ resident_message.created_at }}</td>
+                        <td>
+                            <span class="badge bg-secondary">Filed</span>
                         </td>
                     </tr>
                     {% endfor %}
+
+                    {% if not application.documents.all and not resident_messages %}
+                    <tr>
+                        <td colspan="5" class="text-muted">
+                            No documents or messages are currently in your inbox.
+                        </td>
+                    </tr>
+                    {% endif %}
                 </tbody>
             </table>
         </div>
 
-        <div class="alert alert-info mt-3 mb-0">
-            Future messages, maintenance requests, complaints, leases, and onboarding forms will appear here.
-        </div>
     </div>
 </div>
 
 <h4 id="payment-history" class="fw-bold mb-3">Payment History</h4>
 
 <div class="table-responsive">
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th>Type</th>
-            <th>Description</th>
-            <th>Amount</th>
-            <th>Date</th>
-            <th>Status</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for payment in payments %}
-        <tr>
-            <td>{{ payment.get_payment_type_display }}</td>
-            <td>{{ payment.description }}</td>
-            <td>${{ payment.amount }}</td>
-            <td>{{ payment.created_at }}</td>
-            <td>{{ payment.get_status_display }}</td>
-        </tr>
-        {% empty %}
-        <tr>
-            <td colspan="5">No payments yet</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Type</th>
+                <th>Description</th>
+                <th>Amount</th>
+                <th>Date</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for payment in payments %}
+            <tr>
+                <td>{{ payment.get_payment_type_display }}</td>
+                <td>{{ payment.description }}</td>
+                <td>${{ payment.amount }}</td>
+                <td>{{ payment.created_at }}</td>
+                <td>{{ payment.get_status_display }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5">No payments yet</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="modal fade" id="messageModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content" style="border-radius:22px;">
+
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">
+                    Request / Message Landlord
+                </h5>
+
+                <button type="button"
+                        class="btn-close"
+                        data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+                <form method="POST" action="{% url 'submit_resident_message' %}">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Message Type</label>
+                        <select name="message_type" class="form-select">
+                            <option value="maintenance">Maintenance Request</option>
+                            <option value="complaint">Complaint</option>
+                            <option value="general">General Message</option>
+                            <option value="document">Document Question</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Subject</label>
+                        <input type="text" name="subject" class="form-control" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Message</label>
+                        <textarea name="message" class="form-control" rows="6" required></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary rounded-pill px-4">
+                        Submit Request
+                    </button>
+                </form>
+            </div>
+
+        </div>
+    </div>
 </div>
 
 {% else %}
