@@ -99,14 +99,13 @@ class PropertyImage(models.Model):
         return f"{self.property.name} Image"
 
 
-class HousingApplication(models.Model):
-    property = models.ForeignKey(
-        Property,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="applications",
-    )
+user = models.OneToOneField(
+    User,
+    on_delete=models.SET_NULL,
+    null=True,
+    blank=True,
+    related_name="resident_profile"
+)
 
     full_name = models.CharField(max_length=255)
     phone = models.CharField(max_length=20)
