@@ -14,6 +14,8 @@ from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from .forms import InviteCodeForm
+from django.contrib import messages
 
 from .forms import BlogCommentForm, HousingApplicationForm, FinancialUploadForm
 from .models import (
@@ -80,9 +82,35 @@ def apply(request):
 def apply_success(request):
     return render(request, "apply_success.html")
 
-
+@login_required
 def enter_invite_code(request):
-    return render(request, "enter_invite_code.html")
+    form = InviteCodeForm(request.POST or None)
+
+    if request.method == "POST":
+        if form.is_valid():
+            code = form.cleaned_data["invite_code"].upper()
+
+            user_with_code = User.objects.filter(invite_code=code).first()
+
+            if not user_with_code:
+                messages.error(request, "Invalid code")
+                return redirect("enter_invite_code")
+
+            # Find matching resident profile
+            profile = HousingApplication.objects.filter(email=user_with_code.email).first()
+
+            if not profile:
+                messages.error(request, "No resident profile found for this code")
+                return redirect("enter_invite_code")
+
+            # Connect logged-in user to profile
+            profile.user = request.user
+            profile.save()
+
+            messages.success(request, "Account linked successfully")
+            return redirect("tenant_dashboard")
+
+    return render(request, "enter_invite_code.html", {"form": form})
 
 
 def signup(request):
