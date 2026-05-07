@@ -19,6 +19,7 @@ from django.contrib import messages
 
 from .forms import BlogCommentForm, HousingApplicationForm, FinancialUploadForm
 from .models import (
+    User,
     Property,
     BlogPost,
     HousingApplication,
@@ -26,7 +27,6 @@ from .models import (
     FinancialUpload,
     FinancialEntry,
 )
-
 
 LATE_FEE_AMOUNT = Decimal("25.00")
 
