@@ -336,7 +336,155 @@ def rent_roll(request):
     return render(request, "rent_roll.html", {
         "rows": rows,
     })
+@login_required
+@user_passes_test(staff_required)
+def export_payment_log_csv(request):
 
+    response = HttpResponse(content_type="text/csv")
+
+    response["Content-Disposition"] = (
+        'attachment; filename="payment_log.csv"'
+    )
+
+    writer = csv.writer(response)
+
+    writer.writerow([
+        "Resident",
+        "Property",
+        "Payment Type",
+        "Amount",
+        "Status",
+        "Date",
+    ])
+
+    payments = Payment.objects.all().order_by("-created_at")
+
+    for payment in payments:
+
+        writer.writerow([
+            payment.application.full_name,
+            payment.application.property.name
+            if payment.application.property else "",
+            payment.get_payment_type_display(),
+            payment.amount,
+            payment.status,
+            timezone.localtime(payment.created_at).strftime(
+                "%Y-%m-%d %H:%M"
+            ),
+        ])
+
+    return response
+
+
+@login_required
+@user_passes_test(staff_required)
+def export_rent_roll_csv(request):
+
+    response = HttpResponse(content_type="text/csv")
+
+    response["Content-Disposition"] = (
+        'attachment; filename="rent_roll.csv"'
+    )
+
+    writer = csv.writer(response)
+
+    writer.writerow([
+        "Resident",
+        "Property",
+        "Room",
+        "Monthly Rent",
+        "Balance",
+        "Deposit Required",
+        "Deposit Paid",
+        "Utility Balance",
+    ])
+
+    residents = HousingApplication.objects.all()
+
+    for resident in residents:
+
+        writer.writerow([
+            resident.full_name,
+            resident.property.name if resident.property else "",
+            resident.space_label,
+            resident.monthly_rent,
+            resident.balance,
+            resident.deposit_required,
+            resident.deposit_paid,
+            resident.utility_balance,
+        ])
+
+    return response
+
+
+@login_required
+@user_passes_test(staff_required)
+def export_t12_csv(request):
+
+    response = HttpResponse(content_type="text/csv")
+
+    response["Content-Disposition"] = (
+        'attachment; filename="t12_report.csv"'
+    )
+
+    writer = csv.writer(response)
+
+    writer.writerow([
+        "Month",
+        "Income",
+        "Expenses",
+        "Debt Service",
+        "Cash Flow",
+    ])
+
+    current_year = timezone.localdate().year
+
+    for month in range(1, 13):
+
+        income = (
+            Payment.objects.filter(
+                status="completed",
+                created_at__year=current_year,
+                created_at__month=month,
+            ).aggregate(
+                total=Sum("amount")
+            )["total"]
+            or Decimal("0.00")
+        )
+
+        expenses = (
+            FinancialEntry.objects.filter(
+                year=current_year,
+                month=month,
+                entry_type="operating_expense",
+            ).aggregate(
+                total=Sum("amount")
+            )["total"]
+            or Decimal("0.00")
+        )
+
+        debt_service = (
+            FinancialEntry.objects.filter(
+                year=current_year,
+                month=month,
+                entry_type="debt_service",
+            ).aggregate(
+                total=Sum("amount")
+            )["total"]
+            or Decimal("0.00")
+        )
+
+        cash_flow = income - expenses - debt_service
+
+        writer.writerow([
+            date(current_year, month, 1).strftime("%B"),
+            income,
+            expenses,
+            debt_service,
+            cash_flow,
+        ])
+
+    return response
 
 # =========================================================
 # T12 REPORT
