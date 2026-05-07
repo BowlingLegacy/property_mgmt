@@ -161,6 +161,19 @@ def enter_invite_code(request):
 # =========================================================
 
 @login_required
+@user_passes_test(staff_required)
+def landlord_dashboard(request):
+    applications = HousingApplication.objects.all().order_by("-created_at")
+    properties = Property.objects.all()
+    payments = Payment.objects.all().order_by("-created_at")[:25]
+
+    return render(request, "landlord_dashboard.html", {
+        "applications": applications,
+        "properties": properties,
+        "payments": payments,
+    })
+    
+@login_required
 def tenant_dashboard(request):
     request.session.set_expiry(0)
 
@@ -740,7 +753,6 @@ def printable_application(request, pk):
         "application": application,
     })
 
-
 # =========================================================
 # STRIPE PAYMENTS
 # =========================================================
@@ -757,10 +769,7 @@ def create_checkout_session(request, application_id, payment_type="rent"):
         description = "Rent Payment"
 
     elif payment_type == "deposit":
-        amount = max(
-            application.deposit_required - application.deposit_paid,
-            Decimal("0.00")
-        )
+        amount = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
         description = "Deposit Payment"
 
     elif payment_type == "utility":
@@ -769,25 +778,52 @@ def create_checkout_session(request, application_id, payment_type="rent"):
 
     elif payment_type == "total":
         rent_due = application.balance if application.balance > 0 else Decimal("0.00")
-
-        deposit_due = max(
-            application.deposit_required - application.deposit_paid,
-            Decimal("0.00")
-        )
-
+        deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
         utility_due = application.utility_balance if application.utility_balance > 0 else Decimal("0.00")
 
         amount = rent_due + deposit_due + utility_due
-
         description = "Combined Payment - Total Due"
-
         payment_type = "other"
 
     else:
         return JsonResponse({"error": "Invalid payment type"})
 
     if amount <= 0:
+        return JsonResponse({"error": "No balance due"})
+
+    payment = Payment.objects.create(
+        application=application,
+        payment_type=payment_type,
+        description=description,
+        amount=amount,
+        status="pending",
+    )
+
+    session = stripe.checkout.Session.create(
+        payment_method_types=["card"],
+        mode="payment",
+        line_items=[{
+            "price_data": {
+                "currency": "usd",
+                "product_data": {"name": description},
+                "unit_amount": int(amount * 100),
+            },
+            "quantity": 1,
+        }],
+        success_url=request.build_absolute_uri("/payment-success/"),
+        cancel_url=request.build_absolute_uri("/tenant-dashboard/"),
+        metadata={"payment_id": str(payment.id)},
+    )
+
+    payment.stripe_session_id = session.id
+    payment.save()
+
     return redirect(session.url)
+
+
+def payment_success(request):
+    return render(request, "payment_success.html")
+
 
 # =========================================================
 # STRIPE WEBHOOK
@@ -795,21 +831,15 @@ def create_checkout_session(request, application_id, payment_type="rent"):
 
 @csrf_exempt
 def stripe_webhook(request):
-
     payload = request.body
-
-    sig_header = request.META.get(
-        "HTTP_STRIPE_SIGNATURE"
-    )
+    sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
 
     try:
-
         event = stripe.Webhook.construct_event(
             payload,
             sig_header,
             settings.STRIPE_WEBHOOK_SECRET
         )
-
     except Exception:
         return HttpResponse(status=400)
 
@@ -817,52 +847,40 @@ def stripe_webhook(request):
         return HttpResponse(status=200)
 
     session = event["data"]["object"]
-
-    payment_id = session.get(
-        "metadata",
-        {}
-    ).get("payment_id")
+    payment_id = session.get("metadata", {}).get("payment_id")
 
     if not payment_id:
         return HttpResponse(status=200)
 
-    payment = Payment.objects.filter(
-        id=payment_id
-    ).first()
+    payment = Payment.objects.filter(id=payment_id).first()
 
-    if not payment:
-        return HttpResponse(status=200)
-
-    if payment.status == "completed":
+    if not payment or payment.status == "completed":
         return HttpResponse(status=200)
 
     payment.status = "completed"
-    payment.stripe_payment_intent = session.get(
-        "payment_intent",
-        ""
-    )
-
+    payment.stripe_payment_intent = session.get("payment_intent", "")
     payment.save()
 
     application = payment.application
 
     if payment.payment_type == "rent":
-
         application.balance = max(
             Decimal("0.00"),
             application.balance - payment.amount
         )
 
     elif payment.payment_type == "deposit":
-
-        application.deposit_paid += payment.amount
+        application.deposit_paid = min(
+            application.deposit_required,
+            application.deposit_paid + payment.amount
+        )
 
     elif payment.payment_type == "utility":
-
         application.utility_balance = max(
             Decimal("0.00"),
             application.utility_balance - payment.amount
         )
+
     elif payment.payment_type == "other" and "combined" in payment.description.lower():
         remaining = payment.amount
 
@@ -873,12 +891,16 @@ def stripe_webhook(request):
 
         deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
         deposit_paid = min(deposit_due, remaining)
-        application.deposit_paid += deposit_paid
+        application.deposit_paid = min(
+            application.deposit_required,
+            application.deposit_paid + deposit_paid
+        )
         remaining -= deposit_paid
 
         utility_due = application.utility_balance if application.utility_balance > 0 else Decimal("0.00")
         utility_paid = min(utility_due, remaining)
         application.utility_balance = max(Decimal("0.00"), application.utility_balance - utility_paid)
+
     application.save()
 
     owner_email = "BowlingLegacyLLC@outlook.com"
@@ -888,7 +910,6 @@ def stripe_webhook(request):
 
     send_mail(
         subject="Resident Payment Received",
-
         message=f"""
 Resident: {application.full_name}
 
@@ -898,15 +919,8 @@ Payment Type:
 Amount:
 ${payment.amount}
 """,
-
-        from_email=getattr(
-            settings,
-            "DEFAULT_FROM_EMAIL",
-            None
-        ),
-
+        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
         recipient_list=[owner_email],
-
         fail_silently=True,
     )
 
