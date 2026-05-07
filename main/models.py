@@ -3,6 +3,7 @@ from django.contrib.auth.models import AbstractUser
 import random
 import string
 
+
 class BlogPost(models.Model):
     title = models.CharField(max_length=255)
     body = models.TextField()
@@ -28,12 +29,11 @@ class BlogComment(models.Model):
         return f"Comment by {self.name} on {self.post.title}"
 
 
-
-
 class User(AbstractUser):
     ROLE_CHOICES = [
         ("tenant", "Tenant / Applicant"),
         ("landlord", "Landlord / Property Manager"),
+        ("assistant", "Assistant"),
         ("admin", "Platform Admin"),
     ]
 
@@ -43,11 +43,16 @@ class User(AbstractUser):
     def save(self, *args, **kwargs):
         if not self.invite_code:
             self.invite_code = self.generate_unique_code()
+
+        if self.role == "tenant":
+            self.is_staff = False
+            self.is_superuser = False
+
         super().save(*args, **kwargs)
 
     def generate_unique_code(self):
         while True:
-            code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            code = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
             if not User.objects.filter(invite_code=code).exists():
                 return code
 
@@ -99,17 +104,26 @@ class PropertyImage(models.Model):
         return f"{self.property.name} Image"
 
 
-user = models.OneToOneField(
-    User,
-    on_delete=models.SET_NULL,
-    null=True,
-    blank=True,
-    related_name="resident_profile"
-)
+class HousingApplication(models.Model):
+    property = models.ForeignKey(
+        Property,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="applications",
+    )
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="resident_profile",
+    )
 
     full_name = models.CharField(max_length=255)
     phone = models.CharField(max_length=20)
-    email = models.EmailField()
+    email = models.EmailField(blank=True)
     age = models.PositiveIntegerField()
 
     space_type = models.CharField(max_length=50, blank=True)
