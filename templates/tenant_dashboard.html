@@ -1,35 +1,99 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h2 class="fw-bold mb-4" style="color:#1e3a5f;">Tenant Dashboard</h2>
+<style>
+    .resident-photo {
+        width: 130px;
+        height: 130px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #1e3a5f, #d4af37);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3rem;
+        font-weight: 800;
+        box-shadow: 0 8px 22px rgba(0,0,0,0.22);
+    }
+
+    .resident-card {
+        border-radius: 22px;
+        border: none;
+        background: linear-gradient(135deg, #f8fbff, #ffffff);
+        box-shadow: 0 10px 28px rgba(0,0,0,0.12);
+    }
+
+    .inbox-card {
+        border-radius: 20px;
+        border: none;
+        background: #fff8df;
+        border-top: 6px solid #d4af37;
+        box-shadow: 0 8px 22px rgba(0,0,0,0.12);
+    }
+
+    .pay-card {
+        border-radius: 18px;
+        border: none;
+        box-shadow: 0 8px 22px rgba(0,0,0,0.12);
+    }
+
+    .mail-icon {
+        font-size: 2.5rem;
+    }
+</style>
+
+<h2 class="fw-bold mb-4" style="color:#1e3a5f;">Resident File</h2>
 
 {% if application %}
 
-<div class="card shadow-sm mb-4" style="border-radius:18px;">
-    <div class="card-body">
-        <h4 class="fw-bold">{{ application.full_name }}</h4>
-        <p class="text-muted mb-1">{{ application.email }}</p>
-        <p class="text-muted">{{ application.phone }}</p>
+<div class="card resident-card mb-4">
+    <div class="card-body p-4">
+        <div class="row align-items-center g-4">
 
-        {% if application.property %}
-            <p><strong>Property:</strong> {{ application.property.name }}</p>
-        {% endif %}
+            <div class="col-md-2 text-center">
+                <div class="resident-photo mx-auto">
+                    {{ application.full_name|first|upper }}
+                </div>
+                <p class="text-muted small mt-2 mb-0">Resident Photo</p>
+            </div>
 
-        <p><strong>Room:</strong> {{ application.space_type }} {{ application.space_label }}</p>
+            <div class="col-md-7">
+                <h3 class="fw-bold mb-1">{{ application.full_name }}</h3>
+                <p class="text-muted mb-1">{{ application.phone }}</p>
+                <p class="text-muted mb-3">{{ application.email }}</p>
+
+                {% if application.property %}
+                    <p class="mb-1"><strong>Property:</strong> {{ application.property.name }}</p>
+                {% endif %}
+
+                <p class="mb-1"><strong>Room / Space:</strong> {{ application.space_type }} {{ application.space_label }}</p>
+                <p class="mb-0"><strong>Status:</strong> Active Resident File</p>
+            </div>
+
+            <div class="col-md-3">
+                <a href="#resident-inbox" class="btn btn-gold w-100 rounded-pill mb-2">
+                    ✉ Open Inbox
+                </a>
+                <a href="#payment-history" class="btn btn-outline-primary w-100 rounded-pill">
+                    Payment History
+                </a>
+            </div>
+
+        </div>
     </div>
 </div>
 
-<div class="row g-4">
+<div class="row g-4 mb-5">
 
 {% if application.balance > 0 %}
 <div class="col-md-4">
-    <div class="card shadow-sm h-100" style="border-top:6px solid #1e3a5f; border-radius:18px;">
+    <div class="card pay-card h-100" style="border-top:6px solid #1e3a5f;">
         <div class="card-body">
-            <h5 class="fw-bold">Rent</h5>
-            <p>Balance: ${{ application.balance }}</p>
-            <button id="pay-rent-button" class="btn btn-primary w-100 rounded-pill">
+            <h5 class="fw-bold">Rent Due</h5>
+            <p class="fs-5">Balance: ${{ application.balance }}</p>
+            <a href="{% url 'pay_by_type' application.id 'rent' %}" class="btn btn-primary w-100 rounded-pill">
                 Pay Rent
-            </button>
+            </a>
         </div>
     </div>
 </div>
@@ -37,14 +101,14 @@
 
 {% if application.deposit_paid < application.deposit_required %}
 <div class="col-md-4">
-    <div class="card shadow-sm h-100" style="border-top:6px solid #d4af37; border-radius:18px;">
+    <div class="card pay-card h-100" style="border-top:6px solid #d4af37;">
         <div class="card-body">
-            <h5 class="fw-bold">Deposit</h5>
-            <p>Required: ${{ application.deposit_required }}</p>
+            <h5 class="fw-bold">Deposit Due</h5>
+            <p class="mb-1">Required: ${{ application.deposit_required }}</p>
             <p>Paid: ${{ application.deposit_paid }}</p>
-            <button id="pay-deposit-button" class="btn btn-warning w-100 rounded-pill">
+            <a href="{% url 'pay_by_type' application.id 'deposit' %}" class="btn btn-warning w-100 rounded-pill">
                 Pay Deposit
-            </button>
+            </a>
         </div>
     </div>
 </div>
@@ -52,13 +116,13 @@
 
 {% if application.utility_balance > 0 %}
 <div class="col-md-4">
-    <div class="card shadow-sm h-100" style="border-top:6px solid #198754; border-radius:18px;">
+    <div class="card pay-card h-100" style="border-top:6px solid #198754;">
         <div class="card-body">
-            <h5 class="fw-bold">Utilities</h5>
-            <p>Balance: ${{ application.utility_balance }}</p>
-            <button id="pay-utility-button" class="btn btn-success w-100 rounded-pill">
+            <h5 class="fw-bold">Utilities Due</h5>
+            <p class="fs-5">Balance: ${{ application.utility_balance }}</p>
+            <a href="{% url 'pay_by_type' application.id 'utility' %}" class="btn btn-success w-100 rounded-pill">
                 Pay Utilities
-            </button>
+            </a>
         </div>
     </div>
 </div>
@@ -66,9 +130,63 @@
 
 </div>
 
-<hr class="my-5">
+<div id="resident-inbox" class="card inbox-card mb-5">
+    <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+            <div>
+                <h4 class="fw-bold mb-1">✉ Resident Inbox</h4>
+                <p class="text-muted mb-0">
+                    Applications, leases, onboarding documents, messages, and resident file documents.
+                </p>
+            </div>
+        </div>
 
-<h4 class="fw-bold mb-3">Payment History</h4>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle bg-white">
+                <thead>
+                    <tr>
+                        <th>Document</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Uploaded</th>
+                        <th>Open</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for document in application.documents.all %}
+                    <tr>
+                        <td>{{ document.name }}</td>
+                        <td>{{ document.get_document_type_display }}</td>
+                        <td>{{ document.get_status_display }}</td>
+                        <td>{{ document.created_at }}</td>
+                        <td>
+                            {% if document.file %}
+                                <a href="{{ document.file.url }}" class="btn btn-sm btn-primary rounded-pill" target="_blank">
+                                    Open
+                                </a>
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-muted">
+                            No documents are currently in your inbox.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="alert alert-info mt-3 mb-0">
+            Future messages, maintenance requests, complaints, leases, and onboarding forms will appear here.
+        </div>
+    </div>
+</div>
+
+<h4 id="payment-history" class="fw-bold mb-3">Payment History</h4>
 
 <div class="table-responsive">
 <table class="table table-striped">
@@ -99,74 +217,18 @@
 </table>
 </div>
 
-<script src="https://js.stripe.com/v3/"></script>
-
-<script>
-    const stripe = Stripe("{{ stripe_public_key }}");
-
-    function startCheckout(buttonId, paymentUrl, originalText) {
-        const button = document.getElementById(buttonId);
-
-        if (!button) {
-            return;
-        }
-
-        button.addEventListener("click", function () {
-            button.disabled = true;
-            button.innerText = "Opening checkout...";
-
-            fetch(paymentUrl)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.error) {
-                        alert(data.error);
-                        button.disabled = false;
-                        button.innerText = originalText;
-                        return;
-                    }
-
-                    return stripe.redirectToCheckout({
-                        sessionId: data.id
-                    });
-                })
-                .catch(error => {
-                    alert("Unable to start payment. Please try again.");
-                    button.disabled = false;
-                    button.innerText = originalText;
-                });
-        });
-    }
-
-    startCheckout(
-        "pay-rent-button",
-        "{% url 'pay_by_type' application.id 'rent' %}",
-        "Pay Rent"
-    );
-
-    startCheckout(
-        "pay-deposit-button",
-        "{% url 'pay_by_type' application.id 'deposit' %}",
-        "Pay Deposit"
-    );
-
-    startCheckout(
-        "pay-utility-button",
-        "{% url 'pay_by_type' application.id 'utility' %}",
-        "Pay Utilities"
-    );
-</script>
-
 {% else %}
 
 <div class="alert alert-warning">
-    No resident profile is connected to this login yet.
+    No resident file is connected to this login yet.
 </div>
 
 <p>
-    Your login email must match the email on the resident profile.
+    Please enter your access code or contact Bowling Legacy Housing for help connecting your resident file.
 </p>
 
-<a href="/" class="btn btn-primary">Return Home</a>
+<a href="{% url 'enter_invite_code' %}" class="btn btn-primary rounded-pill">Enter Access Code</a>
+<a href="/" class="btn btn-outline-secondary rounded-pill">Return Home</a>
 
 {% endif %}
 
