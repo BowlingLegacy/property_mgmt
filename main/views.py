@@ -121,9 +121,7 @@ def signup(request):
 def tenant_dashboard(request):
     request.session.set_expiry(0)
 
-    application = HousingApplication.objects.filter(
-        email=request.user.email
-    ).first()
+    application = getattr(request.user, "resident_profile", None)
 
     payments = []
     if application:
