@@ -127,7 +127,23 @@
     </div>
 </div>
 {% endif %}
+{% if total_due > 0 %}
+<div class="card shadow-sm my-5" style="border-radius:22px; border-top:8px solid #1e3a5f;">
+    <div class="card-body text-center p-5">
+        <h3 class="fw-bold" style="color:#1e3a5f;">Pay Total Due</h3>
+        <p class="fs-2 fw-bold mb-4">${{ total_due }}</p>
 
+        <a href="{% url 'pay_by_type' application.id 'total' %}"
+           class="btn btn-primary btn-lg rounded-pill px-5">
+            Pay Full Balance
+        </a>
+
+        <p class="text-muted mt-3 mb-0">
+            This combines rent, deposit, and utilities into one payment.
+        </p>
+    </div>
+</div>
+{% endif %}
 </div>
 
 <div id="resident-inbox" class="card inbox-card mb-5">
