@@ -356,3 +356,48 @@ class FinancialEntry(models.Model):
 
     def __str__(self):
         return f"{self.get_entry_type_display()} - ${self.amount} - {self.sheet_name}"
+
+class ResidentMessage(models.Model):
+    MESSAGE_TYPE_CHOICES = [
+        ("maintenance", "Maintenance Request"),
+        ("complaint", "Complaint"),
+        ("general", "General Message"),
+        ("document", "Document Question"),
+    ]
+
+    STATUS_CHOICES = [
+        ("submitted", "Submitted"),
+        ("reviewed", "Reviewed"),
+        ("closed", "Closed"),
+    ]
+
+    application = models.ForeignKey(
+        HousingApplication,
+        on_delete=models.CASCADE,
+        related_name="resident_messages",
+    )
+
+    message_type = models.CharField(
+        max_length=30,
+        choices=MESSAGE_TYPE_CHOICES,
+        default="general",
+    )
+
+    subject = models.CharField(max_length=255)
+    message = models.TextField()
+
+    status = models.CharField(
+        max_length=30,
+        choices=STATUS_CHOICES,
+        default="submitted",
+    )
+
+    locked = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.get_message_type_display()} - {self.application.full_name} - {self.created_at}"
