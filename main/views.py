@@ -2,7 +2,7 @@ from collections import OrderedDict
 from datetime import date
 from decimal import Decimal, InvalidOperation
 import csv
-
+from django.contrib import messages
 import stripe
 from django.conf import settings
 from django.contrib import messages
@@ -176,7 +176,7 @@ def landlord_dashboard(request):
 @login_required
 def tenant_dashboard(request):
     request.session.set_expiry(0)
-
+def tenant_dashboard(request):
     application = getattr(request.user, "resident_profile", None)
 
     payments = []
@@ -197,6 +197,65 @@ def tenant_dashboard(request):
         "total_due": total_due,
         "stripe_public_key": settings.STRIPE_PUBLIC_KEY,
     })
+@login_required
+def submit_resident_message(request):
+
+    if request.method != "POST":
+        return redirect("tenant_dashboard")
+
+    application = getattr(
+        request.user,
+        "resident_profile",
+        None
+    )
+
+    if not application:
+        messages.error(
+            request,
+            "No resident file connected."
+        )
+        return redirect("tenant_dashboard")
+
+    message_type = request.POST.get(
+        "message_type",
+        "general"
+    )
+
+    subject = request.POST.get(
+        "subject",
+        ""
+    ).strip()
+
+    message = request.POST.get(
+        "message",
+        ""
+    ).strip()
+
+    if not subject or not message:
+
+        messages.error(
+            request,
+            "Subject and message are required."
+        )
+
+        return redirect("tenant_dashboard")
+
+    ResidentMessage.objects.create(
+        application=application,
+        message_type=message_type,
+        subject=subject,
+        message=message,
+        status="submitted",
+        locked=True,
+    )
+
+    messages.success(
+        request,
+        "Your message/request has been submitted."
+    )
+
+    return redirect("tenant_dashboard")
+
 # =========================================================
 # PAYMENT LOG
 # =========================================================
