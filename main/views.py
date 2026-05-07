@@ -746,112 +746,48 @@ def printable_application(request, pk):
 # =========================================================
 
 @login_required
-def create_checkout_session(
-    request,
-    application_id,
-    payment_type="rent"
-):
-
-    application = get_object_or_404(
-        HousingApplication,
-        id=application_id
-    )
+def create_checkout_session(request, application_id, payment_type="rent"):
+    application = get_object_or_404(HousingApplication, id=application_id)
 
     amount = Decimal("0.00")
     description = ""
 
     if payment_type == "rent":
-
-        amount = (
-            application.balance
-            if application.balance > 0
-            else application.monthly_rent
-        )
-
+        amount = application.balance if application.balance > 0 else application.monthly_rent
         description = "Rent Payment"
 
     elif payment_type == "deposit":
-
         amount = max(
             application.deposit_required - application.deposit_paid,
             Decimal("0.00")
         )
-
         description = "Deposit Payment"
 
     elif payment_type == "utility":
-
-        amount = (
-            application.utility_balance
-            if application.utility_balance > 0
-            else application.utility_monthly
-        )
-
+        amount = application.utility_balance if application.utility_balance > 0 else application.utility_monthly
         description = "Utility Payment"
 
-   elif payment_type == "total":
+    elif payment_type == "total":
         rent_due = application.balance if application.balance > 0 else Decimal("0.00")
-        deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
+
+        deposit_due = max(
+            application.deposit_required - application.deposit_paid,
+            Decimal("0.00")
+        )
+
         utility_due = application.utility_balance if application.utility_balance > 0 else Decimal("0.00")
 
         amount = rent_due + deposit_due + utility_due
+
         description = "Combined Payment - Total Due"
+
         payment_type = "other"
+
     else:
-        return JsonResponse({
-            "error": "Invalid payment type"
-        })
+        return JsonResponse({"error": "Invalid payment type"})
 
     if amount <= 0:
-        return JsonResponse({
-            "error": "No balance due"
-        })
-
-    payment = Payment.objects.create(
-        application=application,
-        payment_type=payment_type,
-        description=description,
-        amount=amount,
-        status="pending",
-    )
-
-    session = stripe.checkout.Session.create(
-        payment_method_types=["card"],
-        mode="payment",
-
-        line_items=[{
-            "price_data": {
-                "currency": "usd",
-                "product_data": {
-                    "name": description
-                },
-                "unit_amount": int(amount * 100),
-            },
-            "quantity": 1,
-        }],
-
-        success_url=request.build_absolute_uri(
-            "/payment-success/"
-        ),
-
-        cancel_url=request.build_absolute_uri(
-            "/tenant-dashboard/"
-        ),
-
-        metadata={
-            "payment_id": str(payment.id)
-        },
-    )
-
-    payment.stripe_session_id = session.id
-    payment.save()
-
     return redirect(session.url)
-
-
-def payment_success(request):
-    return render(request, "payment_success.html")
-
 
 # =========================================================
 # STRIPE WEBHOOK
