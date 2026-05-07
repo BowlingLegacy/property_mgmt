@@ -1,765 +1,460 @@
-from collections import OrderedDict
-from datetime import date
-from decimal import Decimal, InvalidOperation
-import csv
-
-import stripe
-from django.conf import settings
-from django.contrib import messages
-from django.contrib.auth import logout
-from django.contrib.auth.decorators import login_required, user_passes_test
-from django.core.mail import send_mail
-from django.db.models import Sum
-from django.http import JsonResponse, HttpResponse
-from django.shortcuts import render, redirect, get_object_or_404
-from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
-
-from .forms import (
-    InviteCodeForm,
-    BlogCommentForm,
-    HousingApplicationForm,
-    FinancialUploadForm,
-)
+from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
 
 from .models import (
     User,
     Property,
-    BlogPost,
+    PropertyImage,
     HousingApplication,
+    ApplicantDocument,
+    BlogPost,
+    BlogComment,
+    RentHistory,
     Payment,
     FinancialUpload,
     FinancialEntry,
 )
 
-stripe.api_key = settings.STRIPE_SECRET_KEY
 
-LATE_FEE_AMOUNT = Decimal("25.00")
-
-
-def money(value):
-    if value is None:
-        return Decimal("0.00")
-
-    if isinstance(value, Decimal):
-        return value
-
-    try:
-        cleaned = str(value).replace("$", "").replace(",", "").strip()
-        return Decimal(cleaned).quantize(Decimal("0.01"))
-
-    except (InvalidOperation, ValueError, TypeError):
-        return Decimal("0.00")
-
-
-def staff_required(user):
-    return user.is_authenticated and (user.is_staff or user.is_superuser)
-
-
-# =========================================================
-# PUBLIC PAGES
-# =========================================================
-
-def home(request):
-    properties = Property.objects.all()
-    posts = BlogPost.objects.all().order_by("-created_at")[:5]
-
-    return render(request, "home.html", {
-        "properties": properties,
-        "posts": posts,
-    })
-
-
-def creed(request):
-    return render(request, "creed.html")
-
-
-def apply(request):
-    if request.method == "POST":
-        form = HousingApplicationForm(request.POST, request.FILES)
-
-        if form.is_valid():
-            form.save()
-            return redirect("apply_success")
-
-    else:
-        form = HousingApplicationForm()
-
-    return render(request, "apply.html", {
-        "form": form,
-    })
-
-
-def apply_success(request):
-    return render(request, "apply_success.html")
-
-
-# =========================================================
-# AUTH
-# =========================================================
-
-def logout_view(request):
-    logout(request)
-    request.session.flush()
-    return redirect("login")
-
-
-def signup(request):
-    return render(request, "signup.html")
-
-
-@login_required
-def enter_invite_code(request):
-    form = InviteCodeForm(request.POST or None)
-
-    if request.method == "POST":
-
-        if form.is_valid():
-            code = form.cleaned_data["invite_code"].upper()
-
-            user_with_code = User.objects.filter(
-                invite_code=code
-            ).first()
-
-            if not user_with_code:
-                messages.error(request, "Invalid access code.")
-                return redirect("enter_invite_code")
-
-            profile = HousingApplication.objects.filter(
-                user=user_with_code
-            ).first()
-
-            if not profile:
-                profile = HousingApplication.objects.filter(
-                    email=user_with_code.email
-                ).first()
-
-            if not profile:
-                messages.error(
-                    request,
-                    "No resident file is connected to this code yet."
-                )
-                return redirect("enter_invite_code")
-
-            profile.user = request.user
-            profile.save()
-
-            messages.success(
-                request,
-                "Resident file linked successfully."
+@admin.register(User)
+class CustomUserAdmin(UserAdmin):
+    fieldsets = (
+        ("Login", {
+            "fields": (
+                "username",
+                "password",
+                "email",
+                "role",
+                "invite_code",
+                "is_active",
             )
-
-            return redirect("tenant_dashboard")
-
-    return render(request, "enter_invite_code.html", {
-        "form": form,
-    })
-
-
-# =========================================================
-# TENANT DASHBOARD = RESIDENT FILE
-# =========================================================
-
-@login_required
-def tenant_dashboard(request):
-
-    request.session.set_expiry(0)
-
-    application = getattr(
-        request.user,
-        "resident_profile",
-        None
-    )
-
-    payments = []
-
-    if application:
-        payments = application.payments.all().order_by("-created_at")
-
-    return render(request, "tenant_dashboard.html", {
-        "application": application,
-        "payments": payments,
-        "stripe_public_key": settings.STRIPE_PUBLIC_KEY,
-    })
-
-
-# =========================================================
-# LANDLORD DASHBOARD
-# =========================================================
-
-@login_required
-@user_passes_test(staff_required)
-def landlord_dashboard(request):
-
-    applications = HousingApplication.objects.all().order_by("-created_at")
-
-    properties = Property.objects.all()
-
-    payments = Payment.objects.all().order_by("-created_at")[:25]
-
-    return render(request, "landlord_dashboard.html", {
-        "applications": applications,
-        "properties": properties,
-        "payments": payments,
-    })
-
-
-# =========================================================
-# PAYMENT LOG
-# =========================================================
-
-@login_required
-@user_passes_test(staff_required)
-def payment_log(request):
-
-    completed_payments = (
-        Payment.objects
-        .filter(status="completed")
-        .select_related("application", "application__property")
-        .order_by(
-            "application__property__name",
-            "-created_at",
-            "application__space_label",
-            "application__full_name",
-        )
-    )
-
-    grouped = OrderedDict()
-
-    for payment in completed_payments:
-
-        application = payment.application
-
-        property_name = (
-            application.property.name
-            if application.property
-            else "No Property"
-        )
-
-        month_label = timezone.localtime(
-            payment.created_at
-        ).strftime("%B %Y")
-
-        grouped.setdefault(property_name, OrderedDict())
-        grouped[property_name].setdefault(month_label, [])
-        grouped[property_name][month_label].append(payment)
-
-    payment_log_data = []
-
-    for property_name, months in grouped.items():
-
-        month_data = []
-
-        for month_label, payments in months.items():
-
-            payments_sorted = sorted(
-                payments,
-                key=lambda p: (
-                    (
-                        p.application.space_label
-                        or p.application.space_type
-                        or ""
-                    ).lower(),
-                    p.application.full_name.lower(),
-                )
+        }),
+        ("Resident Link", {
+            "fields": (
+                "linked_resident_profile",
+                "resident_property",
+                "resident_unit",
+                "resident_monthly_rent",
+                "resident_balance",
             )
-
-            month_data.append({
-                "month_label": month_label,
-                "payments": payments_sorted,
-            })
-
-        payment_log_data.append({
-            "property_name": property_name,
-            "months": month_data,
-        })
-
-    return render(request, "payment_log.html", {
-        "payment_log": payment_log_data,
-    })
-
-
-# =========================================================
-# RENT ROLL
-# =========================================================
-
-@login_required
-@user_passes_test(staff_required)
-def rent_roll(request):
-
-    residents = (
-        HousingApplication.objects
-        .select_related("property")
-        .order_by(
-            "property__name",
-            "space_label",
-            "full_name"
-        )
-    )
-
-    rows = []
-
-    for resident in residents:
-
-        completed_payments = resident.payments.filter(
-            status="completed"
-        )
-
-        rent_paid = (
-            completed_payments
-            .filter(payment_type="rent")
-            .aggregate(total=Sum("amount"))["total"]
-            or Decimal("0.00")
-        )
-
-        utility_paid = (
-            completed_payments
-            .filter(payment_type="utility")
-            .aggregate(total=Sum("amount"))["total"]
-            or Decimal("0.00")
-        )
-
-        rows.append({
-            "property": resident.property.name if resident.property else "No Property",
-            "room": resident.space_label or resident.space_type or "—",
-            "resident": resident.full_name,
-            "monthly_rent": resident.monthly_rent,
-            "rent_balance": resident.balance,
-            "rent_paid": rent_paid,
-            "utility_monthly": resident.utility_monthly,
-            "utility_balance": resident.utility_balance,
-            "utility_paid": utility_paid,
-            "deposit_required": resident.deposit_required,
-            "deposit_paid": resident.deposit_paid,
-        })
-
-    return render(request, "rent_roll.html", {
-        "rows": rows,
-    })
-
-
-# =========================================================
-# T12 REPORT
-# =========================================================
-
-@login_required
-@user_passes_test(staff_required)
-def t12_report(request):
-
-    year = timezone.localdate().year
-
-    financial_entries = FinancialEntry.objects.filter(
-        year=year
-    )
-
-    months = []
-
-    for month_number in range(1, 13):
-
-        online_income = (
-            Payment.objects
-            .filter(
-                status="completed",
-                created_at__year=year,
-                created_at__month=month_number,
+        }),
+        ("Important Dates", {
+            "fields": (
+                "last_login",
+                "date_joined",
             )
-            .aggregate(total=Sum("amount"))["total"]
-            or Decimal("0.00")
-        )
+        }),
+    )
 
-        spreadsheet_income = (
-            financial_entries
-            .filter(
-                month=month_number,
-                entry_type="income"
+    add_fieldsets = (
+        ("Create Login Account", {
+            "classes": ("wide",),
+            "fields": (
+                "username",
+                "email",
+                "role",
+                "password1",
+                "password2",
+            ),
+        }),
+    )
+
+    readonly_fields = (
+        "invite_code",
+        "linked_resident_profile",
+        "resident_property",
+        "resident_unit",
+        "resident_monthly_rent",
+        "resident_balance",
+        "last_login",
+        "date_joined",
+    )
+
+    list_display = (
+        "username",
+        "email",
+        "role",
+        "invite_code",
+        "resident_unit",
+        "resident_balance",
+        "is_active",
+    )
+
+    list_filter = (
+        "role",
+        "is_active",
+    )
+
+    search_fields = (
+        "username",
+        "email",
+        "invite_code",
+    )
+
+    ordering = ("username",)
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.exclude(is_superuser=True)
+
+    def get_resident_profile(self, obj):
+        if not obj:
+            return None
+        return getattr(obj, "resident_profile", None)
+
+    def linked_resident_profile(self, obj):
+        profile = self.get_resident_profile(obj)
+        return profile.full_name if profile else "No resident file linked"
+
+    def resident_property(self, obj):
+        profile = self.get_resident_profile(obj)
+        if profile and profile.property:
+            return profile.property.name
+        return "—"
+
+    def resident_unit(self, obj):
+        profile = self.get_resident_profile(obj)
+        if not profile:
+            return "—"
+        return f"{profile.space_type} {profile.space_label}".strip() or "—"
+
+    def resident_monthly_rent(self, obj):
+        profile = self.get_resident_profile(obj)
+        return f"${profile.monthly_rent}" if profile else "—"
+
+    def resident_balance(self, obj):
+        profile = self.get_resident_profile(obj)
+        if not profile:
+            return "—"
+        return "No balance due" if profile.balance <= 0 else f"${profile.balance}"
+
+    def save_model(self, request, obj, form, change):
+        if obj.role == "tenant":
+            obj.is_staff = False
+            obj.is_superuser = False
+
+        elif obj.role in ["landlord", "assistant", "admin"]:
+            obj.is_staff = True
+            if obj.role != "admin":
+                obj.is_superuser = False
+
+        super().save_model(request, obj, form, change)
+
+
+class PropertyImageInline(admin.TabularInline):
+    model = PropertyImage
+    extra = 0
+
+
+@admin.register(Property)
+class PropertyAdmin(admin.ModelAdmin):
+    inlines = [PropertyImageInline]
+    list_display = ("name", "availability_status", "available_date", "owner_email")
+
+
+class ApplicantDocumentInline(admin.TabularInline):
+    model = ApplicantDocument
+    extra = 0
+    can_delete = False
+
+    fields = (
+        "name",
+        "document_type",
+        "file",
+        "status",
+        "needs_signature",
+        "signed_at",
+        "locked",
+    )
+
+    readonly_fields = (
+        "signed_at",
+        "submitted_at",
+        "locked",
+        "created_at",
+    )
+
+
+class PaymentInline(admin.TabularInline):
+    model = Payment
+    extra = 0
+    can_delete = False
+
+    readonly_fields = (
+        "payment_type",
+        "description",
+        "amount",
+        "status",
+        "created_at",
+    )
+
+    fields = readonly_fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+class RentHistoryInline(admin.TabularInline):
+    model = RentHistory
+    extra = 0
+    can_delete = False
+
+    readonly_fields = (
+        "rent_amount",
+        "effective_date",
+        "created_at",
+    )
+
+    fields = readonly_fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(HousingApplication)
+class HousingApplicationAdmin(admin.ModelAdmin):
+    inlines = [
+        ApplicantDocumentInline,
+        PaymentInline,
+        RentHistoryInline,
+    ]
+
+    list_display = (
+        "full_name",
+        "user",
+        "property",
+        "space_label",
+        "monthly_rent",
+        "balance",
+        "utility_balance",
+        "deposit_paid",
+    )
+
+    list_filter = (
+        "property",
+        "space_type",
+    )
+
+    search_fields = (
+        "full_name",
+        "phone",
+        "email",
+        "space_label",
+        "user__username",
+        "user__invite_code",
+    )
+
+    fieldsets = (
+        ("Resident File Link", {
+            "fields": (
+                "user",
+                "property",
+                "space_type",
+                "space_label",
             )
-            .aggregate(total=Sum("amount"))["total"]
-            or Decimal("0.00")
-        )
-
-        operating_expenses = (
-            financial_entries
-            .filter(
-                month=month_number,
-                entry_type="operating_expense"
+        }),
+        ("Resident Information", {
+            "fields": (
+                "full_name",
+                "phone",
+                "email",
+                "age",
             )
-            .aggregate(total=Sum("amount"))["total"]
-            or Decimal("0.00")
-        )
-
-        debt_service = (
-            financial_entries
-            .filter(
-                month=month_number,
-                entry_type="debt_service"
+        }),
+        ("Rent / Deposit / Utilities", {
+            "fields": (
+                "monthly_rent",
+                "balance",
+                "rent_due_day",
+                "deposit_required",
+                "deposit_paid",
+                "utility_monthly",
+                "utility_balance",
             )
-            .aggregate(total=Sum("amount"))["total"]
-            or Decimal("0.00")
-        )
-
-        capital_expenses = (
-            financial_entries
-            .filter(
-                month=month_number,
-                entry_type="capital_expense"
+        }),
+        ("Address History", {
+            "fields": (
+                "current_address",
+                "current_address_length",
+                "previous_address_1",
+                "previous_address_1_length",
+                "previous_address_2",
+                "previous_address_2_length",
+                "previous_address_3",
+                "previous_address_3_length",
             )
-            .aggregate(total=Sum("amount"))["total"]
-            or Decimal("0.00")
-        )
-
-        total_income = online_income + spreadsheet_income
-        noi = total_income - operating_expenses
-        cash_flow = noi - debt_service
-
-        months.append({
-            "month_name": date(year, month_number, 1).strftime("%B"),
-            "online_income": online_income,
-            "spreadsheet_income": spreadsheet_income,
-            "total_income": total_income,
-            "operating_expenses": operating_expenses,
-            "debt_service": debt_service,
-            "capital_expenses": capital_expenses,
-            "noi": noi,
-            "cash_flow_after_debt": cash_flow,
-        })
-
-    return render(request, "t12_report.html", {
-        "year": year,
-        "months": months,
-    })
-
-
-# =========================================================
-# FINANCIAL UPLOADS
-# =========================================================
-
-@login_required
-@user_passes_test(staff_required)
-def financial_upload(request):
-
-    if request.method == "POST":
-
-        form = FinancialUploadForm(
-            request.POST,
-            request.FILES
-        )
-
-        if form.is_valid():
-
-            upload = form.save()
-
-            return redirect(
-                "parse_financial_upload",
-                upload_id=upload.id
+        }),
+        ("Identification", {
+            "fields": (
+                "drivers_license_number",
+                "has_valid_odl",
+                "oregon_id_number",
+                "id_upload",
             )
-
-    else:
-        form = FinancialUploadForm()
-
-    uploads = FinancialUpload.objects.all().order_by(
-        "-uploaded_at"
+        }),
+        ("Income", {
+            "fields": (
+                "income_source",
+                "monthly_income",
+                "employer_name",
+                "employment_length",
+            )
+        }),
+        ("Background / Recovery / Notes", {
+            "fields": (
+                "previous_evictions",
+                "in_recovery",
+                "drug_of_choice",
+                "on_parole",
+                "parole_officer_name",
+                "parole_officer_phone",
+                "felony_history",
+                "odoc_time_served",
+                "housing_need",
+                "additional_notes",
+            )
+        }),
+        ("References", {
+            "fields": (
+                "reference_1_name",
+                "reference_1_phone",
+                "reference_1_relationship",
+                "reference_1_type",
+                "reference_2_name",
+                "reference_2_phone",
+                "reference_2_relationship",
+                "reference_2_type",
+            )
+        }),
+        ("Acknowledgments", {
+            "fields": (
+                "sobriety_acknowledgment",
+                "unconditional_regard_acknowledgment",
+                "created_at",
+            )
+        }),
     )
 
-    return render(request, "financial_upload.html", {
-        "form": form,
-        "uploads": uploads,
-    })
+    readonly_fields = ("created_at",)
 
 
-@login_required
-@user_passes_test(staff_required)
-def parse_financial_upload(request, upload_id):
+@admin.register(BlogPost)
+class BlogPostAdmin(admin.ModelAdmin):
+    list_display = ("title", "created_at")
 
-    upload = get_object_or_404(
-        FinancialUpload,
-        id=upload_id
+
+@admin.register(BlogComment)
+class BlogCommentAdmin(admin.ModelAdmin):
+    list_display = ("name", "post", "approved", "created_at")
+    list_filter = ("approved",)
+
+
+@admin.register(Payment)
+class PaymentAdmin(admin.ModelAdmin):
+    list_display = (
+        "application",
+        "payment_type",
+        "amount",
+        "status",
+        "created_at",
     )
 
-    upload.parsed_at = timezone.now()
-    upload.save()
-
-    return render(request, "financial_upload_parsed.html", {
-        "upload": upload,
-        "created": 0,
-    })
-
-
-# =========================================================
-# PROPERTY / BLOG
-# =========================================================
-
-def property_detail(request, pk):
-
-    property_obj = get_object_or_404(
-        Property,
-        pk=pk
+    readonly_fields = (
+        "application",
+        "payment_type",
+        "description",
+        "amount",
+        "status",
+        "stripe_session_id",
+        "stripe_payment_intent",
+        "created_at",
     )
 
-    gallery_images = property_obj.images.all()
 
-    return render(request, "property_detail.html", {
-        "property": property_obj,
-        "gallery_images": gallery_images,
-    })
+@admin.register(RentHistory)
+class RentHistoryAdmin(admin.ModelAdmin):
+    list_display = ("application", "rent_amount", "effective_date")
 
 
-def blog_detail(request, pk):
+class FinancialEntryInline(admin.TabularInline):
+    model = FinancialEntry
+    extra = 0
+    can_delete = False
 
-    post = get_object_or_404(
-        BlogPost,
-        pk=pk
+    readonly_fields = (
+        "category",
+        "description",
+        "amount",
+        "month",
+        "year",
+        "sheet_name",
+        "row_number",
     )
 
-    return render(request, "blog_detail.html", {
-        "post": post,
-    })
+    fields = readonly_fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
 
 
-def add_blog_comment(request, post_id):
+@admin.register(FinancialUpload)
+class FinancialUploadAdmin(admin.ModelAdmin):
+    inlines = [FinancialEntryInline]
 
-    post = get_object_or_404(
-        BlogPost,
-        id=post_id
+    list_display = (
+        "name",
+        "uploaded_at",
+        "parsed_at",
     )
 
-    if request.method == "POST":
 
-        form = BlogCommentForm(request.POST)
-
-        if form.is_valid():
-
-            comment = form.save(commit=False)
-            comment.post = post
-            comment.approved = False
-            comment.save()
-
-    return redirect("home")
-
-
-# =========================================================
-# APPLICATION PRINT
-# =========================================================
-
-def printable_application(request, pk):
-
-    application = get_object_or_404(
-        HousingApplication,
-        pk=pk
+@admin.register(FinancialEntry)
+class FinancialEntryAdmin(admin.ModelAdmin):
+    list_display = (
+        "category",
+        "description",
+        "amount",
+        "month",
+        "year",
+        "property_name",
+        "sheet_name",
+        "row_number",
     )
 
-    return render(request, "printable_application.html", {
-        "application": application,
-    })
-
-
-# =========================================================
-# STRIPE PAYMENTS
-# =========================================================
-
-@login_required
-def create_checkout_session(
-    request,
-    application_id,
-    payment_type="rent"
-):
-
-    application = get_object_or_404(
-        HousingApplication,
-        id=application_id
+    list_filter = (
+        "year",
+        "month",
+        "category",
     )
 
-    amount = Decimal("0.00")
-    description = ""
-
-    if payment_type == "rent":
-
-        amount = (
-            application.balance
-            if application.balance > 0
-            else application.monthly_rent
-        )
-
-        description = "Rent Payment"
-
-    elif payment_type == "deposit":
-
-        amount = max(
-            application.deposit_required - application.deposit_paid,
-            Decimal("0.00")
-        )
-
-        description = "Deposit Payment"
-
-    elif payment_type == "utility":
-
-        amount = (
-            application.utility_balance
-            if application.utility_balance > 0
-            else application.utility_monthly
-        )
-
-        description = "Utility Payment"
-
-    else:
-        return JsonResponse({
-            "error": "Invalid payment type"
-        })
-
-    if amount <= 0:
-        return JsonResponse({
-            "error": "No balance due"
-        })
-
-    payment = Payment.objects.create(
-        application=application,
-        payment_type=payment_type,
-        description=description,
-        amount=amount,
-        status="pending",
+    search_fields = (
+        "description",
+        "category",
+        "sheet_name",
     )
 
-    session = stripe.checkout.Session.create(
-        payment_method_types=["card"],
-        mode="payment",
-
-        line_items=[{
-            "price_data": {
-                "currency": "usd",
-                "product_data": {
-                    "name": description
-                },
-                "unit_amount": int(amount * 100),
-            },
-            "quantity": 1,
-        }],
-
-        success_url=request.build_absolute_uri(
-            "/payment-success/"
-        ),
-
-        cancel_url=request.build_absolute_uri(
-            "/tenant-dashboard/"
-        ),
-
-        metadata={
-            "payment_id": str(payment.id)
-        },
+    ordering = (
+        "year",
+        "month",
+        "category",
     )
 
-    payment.stripe_session_id = session.id
-    payment.save()
-
-    return redirect(session.url)
-
-
-def payment_success(request):
-    return render(request, "payment_success.html")
-
-
-# =========================================================
-# STRIPE WEBHOOK
-# =========================================================
-
-@csrf_exempt
-def stripe_webhook(request):
-
-    payload = request.body
-
-    sig_header = request.META.get(
-        "HTTP_STRIPE_SIGNATURE"
+    readonly_fields = (
+        "upload",
+        "property_name",
+        "sheet_name",
+        "row_number",
+        "entry_date",
+        "month",
+        "year",
+        "entry_type",
+        "category",
+        "description",
+        "amount",
+        "created_at",
     )
 
-    try:
-
-        event = stripe.Webhook.construct_event(
-            payload,
-            sig_header,
-            settings.STRIPE_WEBHOOK_SECRET
-        )
-
-    except Exception:
-        return HttpResponse(status=400)
-
-    if event["type"] != "checkout.session.completed":
-        return HttpResponse(status=200)
-
-    session = event["data"]["object"]
-
-    payment_id = session.get(
-        "metadata",
-        {}
-    ).get("payment_id")
-
-    if not payment_id:
-        return HttpResponse(status=200)
-
-    payment = Payment.objects.filter(
-        id=payment_id
-    ).first()
-
-    if not payment:
-        return HttpResponse(status=200)
-
-    if payment.status == "completed":
-        return HttpResponse(status=200)
-
-    payment.status = "completed"
-    payment.stripe_payment_intent = session.get(
-        "payment_intent",
-        ""
-    )
-
-    payment.save()
-
-    application = payment.application
-
-    if payment.payment_type == "rent":
-
-        application.balance = max(
-            Decimal("0.00"),
-            application.balance - payment.amount
-        )
-
-    elif payment.payment_type == "deposit":
-
-        application.deposit_paid += payment.amount
-
-    elif payment.payment_type == "utility":
-
-        application.utility_balance = max(
-            Decimal("0.00"),
-            application.utility_balance - payment.amount
-        )
-
-    application.save()
-
-    owner_email = "BowlingLegacyLLC@outlook.com"
-
-    if application.property and application.property.owner_email:
-        owner_email = application.property.owner_email
-
-    send_mail(
-        subject="Resident Payment Received",
-
-        message=f"""
-Resident: {application.full_name}
-
-Payment Type:
-{payment.get_payment_type_display()}
-
-Amount:
-${payment.amount}
-""",
-
-        from_email=getattr(
-            settings,
-            "DEFAULT_FROM_EMAIL",
-            None
-        ),
-
-        recipient_list=[owner_email],
-
-        fail_silently=True,
-    )
-
-    return HttpResponse(status=200)
+    def has_add_permission(self, request):
+        return False
