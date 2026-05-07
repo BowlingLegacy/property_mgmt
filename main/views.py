@@ -483,6 +483,67 @@ def parse_financial_upload(request, upload_id):
         "created": 0,
     })
 
+@login_required
+@user_passes_test(staff_required)
+def property_financials(request, property_name):
+
+    property_obj = get_object_or_404(
+        Property,
+        name=property_name
+    )
+
+    residents = HousingApplication.objects.filter(
+        property=property_obj
+    )
+
+    monthly_rent = sum(
+        [r.monthly_rent for r in residents],
+        Decimal("0.00")
+    )
+
+    balances_due = sum(
+        [r.balance for r in residents],
+        Decimal("0.00")
+    )
+
+    utilities_due = sum(
+        [r.utility_balance for r in residents],
+        Decimal("0.00")
+    )
+
+    deposits_held = sum(
+        [r.deposit_paid for r in residents],
+        Decimal("0.00")
+    )
+
+    completed_payments = Payment.objects.filter(
+        application__property=property_obj,
+        status="completed"
+    )
+
+    total_collected = (
+        completed_payments.aggregate(
+            total=Sum("amount")
+        )["total"]
+        or Decimal("0.00")
+    )
+
+    context = {
+        "property": property_obj,
+        "residents": residents,
+        "monthly_rent": monthly_rent,
+        "balances_due": balances_due,
+        "utilities_due": utilities_due,
+        "deposits_held": deposits_held,
+        "total_collected": total_collected,
+    }
+
+    return render(
+        request,
+        "property_financials.html",
+        context
+    )
+
 
 # =========================================================
 # PROPERTY / BLOG
