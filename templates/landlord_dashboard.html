@@ -166,15 +166,15 @@
                     </tr>
                 </thead>
                 <tbody>
-                  {% for item in messages_for_property %}
-<tr>
-    <td>{{ item.created_at }}</td>
-    <td>{{ item.application.full_name }}</td>
-    <td>{{ item.application.space_type }} {{ item.application.space_label }}</td>
-    <td>{{ item.get_message_type_display }}</td>
-    <td>
-        <strong>{{ item.subject }}</strong><br>
-        <span class="text-muted small">{{ item.message|truncatechars:90 }}</span>
+         {% for item in messages_for_property %}
+    <tr>
+             <td>{{ item.created_at }}</td>
+            <td>{{ item.application.full_name }}</td>
+            <td>{{ item.application.space_type }} {{ item.application.space_label }}</td>
+            <td>{{ item.get_message_type_display }}</td>
+            <td>
+                <strong>{{ item.subject }}</strong><br>
+                <span class="text-muted small">{{ item.message|truncatechars:90 }}</span>
     </td>
     <td>
         {% if item.status == "submitted" %}
@@ -182,8 +182,8 @@
         {% else %}
             <span class="badge bg-secondary">{{ item.get_status_display }}</span>
         {% endif %}
-    </td>
-    <td>
+  </td>
+  <td>
         <a href="{% url 'landlord_message_detail' item.id %}"
            class="btn btn-sm btn-primary rounded-pill">
             Open
