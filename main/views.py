@@ -161,7 +161,28 @@ def landlord_dashboard(request):
         "landlord_inbox": landlord_inbox,
         "new_message_count": new_message_count,
     })
+@login_required
+@user_passes_test(staff_required)
+def landlord_message_detail(request, message_id):
+    resident_message = get_object_or_404(
+        ResidentMessage.objects.select_related("application", "application__property"),
+        id=message_id,
+    )
 
+    if request.method == "POST":
+        new_status = request.POST.get("status")
+
+        if new_status in ["submitted", "reviewed", "closed"]:
+            resident_message.status = new_status
+            resident_message.save()
+            messages.success(request, "Message status updated.")
+
+        return redirect("landlord_message_detail", message_id=resident_message.id)
+
+    return render(request, "landlord_message_detail.html", {
+        "resident_message": resident_message,
+        "application": resident_message.application,
+    })
 
 @login_required
 def tenant_dashboard(request):
