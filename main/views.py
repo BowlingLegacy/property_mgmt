@@ -122,44 +122,25 @@ def enter_invite_code(request):
 
 @login_required
 @user_passes_test(staff_required)
-def landlord_dashboard(request):
-    applications = (
-        HousingApplication.objects
-        .select_related("property", "user")
-        .all()
-        .order_by("property__name", "space_label", "full_name")
+def landlord_message_detail(request, message_id):
+    resident_message = get_object_or_404(
+        ResidentMessage.objects.select_related("application", "application__property"),
+        id=message_id,
     )
 
-    properties = Property.objects.all().order_by("name")
-    payments = Payment.objects.all().order_by("-created_at")[:25]
+    if request.method == "POST":
+        new_status = request.POST.get("status")
 
-    resident_messages = (
-        ResidentMessage.objects
-        .select_related("application", "application__property")
-        .all()
-        .order_by("application__property__name", "-created_at")
-    )
+        if new_status in ["submitted", "reviewed", "closed"]:
+            resident_message.status = new_status
+            resident_message.save()
+            messages.success(request, "Message status updated.")
 
-    landlord_inbox = OrderedDict()
+        return redirect("landlord_message_detail", message_id=resident_message.id)
 
-    for resident_message in resident_messages:
-        application = resident_message.application
-        property_name = "No Property"
-
-        if application and application.property:
-            property_name = application.property.name
-
-        landlord_inbox.setdefault(property_name, [])
-        landlord_inbox[property_name].append(resident_message)
-
-    new_message_count = resident_messages.filter(status="submitted").count()
-
-    return render(request, "landlord_dashboard.html", {
-        "applications": applications,
-        "properties": properties,
-        "payments": payments,
-        "landlord_inbox": landlord_inbox,
-        "new_message_count": new_message_count,
+    return render(request, "landlord_message_detail.html", {
+        "resident_message": resident_message,
+        "application": resident_message.application,
     })
 
 
