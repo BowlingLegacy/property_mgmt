@@ -42,10 +42,8 @@ LATE_FEE_AMOUNT = Decimal("25.00")
 def money(value):
     if value is None:
         return Decimal("0.00")
-
     if isinstance(value, Decimal):
         return value
-
     try:
         cleaned = str(value).replace("$", "").replace(",", "").strip()
         return Decimal(cleaned).quantize(Decimal("0.01"))
@@ -60,11 +58,7 @@ def staff_required(user):
 def home(request):
     properties = Property.objects.all()
     posts = BlogPost.objects.all().order_by("-created_at")[:5]
-
-    return render(request, "home.html", {
-        "properties": properties,
-        "posts": posts,
-    })
+    return render(request, "home.html", {"properties": properties, "posts": posts})
 
 
 def creed(request):
@@ -79,7 +73,6 @@ def apply(request):
             return redirect("apply_success")
     else:
         form = HousingApplicationForm()
-
     return render(request, "apply.html", {"form": form})
 
 
@@ -101,30 +94,28 @@ def signup(request):
 def enter_invite_code(request):
     form = InviteCodeForm(request.POST or None)
 
-    if request.method == "POST":
-        if form.is_valid():
-            code = form.cleaned_data["invite_code"].upper()
+    if request.method == "POST" and form.is_valid():
+        code = form.cleaned_data["invite_code"].upper()
+        user_with_code = User.objects.filter(invite_code=code).first()
 
-            user_with_code = User.objects.filter(invite_code=code).first()
+        if not user_with_code:
+            messages.error(request, "Invalid access code.")
+            return redirect("enter_invite_code")
 
-            if not user_with_code:
-                messages.error(request, "Invalid access code.")
-                return redirect("enter_invite_code")
+        profile = HousingApplication.objects.filter(user=user_with_code).first()
 
-            profile = HousingApplication.objects.filter(user=user_with_code).first()
+        if not profile:
+            profile = HousingApplication.objects.filter(email=user_with_code.email).first()
 
-            if not profile:
-                profile = HousingApplication.objects.filter(email=user_with_code.email).first()
+        if not profile:
+            messages.error(request, "No resident file is connected to this code yet.")
+            return redirect("enter_invite_code")
 
-            if not profile:
-                messages.error(request, "No resident file is connected to this code yet.")
-                return redirect("enter_invite_code")
+        profile.user = request.user
+        profile.save()
 
-            profile.user = request.user
-            profile.save()
-
-            messages.success(request, "Resident file linked successfully.")
-            return redirect("tenant_dashboard")
+        messages.success(request, "Resident file linked successfully.")
+        return redirect("tenant_dashboard")
 
     return render(request, "enter_invite_code.html", {"form": form})
 
@@ -173,6 +164,35 @@ def landlord_dashboard(request):
 
 
 @login_required
+def tenant_dashboard(request):
+    request.session.set_expiry(0)
+
+    application = getattr(request.user, "resident_profile", None)
+
+    payments = []
+    resident_messages = []
+    total_due = Decimal("0.00")
+
+    if application:
+        payments = application.payments.all().order_by("-created_at")
+        resident_messages = application.resident_messages.all().order_by("-created_at")
+
+        rent_due = application.balance if application.balance > 0 else Decimal("0.00")
+        deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
+        utility_due = application.utility_balance if application.utility_balance > 0 else Decimal("0.00")
+
+        total_due = rent_due + deposit_due + utility_due
+
+    return render(request, "tenant_dashboard.html", {
+        "application": application,
+        "payments": payments,
+        "resident_messages": resident_messages,
+        "total_due": total_due,
+        "stripe_public_key": settings.STRIPE_PUBLIC_KEY,
+    })
+
+
+@login_required
 def submit_resident_message(request):
     if request.method != "POST":
         return redirect("tenant_dashboard")
@@ -201,14 +221,17 @@ def submit_resident_message(request):
     )
 
     owner_email = "BowlingLegacyLLC@outlook.com"
-
     if application.property and application.property.owner_email:
         owner_email = application.property.owner_email
 
     send_mail(
-        subject=f"Resident Message Submitted: {subject}",
+        subject=f"New Resident Request Filed: {subject}",
         message=f"""
+A new resident request/message has been filed.
+
+Property: {application.property.name if application.property else "No Property"}
 Resident: {application.full_name}
+Unit/Space: {application.space_type} {application.space_label}
 
 Type: {message_type}
 
@@ -234,12 +257,7 @@ def payment_log(request):
         Payment.objects
         .filter(status="completed")
         .select_related("application", "application__property")
-        .order_by(
-            "application__property__name",
-            "-created_at",
-            "application__space_label",
-            "application__full_name",
-        )
+        .order_by("application__property__name", "-created_at", "application__space_label", "application__full_name")
     )
 
     grouped = OrderedDict()
@@ -277,9 +295,7 @@ def payment_log(request):
             "months": month_data,
         })
 
-    return render(request, "payment_log.html", {
-        "payment_log": payment_log_data,
-    })
+    return render(request, "payment_log.html", {"payment_log": payment_log_data})
 
 
 @login_required
@@ -296,19 +312,8 @@ def rent_roll(request):
     for resident in residents:
         completed_payments = resident.payments.filter(status="completed")
 
-        rent_paid = (
-            completed_payments
-            .filter(payment_type="rent")
-            .aggregate(total=Sum("amount"))["total"]
-            or Decimal("0.00")
-        )
-
-        utility_paid = (
-            completed_payments
-            .filter(payment_type="utility")
-            .aggregate(total=Sum("amount"))["total"]
-            or Decimal("0.00")
-        )
+        rent_paid = completed_payments.filter(payment_type="rent").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        utility_paid = completed_payments.filter(payment_type="utility").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
 
         rows.append({
             "property": resident.property.name if resident.property else "No Property",
@@ -324,9 +329,7 @@ def rent_roll(request):
             "deposit_paid": resident.deposit_paid,
         })
 
-    return render(request, "rent_roll.html", {
-        "rows": rows,
-    })
+    return render(request, "rent_roll.html", {"rows": rows})
 
 
 @login_required
@@ -336,15 +339,7 @@ def export_payment_log_csv(request):
     response["Content-Disposition"] = 'attachment; filename="payment_log.csv"'
 
     writer = csv.writer(response)
-
-    writer.writerow([
-        "Resident",
-        "Property",
-        "Payment Type",
-        "Amount",
-        "Status",
-        "Date",
-    ])
+    writer.writerow(["Resident", "Property", "Payment Type", "Amount", "Status", "Date"])
 
     payments = Payment.objects.all().order_by("-created_at")
 
@@ -368,17 +363,7 @@ def export_rent_roll_csv(request):
     response["Content-Disposition"] = 'attachment; filename="rent_roll.csv"'
 
     writer = csv.writer(response)
-
-    writer.writerow([
-        "Resident",
-        "Property",
-        "Room",
-        "Monthly Rent",
-        "Balance",
-        "Deposit Required",
-        "Deposit Paid",
-        "Utility Balance",
-    ])
+    writer.writerow(["Resident", "Property", "Room", "Monthly Rent", "Balance", "Deposit Required", "Deposit Paid", "Utility Balance"])
 
     residents = HousingApplication.objects.all()
 
@@ -404,60 +389,17 @@ def export_t12_csv(request):
     response["Content-Disposition"] = 'attachment; filename="t12_report.csv"'
 
     writer = csv.writer(response)
-
-    writer.writerow([
-        "Month",
-        "Income",
-        "Expenses",
-        "Debt Service",
-        "Cash Flow",
-    ])
+    writer.writerow(["Month", "Income", "Expenses", "Debt Service", "Cash Flow"])
 
     current_year = timezone.localdate().year
 
     for month in range(1, 13):
-        income = (
-            Payment.objects
-            .filter(
-                status="completed",
-                created_at__year=current_year,
-                created_at__month=month,
-            )
-            .aggregate(total=Sum("amount"))["total"]
-            or Decimal("0.00")
-        )
-
-        expenses = (
-            FinancialEntry.objects
-            .filter(
-                year=current_year,
-                month=month,
-                entry_type="operating_expense",
-            )
-            .aggregate(total=Sum("amount"))["total"]
-            or Decimal("0.00")
-        )
-
-        debt_service = (
-            FinancialEntry.objects
-            .filter(
-                year=current_year,
-                month=month,
-                entry_type="debt_service",
-            )
-            .aggregate(total=Sum("amount"))["total"]
-            or Decimal("0.00")
-        )
-
+        income = Payment.objects.filter(status="completed", created_at__year=current_year, created_at__month=month).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        expenses = FinancialEntry.objects.filter(year=current_year, month=month, entry_type="operating_expense").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        debt_service = FinancialEntry.objects.filter(year=current_year, month=month, entry_type="debt_service").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
         cash_flow = income - expenses - debt_service
 
-        writer.writerow([
-            date(current_year, month, 1).strftime("%B"),
-            income,
-            expenses,
-            debt_service,
-            cash_flow,
-        ])
+        writer.writerow([date(current_year, month, 1).strftime("%B"), income, expenses, debt_service, cash_flow])
 
     return response
 
@@ -467,48 +409,14 @@ def export_t12_csv(request):
 def t12_report(request):
     year = timezone.localdate().year
     financial_entries = FinancialEntry.objects.filter(year=year)
-
     months = []
 
     for month_number in range(1, 13):
-        online_income = (
-            Payment.objects
-            .filter(
-                status="completed",
-                created_at__year=year,
-                created_at__month=month_number,
-            )
-            .aggregate(total=Sum("amount"))["total"]
-            or Decimal("0.00")
-        )
-
-        spreadsheet_income = (
-            financial_entries
-            .filter(month=month_number, entry_type="income")
-            .aggregate(total=Sum("amount"))["total"]
-            or Decimal("0.00")
-        )
-
-        operating_expenses = (
-            financial_entries
-            .filter(month=month_number, entry_type="operating_expense")
-            .aggregate(total=Sum("amount"))["total"]
-            or Decimal("0.00")
-        )
-
-        debt_service = (
-            financial_entries
-            .filter(month=month_number, entry_type="debt_service")
-            .aggregate(total=Sum("amount"))["total"]
-            or Decimal("0.00")
-        )
-
-        capital_expenses = (
-            financial_entries
-            .filter(month=month_number, entry_type="capital_expense")
-            .aggregate(total=Sum("amount"))["total"]
-            or Decimal("0.00")
-        )
+        online_income = Payment.objects.filter(status="completed", created_at__year=year, created_at__month=month_number).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        spreadsheet_income = financial_entries.filter(month=month_number, entry_type="income").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        operating_expenses = financial_entries.filter(month=month_number, entry_type="operating_expense").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        debt_service = financial_entries.filter(month=month_number, entry_type="debt_service").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        capital_expenses = financial_entries.filter(month=month_number, entry_type="capital_expense").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
 
         total_income = online_income + spreadsheet_income
         noi = total_income - operating_expenses
@@ -526,10 +434,7 @@ def t12_report(request):
             "cash_flow_after_debt": cash_flow,
         })
 
-    return render(request, "t12_report.html", {
-        "year": year,
-        "months": months,
-    })
+    return render(request, "t12_report.html", {"year": year, "months": months})
 
 
 @login_required
@@ -541,37 +446,27 @@ def financial_upload(request):
         if form.is_valid():
             upload = form.save()
             return redirect("parse_financial_upload", upload_id=upload.id)
-
     else:
         form = FinancialUploadForm()
 
     uploads = FinancialUpload.objects.all().order_by("-uploaded_at")
-
-    return render(request, "financial_upload.html", {
-        "form": form,
-        "uploads": uploads,
-    })
+    return render(request, "financial_upload.html", {"form": form, "uploads": uploads})
 
 
 @login_required
 @user_passes_test(staff_required)
 def parse_financial_upload(request, upload_id):
     upload = get_object_or_404(FinancialUpload, id=upload_id)
-
     upload.parsed_at = timezone.now()
     upload.save()
 
-    return render(request, "financial_upload_parsed.html", {
-        "upload": upload,
-        "created": 0,
-    })
+    return render(request, "financial_upload_parsed.html", {"upload": upload, "created": 0})
 
 
 @login_required
 @user_passes_test(staff_required)
 def property_financials(request, property_name):
     property_obj = get_object_or_404(Property, name=property_name)
-
     residents = HousingApplication.objects.filter(property=property_obj)
 
     monthly_rent = sum([r.monthly_rent for r in residents], Decimal("0.00"))
@@ -579,15 +474,8 @@ def property_financials(request, property_name):
     utilities_due = sum([r.utility_balance for r in residents], Decimal("0.00"))
     deposits_held = sum([r.deposit_paid for r in residents], Decimal("0.00"))
 
-    completed_payments = Payment.objects.filter(
-        application__property=property_obj,
-        status="completed"
-    )
-
-    total_collected = (
-        completed_payments.aggregate(total=Sum("amount"))["total"]
-        or Decimal("0.00")
-    )
+    completed_payments = Payment.objects.filter(application__property=property_obj, status="completed")
+    total_collected = completed_payments.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
 
     return render(request, "property_financials.html", {
         "property": property_obj,
@@ -612,10 +500,7 @@ def property_detail(request, pk):
 
 def blog_detail(request, pk):
     post = get_object_or_404(BlogPost, pk=pk)
-
-    return render(request, "blog_detail.html", {
-        "post": post,
-    })
+    return render(request, "blog_detail.html", {"post": post})
 
 
 def add_blog_comment(request, post_id):
@@ -635,10 +520,7 @@ def add_blog_comment(request, post_id):
 
 def printable_application(request, pk):
     application = get_object_or_404(HousingApplication, pk=pk)
-
-    return render(request, "printable_application.html", {
-        "application": application,
-    })
+    return render(request, "printable_application.html", {"application": application})
 
 
 @login_required
@@ -653,10 +535,7 @@ def create_checkout_session(request, application_id, payment_type="rent"):
         description = "Rent Payment"
 
     elif payment_type == "deposit":
-        amount = max(
-            application.deposit_required - application.deposit_paid,
-            Decimal("0.00")
-        )
+        amount = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
         description = "Deposit Payment"
 
     elif payment_type == "utility":
@@ -665,10 +544,7 @@ def create_checkout_session(request, application_id, payment_type="rent"):
 
     elif payment_type == "total":
         rent_due = application.balance if application.balance > 0 else Decimal("0.00")
-        deposit_due = max(
-            application.deposit_required - application.deposit_paid,
-            Decimal("0.00")
-        )
+        deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
         utility_due = application.utility_balance if application.utility_balance > 0 else Decimal("0.00")
 
         amount = rent_due + deposit_due + utility_due
@@ -721,11 +597,7 @@ def stripe_webhook(request):
     sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
 
     try:
-        event = stripe.Webhook.construct_event(
-            payload,
-            sig_header,
-            settings.STRIPE_WEBHOOK_SECRET
-        )
+        event = stripe.Webhook.construct_event(payload, sig_header, settings.STRIPE_WEBHOOK_SECRET)
     except Exception:
         return HttpResponse(status=400)
 
@@ -750,22 +622,13 @@ def stripe_webhook(request):
     application = payment.application
 
     if payment.payment_type == "rent":
-        application.balance = max(
-            Decimal("0.00"),
-            application.balance - payment.amount
-        )
+        application.balance = max(Decimal("0.00"), application.balance - payment.amount)
 
     elif payment.payment_type == "deposit":
-        application.deposit_paid = min(
-            application.deposit_required,
-            application.deposit_paid + payment.amount
-        )
+        application.deposit_paid = min(application.deposit_required, application.deposit_paid + payment.amount)
 
     elif payment.payment_type == "utility":
-        application.utility_balance = max(
-            Decimal("0.00"),
-            application.utility_balance - payment.amount
-        )
+        application.utility_balance = max(Decimal("0.00"), application.utility_balance - payment.amount)
 
     elif payment.payment_type == "other" and "combined" in payment.description.lower():
         remaining = payment.amount
@@ -775,23 +638,14 @@ def stripe_webhook(request):
         application.balance = max(Decimal("0.00"), application.balance - rent_paid)
         remaining -= rent_paid
 
-        deposit_due = max(
-            application.deposit_required - application.deposit_paid,
-            Decimal("0.00")
-        )
+        deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
         deposit_paid = min(deposit_due, remaining)
-        application.deposit_paid = min(
-            application.deposit_required,
-            application.deposit_paid + deposit_paid
-        )
+        application.deposit_paid = min(application.deposit_required, application.deposit_paid + deposit_paid)
         remaining -= deposit_paid
 
         utility_due = application.utility_balance if application.utility_balance > 0 else Decimal("0.00")
         utility_paid = min(utility_due, remaining)
-        application.utility_balance = max(
-            Decimal("0.00"),
-            application.utility_balance - utility_paid
-        )
+        application.utility_balance = max(Decimal("0.00"), application.utility_balance - utility_paid)
 
     application.save()
 
