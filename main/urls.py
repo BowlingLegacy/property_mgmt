@@ -31,15 +31,15 @@ urlpatterns = [
 
     path("property/<int:pk>/", views.property_detail, name="property_detail"),
     path("journal/<int:pk>/", views.blog_detail, name="blog_detail"),
+    path("blog/<int:post_id>/comment/", views.add_blog_comment, name="add_blog_comment"),
 
     path("application/<int:pk>/print/", views.printable_application, name="printable_application"),
-
-    path("blog/<int:post_id>/comment/", views.add_blog_comment, name="add_blog_comment"),
 
     path("pay/<int:application_id>/", views.create_checkout_session, name="pay_rent"),
     path("pay/<int:application_id>/<str:payment_type>/", views.create_checkout_session, name="pay_by_type"),
 
     path("payment-success/", views.payment_success, name="payment_success"),
     path("stripe/webhook/", views.stripe_webhook, name="stripe_webhook"),
+
     path("resident-message/submit/", views.submit_resident_message, name="submit_resident_message"),
 ]
