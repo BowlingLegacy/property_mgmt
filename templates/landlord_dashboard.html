@@ -166,29 +166,35 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for item in messages_for_property %}
-                    <tr>
-                        <td>{{ item.created_at }}</td>
-                        <td>{{ item.application.full_name }}</td>
-                        <td>{{ item.application.space_type }} {{ item.application.space_label }}</td>
-                        <td>{{ item.get_message_type_display }}</td>
-                        <td>
-                            <strong>{{ item.subject }}</strong><br>
-                            <span class="text-muted small">{{ item.message|truncatechars:90 }}</span>
-                        </td>
-                        <td>
-                            {% if item.status == "submitted" %}
-                                <span class="badge-new">New</span>
-                            {% else %}
-                                <span class="badge bg-secondary">{{ item.get_status_display }}</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="6" class="text-muted">No items in this property folder yet.</td>
-                    </tr>
-                    {% endfor %}
+                  {% for item in messages_for_property %}
+<tr>
+    <td>{{ item.created_at }}</td>
+    <td>{{ item.application.full_name }}</td>
+    <td>{{ item.application.space_type }} {{ item.application.space_label }}</td>
+    <td>{{ item.get_message_type_display }}</td>
+    <td>
+        <strong>{{ item.subject }}</strong><br>
+        <span class="text-muted small">{{ item.message|truncatechars:90 }}</span>
+    </td>
+    <td>
+        {% if item.status == "submitted" %}
+            <span class="badge-new">New</span>
+        {% else %}
+            <span class="badge bg-secondary">{{ item.get_status_display }}</span>
+        {% endif %}
+    </td>
+    <td>
+        <a href="{% url 'landlord_message_detail' item.id %}"
+           class="btn btn-sm btn-primary rounded-pill">
+            Open
+        </a>
+    </td>
+</tr>
+{% empty %}
+<tr>
+    <td colspan="7" class="text-muted">No items in this property folder yet.</td>
+</tr>
+{% endfor %}
                 </tbody>
             </table>
         </div>
