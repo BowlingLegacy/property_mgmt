@@ -13,6 +13,7 @@ from .models import (
     Payment,
     FinancialUpload,
     FinancialEntry,
+    ResidentMessage,
 )
 
 
@@ -177,6 +178,29 @@ class ApplicantDocumentInline(admin.TabularInline):
     )
 
 
+class ResidentMessageInline(admin.TabularInline):
+    model = ResidentMessage
+    extra = 0
+    can_delete = False
+
+    fields = (
+        "message_type",
+        "subject",
+        "message",
+        "status",
+        "locked",
+        "created_at",
+    )
+
+    readonly_fields = (
+        "message_type",
+        "subject",
+        "message",
+        "locked",
+        "created_at",
+    )
+
+
 class PaymentInline(admin.TabularInline):
     model = Payment
     extra = 0
@@ -217,6 +241,7 @@ class RentHistoryInline(admin.TabularInline):
 class HousingApplicationAdmin(admin.ModelAdmin):
     inlines = [
         ApplicantDocumentInline,
+        ResidentMessageInline,
         PaymentInline,
         RentHistoryInline,
     ]
@@ -338,6 +363,60 @@ class HousingApplicationAdmin(admin.ModelAdmin):
     )
 
     readonly_fields = ("created_at",)
+
+
+@admin.register(ResidentMessage)
+class ResidentMessageAdmin(admin.ModelAdmin):
+    list_display = (
+        "created_at",
+        "application",
+        "resident_property",
+        "message_type",
+        "subject",
+        "status",
+        "locked",
+    )
+
+    list_filter = (
+        "status",
+        "message_type",
+        "application__property",
+        "locked",
+    )
+
+    search_fields = (
+        "subject",
+        "message",
+        "application__full_name",
+        "application__email",
+        "application__space_label",
+    )
+
+    readonly_fields = (
+        "application",
+        "message_type",
+        "subject",
+        "message",
+        "locked",
+        "created_at",
+    )
+
+    fields = (
+        "application",
+        "message_type",
+        "subject",
+        "message",
+        "status",
+        "locked",
+        "created_at",
+    )
+
+    ordering = ("-created_at",)
+
+    def resident_property(self, obj):
+        if obj.application and obj.application.property:
+            return obj.application.property.name
+        return "No Property"
 
 
 @admin.register(BlogPost)
