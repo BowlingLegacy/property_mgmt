@@ -42,179 +42,199 @@
     <div class="card-body p-4">
         <div class="row align-items-center g-4">
 
-            <div class="col-md-2 text-center">
-                <div class="resident-photo mx-auto">
-                    {{ application.full_name|first|upper }}
-                </div>
-                <p class="text-muted small mt-2 mb-0">Resident Photo</p>
+```
+        <div class="col-md-2 text-center">
+            <div class="resident-photo mx-auto">
+                {{ application.full_name|first|upper }}
             </div>
+            <p class="text-muted small mt-2 mb-0">Resident Photo</p>
+        </div>
 
-            <div class="col-md-7">
-                <h3 class="fw-bold mb-1">{{ application.full_name }}</h3>
-                <p class="text-muted mb-1">{{ application.phone }}</p>
-                <p class="text-muted mb-3">{{ application.email }}</p>
+        <div class="col-md-7">
+            <h3 class="fw-bold mb-1">{{ application.full_name }}</h3>
+            <p class="text-muted mb-1">{{ application.phone }}</p>
+            <p class="text-muted mb-3">{{ application.email }}</p>
 
-                {% if application.property %}
-                    <p class="mb-1"><strong>Property:</strong> {{ application.property.name }}</p>
-                {% endif %}
+            {% if application.property %}
+                <p class="mb-1"><strong>Property:</strong> {{ application.property.name }}</p>
+            {% endif %}
 
-                <p class="mb-1">
-                    <strong>Room / Space:</strong>
-                    {{ application.space_type }} {{ application.space_label }}
-                </p>
+            <p class="mb-1">
+                <strong>Room / Space:</strong>
+                {{ application.space_type }} {{ application.space_label }}
+            </p>
 
-                <p class="mb-0"><strong>Status:</strong> Active Resident File</p>
-            </div>
+            <p class="mb-0"><strong>Status:</strong> Active Resident File</p>
+        </div>
 
-            <div class="col-md-3">
-                <button class="btn btn-gold w-100 rounded-pill mb-2"
-                        data-bs-toggle="modal"
-                        data-bs-target="#messageModal">
-                    ✉ Request / Message
-                </button>
+        <div class="col-md-3">
 
-                <a href="/" class="btn btn-outline-primary w-100 rounded-pill">
-                    Return Home
-                </a>
-            </div>
+            <button class="btn btn-gold w-100 rounded-pill mb-2"
+                    data-bs-toggle="modal"
+                    data-bs-target="#messageModal">
+                ✉ Request / Message
+            </button>
+
+            <button class="btn btn-success w-100 rounded-pill mb-2"
+                    data-bs-toggle="modal"
+                    data-bs-target="#documentUploadModal">
+                📎 Upload Document
+            </button>
+
+            <a href="/" class="btn btn-outline-primary w-100 rounded-pill">
+                Return Home
+            </a>
 
         </div>
+
     </div>
+</div>
+```
+
 </div>
 
 <div class="row g-4 mb-5">
 
-    {% if application.balance > 0 %}
-    <div class="col-md-4">
-        <div class="card pay-card h-100" style="border-top:6px solid #1e3a5f;">
-            <div class="card-body">
-                <h5 class="fw-bold">Rent Due</h5>
-                <p class="fs-5">Balance: ${{ application.balance }}</p>
-                <a href="{% url 'pay_by_type' application.id 'rent' %}"
-                   class="btn btn-primary w-100 rounded-pill">
-                    Pay Rent
-                </a>
-            </div>
+```
+{% if application.balance > 0 %}
+<div class="col-md-4">
+    <div class="card pay-card h-100" style="border-top:6px solid #1e3a5f;">
+        <div class="card-body">
+            <h5 class="fw-bold">Rent Due</h5>
+            <p class="fs-5">Balance: ${{ application.balance }}</p>
+            <a href="{% url 'pay_by_type' application.id 'rent' %}"
+               class="btn btn-primary w-100 rounded-pill">
+                Pay Rent
+            </a>
         </div>
     </div>
-    {% endif %}
+</div>
+{% endif %}
 
-    {% if application.deposit_paid < application.deposit_required %}
-    <div class="col-md-4">
-        <div class="card pay-card h-100" style="border-top:6px solid #d4af37;">
-            <div class="card-body">
-                <h5 class="fw-bold">Deposit Due</h5>
-                <p class="mb-1">Required: ${{ application.deposit_required }}</p>
-                <p>Paid: ${{ application.deposit_paid }}</p>
-                <a href="{% url 'pay_by_type' application.id 'deposit' %}"
-                   class="btn btn-warning w-100 rounded-pill">
-                    Pay Deposit
-                </a>
-            </div>
+{% if application.deposit_paid < application.deposit_required %}
+<div class="col-md-4">
+    <div class="card pay-card h-100" style="border-top:6px solid #d4af37;">
+        <div class="card-body">
+            <h5 class="fw-bold">Deposit Due</h5>
+            <p class="mb-1">Required: ${{ application.deposit_required }}</p>
+            <p>Paid: ${{ application.deposit_paid }}</p>
+            <a href="{% url 'pay_by_type' application.id 'deposit' %}"
+               class="btn btn-warning w-100 rounded-pill">
+                Pay Deposit
+            </a>
         </div>
     </div>
-    {% endif %}
+</div>
+{% endif %}
 
-    {% if application.utility_balance > 0 %}
-    <div class="col-md-4">
-        <div class="card pay-card h-100" style="border-top:6px solid #198754;">
-            <div class="card-body">
-                <h5 class="fw-bold">Utilities Due</h5>
-                <p class="fs-5">Balance: ${{ application.utility_balance }}</p>
-                <a href="{% url 'pay_by_type' application.id 'utility' %}"
-                   class="btn btn-success w-100 rounded-pill">
-                    Pay Utilities
-                </a>
-            </div>
+{% if application.utility_balance > 0 %}
+<div class="col-md-4">
+    <div class="card pay-card h-100" style="border-top:6px solid #198754;">
+        <div class="card-body">
+            <h5 class="fw-bold">Utilities Due</h5>
+            <p class="fs-5">Balance: ${{ application.utility_balance }}</p>
+            <a href="{% url 'pay_by_type' application.id 'utility' %}"
+               class="btn btn-success w-100 rounded-pill">
+                Pay Utilities
+            </a>
         </div>
     </div>
-    {% endif %}
+</div>
+{% endif %}
+```
 
 </div>
 
 {% if total_due > 0 %}
+
 <div class="card shadow-sm my-5" style="border-radius:22px; border-top:8px solid #1e3a5f;">
     <div class="card-body text-center p-5">
         <h3 class="fw-bold" style="color:#1e3a5f;">Pay Total Due</h3>
         <p class="fs-2 fw-bold mb-4">${{ total_due }}</p>
 
-        <a href="{% url 'pay_by_type' application.id 'total' %}"
-           class="btn btn-primary btn-lg rounded-pill px-5">
-            Pay Full Balance
-        </a>
+```
+    <a href="{% url 'pay_by_type' application.id 'total' %}"
+       class="btn btn-primary btn-lg rounded-pill px-5">
+        Pay Full Balance
+    </a>
 
-        <p class="text-muted mt-3 mb-0">
-            This combines rent, deposit, and utilities into one payment.
-        </p>
-    </div>
+    <p class="text-muted mt-3 mb-0">
+        This combines rent, deposit, and utilities into one payment.
+    </p>
+</div>
+```
+
 </div>
 {% endif %}
 
 <div id="resident-inbox" class="card inbox-card mb-5">
     <div class="card-body p-4">
 
-        <h4 class="fw-bold mb-1">✉ Resident Inbox</h4>
-        <p class="text-muted">
-            Applications, leases, onboarding documents, messages, requests, and resident file records.
-        </p>
+```
+    <h4 class="fw-bold mb-1">✉ Resident Inbox</h4>
+    <p class="text-muted">
+        Applications, leases, onboarding documents, messages, requests, and resident file records.
+    </p>
 
-        <div class="table-responsive">
-            <table class="table table-hover align-middle bg-white">
-                <thead>
-                    <tr>
-                        <th>Item</th>
-                        <th>Type</th>
-                        <th>Status</th>
-                        <th>Date / Time</th>
-                        <th>Open</th>
-                    </tr>
-                </thead>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle bg-white">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Date / Time</th>
+                    <th>Open</th>
+                </tr>
+            </thead>
 
-                <tbody>
-                    {% for document in application.documents.all %}
-                    <tr>
-                        <td>{{ document.name }}</td>
-                        <td>{{ document.get_document_type_display }}</td>
-                        <td>{{ document.get_status_display }}</td>
-                        <td>{{ document.created_at }}</td>
-                        <td>
-                            {% if document.file %}
-                                <a href="{{ document.file.url }}"
-                                   class="btn btn-sm btn-primary rounded-pill"
-                                   target="_blank">
-                                    Open
-                                </a>
-                            {% else %}
-                                —
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
+            <tbody>
+                {% for document in application.documents.all %}
+                <tr>
+                    <td>{{ document.name }}</td>
+                    <td>{{ document.get_document_type_display }}</td>
+                    <td>{{ document.get_status_display }}</td>
+                    <td>{{ document.created_at }}</td>
+                    <td>
+                        {% if document.file %}
+                            <a href="{{ document.file.url }}"
+                               class="btn btn-sm btn-primary rounded-pill"
+                               target="_blank">
+                                Open
+                            </a>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
 
-                    {% for resident_message in resident_messages %}
-                    <tr>
-                        <td>{{ resident_message.subject }}</td>
-                        <td>{{ resident_message.get_message_type_display }}</td>
-                        <td>{{ resident_message.get_status_display }}</td>
-                        <td>{{ resident_message.created_at }}</td>
-                        <td>
-                            <span class="badge bg-secondary">Filed</span>
-                        </td>
-                    </tr>
-                    {% endfor %}
+                {% for resident_message in resident_messages %}
+                <tr>
+                    <td>{{ resident_message.subject }}</td>
+                    <td>{{ resident_message.get_message_type_display }}</td>
+                    <td>{{ resident_message.get_status_display }}</td>
+                    <td>{{ resident_message.created_at }}</td>
+                    <td>
+                        <span class="badge bg-secondary">Filed</span>
+                    </td>
+                </tr>
+                {% endfor %}
 
-                    {% if not application.documents.all and not resident_messages %}
-                    <tr>
-                        <td colspan="5" class="text-muted">
-                            No documents or messages are currently in your inbox.
-                        </td>
-                    </tr>
-                    {% endif %}
-                </tbody>
-            </table>
-        </div>
-
+                {% if not application.documents.all and not resident_messages %}
+                <tr>
+                    <td colspan="5" class="text-muted">
+                        No documents or messages are currently in your inbox.
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
     </div>
+
+</div>
+```
+
 </div>
 
 <h4 id="payment-history" class="fw-bold mb-3">Payment History</h4>
@@ -231,70 +251,171 @@
             </tr>
         </thead>
 
-        <tbody>
-            {% for payment in payments %}
-            <tr>
-                <td>{{ payment.get_payment_type_display }}</td>
-                <td>{{ payment.description }}</td>
-                <td>${{ payment.amount }}</td>
-                <td>{{ payment.created_at }}</td>
-                <td>{{ payment.get_status_display }}</td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="5">No payments yet</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+```
+    <tbody>
+        {% for payment in payments %}
+        <tr>
+            <td>{{ payment.get_payment_type_display }}</td>
+            <td>{{ payment.description }}</td>
+            <td>${{ payment.amount }}</td>
+            <td>{{ payment.created_at }}</td>
+            <td>{{ payment.get_status_display }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="5">No payments yet</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+```
+
 </div>
 
 <div class="modal fade" id="messageModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content" style="border-radius:22px;">
 
-            <div class="modal-header">
-                <h5 class="modal-title fw-bold">
-                    Request / Message Landlord
-                </h5>
+```
+        <div class="modal-header">
+            <h5 class="modal-title fw-bold">
+                Request / Message Landlord
+            </h5>
 
-                <button type="button"
-                        class="btn-close"
-                        data-bs-dismiss="modal"></button>
-            </div>
+            <button type="button"
+                    class="btn-close"
+                    data-bs-dismiss="modal"></button>
+        </div>
 
-            <div class="modal-body">
-                <form method="POST" action="{% url 'submit_resident_message' %}">
-                    {% csrf_token %}
+        <div class="modal-body">
+            <form method="POST" action="{% url 'submit_resident_message' %}">
+                {% csrf_token %}
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Message Type</label>
-                        <select name="message_type" class="form-select">
-                            <option value="maintenance">Maintenance Request</option>
-                            <option value="complaint">Complaint</option>
-                            <option value="general">General Message</option>
-                            <option value="document">Document Question</option>
-                        </select>
-                    </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Message Type</label>
+                    <select name="message_type" class="form-select">
+                        <option value="maintenance">Maintenance Request</option>
+                        <option value="complaint">Complaint</option>
+                        <option value="general">General Message</option>
+                        <option value="document">Document Question</option>
+                    </select>
+                </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Subject</label>
-                        <input type="text" name="subject" class="form-control" required>
-                    </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Subject</label>
+                    <input type="text" name="subject" class="form-control" required>
+                </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Message</label>
-                        <textarea name="message" class="form-control" rows="6" required></textarea>
-                    </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Message</label>
+                    <textarea name="message" class="form-control" rows="6" required></textarea>
+                </div>
 
-                    <button type="submit" class="btn btn-primary rounded-pill px-4">
-                        Submit Request
-                    </button>
-                </form>
-            </div>
+                <button type="submit" class="btn btn-primary rounded-pill px-4">
+                    Submit Request
+                </button>
+            </form>
+        </div>
+
+    </div>
+</div>
+```
+
+</div>
+
+<div class="modal fade" id="documentUploadModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content" style="border-radius:22px;">
+
+```
+        <div class="modal-header">
+            <h5 class="modal-title fw-bold">
+                Upload Resident Document
+            </h5>
+
+            <button type="button"
+                    class="btn-close"
+                    data-bs-dismiss="modal"></button>
+        </div>
+
+        <div class="modal-body">
+
+            <form method="POST"
+                  action="{% url 'upload_resident_document' %}"
+                  enctype="multipart/form-data">
+
+                {% csrf_token %}
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">
+                        Document Type
+                    </label>
+
+                    <select name="document_type" class="form-select">
+
+                        <option value="id">
+                            Identification
+                        </option>
+
+                        <option value="income">
+                            Proof of Income / Pay Stub / SSI / SSDI
+                        </option>
+
+                        <option value="bank">
+                            Bank Statements / Deposit Verification
+                        </option>
+
+                        <option value="lease">
+                            Lease / Agreement
+                        </option>
+
+                        <option value="onboarding">
+                            Onboarding Document
+                        </option>
+
+                        <option value="other">
+                            Other
+                        </option>
+
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">
+                        Document Name
+                    </label>
+
+                    <input type="text"
+                           name="name"
+                           class="form-control"
+                           required
+                           placeholder="Example: May pay stub, SSI award letter, 90-day bank statements">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">
+                        Choose File
+                    </label>
+
+                    <input type="file"
+                           name="file"
+                           class="form-control"
+                           required>
+                </div>
+
+                <button type="submit"
+                        class="btn btn-success rounded-pill px-4">
+                    Upload Document
+                </button>
+
+            </form>
 
         </div>
+
     </div>
+</div>
+```
+
 </div>
 
 {% else %}
@@ -307,8 +428,7 @@
     Please enter your access code or contact Bowling Legacy Housing for help connecting your resident file.
 </p>
 
-<a href="{% url 'enter_invite_code' %}" class="btn btn-primary rounded-pill">Enter Access Code</a>
-<a href="/" class="btn btn-outline-secondary rounded-pill">Return Home</a>
+<a href="{% url 'enter_invite_code' %}" class="btn btn-primary rounded-pill">Enter Access Code</a> <a href="/" class="btn btn-outline-secondary rounded-pill">Return Home</a>
 
 {% endif %}
 
