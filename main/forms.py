@@ -7,6 +7,7 @@ from .models import (
     BlogComment,
     FinancialUpload,
     ResidentMessage,
+    ApplicantDocument,
 )
 
 
@@ -39,6 +40,19 @@ class FinancialUploadForm(forms.ModelForm):
             "name": forms.TextInput(attrs={"class": "form-control"}),
             "file": forms.ClearableFileInput(attrs={"class": "form-control"}),
             "notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+        }
+        
+class ResidentDocumentUploadForm(forms.ModelForm):
+    class Meta:
+        model = ApplicantDocument
+        fields = ["document_type", "name", "file"]
+        widgets = {
+            "document_type": forms.Select(attrs={"class": "form-select"}),
+            "name": forms.TextInput(attrs={
+                "class": "form-control",
+                "placeholder": "Example: May pay stub, Social Security award letter, bank statement",
+            }),
+            "file": forms.ClearableFileInput(attrs={"class": "form-control"}),
         }
 
 
