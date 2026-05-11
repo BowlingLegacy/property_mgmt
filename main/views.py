@@ -626,8 +626,8 @@ def stripe_webhook(request):
         return HttpResponse(status=200)
 
     session = event["data"]["object"]
-    payment_id = session.get("metadata", {}).get("payment_id")
-
+    payment_id = session["metadata"]["payment_id"]
+    
     if not payment_id:
         return HttpResponse(status=200)
 
@@ -637,7 +637,7 @@ def stripe_webhook(request):
         return HttpResponse(status=200)
 
     payment.status = "completed"
-    payment.stripe_payment_intent = session.get("payment_intent", "")
+    payment.stripe_payment_intent = session["payment_intent"]
     payment.save()
 
     application = payment.application
