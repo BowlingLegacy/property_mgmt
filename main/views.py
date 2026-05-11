@@ -604,9 +604,25 @@ def printable_application(request, pk):
     return render(request, "printable_application.html", {"application": application})
 
 
-@login_required
+@login_required 
 def create_checkout_session(request, application_id, payment_type="rent"):
     application = get_object_or_404(HousingApplication, id=application_id)
+
+    existing_pending = Payment.objects.filter(
+        application=application,
+        payment_type=payment_type,
+        status="pending",
+    ).exists()
+
+    if existing_pending:
+        return JsonResponse({
+            "error": "A payment is already pending. Please wait before trying again."
+        })
+
+    if payment_type == "rent" and application.balance <= 0:
+        return JsonResponse({
+            "error": "No rent balance due."
+        })
 
     amount = Decimal("0.00")
     description = ""
