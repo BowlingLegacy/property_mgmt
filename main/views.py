@@ -32,6 +32,7 @@ from .models import (
     FinancialUpload,
     FinancialEntry,
     ResidentMessage,
+    ApplicantDocument,
 )
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -161,6 +162,8 @@ def landlord_dashboard(request):
         "landlord_inbox": landlord_inbox,
         "new_message_count": new_message_count,
     })
+
+
 @login_required
 @user_passes_test(staff_required)
 def landlord_message_detail(request, message_id):
@@ -183,6 +186,7 @@ def landlord_message_detail(request, message_id):
         "resident_message": resident_message,
         "application": resident_message.application,
     })
+
 
 @login_required
 def tenant_dashboard(request):
@@ -211,6 +215,62 @@ def tenant_dashboard(request):
         "total_due": total_due,
         "stripe_public_key": settings.STRIPE_PUBLIC_KEY,
     })
+
+
+@login_required
+def upload_resident_document(request):
+    if request.method != "POST":
+        return redirect("tenant_dashboard")
+
+    application = getattr(request.user, "resident_profile", None)
+
+    if not application:
+        messages.error(request, "No resident file connected.")
+        return redirect("tenant_dashboard")
+
+    document_type = request.POST.get("document_type", "other")
+    name = request.POST.get("name", "").strip()
+    uploaded_file = request.FILES.get("file")
+
+    if not name or not uploaded_file:
+        messages.error(request, "Document name and file are required.")
+        return redirect("tenant_dashboard")
+
+    ApplicantDocument.objects.create(
+        application=application,
+        document_type=document_type,
+        name=name,
+        file=uploaded_file,
+        status="uploaded",
+        locked=False,
+    )
+
+    owner_email = "BowlingLegacyLLC@outlook.com"
+    if application.property and application.property.owner_email:
+        owner_email = application.property.owner_email
+
+    send_mail(
+        subject=f"New Resident Document Uploaded: {name}",
+        message=f"""
+A resident uploaded a new document.
+
+Property: {application.property.name if application.property else "No Property"}
+Resident: {application.full_name}
+Room/Space: {application.space_type} {application.space_label}
+
+Document:
+{name}
+
+Type:
+{document_type}
+""",
+        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+        recipient_list=[owner_email],
+        fail_silently=True,
+    )
+
+    messages.success(request, "Your document has been uploaded and filed.")
+    return redirect("tenant_dashboard")
 
 
 @login_required
@@ -627,7 +687,7 @@ def stripe_webhook(request):
 
     session = event["data"]["object"]
     payment_id = session["metadata"]["payment_id"]
-    
+
     if not payment_id:
         return HttpResponse(status=200)
 
