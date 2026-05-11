@@ -43,5 +43,5 @@ urlpatterns = [
     path("stripe/webhook/", views.stripe_webhook, name="stripe_webhook"),
 
     path("resident-message/submit/", views.submit_resident_message, name="submit_resident_message"),
-    path("resident-document/upload/", views.upload_resident_document, name="upload_resident_document"),
+    
 ]
