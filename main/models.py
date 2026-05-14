@@ -350,7 +350,13 @@ class Payment(models.Model):
         on_delete=models.CASCADE,
         related_name="payments",
     )
-
+    monthly_charge = models.ForeignKey(
+        MonthlyCharge,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="payments",
+    )
     payment_type = models.CharField(max_length=30, choices=PAYMENT_TYPE_CHOICES, default="rent")
     description = models.CharField(max_length=255, blank=True)
 
