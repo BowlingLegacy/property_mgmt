@@ -28,8 +28,12 @@ class Command(BaseCommand):
 
         today = timezone.localdate()
 
-        month = today.month
-        year = today.year
+        if today.month == 12:
+            month = 1
+            year = today.year + 1
+        else:
+            month = today.month + 1
+            year = today.year
 
         resident_id = options.get("resident_id")
 
