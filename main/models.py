@@ -265,6 +265,13 @@ class RentHistory(models.Model):
         related_name="rent_history",
     )
 
+    rent_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    effective_date = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.application.full_name} - ${self.rent_amount}"
+
 class MonthlyCharge(models.Model):
     STATUS_CHOICES = [
         ("unpaid", "Unpaid"),
@@ -298,7 +305,7 @@ class MonthlyCharge(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-class Meta:
+    class Meta:
         unique_together = ("application", "month", "year")
         ordering = ["-year", "-month", "application__space_label", "application__full_name"]
 
@@ -320,12 +327,7 @@ class Meta:
     def __str__(self):
         return f"{self.application.full_name} - {self.month}/{self.year} - {self.status}"
     
-    rent_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    effective_date = models.DateField()
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.application.full_name} - ${self.rent_amount}"
+    
 
 
 class Payment(models.Model):
