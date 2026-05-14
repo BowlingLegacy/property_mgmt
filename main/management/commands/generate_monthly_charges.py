@@ -31,7 +31,12 @@ class Command(BaseCommand):
         month = today.month
         year = today.year
 
-        applications = HousingApplication.objects.all()
+        resident_id = options.get("resident_id")
+
+        if resident_id:
+           applications = HousingApplication.objects.filter(id=resident_id)
+        else:
+           applications = HousingApplication.objects.all()
 
         created_count = 0
 
