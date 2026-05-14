@@ -2,116 +2,95 @@ from decimal import Decimal
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from main.models import HousingApplication, Payment
+from main.models import HousingApplication, MonthlyCharge
 
 
 LATE_FEE_AMOUNT = Decimal("25.00")
 
 
 class Command(BaseCommand):
-    help = "Generate monthly rent, utilities, and late fees"
+    help = "Generate monthly charges"
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Preview charges without saving"
+        )
 
     def handle(self, *args, **options):
 
+        dry_run = options["dry_run"]
+
         today = timezone.localdate()
 
-        current_month = today.month
-        current_year = today.year
+        month = today.month
+        year = today.year
 
         applications = HousingApplication.objects.all()
 
-        created_rent = 0
-        created_utilities = 0
-        created_late_fees = 0
+        created_count = 0
 
         for application in applications:
 
-            # Skip incomplete resident files
-            if not application.monthly_rent:
+            if application.monthly_rent <= 0:
                 continue
 
-            # -----------------------------------
-            # RENT CHARGE
-            # -----------------------------------
-
-            existing_rent = Payment.objects.filter(
+            existing = MonthlyCharge.objects.filter(
                 application=application,
-                payment_type="rent",
-                description__icontains=f"{today.strftime('%B')} {current_year}",
+                month=month,
+                year=year,
             ).exists()
 
-            if not existing_rent:
-
-                application.balance += application.monthly_rent
-
-                Payment.objects.create(
-                    application=application,
-                    payment_type="rent",
-                    description=f"{today.strftime('%B')} {current_year} Monthly Rent Charge",
-                    amount=application.monthly_rent,
-                    status="completed",
+            if existing:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Skipping existing charge: {application.full_name}"
+                    )
                 )
+                continue
 
-                created_rent += 1
+            rent_charge = application.monthly_rent
+            utility_charge = application.utility_monthly
 
-            # -----------------------------------
-            # UTILITY CHARGE
-            # -----------------------------------
-
-            existing_utility = Payment.objects.filter(
-                application=application,
-                payment_type="utility",
-                description__icontains=f"{today.strftime('%B')} {current_year}",
-            ).exists()
-
-            if not existing_utility:
-
-                application.utility_balance += application.utility_monthly
-
-                Payment.objects.create(
-                    application=application,
-                    payment_type="utility",
-                    description=f"{today.strftime('%B')} {current_year} Utility Charge",
-                    amount=application.utility_monthly,
-                    status="completed",
-                )
-
-                created_utilities += 1
-
-            # -----------------------------------
-            # LATE FEE
-            # -----------------------------------
+            late_fee = Decimal("0.00")
 
             if today.day > 5 and application.balance > 0:
+                late_fee = LATE_FEE_AMOUNT
 
-                existing_late_fee = Payment.objects.filter(
-                    application=application,
-                    payment_type="late_fee",
-                    description__icontains=f"{today.strftime('%B')} {current_year}",
-                ).exists()
+            total = rent_charge + utility_charge + late_fee
 
-                if not existing_late_fee:
-
-                    application.balance += LATE_FEE_AMOUNT
-
-                    Payment.objects.create(
-                        application=application,
-                        payment_type="late_fee",
-                        description=f"{today.strftime('%B')} {current_year} Late Fee",
-                        amount=LATE_FEE_AMOUNT,
-                        status="completed",
-                    )
-
-                    created_late_fees += 1
-
-            application.save()
-
-        self.stdout.write(self.style.SUCCESS(
-            f"""
-Monthly charges generated successfully.
-
-Rent Charges Created: {created_rent}
-Utility Charges Created: {created_utilities}
-Late Fees Created: {created_late_fees}
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"""
+Resident: {application.full_name}
+Rent: ${rent_charge}
+Utilities: ${utility_charge}
+Late Fee: ${late_fee}
+Total: ${total}
 """
-        ))
+                )
+            )
+
+            if not dry_run:
+
+                MonthlyCharge.objects.create(
+                    application=application,
+                    month=month,
+                    year=year,
+                    rent_charge=rent_charge,
+                    utility_charge=utility_charge,
+                    late_fee=late_fee,
+                )
+
+                application.balance += rent_charge + late_fee
+                application.utility_balance += utility_charge
+                application.save()
+
+            created_count += 1
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"\nProcessed {created_count} monthly charges."
+            )
+        )
