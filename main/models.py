@@ -265,6 +265,61 @@ class RentHistory(models.Model):
         related_name="rent_history",
     )
 
+class MonthlyCharge(models.Model):
+    STATUS_CHOICES = [
+        ("unpaid", "Unpaid"),
+        ("partial", "Partially Paid"),
+        ("paid", "Paid"),
+        ("waived", "Waived"),
+    ]
+
+    application = models.ForeignKey(
+        HousingApplication,
+        on_delete=models.CASCADE,
+        related_name="monthly_charges",
+    )
+
+    month = models.IntegerField()
+    year = models.IntegerField()
+
+    rent_charge = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    utility_charge = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    late_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    balance_remaining = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="unpaid")
+
+    rent_charged_at = models.DateTimeField(blank=True, null=True)
+    utility_charged_at = models.DateTimeField(blank=True, null=True)
+    late_fee_charged_at = models.DateTimeField(blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+class Meta:
+        unique_together = ("application", "month", "year")
+        ordering = ["-year", "-month", "application__space_label", "application__full_name"]
+
+    def recalculate_status(self):
+        total_due = self.rent_charge + self.utility_charge + self.late_fee
+        self.balance_remaining = max(total_due - self.amount_paid, 0)
+
+        if self.balance_remaining <= 0:
+            self.status = "paid"
+        elif self.amount_paid > 0:
+            self.status = "partial"
+        else:
+            self.status = "unpaid"
+
+    def save(self, *args, **kwargs):
+        self.recalculate_status()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.application.full_name} - {self.month}/{self.year} - {self.status}"
+    
     rent_amount = models.DecimalField(max_digits=10, decimal_places=2)
     effective_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
