@@ -17,7 +17,11 @@ class Command(BaseCommand):
             action="store_true",
             help="Preview charges without saving"
         )
-
+        parser.add_argument(
+            "--resident-id",
+            type=int,
+            help="Generate charges for one resident only"
+        )
     def handle(self, *args, **options):
 
         dry_run = options["dry_run"]
