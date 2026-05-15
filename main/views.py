@@ -635,6 +635,63 @@ def lease_sign(request):
         "signed_document": signed_document,
     })
 
+@login_required
+def submit_lease_signature(request):
+
+    if request.method != "POST":
+        return redirect("tenant_dashboard")
+
+    application = getattr(request.user, "resident_profile", None)
+
+    if not application:
+        messages.error(request, "No resident file connected.")
+        return redirect("tenant_dashboard")
+
+    signed_document = SignedDocument.objects.filter(
+        application=application,
+        document_type="lease",
+    ).first()
+
+    if not signed_document:
+        messages.error(request, "Lease document not found.")
+        return redirect("tenant_dashboard")
+
+    if signed_document.locked:
+        messages.info(request, "This lease has already been signed.")
+        return redirect("tenant_dashboard")
+
+    signed_document.rent_initials = request.POST.get("rent_initials", "").strip()
+    signed_document.sobriety_initials = request.POST.get("sobriety_initials", "").strip()
+    signed_document.testing_initials = request.POST.get("testing_initials", "").strip()
+    signed_document.guest_policy_initials = request.POST.get("guest_policy_initials", "").strip()
+    signed_document.cleanliness_initials = request.POST.get("cleanliness_initials", "").strip()
+    signed_document.disclosure_initials = request.POST.get("disclosure_initials", "").strip()
+
+    signed_document.resident_signature = request.POST.get("resident_signature", "").strip()
+
+    signed_document.signature_agreement = bool(
+        request.POST.get("signature_agreement")
+    )
+
+    if not signed_document.resident_signature:
+        messages.error(request, "Signature is required.")
+        return redirect("lease_sign")
+
+    if not signed_document.signature_agreement:
+        messages.error(request, "You must agree to electronically sign.")
+        return redirect("lease_sign")
+
+    signed_document.signed_at = timezone.now()
+    signed_document.locked = True
+
+    signed_document.save()
+
+    messages.success(
+        request,
+        "Lease agreement successfully signed and filed."
+    )
+
+    return redirect("tenant_dashboard")
 
 @login_required 
 def create_checkout_session(request, application_id, payment_type="rent"):
