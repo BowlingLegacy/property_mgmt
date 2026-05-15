@@ -32,6 +32,107 @@
         background: #fff8df;
         border-top: 6px solid #d4af37;
     }
+
+    @media (max-width: 768px) {
+        h2 {
+            font-size: 1.35rem;
+            margin-bottom: 1rem !important;
+        }
+
+        h3 {
+            font-size: 1.25rem;
+        }
+
+        h4 {
+            font-size: 1.1rem;
+        }
+
+        h5 {
+            font-size: 1rem;
+        }
+
+        .resident-card,
+        .pay-card,
+        .inbox-card {
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.10);
+        }
+
+        .resident-card .card-body,
+        .inbox-card .card-body,
+        .pay-card .card-body {
+            padding: 1rem !important;
+        }
+
+        .resident-photo {
+            width: 74px;
+            height: 74px;
+            font-size: 1.8rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .row.g-4 {
+            --bs-gutter-y: 0.85rem;
+            --bs-gutter-x: 0.85rem;
+        }
+
+        .mb-4 {
+            margin-bottom: 1rem !important;
+        }
+
+        .mb-5 {
+            margin-bottom: 1.5rem !important;
+        }
+
+        .my-5 {
+            margin-top: 1.25rem !important;
+            margin-bottom: 1.25rem !important;
+        }
+
+        .p-5 {
+            padding: 1.25rem !important;
+        }
+
+        .fs-2 {
+            font-size: 1.6rem !important;
+        }
+
+        .fs-5 {
+            font-size: 1rem !important;
+        }
+
+        .btn {
+            font-size: 0.9rem;
+            padding: 0.45rem 0.75rem;
+        }
+
+        .btn-lg {
+            font-size: 1rem;
+            padding: 0.6rem 1rem;
+        }
+
+        .table {
+            font-size: 0.82rem;
+        }
+
+        .table th,
+        .table td {
+            padding: 0.45rem;
+            white-space: nowrap;
+        }
+
+        .modal-dialog {
+            margin: 0.75rem;
+        }
+
+        .modal-body textarea {
+            rows: 4;
+        }
+
+        .resident-action-buttons {
+            margin-top: 0.75rem;
+        }
+    }
 </style>
 
 <h2 class="fw-bold mb-4" style="color:#1e3a5f;">Resident File</h2>
@@ -42,17 +143,17 @@
     <div class="card-body p-4">
         <div class="row align-items-center g-4">
 
-            <div class="col-md-2 text-center">
+            <div class="col-4 col-md-2 text-center">
                 <div class="resident-photo mx-auto">
                     {{ application.full_name|first|upper }}
                 </div>
                 <p class="text-muted small mt-2 mb-0">Resident Photo</p>
             </div>
 
-            <div class="col-md-7">
+            <div class="col-8 col-md-7">
                 <h3 class="fw-bold mb-1">{{ application.full_name }}</h3>
                 <p class="text-muted mb-1">{{ application.phone }}</p>
-                <p class="text-muted mb-3">{{ application.email }}</p>
+                <p class="text-muted mb-2">{{ application.email }}</p>
 
                 {% if application.property %}
                     <p class="mb-1"><strong>Property:</strong> {{ application.property.name }}</p>
@@ -66,7 +167,7 @@
                 <p class="mb-0"><strong>Status:</strong> Active Resident File</p>
             </div>
 
-            <div class="col-md-3">
+            <div class="col-12 col-md-3 resident-action-buttons">
                 <button class="btn btn-gold w-100 rounded-pill mb-2"
                         data-bs-toggle="modal"
                         data-bs-target="#messageModal">
@@ -91,7 +192,7 @@
 <div class="row g-4 mb-5">
 
     {% if application.balance > 0 %}
-    <div class="col-md-4">
+    <div class="col-12 col-md-4">
         <div class="card pay-card h-100" style="border-top:6px solid #1e3a5f;">
             <div class="card-body">
                 <h5 class="fw-bold">Rent Due</h5>
@@ -106,7 +207,7 @@
     {% endif %}
 
     {% if application.deposit_paid < application.deposit_required %}
-    <div class="col-md-4">
+    <div class="col-12 col-md-4">
         <div class="card pay-card h-100" style="border-top:6px solid #d4af37;">
             <div class="card-body">
                 <h5 class="fw-bold">Deposit Due</h5>
@@ -122,7 +223,7 @@
     {% endif %}
 
     {% if application.utility_balance > 0 %}
-    <div class="col-md-4">
+    <div class="col-12 col-md-4">
         <div class="card pay-card h-100" style="border-top:6px solid #198754;">
             <div class="card-body">
                 <h5 class="fw-bold">Utilities Due</h5>
@@ -160,7 +261,7 @@
     <div class="card-body p-4">
 
         <h4 class="fw-bold mb-1">✉ Resident Inbox</h4>
-        <p class="text-muted">
+        <p class="text-muted mb-3">
             Applications, leases, onboarding documents, uploaded documents, messages, requests, and resident file records.
         </p>
 
@@ -290,7 +391,7 @@
 
                     <div class="mb-3">
                         <label class="form-label fw-bold">Message</label>
-                        <textarea name="message" class="form-control" rows="6" required></textarea>
+                        <textarea name="message" class="form-control" rows="5" required></textarea>
                     </div>
 
                     <button type="submit" class="btn btn-primary rounded-pill px-4">
