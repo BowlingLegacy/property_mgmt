@@ -20,17 +20,40 @@
     }
 
     .lease-header {
-        background: linear-gradient(135deg, #111827, #1e3a5f);
-        color: white;
-        padding: 2rem;
-        text-align: center;
-    }
+    position: relative;
+    background: linear-gradient(135deg, #050505, #111111);
+    color: white;
+    padding: 2rem 2rem 3.5rem;
+    text-align: center;
+    overflow: hidden;
+}
 
-    .lease-header img {
-        max-width: 120px;
-        margin-bottom: 1rem;
-    }
+.lease-header::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 55px;
+    background: white;
+    clip-path: polygon(0 70%, 50% 100%, 100% 70%, 100% 100%, 0 100%);
+    border-top: 4px solid #d4af37;
+}
 
+.lease-header img {
+    max-width: 130px;
+    margin-bottom: 0.75rem;
+    position: relative;
+    z-index: 2;
+}
+
+.lease-header h1,
+.lease-header p {
+    position: relative;
+    z-index: 2;
+}
+
+    
     .lease-header h1 {
         font-weight: 800;
         margin-bottom: 0.25rem;
