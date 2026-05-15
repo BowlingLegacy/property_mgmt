@@ -2,510 +2,648 @@
 {% block content %}
 
 <style>
-    body {
-        background: linear-gradient(180deg, #fbf6e8 0%, #f1ead9 100%);
-        color: #1f1f1f;
+
+body {
+    background:
+        linear-gradient(180deg, #faf6ee 0%, #f2ead9 100%);
+    color: #1f1f1f;
+}
+
+.page-shell {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+
+.dashboard-wrap {
+    padding-bottom: 2rem;
+}
+
+/* ===== HERO ===== */
+
+.hero-row {
+    margin-bottom: 2.2rem;
+}
+
+.house-thumb {
+    width: 145px;
+    height: 105px;
+    object-fit: cover;
+    border-radius: 16px;
+    box-shadow: 0 10px 22px rgba(0,0,0,0.14);
+}
+
+.painted-lady-wrap {
+    border-right: 1px solid rgba(191,150,52,0.35);
+    padding-right: 2rem;
+}
+
+.the-script {
+    font-family: "Times New Roman", serif;
+    font-style: italic;
+    color: #c59a32;
+    font-size: 3.2rem;
+    line-height: 0.7;
+}
+
+.painted-lady-title {
+    font-family: Georgia, serif;
+    font-size: 3rem;
+    color: #1f1f1f;
+    line-height: 0.95;
+    letter-spacing: 1px;
+}
+
+.community-line {
+    color: #a57c18;
+    letter-spacing: 5px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    margin-top: 0.8rem;
+}
+
+.welcome-title {
+    font-family: Georgia, serif;
+    font-size: 3rem;
+    font-weight: 700;
+    color: #121212;
+}
+
+.welcome-text {
+    color: #555;
+    font-size: 1.15rem;
+}
+
+.message-btn {
+    background: transparent;
+    border: 1px solid #c59a32;
+    border-radius: 12px;
+    padding: 1rem 1.4rem;
+    color: #a57c18;
+    font-weight: 700;
+    width: 100%;
+}
+
+.message-btn:hover {
+    background: rgba(197,154,50,0.08);
+}
+
+/* ===== CARDS ===== */
+
+.soft-card {
+    background: rgba(255,255,255,0.84);
+    border: 1px solid rgba(188,150,45,0.12);
+    border-radius: 20px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+}
+
+.card-title {
+    font-family: Georgia, serif;
+    font-size: 1.9rem;
+    color: #1c1c1c;
+    margin-bottom: 1rem;
+}
+
+.section-title {
+    font-family: Georgia, serif;
+    font-size: 2rem;
+    color: #1c1c1c;
+}
+
+.profile-card {
+    min-height: 620px;
+}
+
+.profile-photo {
+    width: 135px;
+    height: 135px;
+    border-radius: 50%;
+    background: #f0e5ca;
+    color: #b98b1d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: Georgia, serif;
+    font-size: 3.3rem;
+    margin: 1rem auto;
+}
+
+.profile-name {
+    font-family: Georgia, serif;
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+.profile-line {
+    margin-bottom: 0.8rem;
+    color: #333;
+}
+
+.profile-divider {
+    border-top: 1px solid rgba(188,150,45,0.3);
+    margin: 1.4rem 0;
+}
+
+.amount {
+    font-family: Georgia, serif;
+    font-size: 3.2rem;
+    font-weight: 700;
+    color: #111;
+}
+
+.gold-btn {
+    background: linear-gradient(135deg, #c48f22, #d8ab3b);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 0.95rem 1.2rem;
+    font-weight: 700;
+    width: 100%;
+}
+
+.gold-btn:hover {
+    opacity: 0.95;
+}
+
+.gold-link {
+    color: #a97d17;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+}
+
+.gold-link:hover {
+    color: #d0a12e;
+}
+
+/* ===== TABLES ===== */
+
+.table {
+    margin-bottom: 0;
+}
+
+.table thead {
+    background: #f3ead7;
+}
+
+.table th {
+    color: #6f5411;
+    border-bottom: none;
+}
+
+.table td {
+    color: #333;
+    vertical-align: middle;
+}
+
+/* ===== FOOTER FIX ===== */
+
+.footer,
+.footer p,
+.footer a {
+    color: #3d3320 !important;
+}
+
+/* ===== MOBILE ===== */
+
+@media (max-width: 768px) {
+
+    .painted-lady-wrap {
+        border-right: none;
+        padding-right: 0;
+        text-align: center;
     }
 
-    .page-shell {
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        padding: 0 !important;
-    }
-
-    .dashboard-wrap {
-        font-family: Tahoma, sans-serif;
-    }
-
-    .dashboard-intro {
-        margin-bottom: 2rem;
-    }
-
-    .house-thumb {
-        width: 170px;
-        height: 115px;
-        object-fit: cover;
-        border-radius: 14px;
-        box-shadow: 0 8px 22px rgba(0,0,0,0.18);
-    }
-
-    .property-legend {
-        font-family: Georgia, serif;
+    .painted-lady-title {
         font-size: 2rem;
-        color: #1e1e1e;
-        line-height: 1.1;
     }
 
-    .property-legend small {
-        display: block;
-        font-family: Tahoma, sans-serif;
-        font-size: 0.7rem;
-        letter-spacing: 4px;
-        color: #9b7417;
-        margin-top: 0.5rem;
-        text-transform: uppercase;
+    .the-script {
+        font-size: 2.4rem;
     }
 
     .welcome-title {
-        font-family: Georgia, serif;
-        font-size: 2.25rem;
-        font-weight: 700;
-        color: #1e1e1e;
+        font-size: 2rem;
+        text-align: center;
     }
 
-    .soft-card {
-        background: rgba(255,255,255,0.78);
-        border: 1px solid rgba(159,122,22,0.18);
-        border-radius: 18px;
-        box-shadow: 0 8px 22px rgba(0,0,0,0.08);
+    .welcome-text {
+        text-align: center;
     }
 
-    .card-heading {
-        font-family: Georgia, serif;
-        font-size: 1.25rem;
-        font-weight: 700;
-        color: #1e1e1e;
+    .profile-card {
+        min-height: auto;
     }
 
-    .gold-link {
-        color: #a87913;
-        font-weight: 700;
-        text-decoration: underline;
-        text-underline-offset: 4px;
-    }
+}
 
-    .gold-link:hover {
-        color: #d4af37;
-    }
-
-    .gold-btn {
-        background: linear-gradient(135deg, #c7942e, #d4af37);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 0.75rem 1rem;
-        font-weight: 700;
-        box-shadow: 0 4px 12px rgba(159,122,22,0.25);
-    }
-
-    .outline-gold-btn {
-        background: transparent;
-        color: #a87913;
-        border: 1px solid #c7942e;
-        border-radius: 8px;
-        padding: 0.75rem 1rem;
-        font-weight: 700;
-    }
-
-    .resident-photo {
-        width: 115px;
-        height: 115px;
-        border-radius: 50%;
-        background: #eee0c1;
-        color: #b18019;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-family: Georgia, serif;
-        font-size: 2.4rem;
-        font-weight: 700;
-        margin: 1.25rem auto;
-    }
-
-    .amount {
-        font-family: Georgia, serif;
-        font-size: 2.2rem;
-        font-weight: 700;
-    }
-
-    .table {
-        margin-bottom: 0;
-    }
-
-    .table thead {
-        background: #f4ead4;
-    }
-
-    .table th {
-        color: #6f5411;
-        font-weight: 700;
-        border-bottom: none;
-    }
-
-    .table td {
-        vertical-align: middle;
-        color: #333;
-    }
-
-    .modal-content {
-        border-radius: 18px;
-    }
-
-    @media (max-width: 768px) {
-        .property-legend {
-            font-size: 1.5rem;
-            text-align: center;
-        }
-
-        .welcome-title {
-            font-size: 1.7rem;
-            text-align: center;
-        }
-
-        .house-thumb {
-            width: 130px;
-            height: 90px;
-        }
-
-        .amount {
-            font-size: 1.7rem;
-        }
-    }
 </style>
 
 {% if application %}
 
 <div class="dashboard-wrap">
 
-    <div class="row align-items-center dashboard-intro g-4">
-        <div class="col-md-2 text-center">
-            <img src="/static/images/photo03.JPG" class="house-thumb" alt="The Painted Lady Inn">
+    <!-- HERO -->
+
+    <div class="row align-items-center hero-row g-4">
+
+        <div class="col-lg-2 text-center">
+            <img src="/static/images/photo03.JPG"
+                 class="house-thumb"
+                 alt="The Painted Lady Inn">
         </div>
 
-        <div class="col-md-3 text-center text-md-start">
-            <div class="property-legend">
-                The<br>
-                Painted Lady Inn
-                <small>A Bowling Legacy Community</small>
+        <div class="col-lg-4 painted-lady-wrap">
+
+            <div class="the-script">
+                The
             </div>
+
+            <div class="painted-lady-title">
+                Painted Lady Inn
+            </div>
+
+            <div class="community-line">
+                A Bowling Legacy Community
+            </div>
+
         </div>
 
-        <div class="col-md-4">
-            <h1 class="welcome-title mb-2">
-                Welcome back, {{ application.full_name|default:"Resident" }}
+        <div class="col-lg-4">
+
+            <h1 class="welcome-title">
+                Welcome back, {{ application.full_name }}
             </h1>
-            <p class="text-muted mb-0">
-                We're glad to have you as part of The Painted Lady Inn community.
+
+            <p class="welcome-text mb-0">
+                We're glad to have you as part of
+                The Painted Lady Inn community.
             </p>
+
         </div>
 
-        <div class="col-md-3 text-center">
-            <button class="outline-gold-btn w-100"
+        <div class="col-lg-2">
+
+            <button class="message-btn"
                     data-bs-toggle="modal"
                     data-bs-target="#messageModal">
+
                 Send a Message
+
             </button>
-            <p class="text-muted small mt-2 mb-0">
+
+            <p class="small text-muted mt-2 mb-0">
                 We typically respond within 1 business day.
             </p>
+
         </div>
+
     </div>
+
+    <!-- TOP CARDS -->
 
     <div class="row g-4 mb-4">
 
-        <div class="col-lg-3 col-md-6">
-            <div class="soft-card h-100 p-4 text-center">
-                <div class="card-heading text-start">Resident Profile</div>
+        <!-- PROFILE -->
 
-                <div class="resident-photo">
+        <div class="col-lg-3">
+
+            <div class="soft-card profile-card p-4">
+
+                <div class="card-title">
+                    Resident Profile
+                </div>
+
+                <div class="profile-photo">
                     {{ application.full_name|first|upper }}
                 </div>
 
-                <h4 class="fw-bold">{{ application.full_name }}</h4>
+                <div class="text-center">
 
-                <p class="text-muted mb-1">
-                    {{ application.space_type }} {{ application.space_label }} • The Painted Lady Inn
-                </p>
+                    <div class="profile-name">
+                        {{ application.full_name }}
+                    </div>
 
-                <p class="text-muted small mb-1">
+                    <div class="profile-line">
+                        {{ application.space_type }}
+                        {{ application.space_label }}
+                        • The Painted Lady Inn
+                    </div>
+
+                </div>
+
+                <div class="profile-divider"></div>
+
+                <div class="profile-line">
                     {{ application.email }}
-                </p>
+                </div>
 
-                <p class="text-muted small mb-3">
+                <div class="profile-line">
                     {{ application.phone }}
-                </p>
+                </div>
 
-                <a href="#resident-inbox" class="outline-gold-btn d-block text-decoration-none">
-                    View My File
-                </a>
+                <div class="profile-line">
+                    Member since 2026
+                </div>
+
+                <div class="profile-divider"></div>
+
+                <div class="profile-line">
+                    <strong>Space Type</strong><br>
+                    {{ application.space_type }}
+                </div>
+
+                <div class="profile-line">
+                    <strong>Room / Space</strong><br>
+                    {{ application.space_label }}
+                </div>
+
+                <div class="profile-line">
+                    <strong>Status</strong><br>
+                    Active Resident
+                </div>
+
+                <div class="mt-4">
+                    <button class="message-btn w-100">
+                        View / Edit Profile
+                    </button>
+                </div>
+
             </div>
+
         </div>
 
-        <div class="col-lg-3 col-md-6">
-            <div class="soft-card h-100 p-4 text-center">
-                <div class="card-heading text-start">Current Balance</div>
+        <!-- BALANCE -->
 
-                <div class="amount my-4">
+        <div class="col-lg-3">
+
+            <div class="soft-card p-4 h-100">
+
+                <div class="card-title">
+                    Current Balance
+                </div>
+
+                <div class="amount text-center mt-5">
                     ${{ total_due }}
                 </div>
 
-                <p class="text-muted">
+                <p class="text-center text-muted">
                     Total amount currently due
                 </p>
 
                 {% if total_due > 0 %}
-                    <a href="{% url 'pay_by_type' application.id 'total' %}"
-                       class="gold-btn d-block text-decoration-none">
-                        Make a Payment
-                    </a>
-                {% else %}
-                    <span class="text-success fw-bold">No balance due</span>
+                <a href="{% url 'pay_by_type' application.id 'total' %}"
+                   class="gold-btn d-block text-center text-decoration-none mt-4">
+
+                    Make a Payment
+
+                </a>
                 {% endif %}
 
-                <div class="mt-3">
-                    <a href="#payment-history" class="gold-link">View Payment History</a>
-                </div>
-            </div>
-        </div>
+                <div class="text-center mt-4">
+                    <a href="#payment-history"
+                       class="gold-link">
 
-        <div class="col-lg-3 col-md-6">
-            <div class="soft-card h-100 p-4 text-center">
-                <div class="card-heading text-start">Next Payment</div>
+                        View Payment History
 
-                <div class="amount my-4">
-                    1st
+                    </a>
                 </div>
 
-                <p class="text-muted">
-                    Rent is due on the 1st and collected on the 3rd.
-                </p>
-
-                <a href="#payment-history" class="gold-link">
-                    View Payment Details
-                </a>
             </div>
+
         </div>
 
-        <div class="col-lg-3 col-md-6">
-            <div class="soft-card h-100 p-4 text-center">
-                <div class="card-heading text-start">Maintenance</div>
+        <!-- NEXT PAYMENT -->
 
-                <p class="my-4 fs-5">
-                    Need something taken care of?
+        <div class="col-lg-3">
+
+            <div class="soft-card p-4 h-100">
+
+                <div class="card-title">
+                    Next Payment
+                </div>
+
+                <div class="amount text-center mt-5">
+                    June 1, 2026
+                </div>
+
+                <p class="text-center text-muted">
+                    Rent is due on the 1st
+                    and collected on the 3rd.
                 </p>
 
-                <button class="gold-btn w-100"
+                <div class="text-center mt-5">
+                    <a href="#payment-history"
+                       class="gold-link">
+
+                        View Payment Details
+
+                    </a>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- MAINTENANCE -->
+
+        <div class="col-lg-3">
+
+            <div class="soft-card p-4 h-100">
+
+                <div class="card-title">
+                    Maintenance
+                </div>
+
+                <div class="text-center mt-5">
+
+                    <p style="font-size:1.35rem;">
+                        Need something
+                        taken care of?
+                    </p>
+
+                </div>
+
+                <button class="gold-btn mt-4"
                         data-bs-toggle="modal"
                         data-bs-target="#messageModal">
+
                     Submit a Request
+
                 </button>
 
-                <div class="mt-3">
-                    <a href="#resident-inbox" class="gold-link">View My Requests</a>
+                <div class="text-center mt-4">
+                    <a href="#resident-inbox"
+                       class="gold-link">
+
+                        View My Requests
+
+                    </a>
                 </div>
+
             </div>
+
         </div>
 
     </div>
 
+    <!-- LOWER SECTION -->
+
     <div class="row g-4">
 
+        <!-- INBOX -->
+
         <div class="col-lg-6">
-            <div id="resident-inbox" class="soft-card h-100">
-                <div class="p-4 border-bottom">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h3 class="card-heading mb-0">Inbox</h3>
-                        <button class="btn btn-sm gold-link"
-                                data-bs-toggle="modal"
-                                data-bs-target="#documentUploadModal">
-                            Upload Document
-                        </button>
+
+            <div id="resident-inbox"
+                 class="soft-card h-100">
+
+                <div class="p-4 border-bottom d-flex justify-content-between align-items-center">
+
+                    <div class="section-title">
+                        Inbox
                     </div>
+
+                    <button class="btn btn-link gold-link"
+                            data-bs-toggle="modal"
+                            data-bs-target="#documentUploadModal">
+
+                        Upload Document
+
+                    </button>
+
                 </div>
 
                 <div class="table-responsive">
-                    <table class="table align-middle">
-                        <tbody>
-                            {% for document in application.documents.all %}
-                            <tr>
-                                <td>
-                                    <strong>{{ document.name }}</strong><br>
-                                    <small class="text-muted">{{ document.get_document_type_display }}</small>
-                                </td>
-                                <td>{{ document.get_status_display }}</td>
-                                <td>
-                                    {% if document.file %}
-                                        <a href="{{ document.file.url }}" target="_blank" class="gold-link">Open</a>
-                                    {% else %}
-                                        —
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
 
-                            {% for resident_message in resident_messages %}
+                    <table class="table">
+
+                        <tbody>
+
+                        {% for resident_message in resident_messages %}
+
                             <tr>
+
                                 <td>
                                     <strong>{{ resident_message.subject }}</strong><br>
-                                    <small class="text-muted">{{ resident_message.get_message_type_display }}</small>
+                                    <small>{{ resident_message.message }}</small>
                                 </td>
-                                <td>{{ resident_message.get_status_display }}</td>
-                                <td>{{ resident_message.created_at|date:"M j, Y" }}</td>
-                            </tr>
-                            {% endfor %}
 
-                            {% if not application.documents.all and not resident_messages %}
+                                <td>
+                                    {{ resident_message.created_at|date:"M j, Y" }}
+                                </td>
+
+                            </tr>
+
+                        {% empty %}
+
                             <tr>
-                                <td class="text-muted p-4" colspan="3">
-                                    No documents or messages are currently in your inbox.
+                                <td class="p-4">
+                                    No inbox items yet.
                                 </td>
                             </tr>
-                            {% endif %}
+
+                        {% endfor %}
+
                         </tbody>
+
                     </table>
+
                 </div>
 
             </div>
+
         </div>
 
+        <!-- PAYMENT HISTORY -->
+
         <div class="col-lg-6">
-            <div id="payment-history" class="soft-card h-100">
-                <div class="p-4 border-bottom">
-                    <h3 class="card-heading mb-0">Payment History</h3>
+
+            <div id="payment-history"
+                 class="soft-card h-100">
+
+                <div class="p-4 border-bottom d-flex justify-content-between align-items-center">
+
+                    <div class="section-title">
+                        Payment History
+                    </div>
+
+                    <a href="#"
+                       class="gold-link">
+
+                        View All Payments
+
+                    </a>
+
                 </div>
 
                 <div class="table-responsive">
-                    <table class="table align-middle">
+
+                    <table class="table">
+
                         <thead>
+
                             <tr>
+
                                 <th>Date</th>
                                 <th>Description</th>
                                 <th>Amount</th>
                                 <th>Status</th>
+
                             </tr>
+
                         </thead>
 
                         <tbody>
-                            {% for payment in payments %}
+
+                        {% for payment in payments %}
+
                             <tr>
-                                <td>{{ payment.created_at|date:"M j, Y" }}</td>
-                                <td>{{ payment.description|default:payment.get_payment_type_display }}</td>
-                                <td>${{ payment.amount }}</td>
-                                <td>{{ payment.get_status_display }}</td>
+
+                                <td>
+                                    {{ payment.created_at|date:"M j, Y" }}
+                                </td>
+
+                                <td>
+                                    {{ payment.get_payment_type_display }}
+                                </td>
+
+                                <td>
+                                    ${{ payment.amount }}
+                                </td>
+
+                                <td>
+                                    {{ payment.get_status_display }}
+                                </td>
+
                             </tr>
-                            {% empty %}
+
+                        {% empty %}
+
                             <tr>
-                                <td colspan="4" class="text-muted p-4">
+
+                                <td colspan="4" class="p-4">
                                     No payment history yet.
                                 </td>
+
                             </tr>
-                            {% endfor %}
+
+                        {% endfor %}
+
                         </tbody>
+
                     </table>
+
                 </div>
 
             </div>
+
         </div>
 
     </div>
 
 </div>
-
-<div class="modal fade" id="messageModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-
-            <div class="modal-header">
-                <h5 class="modal-title fw-bold">Request / Message Landlord</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-
-            <div class="modal-body">
-                <form method="POST" action="{% url 'submit_resident_message' %}">
-                    {% csrf_token %}
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Message Type</label>
-                        <select name="message_type" class="form-select">
-                            <option value="maintenance">Maintenance Request</option>
-                            <option value="complaint">Complaint</option>
-                            <option value="general">General Message</option>
-                            <option value="document">Document Question</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Subject</label>
-                        <input type="text" name="subject" class="form-control" required>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Message</label>
-                        <textarea name="message" class="form-control" rows="5" required></textarea>
-                    </div>
-
-                    <button type="submit" class="gold-btn">
-                        Submit Request
-                    </button>
-                </form>
-            </div>
-
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="documentUploadModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-
-            <div class="modal-header">
-                <h5 class="modal-title fw-bold">Upload Resident Document</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-
-            <div class="modal-body">
-                <form method="POST"
-                      action="{% url 'upload_resident_document' %}"
-                      enctype="multipart/form-data">
-                    {% csrf_token %}
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Document Type</label>
-                        <select name="document_type" class="form-select">
-                            <option value="id">Identification</option>
-                            <option value="income">Proof of Income / Pay Stub / SSI / SSDI</option>
-                            <option value="bank">Bank Statements / Deposit Verification</option>
-                            <option value="lease">Lease / Agreement</option>
-                            <option value="onboarding">Onboarding Document</option>
-                            <option value="other">Other</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Document Name</label>
-                        <input type="text"
-                               name="name"
-                               class="form-control"
-                               required>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Choose File</label>
-                        <input type="file"
-                               name="file"
-                               class="form-control"
-                               required>
-                    </div>
-
-                    <button type="submit" class="gold-btn">
-                        Upload Document
-                    </button>
-                </form>
-            </div>
-
-        </div>
-    </div>
-</div>
-
-{% else %}
-
-<div class="alert alert-warning">
-    No resident file is connected to this login yet.
-</div>
-
-<a href="{% url 'enter_invite_code' %}" class="btn btn-primary rounded-pill">Enter Access Code</a>
-<a href="/" class="btn btn-outline-secondary rounded-pill">Return Home</a>
 
 {% endif %}
 
