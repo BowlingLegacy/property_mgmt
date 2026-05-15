@@ -33,6 +33,7 @@ from .models import (
     FinancialEntry,
     ResidentMessage,
     ApplicantDocument,
+    SignedDocument,
 )
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -602,6 +603,37 @@ def add_blog_comment(request, post_id):
 def printable_application(request, pk):
     application = get_object_or_404(HousingApplication, pk=pk)
     return render(request, "printable_application.html", {"application": application})
+
+@login_required
+def lease_sign(request):
+
+    application = getattr(request.user, "resident_profile", None)
+
+    if not application:
+        messages.error(request, "No resident file connected.")
+        return redirect("tenant_dashboard")
+
+    signed_document = SignedDocument.objects.filter(
+        application=application,
+        document_type="lease",
+    ).first()
+
+    if signed_document and signed_document.locked:
+        messages.info(request, "Your lease has already been signed.")
+        return redirect("tenant_dashboard")
+
+    if not signed_document:
+        signed_document = SignedDocument.objects.create(
+            application=application,
+            document_type="lease",
+            title="Resident Lease Agreement",
+            lease_sent_date=timezone.localdate(),
+        )
+
+    return render(request, "lease_sign.html", {
+        "application": application,
+        "signed_document": signed_document,
+    })
 
 
 @login_required 
