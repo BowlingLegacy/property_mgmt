@@ -20,40 +20,39 @@
     }
 
     .lease-header {
-    position: relative;
-    background: linear-gradient(135deg, #050505, #111111);
-    color: white;
-    padding: 2rem 2rem 3.5rem;
-    text-align: center;
-    overflow: hidden;
-}
+        position: relative;
+        background: linear-gradient(135deg, #050505, #111111);
+        color: white;
+        padding: 2rem 2rem 3.5rem;
+        text-align: center;
+        overflow: hidden;
+    }
 
-.lease-header::after {
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: -1px;
-    height: 55px;
-    background: white;
-    clip-path: polygon(0 70%, 50% 100%, 100% 70%, 100% 100%, 0 100%);
-    border-top: 4px solid #d4af37;
-}
+    .lease-header::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -1px;
+        height: 55px;
+        background: white;
+        clip-path: polygon(0 70%, 50% 100%, 100% 70%, 100% 100%, 0 100%);
+        border-top: 4px solid #d4af37;
+    }
 
-.lease-header img {
-    max-width: 130px;
-    margin-bottom: 0.75rem;
-    position: relative;
-    z-index: 2;
-}
+    .lease-header img {
+        max-width: 130px;
+        margin-bottom: 0.75rem;
+        position: relative;
+        z-index: 2;
+    }
 
-.lease-header h1,
-.lease-header p {
-    position: relative;
-    z-index: 2;
-}
+    .lease-header h1,
+    .lease-header p {
+        position: relative;
+        z-index: 2;
+    }
 
-    
     .lease-header h1 {
         font-weight: 800;
         margin-bottom: 0.25rem;
@@ -80,8 +79,15 @@
         padding-bottom: 0.5rem;
     }
 
+    .lease-section p,
+    .lease-section li {
+        line-height: 1.7;
+        color: #222;
+    }
+
     .initial-box {
         max-width: 140px;
+        margin-top: 1rem;
     }
 
     .signature-box {
@@ -91,10 +97,17 @@
         border: 1px solid #dee2e6;
     }
 
+    .info-card {
+        background: #f8f9fb;
+        border-radius: 18px;
+        padding: 1.25rem;
+        border: 1px solid #e1e4e8;
+    }
+
     @media (max-width: 768px) {
 
         .lease-header {
-            padding: 1.5rem 1rem;
+            padding: 1.5rem 1rem 3rem;
         }
 
         .lease-body {
@@ -137,40 +150,44 @@
 
                 <h3>Resident Information</h3>
 
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <strong>Resident:</strong><br>
-                        {{ signed_document.resident_name }}
-                    </div>
+                <div class="info-card">
 
-                    <div class="col-md-6 mb-3">
-                        <strong>Property:</strong><br>
-                        {{ signed_document.property_name }}
-                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <strong>Resident:</strong><br>
+                            {{ signed_document.resident_name }}
+                        </div>
 
-                    <div class="col-md-6 mb-3">
-                        <strong>Room / Space:</strong><br>
-                        {{ signed_document.room_space }}
-                    </div>
+                        <div class="col-md-6 mb-3">
+                            <strong>Property:</strong><br>
+                            {{ signed_document.property_name }}
+                        </div>
 
-                    <div class="col-md-6 mb-3">
-                        <strong>Lease Start Date:</strong><br>
-                        {{ signed_document.lease_start_date }}
-                    </div>
+                        <div class="col-md-6 mb-3">
+                            <strong>Room / Space:</strong><br>
+                            {{ signed_document.room_space }}
+                        </div>
 
-                    <div class="col-md-6 mb-3">
-                        <strong>Monthly Rent:</strong><br>
-                        ${{ signed_document.monthly_rent }}
-                    </div>
+                        <div class="col-md-6 mb-3">
+                            <strong>Lease Start Date:</strong><br>
+                            {{ signed_document.lease_start_date }}
+                        </div>
 
-                    <div class="col-md-6 mb-3">
-                        <strong>Utility Contribution:</strong><br>
-                        ${{ signed_document.utility_fee }}
-                    </div>
+                        <div class="col-md-6 mb-3">
+                            <strong>Monthly Rent:</strong><br>
+                            ${{ signed_document.monthly_rent }}
+                        </div>
 
-                    <div class="col-md-6 mb-3">
-                        <strong>Security Deposit:</strong><br>
-                        ${{ signed_document.security_deposit }}
+                        <div class="col-md-6 mb-3">
+                            <strong>Utility Contribution:</strong><br>
+                            ${{ signed_document.utility_fee }}
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <strong>Security Deposit:</strong><br>
+                            ${{ signed_document.security_deposit }}
+                        </div>
+
                     </div>
 
                 </div>
@@ -182,101 +199,40 @@
                 {% csrf_token %}
 
                 <div class="lease-section">
-
-                    <h3>Sober Living Requirements</h3>
+                    <h3>1. Premises and Purpose</h3>
 
                     <p>
-                        This property operates as a sober living environment.
-                        Residents agree to maintain a drug and alcohol free living environment
-                        and understand that violations may result in removal from the property.
+                        Residents are granted the right to occupy a room at
+                        The Painted Lady Inn, a permanent housing option
+                        committed to sobriety, self-sufficiency, and community support.
+                        Residency is contingent upon compliance with the terms below.
                     </p>
+                </div>
 
-                    <label class="fw-bold">
-                        Initial to acknowledge:
-                    </label>
+                <div class="lease-section">
+                    <h3>2. Term of Residency</h3>
 
-                    <input type="text"
-                           name="sobriety_initials"
-                           class="form-control initial-box"
-                           maxlength="10"
-                           required>
-
+                    <ul>
+                        <li>Start Date: {{ signed_document.lease_start_date }}</li>
+                        <li>End Date: Month-to-month unless terminated earlier pursuant to Section 10</li>
+                        <li>Renewal: Automatic month-to-month renewal unless otherwise agreed in writing</li>
+                    </ul>
                 </div>
 
                 <div class="lease-section">
 
-                    <h3>Drug & Alcohol Screening</h3>
+                    <h3>3. Monthly Rent and Payment Terms</h3>
 
-                    <p>
-                        Residents acknowledge that reasonable drug or alcohol screening
-                        may be required to maintain safety and community harmony.
-                    </p>
-
-                    <label class="fw-bold">
-                        Initial to acknowledge:
-                    </label>
-
-                    <input type="text"
-                           name="testing_initials"
-                           class="form-control initial-box"
-                           maxlength="10"
-                           required>
-
-                </div>
-
-                <div class="lease-section">
-
-                    <h3>Guest Policies</h3>
-
-                    <p>
-                        Guests must comply with all house rules and may not disrupt
-                        the safety, peace, or harmony of the property.
-                    </p>
+                    <ul>
+                        <li>Base Rent: ${{ signed_document.monthly_rent }} per month</li>
+                        <li>Due Date: Rent is due on the 1st of each month</li>
+                        <li>Collection Date: Rent is collected on the 3rd</li>
+                        <li>Late Fee: $25.00 after the 5th pursuant to ORS 90.260</li>
+                        <li>Returned Check Fee: $50.00 pursuant to ORS 90.302</li>
+                    </ul>
 
                     <label class="fw-bold">
-                        Initial to acknowledge:
-                    </label>
-
-                    <input type="text"
-                           name="guest_policy_initials"
-                           class="form-control initial-box"
-                           maxlength="10"
-                           required>
-
-                </div>
-
-                <div class="lease-section">
-
-                    <h3>Cleanliness & Shared Spaces</h3>
-
-                    <p>
-                        Residents agree to help maintain clean common areas and
-                        participate respectfully within the shared living environment.
-                    </p>
-
-                    <label class="fw-bold">
-                        Initial to acknowledge:
-                    </label>
-
-                    <input type="text"
-                           name="cleanliness_initials"
-                           class="form-control initial-box"
-                           maxlength="10"
-                           required>
-
-                </div>
-
-                <div class="lease-section">
-
-                    <h3>Rent & Payment Responsibility</h3>
-
-                    <p>
-                        Resident acknowledges responsibility for monthly rent,
-                        utilities, and other applicable charges according to lease terms.
-                    </p>
-
-                    <label class="fw-bold">
-                        Initial to acknowledge:
+                        Resident Initials
                     </label>
 
                     <input type="text"
@@ -289,15 +245,194 @@
 
                 <div class="lease-section">
 
-                    <h3>Disclosures & Acknowledgments</h3>
+                    <h3>4. Shared Utilities</h3>
 
                     <p>
-                        Resident acknowledges receipt of required disclosures,
-                        onboarding information, and community expectations.
+                        Residents contribute to shared utilities including electric,
+                        gas, water, and garbage.
+                    </p>
+
+                    <ul>
+                        <li>Current Utility Fee: ${{ signed_document.utility_fee }}</li>
+                        <li>Utility adjustments may occur based on occupancy</li>
+                        <li>30-day written notice provided for changes</li>
+                    </ul>
+
+                </div>
+
+                <div class="lease-section">
+
+                    <h3>5. Periodic Rent Adjustments</h3>
+
+                    <ul>
+                        <li>Rent increases take effect January 1 annually</li>
+                        <li>No increase exceeds Oregon limits under ORS 90.323</li>
+                        <li>Residents may submit hardship requests for review</li>
+                    </ul>
+
+                </div>
+
+                <div class="lease-section">
+
+                    <h3>6. Resident Responsibilities</h3>
+
+                    <ul>
+                        <li>Maintain cleanliness in common areas</li>
+                        <li>Avoid excessive trash, clutter, or food waste</li>
+                        <li>Clean private rooms regularly</li>
+                        <li>Respect fellow residents and house harmony</li>
+                        <li>Participation in recovery programs is encouraged but not required</li>
+                    </ul>
+
+                    <label class="fw-bold">
+                        Resident Initials
+                    </label>
+
+                    <input type="text"
+                           name="cleanliness_initials"
+                           class="form-control initial-box"
+                           maxlength="10"
+                           required>
+
+                </div>
+
+                <div class="lease-section">
+
+                    <h3>7. Manager Housing and Support</h3>
+
+                    <p>
+                        The Painted Lady Inn may provide on-site housing for a manager
+                        who supports daily operations, enforces house rules,
+                        and models recovery.
+                    </p>
+
+                </div>
+
+                <div class="lease-section">
+
+                    <h3>8. Property Improvements and Access Notice</h3>
+
+                    <ul>
+                        <li>Property is undergoing phased remodeling</li>
+                        <li>24-hour notice provided whenever possible under ORS 90.322</li>
+                        <li>Residents agree to cooperate with reasonable access requests</li>
+                    </ul>
+
+                </div>
+
+                <div class="lease-section">
+
+                    <h3>9. House Rules and Charter Conditions</h3>
+
+                    <p>
+                        Serious violations may result in termination under ORS 90.392
+                        or ORS 90.396.
+                    </p>
+
+                    <ul>
+                        <li>Alcohol or illegal drug use</li>
+                        <li>Being under the influence on the property</li>
+                        <li>Disruption of house harmony or safety</li>
+                        <li>Failure to pay rent or utilities</li>
+                        <li>Repeated failure to maintain cleanliness</li>
+                        <li>Refusal of reasonable testing</li>
+                    </ul>
+
+                    <label class="fw-bold">
+                        Resident Initials
+                    </label>
+
+                    <input type="text"
+                           name="sobriety_initials"
+                           class="form-control initial-box"
+                           maxlength="10"
+                           required>
+
+                </div>
+
+                <div class="lease-section">
+
+                    <h3>10. Termination of Residency</h3>
+
+                    <ul>
+                        <li>24-Hour Notice pursuant to ORS 90.396</li>
+                        <li>10-Day Notice pursuant to ORS 90.392</li>
+                        <li>Standard nonpayment notices apply</li>
+                        <li>Resident may terminate with 30 days written notice</li>
+                    </ul>
+
+                </div>
+
+                <div class="lease-section">
+
+                    <h3>12. Sober-Living Environment and Resident Responsibilities</h3>
+
+                    <p>
+                        This residence operates as a sober-living community.
+                        All residents agree to maintain complete abstinence from alcohol,
+                        illegal drugs, and misuse of prescription medications.
+                    </p>
+
+                    <p>
+                        Refusal to submit to reasonable testing is considered
+                        a violation of residency requirements.
+                    </p>
+
+                    <p>
+                        Residents agree to maintain safety, cleanliness,
+                        and harmony in all shared living spaces.
                     </p>
 
                     <label class="fw-bold">
-                        Initial to acknowledge:
+                        Resident Initials
+                    </label>
+
+                    <input type="text"
+                           name="testing_initials"
+                           class="form-control initial-box"
+                           maxlength="10"
+                           required>
+
+                </div>
+
+                <div class="lease-section">
+
+                    <h3>17. Guests, Family, and Community</h3>
+
+                    <ul>
+                        <li>Guest policies exist to protect safety and harmony</li>
+                        <li>Immediate family may visit during normal visiting hours</li>
+                        <li>Non-family guests require manager approval</li>
+                        <li>Guests must be introduced upon arrival</li>
+                        <li>Residents are responsible for guest behavior</li>
+                        <li>No guests after 10:00 PM without approval</li>
+                        <li>First 90 days guest restrictions apply</li>
+                    </ul>
+
+                    <label class="fw-bold">
+                        Resident Initials
+                    </label>
+
+                    <input type="text"
+                           name="guest_policy_initials"
+                           class="form-control initial-box"
+                           maxlength="10"
+                           required>
+
+                </div>
+
+                <div class="lease-section">
+
+                    <h3>Lead-Based Paint Disclosure</h3>
+
+                    <p>
+                        Housing built before 1978 may contain lead-based paint.
+                        Residents acknowledge receipt of lead awareness information
+                        and agree to report peeling or damaged paint immediately.
+                    </p>
+
+                    <label class="fw-bold">
+                        Resident Initials
                     </label>
 
                     <input type="text"
@@ -305,6 +440,17 @@
                            class="form-control initial-box"
                            maxlength="10"
                            required>
+
+                </div>
+
+                <div class="lease-section">
+
+                    <h3>Asbestos Disclosure</h3>
+
+                    <p>
+                        Residents acknowledge receipt of asbestos awareness information
+                        and agree not to disturb suspected materials.
+                    </p>
 
                 </div>
 
