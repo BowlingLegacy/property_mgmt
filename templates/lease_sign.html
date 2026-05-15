@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+    body {
+        background: #f4f6f9;
+    }
+
+    .lease-wrapper {
+        max-width: 950px;
+        margin: auto;
+    }
+
+    .lease-document {
+        background: white;
+        border-radius: 24px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+        overflow: hidden;
+        margin-bottom: 2rem;
+    }
+
+    .lease-header {
+        background: linear-gradient(135deg, #111827, #1e3a5f);
+        color: white;
+        padding: 2rem;
+        text-align: center;
+    }
+
+    .lease-header img {
+        max-width: 120px;
+        margin-bottom: 1rem;
+    }
+
+    .lease-header h1 {
+        font-weight: 800;
+        margin-bottom: 0.25rem;
+    }
+
+    .lease-header p {
+        opacity: 0.9;
+        margin-bottom: 0;
+    }
+
+    .lease-body {
+        padding: 2rem;
+    }
+
+    .lease-section {
+        margin-bottom: 2rem;
+    }
+
+    .lease-section h3 {
+        color: #1e3a5f;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        border-bottom: 2px solid #d4af37;
+        padding-bottom: 0.5rem;
+    }
+
+    .initial-box {
+        max-width: 140px;
+    }
+
+    .signature-box {
+        background: #f8f9fb;
+        border-radius: 18px;
+        padding: 1.5rem;
+        border: 1px solid #dee2e6;
+    }
+
+    @media (max-width: 768px) {
+
+        .lease-header {
+            padding: 1.5rem 1rem;
+        }
+
+        .lease-body {
+            padding: 1.25rem;
+        }
+
+        .lease-header h1 {
+            font-size: 1.5rem;
+        }
+
+        .lease-section h3 {
+            font-size: 1.1rem;
+        }
+
+        .lease-document {
+            border-radius: 16px;
+        }
+    }
+</style>
+
+<div class="container my-4 lease-wrapper">
+
+    <div class="lease-document">
+
+        <div class="lease-header">
+
+            <img src="/static/images/bl-logo.png" alt="Bowling Legacy">
+
+            <h1>Bowling Legacy Housing</h1>
+
+            <p>
+                Resident Lease Agreement
+            </p>
+
+        </div>
+
+        <div class="lease-body">
+
+            <div class="lease-section">
+
+                <h3>Resident Information</h3>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <strong>Resident:</strong><br>
+                        {{ signed_document.resident_name }}
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <strong>Property:</strong><br>
+                        {{ signed_document.property_name }}
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <strong>Room / Space:</strong><br>
+                        {{ signed_document.room_space }}
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <strong>Lease Start Date:</strong><br>
+                        {{ signed_document.lease_start_date }}
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <strong>Monthly Rent:</strong><br>
+                        ${{ signed_document.monthly_rent }}
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <strong>Utility Contribution:</strong><br>
+                        ${{ signed_document.utility_fee }}
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <strong>Security Deposit:</strong><br>
+                        ${{ signed_document.security_deposit }}
+                    </div>
+
+                </div>
+
+            </div>
+
+            <form method="POST" action="{% url 'submit_lease_signature' %}">
+
+                {% csrf_token %}
+
+                <div class="lease-section">
+
+                    <h3>Sober Living Requirements</h3>
+
+                    <p>
+                        This property operates as a sober living environment.
+                        Residents agree to maintain a drug and alcohol free living environment
+                        and understand that violations may result in removal from the property.
+                    </p>
+
+                    <label class="fw-bold">
+                        Initial to acknowledge:
+                    </label>
+
+                    <input type="text"
+                           name="sobriety_initials"
+                           class="form-control initial-box"
+                           maxlength="10"
+                           required>
+
+                </div>
+
+                <div class="lease-section">
+
+                    <h3>Drug & Alcohol Screening</h3>
+
+                    <p>
+                        Residents acknowledge that reasonable drug or alcohol screening
+                        may be required to maintain safety and community harmony.
+                    </p>
+
+                    <label class="fw-bold">
+                        Initial to acknowledge:
+                    </label>
+
+                    <input type="text"
+                           name="testing_initials"
+                           class="form-control initial-box"
+                           maxlength="10"
+                           required>
+
+                </div>
+
+                <div class="lease-section">
+
+                    <h3>Guest Policies</h3>
+
+                    <p>
+                        Guests must comply with all house rules and may not disrupt
+                        the safety, peace, or harmony of the property.
+                    </p>
+
+                    <label class="fw-bold">
+                        Initial to acknowledge:
+                    </label>
+
+                    <input type="text"
+                           name="guest_policy_initials"
+                           class="form-control initial-box"
+                           maxlength="10"
+                           required>
+
+                </div>
+
+                <div class="lease-section">
+
+                    <h3>Cleanliness & Shared Spaces</h3>
+
+                    <p>
+                        Residents agree to help maintain clean common areas and
+                        participate respectfully within the shared living environment.
+                    </p>
+
+                    <label class="fw-bold">
+                        Initial to acknowledge:
+                    </label>
+
+                    <input type="text"
+                           name="cleanliness_initials"
+                           class="form-control initial-box"
+                           maxlength="10"
+                           required>
+
+                </div>
+
+                <div class="lease-section">
+
+                    <h3>Rent & Payment Responsibility</h3>
+
+                    <p>
+                        Resident acknowledges responsibility for monthly rent,
+                        utilities, and other applicable charges according to lease terms.
+                    </p>
+
+                    <label class="fw-bold">
+                        Initial to acknowledge:
+                    </label>
+
+                    <input type="text"
+                           name="rent_initials"
+                           class="form-control initial-box"
+                           maxlength="10"
+                           required>
+
+                </div>
+
+                <div class="lease-section">
+
+                    <h3>Disclosures & Acknowledgments</h3>
+
+                    <p>
+                        Resident acknowledges receipt of required disclosures,
+                        onboarding information, and community expectations.
+                    </p>
+
+                    <label class="fw-bold">
+                        Initial to acknowledge:
+                    </label>
+
+                    <input type="text"
+                           name="disclosure_initials"
+                           class="form-control initial-box"
+                           maxlength="10"
+                           required>
+
+                </div>
+
+                <div class="signature-box">
+
+                    <h3 class="mb-3">
+                        Electronic Signature
+                    </h3>
+
+                    <p>
+                        By typing my name below and submitting this agreement,
+                        I acknowledge that my typed name constitutes my electronic
+                        signature and that I agree to the terms of this Lease Agreement.
+                    </p>
+
+                    <div class="mb-3">
+                        <label class="fw-bold">
+                            Full Legal Name
+                        </label>
+
+                        <input type="text"
+                               name="resident_signature"
+                               class="form-control"
+                               required>
+                    </div>
+
+                    <div class="form-check mb-4">
+
+                        <input class="form-check-input"
+                               type="checkbox"
+                               name="signature_agreement"
+                               id="signatureAgreement"
+                               required>
+
+                        <label class="form-check-label"
+                               for="signatureAgreement">
+
+                            I agree that my typed name constitutes my
+                            electronic signature.
+
+                        </label>
+
+                    </div>
+
+                    <button type="submit"
+                            class="btn btn-dark btn-lg rounded-pill px-5">
+
+                        Sign & Submit Lease
+
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
