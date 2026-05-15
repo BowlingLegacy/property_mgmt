@@ -2,494 +2,514 @@
 {% block content %}
 
 <style>
+
+body {
+    background:
+        radial-gradient(circle at top, rgba(212,175,55,0.08), transparent 35%),
+        linear-gradient(180deg, #050505 0%, #111111 100%);
+    color: #f5f5f5;
+    min-height: 100vh;
+}
+
+/* ===== BRAND TYPOGRAPHY ===== */
+
+.portal-title,
+.section-title,
+.card-title {
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.portal-title {
+    font-size: 2.4rem;
+    font-weight: 800;
+    color: #d4af37;
+    text-shadow: 0 0 10px rgba(212,175,55,0.15);
+}
+
+.portal-subtitle {
+    color: rgba(255,255,255,0.72);
+    font-size: 1rem;
+}
+
+/* ===== TOP HEADER ===== */
+
+.portal-header {
+    background:
+        linear-gradient(135deg, rgba(0,0,0,0.95), rgba(20,20,20,0.95));
+    border: 1px solid rgba(212,175,55,0.25);
+    border-radius: 28px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow:
+        0 12px 40px rgba(0,0,0,0.45),
+        0 0 25px rgba(212,175,55,0.06);
+    position: relative;
+    overflow: hidden;
+}
+
+.portal-header::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 45px;
+    background: #111111;
+    clip-path: polygon(0 60%, 50% 100%, 100% 60%, 100% 100%, 0 100%);
+    border-top: 2px solid #d4af37;
+}
+
+.portal-logo {
+    width: 110px;
+    filter: drop-shadow(0 0 12px rgba(212,175,55,0.2));
+}
+
+/* ===== CARDS ===== */
+
+.portal-card,
+.payment-card,
+.inbox-card,
+.history-card {
+    background:
+        linear-gradient(145deg, rgba(20,20,20,0.96), rgba(10,10,10,0.96));
+    border: 1px solid rgba(212,175,55,0.18);
+    border-radius: 24px;
+    box-shadow:
+        0 10px 28px rgba(0,0,0,0.4);
+    overflow: hidden;
+}
+
+.portal-card:hover,
+.payment-card:hover,
+.inbox-card:hover {
+    transform: translateY(-2px);
+    transition: 0.25s ease;
+    border-color: rgba(212,175,55,0.38);
+}
+
+/* ===== RESIDENT PHOTO ===== */
+
+.resident-photo {
+    width: 135px;
+    height: 135px;
+    border-radius: 50%;
+    background:
+        linear-gradient(135deg, #d4af37, #8f6b17);
+    color: black;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    font-weight: 800;
+    border: 4px solid rgba(255,255,255,0.08);
+    box-shadow:
+        0 10px 28px rgba(0,0,0,0.45),
+        0 0 22px rgba(212,175,55,0.18);
+}
+
+/* ===== TEXT ===== */
+
+.portal-card p,
+.payment-card p,
+.inbox-card p,
+.history-card p,
+.portal-card li {
+    color: rgba(255,255,255,0.82);
+}
+
+.resident-name {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #f8f8f8;
+}
+
+.gold-text {
+    color: #d4af37;
+}
+
+.soft-text {
+    color: rgba(255,255,255,0.65);
+}
+
+/* ===== LINKS / BUTTONS ===== */
+
+.portal-link,
+.portal-btn {
+    color: #d4af37;
+    text-decoration: none;
+    border: 1px solid rgba(212,175,55,0.4);
+    padding: 0.7rem 1.1rem;
+    border-radius: 999px;
+    display: inline-block;
+    transition: 0.25s ease;
+    background: transparent;
+    font-weight: 600;
+}
+
+.portal-link:hover,
+.portal-btn:hover {
+    background: rgba(212,175,55,0.08);
+    color: #fff2bf;
+    border-color: #d4af37;
+    transform: translateY(-1px);
+}
+
+.pay-link {
+    display: block;
+    text-align: center;
+    margin-top: 1rem;
+}
+
+/* ===== PAYMENT CARDS ===== */
+
+.payment-card {
+    border-top: 4px solid #d4af37;
+}
+
+.payment-amount {
+    font-size: 1.7rem;
+    font-weight: 800;
+    color: #d4af37;
+}
+
+/* ===== TABLES ===== */
+
+.table {
+    color: rgba(255,255,255,0.85);
+}
+
+.table thead {
+    background: rgba(212,175,55,0.08);
+}
+
+.table th {
+    color: #d4af37;
+    border-bottom: 1px solid rgba(212,175,55,0.25);
+}
+
+.table td {
+    border-color: rgba(255,255,255,0.08);
+}
+
+.table-hover tbody tr:hover {
+    background: rgba(212,175,55,0.05);
+}
+
+/* ===== MODALS ===== */
+
+.modal-content {
+    background: #121212;
+    border: 1px solid rgba(212,175,55,0.25);
+    color: white;
+}
+
+.form-control,
+.form-select {
+    background: #1a1a1a;
+    border: 1px solid rgba(212,175,55,0.2);
+    color: white;
+}
+
+.form-control:focus,
+.form-select:focus {
+    background: #1a1a1a;
+    color: white;
+    border-color: #d4af37;
+    box-shadow: 0 0 0 0.15rem rgba(212,175,55,0.15);
+}
+
+/* ===== MOBILE ===== */
+
+@media (max-width: 768px) {
+
+    .portal-title {
+        font-size: 1.7rem;
+    }
+
     .resident-photo {
-        width: 130px;
-        height: 130px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #1e3a5f, #d4af37);
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 3rem;
-        font-weight: 800;
-        box-shadow: 0 8px 22px rgba(0,0,0,0.22);
+        width: 82px;
+        height: 82px;
+        font-size: 2rem;
     }
 
-    .resident-card,
-    .pay-card,
-    .inbox-card {
-        border-radius: 22px;
-        border: none;
-        box-shadow: 0 8px 22px rgba(0,0,0,0.12);
+    .resident-name {
+        font-size: 1.4rem;
     }
 
-    .resident-card {
-        background: linear-gradient(135deg, #f8fbff, #ffffff);
+    .portal-header {
+        padding: 1.35rem;
     }
 
-    .inbox-card {
-        background: #fff8df;
-        border-top: 6px solid #d4af37;
+    .portal-card,
+    .payment-card,
+    .inbox-card,
+    .history-card {
+        border-radius: 18px;
     }
 
-    @media (max-width: 768px) {
-        h2 {
-            font-size: 1.35rem;
-            margin-bottom: 1rem !important;
-        }
-
-        h3 {
-            font-size: 1.25rem;
-        }
-
-        h4 {
-            font-size: 1.1rem;
-        }
-
-        h5 {
-            font-size: 1rem;
-        }
-
-        .resident-card,
-        .pay-card,
-        .inbox-card {
-            border-radius: 16px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.10);
-        }
-
-        .resident-card .card-body,
-        .inbox-card .card-body,
-        .pay-card .card-body {
-            padding: 1rem !important;
-        }
-
-        .resident-photo {
-            width: 74px;
-            height: 74px;
-            font-size: 1.8rem;
-            margin-bottom: 0.25rem;
-        }
-
-        .row.g-4 {
-            --bs-gutter-y: 0.85rem;
-            --bs-gutter-x: 0.85rem;
-        }
-
-        .mb-4 {
-            margin-bottom: 1rem !important;
-        }
-
-        .mb-5 {
-            margin-bottom: 1.5rem !important;
-        }
-
-        .my-5 {
-            margin-top: 1.25rem !important;
-            margin-bottom: 1.25rem !important;
-        }
-
-        .p-5 {
-            padding: 1.25rem !important;
-        }
-
-        .fs-2 {
-            font-size: 1.6rem !important;
-        }
-
-        .fs-5 {
-            font-size: 1rem !important;
-        }
-
-        .btn {
-            font-size: 0.9rem;
-            padding: 0.45rem 0.75rem;
-        }
-
-        .btn-lg {
-            font-size: 1rem;
-            padding: 0.6rem 1rem;
-        }
-
-        .table {
-            font-size: 0.82rem;
-        }
-
-        .table th,
-        .table td {
-            padding: 0.45rem;
-            white-space: nowrap;
-        }
-
-        .modal-dialog {
-            margin: 0.75rem;
-        }
-
-        .modal-body textarea {
-            rows: 4;
-        }
-
-        .resident-action-buttons {
-            margin-top: 0.75rem;
-        }
+    .table {
+        font-size: 0.84rem;
     }
+
+    .table td,
+    .table th {
+        white-space: nowrap;
+    }
+
+}
+
 </style>
 
-<h2 class="fw-bold mb-4" style="color:#1e3a5f;">Resident File</h2>
+<div class="container py-4">
 
 {% if application %}
 
-<div class="card resident-card mb-4">
+<!-- ===== PORTAL HEADER ===== -->
+
+<div class="portal-header">
+
+    <div class="row align-items-center">
+
+        <div class="col-md-2 text-center mb-3 mb-md-0">
+
+            <img src="/static/images/bl-logo.png"
+                 class="portal-logo"
+                 alt="Bowling Legacy">
+
+        </div>
+
+        <div class="col-md-10 text-md-start text-center">
+
+            <h1 class="portal-title mb-1">
+                Bowling Legacy Housing
+            </h1>
+
+            <p class="portal-subtitle mb-0">
+                Resident Portal • The Painted Lady Inn
+            </p>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ===== RESIDENT PROFILE ===== -->
+
+<div class="portal-card mb-4">
+
     <div class="card-body p-4">
+
         <div class="row align-items-center g-4">
 
-            <div class="col-4 col-md-2 text-center">
+            <div class="col-md-2 text-center">
+
                 <div class="resident-photo mx-auto">
                     {{ application.full_name|first|upper }}
                 </div>
-                <p class="text-muted small mt-2 mb-0">Resident Photo</p>
+
             </div>
 
-            <div class="col-8 col-md-7">
-                <h3 class="fw-bold mb-1">{{ application.full_name }}</h3>
-                <p class="text-muted mb-1">{{ application.phone }}</p>
-                <p class="text-muted mb-2">{{ application.email }}</p>
+            <div class="col-md-7">
+
+                <h2 class="resident-name mb-2">
+                    {{ application.full_name }}
+                </h2>
+
+                <p class="soft-text mb-1">
+                    {{ application.email }}
+                </p>
+
+                <p class="soft-text mb-3">
+                    {{ application.phone }}
+                </p>
 
                 {% if application.property %}
-                    <p class="mb-1"><strong>Property:</strong> {{ application.property.name }}</p>
+                <p class="mb-1">
+                    <span class="gold-text">Property:</span>
+                    {{ application.property.name }}
+                </p>
                 {% endif %}
 
                 <p class="mb-1">
-                    <strong>Room / Space:</strong>
-                    {{ application.space_type }} {{ application.space_label }}
+                    <span class="gold-text">Room / Space:</span>
+                    {{ application.space_type }}
+                    {{ application.space_label }}
                 </p>
 
-                <p class="mb-0"><strong>Status:</strong> Active Resident File</p>
+                <p class="mb-0">
+                    <span class="gold-text">Status:</span>
+                    Active Resident File
+                </p>
+
             </div>
 
-            <div class="col-12 col-md-3 resident-action-buttons">
-                <button class="btn btn-gold w-100 rounded-pill mb-2"
-                        data-bs-toggle="modal"
-                        data-bs-target="#messageModal">
-                    ✉ Request / Message
-                </button>
+            <div class="col-md-3">
 
-                <button class="btn btn-success w-100 rounded-pill mb-2"
-                        data-bs-toggle="modal"
-                        data-bs-target="#documentUploadModal">
-                    📎 Upload Document
-                </button>
+                <div class="d-grid gap-2">
 
-                <a href="/" class="btn btn-outline-primary w-100 rounded-pill">
-                    Return Home
-                </a>
+                    <button class="portal-btn"
+                            data-bs-toggle="modal"
+                            data-bs-target="#messageModal">
+
+                        Request / Message
+
+                    </button>
+
+                    <button class="portal-btn"
+                            data-bs-toggle="modal"
+                            data-bs-target="#documentUploadModal">
+
+                        Upload Document
+
+                    </button>
+
+                    <a href="/"
+                       class="portal-link text-center">
+
+                        Return Home
+
+                    </a>
+
+                </div>
+
             </div>
 
         </div>
+
     </div>
+
 </div>
+
+<!-- ===== PAYMENT SECTION ===== -->
 
 <div class="row g-4 mb-5">
 
-    {% if application.balance > 0 %}
-    <div class="col-12 col-md-4">
-        <div class="card pay-card h-100" style="border-top:6px solid #1e3a5f;">
-            <div class="card-body">
-                <h5 class="fw-bold">Rent Due</h5>
-                <p class="fs-5">Balance: ${{ application.balance }}</p>
-                <a href="{% url 'pay_by_type' application.id 'rent' %}"
-                   class="btn btn-primary w-100 rounded-pill">
-                    Pay Rent
-                </a>
-            </div>
-        </div>
-    </div>
-    {% endif %}
+{% if application.balance > 0 %}
+<div class="col-md-4">
 
-    {% if application.deposit_paid < application.deposit_required %}
-    <div class="col-12 col-md-4">
-        <div class="card pay-card h-100" style="border-top:6px solid #d4af37;">
-            <div class="card-body">
-                <h5 class="fw-bold">Deposit Due</h5>
-                <p class="mb-1">Required: ${{ application.deposit_required }}</p>
-                <p>Paid: ${{ application.deposit_paid }}</p>
-                <a href="{% url 'pay_by_type' application.id 'deposit' %}"
-                   class="btn btn-warning w-100 rounded-pill">
-                    Pay Deposit
-                </a>
-            </div>
-        </div>
-    </div>
-    {% endif %}
+    <div class="payment-card h-100">
 
-    {% if application.utility_balance > 0 %}
-    <div class="col-12 col-md-4">
-        <div class="card pay-card h-100" style="border-top:6px solid #198754;">
-            <div class="card-body">
-                <h5 class="fw-bold">Utilities Due</h5>
-                <p class="fs-5">Balance: ${{ application.utility_balance }}</p>
-                <a href="{% url 'pay_by_type' application.id 'utility' %}"
-                   class="btn btn-success w-100 rounded-pill">
-                    Pay Utilities
-                </a>
+        <div class="card-body p-4">
+
+            <h4 class="gold-text mb-3">
+                Rent Due
+            </h4>
+
+            <div class="payment-amount">
+                ${{ application.balance }}
             </div>
+
+            <a href="{% url 'pay_by_type' application.id 'rent' %}"
+               class="portal-link pay-link">
+
+                Pay Rent
+
+            </a>
+
         </div>
+
     </div>
-    {% endif %}
 
 </div>
+{% endif %}
+
+{% if application.deposit_paid < application.deposit_required %}
+<div class="col-md-4">
+
+    <div class="payment-card h-100">
+
+        <div class="card-body p-4">
+
+            <h4 class="gold-text mb-3">
+                Deposit Due
+            </h4>
+
+            <p>
+                Required: ${{ application.deposit_required }}
+            </p>
+
+            <p>
+                Paid: ${{ application.deposit_paid }}
+            </p>
+
+            <a href="{% url 'pay_by_type' application.id 'deposit' %}"
+               class="portal-link pay-link">
+
+                Pay Deposit
+
+            </a>
+
+        </div>
+
+    </div>
+
+</div>
+{% endif %}
+
+{% if application.utility_balance > 0 %}
+<div class="col-md-4">
+
+    <div class="payment-card h-100">
+
+        <div class="card-body p-4">
+
+            <h4 class="gold-text mb-3">
+                Utilities Due
+            </h4>
+
+            <div class="payment-amount">
+                ${{ application.utility_balance }}
+            </div>
+
+            <a href="{% url 'pay_by_type' application.id 'utility' %}"
+               class="portal-link pay-link">
+
+                Pay Utilities
+
+            </a>
+
+        </div>
+
+    </div>
+
+</div>
+{% endif %}
+
+</div>
+
+<!-- ===== TOTAL DUE ===== -->
 
 {% if total_due > 0 %}
-<div class="card shadow-sm my-5" style="border-radius:22px; border-top:8px solid #1e3a5f;">
+
+<div class="payment-card mb-5">
+
     <div class="card-body text-center p-5">
-        <h3 class="fw-bold" style="color:#1e3a5f;">Pay Total Due</h3>
-        <p class="fs-2 fw-bold mb-4">${{ total_due }}</p>
+
+        <h3 class="gold-text mb-3">
+            Total Resident Balance
+        </h3>
+
+        <div class="payment-amount mb-4">
+            ${{ total_due }}
+        </div>
 
         <a href="{% url 'pay_by_type' application.id 'total' %}"
-           class="btn btn-primary btn-lg rounded-pill px-5">
+           class="portal-link">
+
             Pay Full Balance
+
         </a>
 
-        <p class="text-muted mt-3 mb-0">
-            This combines rent, deposit, and utilities into one payment.
-        </p>
     </div>
+
 </div>
+
 {% endif %}
 
-<div id="resident-inbox" class="card inbox-card mb-5">
-    <div class="card-body p-4">
-
-        <h4 class="fw-bold mb-1">✉ Resident Inbox</h4>
-        <p class="text-muted mb-3">
-            Applications, leases, onboarding documents, uploaded documents, messages, requests, and resident file records.
-        </p>
-
-        <div class="table-responsive">
-            <table class="table table-hover align-middle bg-white">
-                <thead>
-                    <tr>
-                        <th>Item</th>
-                        <th>Type</th>
-                        <th>Status</th>
-                        <th>Date / Time</th>
-                        <th>Open</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                    {% for document in application.documents.all %}
-                    <tr>
-                        <td>{{ document.name }}</td>
-                        <td>{{ document.get_document_type_display }}</td>
-                        <td>{{ document.get_status_display }}</td>
-                        <td>{{ document.created_at }}</td>
-                        <td>
-                            {% if document.file %}
-                                <a href="{{ document.file.url }}"
-                                   class="btn btn-sm btn-primary rounded-pill"
-                                   target="_blank">
-                                    Open
-                                </a>
-                            {% else %}
-                                —
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-
-                    {% for resident_message in resident_messages %}
-                    <tr>
-                        <td>{{ resident_message.subject }}</td>
-                        <td>{{ resident_message.get_message_type_display }}</td>
-                        <td>{{ resident_message.get_status_display }}</td>
-                        <td>{{ resident_message.created_at }}</td>
-                        <td>
-                            <span class="badge bg-secondary">Filed</span>
-                        </td>
-                    </tr>
-                    {% endfor %}
-
-                    {% if not application.documents.all and not resident_messages %}
-                    <tr>
-                        <td colspan="5" class="text-muted">
-                            No documents or messages are currently in your inbox.
-                        </td>
-                    </tr>
-                    {% endif %}
-                </tbody>
-            </table>
-        </div>
-
-    </div>
-</div>
-
-<h4 id="payment-history" class="fw-bold mb-3">Payment History</h4>
-
-<div class="table-responsive">
-    <table class="table table-striped">
-        <thead>
-            <tr>
-                <th>Type</th>
-                <th>Description</th>
-                <th>Amount</th>
-                <th>Date</th>
-                <th>Status</th>
-            </tr>
-        </thead>
-
-        <tbody>
-            {% for payment in payments %}
-            <tr>
-                <td>{{ payment.get_payment_type_display }}</td>
-                <td>{{ payment.description }}</td>
-                <td>${{ payment.amount }}</td>
-                <td>{{ payment.created_at }}</td>
-                <td>{{ payment.get_status_display }}</td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="5">No payments yet</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-
-<div class="modal fade" id="messageModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content" style="border-radius:22px;">
-
-            <div class="modal-header">
-                <h5 class="modal-title fw-bold">
-                    Request / Message Landlord
-                </h5>
-
-                <button type="button"
-                        class="btn-close"
-                        data-bs-dismiss="modal"></button>
-            </div>
-
-            <div class="modal-body">
-                <form method="POST" action="{% url 'submit_resident_message' %}">
-                    {% csrf_token %}
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Message Type</label>
-                        <select name="message_type" class="form-select">
-                            <option value="maintenance">Maintenance Request</option>
-                            <option value="complaint">Complaint</option>
-                            <option value="general">General Message</option>
-                            <option value="document">Document Question</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Subject</label>
-                        <input type="text" name="subject" class="form-control" required>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Message</label>
-                        <textarea name="message" class="form-control" rows="5" required></textarea>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary rounded-pill px-4">
-                        Submit Request
-                    </button>
-                </form>
-            </div>
-
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="documentUploadModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content" style="border-radius:22px;">
-
-            <div class="modal-header">
-                <h5 class="modal-title fw-bold">
-                    Upload Resident Document
-                </h5>
-
-                <button type="button"
-                        class="btn-close"
-                        data-bs-dismiss="modal"></button>
-            </div>
-
-            <div class="modal-body">
-
-                <form method="POST"
-                      action="{% url 'upload_resident_document' %}"
-                      enctype="multipart/form-data">
-
-                    {% csrf_token %}
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">
-                            Document Type
-                        </label>
-
-                        <select name="document_type" class="form-select">
-                            <option value="id">Identification</option>
-                            <option value="income">Proof of Income / Pay Stub / SSI / SSDI</option>
-                            <option value="bank">Bank Statements / Deposit Verification</option>
-                            <option value="lease">Lease / Agreement</option>
-                            <option value="onboarding">Onboarding Document</option>
-                            <option value="other">Other</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">
-                            Document Name
-                        </label>
-
-                        <input type="text"
-                               name="name"
-                               class="form-control"
-                               required
-                               placeholder="Example: May pay stub, SSI award letter, 90-day bank statements">
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">
-                            Choose File
-                        </label>
-
-                        <input type="file"
-                               name="file"
-                               class="form-control"
-                               required>
-                    </div>
-
-                    <button type="submit"
-                            class="btn btn-success rounded-pill px-4">
-                        Upload Document
-                    </button>
-
-                </form>
-
-            </div>
-
-        </div>
-    </div>
-</div>
-
-{% else %}
-
-<div class="alert alert-warning">
-    No resident file is connected to this login yet.
-</div>
-
-<p>
-    Please enter your access code or contact Bowling Legacy Housing for help connecting your resident file.
-</p>
-
-<a href="{% url 'enter_invite_code' %}" class="btn btn-primary rounded-pill">Enter Access Code</a>
-<a href="/" class="btn btn-outline-secondary rounded-pill">Return Home</a>
-
 {% endif %}
+
+</div>
 
 {% endblock %}
