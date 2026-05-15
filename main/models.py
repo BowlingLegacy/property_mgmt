@@ -135,6 +135,7 @@ class HousingApplication(models.Model):
     monthly_rent = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     rent_due_day = models.IntegerField(default=1)
+    
     lease_start_date = models.DateField(blank=True, null=True)
 
     deposit_required = models.DecimalField(max_digits=10, decimal_places=2, default=450.00)
