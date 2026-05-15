@@ -247,6 +247,134 @@ class ApplicantDocument(models.Model):
     def __str__(self):
         return f"{self.name} ({self.application.full_name})"
 
+class SignedDocument(models.Model):
+    DOCUMENT_TYPE_CHOICES = [
+        ("lease", "Resident Lease Agreement"),
+        ("emergency_contact", "Emergency Contact Form"),
+        ("painted_lady_acknowledgment", "Painted Lady Acknowledgment"),
+        ("lead_disclosure", "Lead Disclosure"),
+        ("asbestos_disclosure", "Asbestos Disclosure"),
+        ("house_rules", "House Rules"),
+        ("other", "Other"),
+    ]
+
+    application = models.ForeignKey(
+        HousingApplication,
+        on_delete=models.CASCADE,
+        related_name="signed_documents"
+    )
+
+    document_type = models.CharField(
+        max_length=50,
+        choices=DOCUMENT_TYPE_CHOICES,
+        default="other"
+    )
+
+    title = models.CharField(max_length=255)
+
+    # ---------------------------------------------------------
+    # AUTO-POPULATED LEASE FIELDS
+    # ---------------------------------------------------------
+    property_name = models.CharField(max_length=255, blank=True)
+    property_address = models.CharField(max_length=255, blank=True)
+
+    resident_name = models.CharField(max_length=255, blank=True)
+
+    room_space = models.CharField(max_length=100, blank=True)
+
+    monthly_rent = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0.00
+    )
+
+    utility_fee = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0.00
+    )
+
+    security_deposit = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0.00
+    )
+
+    lease_start_date = models.DateField(blank=True, null=True)
+
+    landlord_name = models.CharField(
+        max_length=255,
+        default="Michael Bowling"
+    )
+
+    landlord_signature = models.CharField(
+        max_length=255,
+        default="Michael Bowling"
+    )
+
+    lease_sent_date = models.DateField(blank=True, null=True)
+
+    # ---------------------------------------------------------
+    # RESIDENT ACKNOWLEDGMENTS / INITIALS
+    # ---------------------------------------------------------
+    rent_initials = models.CharField(max_length=10, blank=True)
+
+    sobriety_initials = models.CharField(max_length=10, blank=True)
+
+    testing_initials = models.CharField(max_length=10, blank=True)
+
+    guest_policy_initials = models.CharField(max_length=10, blank=True)
+
+    cleanliness_initials = models.CharField(max_length=10, blank=True)
+
+    disclosure_initials = models.CharField(max_length=10, blank=True)
+
+    # ---------------------------------------------------------
+    # SIGNATURES
+    # ---------------------------------------------------------
+    resident_signature = models.CharField(
+        max_length=255,
+        blank=True
+    )
+
+    signature_agreement = models.BooleanField(default=False)
+
+    signed_at = models.DateTimeField(blank=True, null=True)
+
+    locked = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.title} - {self.application.full_name}"
+
+    def save(self, *args, **kwargs):
+
+        # AUTO POPULATE FROM RESIDENT FILE
+        if self.application:
+
+            self.resident_name = self.application.full_name
+
+            self.monthly_rent = self.application.monthly_rent
+
+            self.utility_fee = self.application.utility_monthly
+
+            self.security_deposit = self.application.deposit_required
+
+            self.room_space = (
+                f"{self.application.space_type} "
+                f"{self.application.space_label}"
+            )
+
+            if self.application.property:
+                self.property_name = self.application.property.name
+                self.property_address = self.application.property.address
+
+        super().save(*args, **kwargs)
+
 
 class RentHistory(models.Model):
     application = models.ForeignKey(HousingApplication, on_delete=models.CASCADE, related_name="rent_history")
