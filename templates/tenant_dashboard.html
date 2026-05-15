@@ -5,218 +5,192 @@
 
 body {
     background:
-        radial-gradient(circle at top, rgba(212,175,55,0.08), transparent 35%),
-        linear-gradient(180deg, #050505 0%, #111111 100%);
-    color: #f5f5f5;
-    min-height: 100vh;
+        linear-gradient(180deg, #f4f1ea 0%, #ece7dc 100%);
+    color: #2a2a2a;
 }
 
-/* ===== BRAND TYPOGRAPHY ===== */
+/* ===== PORTAL HERO ===== */
 
-.portal-title,
-.section-title,
-.card-title {
-    letter-spacing: 1px;
-    text-transform: uppercase;
+.portal-hero {
+    background:
+        linear-gradient(135deg, rgba(15,15,15,0.96), rgba(35,35,35,0.94));
+    border-radius: 30px;
+    overflow: hidden;
+    box-shadow: 0 12px 34px rgba(0,0,0,0.18);
+    margin-bottom: 2rem;
+}
+
+.portal-hero .hero-image {
+    height: 100%;
+    min-height: 260px;
+    background-image: url("/static/images/photo03.JPG");
+    background-size: cover;
+    background-position: center;
+}
+
+.portal-hero .hero-content {
+    padding: 2.5rem;
+    color: white;
 }
 
 .portal-title {
-    font-size: 2.4rem;
+    font-size: 2.5rem;
     font-weight: 800;
     color: #d4af37;
-    text-shadow: 0 0 10px rgba(212,175,55,0.15);
+    margin-bottom: 0.25rem;
 }
 
 .portal-subtitle {
-    color: rgba(255,255,255,0.72);
+    color: rgba(255,255,255,0.76);
     font-size: 1rem;
-}
-
-/* ===== TOP HEADER ===== */
-
-.portal-header {
-    background:
-        linear-gradient(135deg, rgba(0,0,0,0.95), rgba(20,20,20,0.95));
-    border: 1px solid rgba(212,175,55,0.25);
-    border-radius: 28px;
-    padding: 2rem;
     margin-bottom: 2rem;
-    box-shadow:
-        0 12px 40px rgba(0,0,0,0.45),
-        0 0 25px rgba(212,175,55,0.06);
-    position: relative;
-    overflow: hidden;
 }
 
-.portal-header::after {
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: -1px;
-    height: 45px;
-    background: #111111;
-    clip-path: polygon(0 60%, 50% 100%, 100% 60%, 100% 100%, 0 100%);
-    border-top: 2px solid #d4af37;
+/* ===== RESIDENT CARD ===== */
+
+.resident-card {
+    background: white;
+    border-radius: 26px;
+    border: none;
+    box-shadow: 0 8px 26px rgba(0,0,0,0.10);
+    margin-bottom: 2rem;
 }
-
-.portal-logo {
-    width: 110px;
-    filter: drop-shadow(0 0 12px rgba(212,175,55,0.2));
-}
-
-/* ===== CARDS ===== */
-
-.portal-card,
-.payment-card,
-.inbox-card,
-.history-card {
-    background:
-        linear-gradient(145deg, rgba(20,20,20,0.96), rgba(10,10,10,0.96));
-    border: 1px solid rgba(212,175,55,0.18);
-    border-radius: 24px;
-    box-shadow:
-        0 10px 28px rgba(0,0,0,0.4);
-    overflow: hidden;
-}
-
-.portal-card:hover,
-.payment-card:hover,
-.inbox-card:hover {
-    transform: translateY(-2px);
-    transition: 0.25s ease;
-    border-color: rgba(212,175,55,0.38);
-}
-
-/* ===== RESIDENT PHOTO ===== */
 
 .resident-photo {
-    width: 135px;
-    height: 135px;
+    width: 120px;
+    height: 120px;
     border-radius: 50%;
     background:
-        linear-gradient(135deg, #d4af37, #8f6b17);
-    color: black;
+        linear-gradient(135deg, #d4af37, #f5d76e);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 3rem;
     font-weight: 800;
-    border: 4px solid rgba(255,255,255,0.08);
-    box-shadow:
-        0 10px 28px rgba(0,0,0,0.45),
-        0 0 22px rgba(212,175,55,0.18);
-}
-
-/* ===== TEXT ===== */
-
-.portal-card p,
-.payment-card p,
-.inbox-card p,
-.history-card p,
-.portal-card li {
-    color: rgba(255,255,255,0.82);
+    color: #222;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.18);
 }
 
 .resident-name {
     font-size: 2rem;
-    font-weight: 700;
-    color: #f8f8f8;
-}
-
-.gold-text {
-    color: #d4af37;
+    font-weight: 800;
+    color: #1f1f1f;
 }
 
 .soft-text {
-    color: rgba(255,255,255,0.65);
+    color: #666;
 }
 
-/* ===== LINKS / BUTTONS ===== */
+/* ===== ACTION LINKS ===== */
 
-.portal-link,
-.portal-btn {
-    color: #d4af37;
-    text-decoration: none;
-    border: 1px solid rgba(212,175,55,0.4);
-    padding: 0.7rem 1.1rem;
-    border-radius: 999px;
+.portal-link {
     display: inline-block;
-    transition: 0.25s ease;
-    background: transparent;
-    font-weight: 600;
+    color: #9f7a16;
+    text-decoration: none;
+    font-weight: 700;
+    border-bottom: 2px solid transparent;
+    transition: 0.2s ease;
 }
 
-.portal-link:hover,
-.portal-btn:hover {
-    background: rgba(212,175,55,0.08);
-    color: #fff2bf;
+.portal-link:hover {
+    color: #d4af37;
     border-color: #d4af37;
-    transform: translateY(-1px);
-}
-
-.pay-link {
-    display: block;
-    text-align: center;
-    margin-top: 1rem;
 }
 
 /* ===== PAYMENT CARDS ===== */
 
 .payment-card {
-    border-top: 4px solid #d4af37;
+    background: white;
+    border-radius: 22px;
+    border: none;
+    box-shadow: 0 8px 22px rgba(0,0,0,0.08);
+    overflow: hidden;
+    height: 100%;
+}
+
+.payment-card .card-top {
+    height: 6px;
+    background: linear-gradient(90deg, #d4af37, #f5d76e);
 }
 
 .payment-amount {
-    font-size: 1.7rem;
+    font-size: 2rem;
     font-weight: 800;
-    color: #d4af37;
+    color: #1e1e1e;
+}
+
+.payment-label {
+    color: #8a6b15;
+    font-weight: 700;
+}
+
+/* ===== INBOX ===== */
+
+.inbox-card,
+.history-card {
+    background: white;
+    border-radius: 24px;
+    border: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    margin-bottom: 2rem;
+}
+
+.section-title {
+    color: #1e1e1e;
+    font-weight: 800;
+}
+
+.section-subtitle {
+    color: #666;
 }
 
 /* ===== TABLES ===== */
 
 .table {
-    color: rgba(255,255,255,0.85);
+    color: #333;
 }
 
 .table thead {
-    background: rgba(212,175,55,0.08);
+    background: #f7f1df;
 }
 
 .table th {
-    color: #d4af37;
-    border-bottom: 1px solid rgba(212,175,55,0.25);
+    color: #7d6110;
+    font-weight: 700;
+    border-bottom: none;
 }
 
 .table td {
-    border-color: rgba(255,255,255,0.08);
+    vertical-align: middle;
 }
 
-.table-hover tbody tr:hover {
-    background: rgba(212,175,55,0.05);
+/* ===== BUTTONS ===== */
+
+.soft-btn {
+    background: #f7f1df;
+    color: #7d6110;
+    border: none;
+    border-radius: 999px;
+    padding: 0.55rem 1rem;
+    font-weight: 700;
+}
+
+.soft-btn:hover {
+    background: #ead69d;
+    color: #4f3d0b;
 }
 
 /* ===== MODALS ===== */
 
 .modal-content {
-    background: #121212;
-    border: 1px solid rgba(212,175,55,0.25);
-    color: white;
+    border-radius: 24px;
+    border: none;
 }
 
 .form-control,
 .form-select {
-    background: #1a1a1a;
-    border: 1px solid rgba(212,175,55,0.2);
-    color: white;
-}
-
-.form-control:focus,
-.form-select:focus {
-    background: #1a1a1a;
-    color: white;
-    border-color: #d4af37;
-    box-shadow: 0 0 0 0.15rem rgba(212,175,55,0.15);
+    border-radius: 14px;
+    padding: 0.75rem;
 }
 
 /* ===== MOBILE ===== */
@@ -224,7 +198,11 @@ body {
 @media (max-width: 768px) {
 
     .portal-title {
-        font-size: 1.7rem;
+        font-size: 1.8rem;
+    }
+
+    .hero-content {
+        padding: 1.5rem !important;
     }
 
     .resident-photo {
@@ -237,57 +215,60 @@ body {
         font-size: 1.4rem;
     }
 
-    .portal-header {
-        padding: 1.35rem;
-    }
-
-    .portal-card,
-    .payment-card,
-    .inbox-card,
-    .history-card {
-        border-radius: 18px;
-    }
-
-    .table {
-        font-size: 0.84rem;
-    }
-
-    .table td,
-    .table th {
-        white-space: nowrap;
-    }
-
 }
 
 </style>
 
-<div class="container py-4">
-
 {% if application %}
 
-<!-- ===== PORTAL HEADER ===== -->
+<!-- HERO -->
 
-<div class="portal-header">
+<div class="portal-hero">
 
-    <div class="row align-items-center">
+    <div class="row g-0 align-items-stretch">
 
-        <div class="col-md-2 text-center mb-3 mb-md-0">
-
-            <img src="/static/images/bl-logo.png"
-                 class="portal-logo"
-                 alt="Bowling Legacy">
-
+        <div class="col-lg-5">
+            <div class="hero-image"></div>
         </div>
 
-        <div class="col-md-10 text-md-start text-center">
+        <div class="col-lg-7">
 
-            <h1 class="portal-title mb-1">
-                Bowling Legacy Housing
-            </h1>
+            <div class="hero-content">
 
-            <p class="portal-subtitle mb-0">
-                Resident Portal • The Painted Lady Inn
-            </p>
+                <h1 class="portal-title">
+                    The Painted Lady Inn
+                </h1>
+
+                <p class="portal-subtitle">
+                    Bowling Legacy Housing Resident Portal
+                </p>
+
+                <p>
+                    Welcome back,
+                    <strong>{{ application.full_name }}</strong>
+                </p>
+
+                <div class="d-flex gap-4 flex-wrap mt-4">
+
+                    <button class="soft-btn"
+                            data-bs-toggle="modal"
+                            data-bs-target="#messageModal">
+                        Request / Message
+                    </button>
+
+                    <button class="soft-btn"
+                            data-bs-toggle="modal"
+                            data-bs-target="#documentUploadModal">
+                        Upload Document
+                    </button>
+
+                    <a href="/" class="portal-link">
+                        Return Home
+                    </a>
+
+                </div>
+
+            </div>
 
         </div>
 
@@ -295,9 +276,9 @@ body {
 
 </div>
 
-<!-- ===== RESIDENT PROFILE ===== -->
+<!-- RESIDENT CARD -->
 
-<div class="portal-card mb-4">
+<div class="card resident-card">
 
     <div class="card-body p-4">
 
@@ -311,7 +292,7 @@ body {
 
             </div>
 
-            <div class="col-md-7">
+            <div class="col-md-10">
 
                 <h2 class="resident-name mb-2">
                     {{ application.full_name }}
@@ -325,52 +306,23 @@ body {
                     {{ application.phone }}
                 </p>
 
-                {% if application.property %}
-                <p class="mb-1">
-                    <span class="gold-text">Property:</span>
-                    {{ application.property.name }}
-                </p>
-                {% endif %}
+                <div class="row">
 
-                <p class="mb-1">
-                    <span class="gold-text">Room / Space:</span>
-                    {{ application.space_type }}
-                    {{ application.space_label }}
-                </p>
+                    <div class="col-md-4 mb-2">
+                        <strong>Property:</strong><br>
+                        {{ application.property.name }}
+                    </div>
 
-                <p class="mb-0">
-                    <span class="gold-text">Status:</span>
-                    Active Resident File
-                </p>
+                    <div class="col-md-4 mb-2">
+                        <strong>Room / Space:</strong><br>
+                        {{ application.space_type }}
+                        {{ application.space_label }}
+                    </div>
 
-            </div>
-
-            <div class="col-md-3">
-
-                <div class="d-grid gap-2">
-
-                    <button class="portal-btn"
-                            data-bs-toggle="modal"
-                            data-bs-target="#messageModal">
-
-                        Request / Message
-
-                    </button>
-
-                    <button class="portal-btn"
-                            data-bs-toggle="modal"
-                            data-bs-target="#documentUploadModal">
-
-                        Upload Document
-
-                    </button>
-
-                    <a href="/"
-                       class="portal-link text-center">
-
-                        Return Home
-
-                    </a>
+                    <div class="col-md-4 mb-2">
+                        <strong>Status:</strong><br>
+                        Active Resident
+                    </div>
 
                 </div>
 
@@ -382,30 +334,30 @@ body {
 
 </div>
 
-<!-- ===== PAYMENT SECTION ===== -->
+<!-- PAYMENTS -->
 
 <div class="row g-4 mb-5">
 
 {% if application.balance > 0 %}
 <div class="col-md-4">
 
-    <div class="payment-card h-100">
+    <div class="payment-card">
+
+        <div class="card-top"></div>
 
         <div class="card-body p-4">
 
-            <h4 class="gold-text mb-3">
+            <div class="payment-label mb-2">
                 Rent Due
-            </h4>
+            </div>
 
-            <div class="payment-amount">
+            <div class="payment-amount mb-3">
                 ${{ application.balance }}
             </div>
 
             <a href="{% url 'pay_by_type' application.id 'rent' %}"
-               class="portal-link pay-link">
-
+               class="portal-link">
                 Pay Rent
-
             </a>
 
         </div>
@@ -418,13 +370,15 @@ body {
 {% if application.deposit_paid < application.deposit_required %}
 <div class="col-md-4">
 
-    <div class="payment-card h-100">
+    <div class="payment-card">
+
+        <div class="card-top"></div>
 
         <div class="card-body p-4">
 
-            <h4 class="gold-text mb-3">
+            <div class="payment-label mb-2">
                 Deposit Due
-            </h4>
+            </div>
 
             <p>
                 Required: ${{ application.deposit_required }}
@@ -435,10 +389,8 @@ body {
             </p>
 
             <a href="{% url 'pay_by_type' application.id 'deposit' %}"
-               class="portal-link pay-link">
-
+               class="portal-link">
                 Pay Deposit
-
             </a>
 
         </div>
@@ -451,23 +403,23 @@ body {
 {% if application.utility_balance > 0 %}
 <div class="col-md-4">
 
-    <div class="payment-card h-100">
+    <div class="payment-card">
+
+        <div class="card-top"></div>
 
         <div class="card-body p-4">
 
-            <h4 class="gold-text mb-3">
+            <div class="payment-label mb-2">
                 Utilities Due
-            </h4>
+            </div>
 
-            <div class="payment-amount">
+            <div class="payment-amount mb-3">
                 ${{ application.utility_balance }}
             </div>
 
             <a href="{% url 'pay_by_type' application.id 'utility' %}"
-               class="portal-link pay-link">
-
+               class="portal-link">
                 Pay Utilities
-
             </a>
 
         </div>
@@ -479,37 +431,119 @@ body {
 
 </div>
 
-<!-- ===== TOTAL DUE ===== -->
+<!-- INBOX -->
 
-{% if total_due > 0 %}
+<div class="card inbox-card">
 
-<div class="payment-card mb-5">
+    <div class="card-body p-4">
 
-    <div class="card-body text-center p-5">
-
-        <h3 class="gold-text mb-3">
-            Total Resident Balance
+        <h3 class="section-title mb-1">
+            Resident Inbox & Documents
         </h3>
 
-        <div class="payment-amount mb-4">
-            ${{ total_due }}
+        <p class="section-subtitle mb-4">
+            Applications, leases, uploads, onboarding forms, and requests.
+        </p>
+
+        <div class="table-responsive">
+
+            <table class="table align-middle">
+
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for document in application.documents.all %}
+                    <tr>
+                        <td>{{ document.name }}</td>
+                        <td>{{ document.get_document_type_display }}</td>
+                        <td>{{ document.get_status_display }}</td>
+                        <td>{{ document.created_at }}</td>
+                    </tr>
+                    {% endfor %}
+
+                    {% for resident_message in resident_messages %}
+                    <tr>
+                        <td>{{ resident_message.subject }}</td>
+                        <td>{{ resident_message.get_message_type_display }}</td>
+                        <td>{{ resident_message.get_status_display }}</td>
+                        <td>{{ resident_message.created_at }}</td>
+                    </tr>
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
         </div>
 
-        <a href="{% url 'pay_by_type' application.id 'total' %}"
-           class="portal-link">
+    </div>
 
-            Pay Full Balance
+</div>
 
-        </a>
+<!-- PAYMENT HISTORY -->
+
+<div class="card history-card">
+
+    <div class="card-body p-4">
+
+        <h3 class="section-title mb-1">
+            Payment History
+        </h3>
+
+        <p class="section-subtitle mb-4">
+            Rent, deposit, utility, and combined payments.
+        </p>
+
+        <div class="table-responsive">
+
+            <table class="table align-middle">
+
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Description</th>
+                        <th>Amount</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for payment in payments %}
+                    <tr>
+                        <td>{{ payment.get_payment_type_display }}</td>
+                        <td>{{ payment.description }}</td>
+                        <td>${{ payment.amount }}</td>
+                        <td>{{ payment.created_at }}</td>
+                        <td>{{ payment.get_status_display }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5">
+                            No payment history yet.
+                        </td>
+                    </tr>
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
 
     </div>
 
 </div>
 
 {% endif %}
-
-{% endif %}
-
-</div>
 
 {% endblock %}
