@@ -57,6 +57,9 @@ urlpatterns = [
 
     path("application/<int:pk>/print/", views.printable_application, name="printable_application"),
 
+    path("lease/sign/", views.lease_sign, name="lease_sign"),
+    path("lease/submit/", views.submit_lease_signature, name="submit_lease_signature"),
+    
     path("pay/<int:application_id>/", views.create_checkout_session, name="pay_rent"),
     path("pay/<int:application_id>/<str:payment_type>/", views.create_checkout_session, name="pay_by_type"),
 
