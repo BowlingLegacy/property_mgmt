@@ -364,7 +364,7 @@ class SignedDocument(models.Model):
             self.utility_fee = self.application.utility_monthly
 
             self.security_deposit = self.application.deposit_required
-            self.lease_start_date = self.application.lease_start_date
+            
             
             self.room_space = (
                 f"{self.application.space_type} "
