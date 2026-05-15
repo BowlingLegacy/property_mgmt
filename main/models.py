@@ -374,7 +374,11 @@ class SignedDocument(models.Model):
             if self.application.property:
                 self.property_name = self.application.property.name
                 self.property_address = self.application.property.address
+                
+            if not self.lease_start_date:
+                self.lease_start_date = timezone.now().date()
 
+     
         super().save(*args, **kwargs)
 
 
