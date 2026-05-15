@@ -2,10 +2,8 @@
 {% block content %}
 
 <style>
-
 body {
-    background:
-        linear-gradient(180deg, #faf6ee 0%, #f2ead9 100%);
+    background: linear-gradient(180deg, #faf6ee 0%, #f2ead9 100%);
     color: #1f1f1f;
 }
 
@@ -19,8 +17,6 @@ body {
 .dashboard-wrap {
     padding-bottom: 2rem;
 }
-
-/* ===== HERO ===== */
 
 .hero-row {
     margin-bottom: 2.2rem;
@@ -75,40 +71,26 @@ body {
     font-size: 1.15rem;
 }
 
-.message-btn {
-    background: transparent;
-    border: 1px solid #c59a32;
-    border-radius: 12px;
-    padding: 1rem 1.4rem;
-    color: #a57c18;
-    font-weight: 700;
-    width: 100%;
-}
-
-.message-btn:hover {
-    background: rgba(197,154,50,0.08);
-}
-
-/* ===== CARDS ===== */
-
 .soft-card {
-    background: rgba(255,255,255,0.84);
+    background: rgba(255,255,255,0.88);
     border: 1px solid rgba(188,150,45,0.12);
     border-radius: 20px;
     box-shadow: 0 8px 20px rgba(0,0,0,0.06);
 }
 
-.card-title {
+.card-title,
+.section-title {
     font-family: Georgia, serif;
-    font-size: 1.9rem;
     color: #1c1c1c;
+}
+
+.card-title {
+    font-size: 1.65rem;
     margin-bottom: 1rem;
 }
 
 .section-title {
-    font-family: Georgia, serif;
-    font-size: 2rem;
-    color: #1c1c1c;
+    font-size: 1.8rem;
 }
 
 .profile-card {
@@ -131,7 +113,7 @@ body {
 
 .profile-name {
     font-family: Georgia, serif;
-    font-size: 2rem;
+    font-size: 1.75rem;
     font-weight: 700;
 }
 
@@ -147,7 +129,7 @@ body {
 
 .amount {
     font-family: Georgia, serif;
-    font-size: 3.2rem;
+    font-size: 2.4rem;
     font-weight: 700;
     color: #111;
 }
@@ -157,13 +139,19 @@ body {
     color: white;
     border: none;
     border-radius: 10px;
-    padding: 0.95rem 1.2rem;
+    padding: 0.8rem 1rem;
     font-weight: 700;
     width: 100%;
 }
 
-.gold-btn:hover {
-    opacity: 0.95;
+.message-btn {
+    background: transparent;
+    border: 1px solid #c59a32;
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    color: #a57c18;
+    font-weight: 700;
+    width: 100%;
 }
 
 .gold-link {
@@ -172,12 +160,6 @@ body {
     text-decoration: underline;
     text-underline-offset: 4px;
 }
-
-.gold-link:hover {
-    color: #d0a12e;
-}
-
-/* ===== TABLES ===== */
 
 .table {
     margin-bottom: 0;
@@ -197,18 +179,17 @@ body {
     vertical-align: middle;
 }
 
-/* ===== FOOTER FIX ===== */
-
 .footer,
 .footer p,
 .footer a {
     color: #3d3320 !important;
 }
 
-/* ===== MOBILE ===== */
+.modal-content {
+    border-radius: 18px;
+}
 
 @media (max-width: 768px) {
-
     .painted-lady-wrap {
         border-right: none;
         padding-right: 0;
@@ -235,117 +216,64 @@ body {
     .profile-card {
         min-height: auto;
     }
-
 }
-
 </style>
 
 {% if application %}
 
 <div class="dashboard-wrap">
 
-    <!-- HERO -->
-
     <div class="row align-items-center hero-row g-4">
-
         <div class="col-lg-2 text-center">
-            <img src="/static/images/photo03.JPG"
-                 class="house-thumb"
-                 alt="The Painted Lady Inn">
+            <img src="/static/images/photo03.JPG" class="house-thumb" alt="The Painted Lady Inn">
         </div>
 
         <div class="col-lg-4 painted-lady-wrap">
-
-            <div class="the-script">
-                The
-            </div>
-
-            <div class="painted-lady-title">
-                Painted Lady Inn
-            </div>
-
-            <div class="community-line">
-                A Bowling Legacy Community
-            </div>
-
+            <div class="the-script">The</div>
+            <div class="painted-lady-title">Painted Lady Inn</div>
+            <div class="community-line">A Bowling Legacy Community</div>
         </div>
 
         <div class="col-lg-4">
-
             <h1 class="welcome-title">
                 Welcome back, {{ application.full_name }}
             </h1>
-
             <p class="welcome-text mb-0">
-                We're glad to have you as part of
-                The Painted Lady Inn community.
+                We're glad to have you as part of The Painted Lady Inn community.
             </p>
-
         </div>
 
         <div class="col-lg-2">
-
-            <button class="message-btn"
-                    data-bs-toggle="modal"
-                    data-bs-target="#messageModal">
-
+            <button class="message-btn" data-bs-toggle="modal" data-bs-target="#messageModal">
                 Send a Message
-
             </button>
-
             <p class="small text-muted mt-2 mb-0">
                 We typically respond within 1 business day.
             </p>
-
         </div>
-
     </div>
 
-    <!-- TOP CARDS -->
-
-    <div class="row g-4 mb-4">
-
-        <!-- PROFILE -->
+    <div class="row g-4">
 
         <div class="col-lg-3">
-
             <div class="soft-card profile-card p-4">
-
-                <div class="card-title">
-                    Resident Profile
-                </div>
+                <div class="card-title">Resident Profile</div>
 
                 <div class="profile-photo">
                     {{ application.full_name|first|upper }}
                 </div>
 
                 <div class="text-center">
-
-                    <div class="profile-name">
-                        {{ application.full_name }}
-                    </div>
-
+                    <div class="profile-name">{{ application.full_name }}</div>
                     <div class="profile-line">
-                        {{ application.space_type }}
-                        {{ application.space_label }}
-                        • The Painted Lady Inn
+                        {{ application.space_type }} {{ application.space_label }} • The Painted Lady Inn
                     </div>
-
                 </div>
 
                 <div class="profile-divider"></div>
 
-                <div class="profile-line">
-                    {{ application.email }}
-                </div>
-
-                <div class="profile-line">
-                    {{ application.phone }}
-                </div>
-
-                <div class="profile-line">
-                    Member since 2026
-                </div>
+                <div class="profile-line">{{ application.email }}</div>
+                <div class="profile-line">{{ application.phone }}</div>
 
                 <div class="profile-divider"></div>
 
@@ -365,304 +293,181 @@ body {
                 </div>
 
                 <div class="mt-4">
-                    <button class="message-btn w-100">
-                        View / Edit Profile
-                    </button>
-                </div>
-
-            </div>
-
-       </div>
-
-<div class="col-lg-9">
-
-    <div class="row g-4 mb-4">
-
-        <!-- BALANCE -->
-
-        <div class="col-lg-4">
-            
-            <div class="soft-card p-4">
-
-                <div class="card-title">
-                    Current Balance
-                </div>
-
-                <div class="amount text-center mt-5">
-                    ${{ total_due }}
-                </div>
-
-                <p class="text-center text-muted">
-                    Total amount currently due
-                </p>
-
-                {% if total_due > 0 %}
-                <a href="{% url 'pay_by_type' application.id 'total' %}"
-                   class="gold-btn d-block text-center text-decoration-none mt-4">
-
-                    Make a Payment
-
-                </a>
-                {% endif %}
-
-                <div class="text-center mt-4">
-                    <a href="#payment-history"
-                       class="gold-link">
-
-                        View Payment History
-
+                    <a href="#resident-inbox" class="message-btn d-block text-center text-decoration-none">
+                        View My File
                     </a>
                 </div>
-
             </div>
-
         </div>
 
-<div class="col-lg-9">
+        <div class="col-lg-9">
 
-    <div class="row g-4 mb-4">
+            <div class="row g-4 mb-4">
 
-        <!-- NEXT PAYMENT -->
+                <div class="col-lg-4">
+                    <div class="soft-card p-4">
+                        <div class="card-title">Current Balance</div>
 
-        <div class="col-lg-4">
+                        <div class="amount text-center mt-4">
+                            ${{ total_due }}
+                        </div>
 
-            <div class="soft-card p-4">
+                        <p class="text-center text-muted">
+                            Total amount currently due
+                        </p>
 
-                <div class="card-title">
-                    Next Payment
-                </div>
+                        {% if total_due > 0 %}
+                        <a href="{% url 'pay_by_type' application.id 'total' %}"
+                           class="gold-btn d-block text-center text-decoration-none mt-3">
+                            Make a Payment
+                        </a>
+                        {% endif %}
 
-                <div class="amount text-center mt-5">
-                    June 1, 2026
-                </div>
-
-                <p class="text-center text-muted">
-                    Rent is due on the 1st
-                    and collected on the 3rd.
-                </p>
-
-                <div class="text-center mt-5">
-                    <a href="#payment-history"
-                       class="gold-link">
-
-                        View Payment Details
-
-                    </a>
-                </div>
-
-            </div>
-
-         </div>
-
-<div class="col-lg-9">
-
-    <div class="row g-4 mb-4">
-
-        <!-- NEXT PAYMENT -->
-
-        <div class="col-lg-4">
-
-            <div class="soft-card p-4">
-                
-              <div class="col-lg-4">
-
-            <div class="soft-card p-4">    
-
-        </div>
-
-<div class="col-lg-9">
-
-    <div class="row g-4 mb-4">
-
-        <!-- MAINTENANCE -->
-
-        <div class="col-lg-4">
-
-            <div class="soft-card p-4">
-
-                <div class="card-title">
-                    Maintenance
-                </div>
-
-                <div class="text-center mt-5">
-
-                    <p style="font-size:1.35rem;">
-                        Need something
-                        taken care of?
-                    </p>
-
-                </div>
-
-                <button class="gold-btn mt-4"
-                        data-bs-toggle="modal"
-                        data-bs-target="#messageModal">
-
-                    Submit a Request
-
-                </button>
-
-                <div class="text-center mt-4">
-                    <a href="#resident-inbox"
-                       class="gold-link">
-
-                        View My Requests
-
-                    </a>
-                </div>
-
-            </div>
-
-        </div>
-
-    </div>
-
-    <!-- LOWER SECTION -->
-
-    <div class="row g-4">
-
-        <!-- INBOX -->
-
-        <div class="col-lg-6">
-
-            <div id="resident-inbox"
-                 class="soft-card h-100">
-
-                <div class="p-4 border-bottom d-flex justify-content-between align-items-center">
-
-                    <div class="section-title">
-                        Inbox
+                        <div class="text-center mt-3">
+                            <a href="#payment-history" class="gold-link">
+                                View Payment History
+                            </a>
+                        </div>
                     </div>
-
-                    <button class="btn btn-link gold-link"
-                            data-bs-toggle="modal"
-                            data-bs-target="#documentUploadModal">
-
-                        Upload Document
-
-                    </button>
-
                 </div>
 
-                <div class="table-responsive">
+                <div class="col-lg-4">
+                    <div class="soft-card p-4">
+                        <div class="card-title">Next Payment</div>
 
-                    <table class="table">
+                        <div class="amount text-center mt-4">
+                            1st
+                        </div>
 
-                        <tbody>
+                        <p class="text-center text-muted">
+                            Rent is due on the 1st and collected on the 3rd.
+                        </p>
 
-                        {% for resident_message in resident_messages %}
+                        <div class="text-center mt-3">
+                            <a href="#payment-history" class="gold-link">
+                                View Payment Details
+                            </a>
+                        </div>
+                    </div>
+                </div>
 
-                            <tr>
+                <div class="col-lg-4">
+                    <div class="soft-card p-4">
+                        <div class="card-title">Maintenance</div>
 
-                                <td>
-                                    <strong>{{ resident_message.subject }}</strong><br>
-                                    <small>{{ resident_message.message }}</small>
-                                </td>
+                        <p class="text-center mt-4" style="font-size:1.2rem;">
+                            Need something taken care of?
+                        </p>
 
-                                <td>
-                                    {{ resident_message.created_at|date:"M j, Y" }}
-                                </td>
+                        <button class="gold-btn mt-3"
+                                data-bs-toggle="modal"
+                                data-bs-target="#messageModal">
+                            Submit a Request
+                        </button>
 
-                            </tr>
-
-                        {% empty %}
-
-                            <tr>
-                                <td class="p-4">
-                                    No inbox items yet.
-                                </td>
-                            </tr>
-
-                        {% endfor %}
-
-                        </tbody>
-
-                    </table>
-
+                        <div class="text-center mt-3">
+                            <a href="#resident-inbox" class="gold-link">
+                                View My Requests
+                            </a>
+                        </div>
+                    </div>
                 </div>
 
             </div>
 
-        </div>
+            <div class="row g-4">
 
-        <!-- PAYMENT HISTORY -->
+                <div class="col-lg-6">
+                    <div id="resident-inbox" class="soft-card h-100">
+                        <div class="p-4 border-bottom d-flex justify-content-between align-items-center">
+                            <div class="section-title">Inbox</div>
+                            <button class="btn btn-link gold-link"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#documentUploadModal">
+                                Upload Document
+                            </button>
+                        </div>
 
-        <div class="col-lg-6">
+                        <div class="table-responsive">
+                            <table class="table">
+                                <tbody>
+                                    {% for document in application.documents.all %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ document.name }}</strong><br>
+                                            <small>{{ document.get_document_type_display }}</small>
+                                        </td>
+                                        <td>{{ document.get_status_display }}</td>
+                                        <td>
+                                            {% if document.file %}
+                                            <a href="{{ document.file.url }}" target="_blank" class="gold-link">Open</a>
+                                            {% else %}
+                                            —
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
 
-            <div id="payment-history"
-                 class="soft-card h-100">
+                                    {% for resident_message in resident_messages %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ resident_message.subject }}</strong><br>
+                                            <small>{{ resident_message.get_message_type_display }}</small>
+                                        </td>
+                                        <td>{{ resident_message.get_status_display }}</td>
+                                        <td>{{ resident_message.created_at|date:"M j, Y" }}</td>
+                                    </tr>
+                                    {% endfor %}
 
-                <div class="p-4 border-bottom d-flex justify-content-between align-items-center">
-
-                    <div class="section-title">
-                        Payment History
+                                    {% if not application.documents.all and not resident_messages %}
+                                    <tr>
+                                        <td class="p-4 text-muted" colspan="3">
+                                            No inbox items yet.
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-
-                    <a href="#"
-                       class="gold-link">
-
-                        View All Payments
-
-                    </a>
-
                 </div>
 
-                <div class="table-responsive">
+                <div class="col-lg-6">
+                    <div id="payment-history" class="soft-card h-100">
+                        <div class="p-4 border-bottom">
+                            <div class="section-title">Payment History</div>
+                        </div>
 
-                    <table class="table">
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Description</th>
+                                        <th>Amount</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
 
-                        <thead>
-
-                            <tr>
-
-                                <th>Date</th>
-                                <th>Description</th>
-                                <th>Amount</th>
-                                <th>Status</th>
-
-                            </tr>
-
-                        </thead>
-
-                        <tbody>
-
-                        {% for payment in payments %}
-
-                            <tr>
-
-                                <td>
-                                    {{ payment.created_at|date:"M j, Y" }}
-                                </td>
-
-                                <td>
-                                    {{ payment.get_payment_type_display }}
-                                </td>
-
-                                <td>
-                                    ${{ payment.amount }}
-                                </td>
-
-                                <td>
-                                    {{ payment.get_status_display }}
-                                </td>
-
-                            </tr>
-
-                        {% empty %}
-
-                            <tr>
-
-                                <td colspan="4" class="p-4">
-                                    No payment history yet.
-                                </td>
-
-                            </tr>
-
-                        {% endfor %}
-
-                        </tbody>
-
-                    </table>
-
+                                <tbody>
+                                    {% for payment in payments %}
+                                    <tr>
+                                        <td>{{ payment.created_at|date:"M j, Y" }}</td>
+                                        <td>{{ payment.get_payment_type_display }}</td>
+                                        <td>${{ payment.amount }}</td>
+                                        <td>{{ payment.get_status_display }}</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="p-4 text-muted">
+                                            No payment history yet.
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
 
             </div>
@@ -672,6 +477,101 @@ body {
     </div>
 
 </div>
+
+<div class="modal fade" id="messageModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Request / Message Landlord</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+                <form method="POST" action="{% url 'submit_resident_message' %}">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Message Type</label>
+                        <select name="message_type" class="form-select">
+                            <option value="maintenance">Maintenance Request</option>
+                            <option value="complaint">Complaint</option>
+                            <option value="general">General Message</option>
+                            <option value="document">Document Question</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Subject</label>
+                        <input type="text" name="subject" class="form-control" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Message</label>
+                        <textarea name="message" class="form-control" rows="5" required></textarea>
+                    </div>
+
+                    <button type="submit" class="gold-btn">
+                        Submit Request
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="documentUploadModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Upload Resident Document</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+                <form method="POST"
+                      action="{% url 'upload_resident_document' %}"
+                      enctype="multipart/form-data">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Document Type</label>
+                        <select name="document_type" class="form-select">
+                            <option value="id">Identification</option>
+                            <option value="income">Proof of Income / Pay Stub / SSI / SSDI</option>
+                            <option value="bank">Bank Statements / Deposit Verification</option>
+                            <option value="lease">Lease / Agreement</option>
+                            <option value="onboarding">Onboarding Document</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Document Name</label>
+                        <input type="text" name="name" class="form-control" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Choose File</label>
+                        <input type="file" name="file" class="form-control" required>
+                    </div>
+
+                    <button type="submit" class="gold-btn">
+                        Upload Document
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+
+<div class="alert alert-warning">
+    No resident file is connected to this login yet.
+</div>
+
+<a href="{% url 'enter_invite_code' %}" class="btn btn-primary rounded-pill">Enter Access Code</a>
+<a href="/" class="btn btn-outline-secondary rounded-pill">Return Home</a>
 
 {% endif %}
 
