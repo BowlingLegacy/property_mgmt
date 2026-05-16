@@ -8,6 +8,7 @@ from .models import (
     FinancialUpload,
     ResidentMessage,
     ApplicantDocument,
+    Property,
 )
 
 
@@ -41,7 +42,137 @@ class FinancialUploadForm(forms.ModelForm):
             "file": forms.ClearableFileInput(attrs={"class": "form-control"}),
             "notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
         }
-        
+
+
+class LandlordCreateTenantForm(forms.Form):
+    full_name = forms.CharField(
+        max_length=255,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Resident full legal name"}),
+    )
+    phone = forms.CharField(
+        max_length=20,
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Phone number"}),
+    )
+    email = forms.EmailField(
+        required=False,
+        widget=forms.EmailInput(attrs={"class": "form-control", "placeholder": "Resident email"}),
+    )
+    username = forms.CharField(
+        max_length=150,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Portal username"}),
+    )
+    temporary_password = forms.CharField(
+        max_length=128,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Temporary password"}),
+        help_text="Give this temporary password to the tenant. They can change it later.",
+    )
+
+    property = forms.ModelChoiceField(
+        queryset=Property.objects.none(),
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    space_type = forms.CharField(
+        max_length=50,
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Room, Unit, Space, Suite"}),
+    )
+    space_label = forms.CharField(
+        max_length=50,
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Example: A, 101, Suite 2"}),
+    )
+
+    monthly_rent = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        initial=0,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+    )
+    balance = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        initial=0,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+    )
+    rent_due_day = forms.IntegerField(
+        initial=1,
+        min_value=1,
+        max_value=31,
+        widget=forms.NumberInput(attrs={"class": "form-control"}),
+    )
+    lease_start_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+    )
+    deposit_required = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        initial=450,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+    )
+    deposit_paid = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        initial=0,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+    )
+    utility_monthly = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        initial=66,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+    )
+    utility_balance = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        initial=0,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+    )
+
+    age = forms.IntegerField(
+        initial=55,
+        min_value=0,
+        widget=forms.NumberInput(attrs={"class": "form-control"}),
+    )
+    income_source = forms.CharField(
+        max_length=255,
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Income source"}),
+    )
+    monthly_income = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        initial=0,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+    )
+    housing_need = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Internal housing notes"}),
+    )
+    additional_notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Landlord notes"}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["property"].queryset = Property.objects.all().order_by("name")
+
+    def clean_username(self):
+        username = self.cleaned_data["username"].strip()
+        if User.objects.filter(username__iexact=username).exists():
+            raise forms.ValidationError("That username is already in use.")
+        return username
+
+    def clean_email(self):
+        email = self.cleaned_data.get("email", "").strip()
+        if email and User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError("A user with this email already exists.")
+        return email
+
+
 class ResidentDocumentUploadForm(forms.ModelForm):
     class Meta:
         model = ApplicantDocument
