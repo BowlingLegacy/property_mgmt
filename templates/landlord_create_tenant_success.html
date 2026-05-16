@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+.success-shell {
+    background: #efe2c2;
+    min-height: 100vh;
+    margin: -1rem;
+    padding: 1.5rem;
+    color: #17130a;
+}
+.success-card {
+    max-width: 980px;
+    margin: 0 auto;
+    background: #f7efd9;
+    border: 1px solid #a98226;
+    border-radius: 18px;
+    box-shadow: 0 10px 24px rgba(0,0,0,.10);
+    overflow: hidden;
+}
+.success-header {
+    background: #090909;
+    color: #f3d27a;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 2px solid #a98226;
+}
+.info-box {
+    background: #ead29b;
+    border: 1px solid #a98226;
+    border-radius: 14px;
+    padding: 1rem;
+    height: 100%;
+}
+.info-label {
+    color: #5d4b22;
+    font-size: .78rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+}
+.info-value {
+    color: #111;
+    font-size: 1.25rem;
+    font-weight: 900;
+    overflow-wrap: anywhere;
+}
+.code-box {
+    background: #090909;
+    color: #f3d27a;
+    border: 2px solid #a98226;
+    border-radius: 18px;
+    padding: 1.25rem;
+    text-align: center;
+}
+.code-value {
+    font-size: 2.4rem;
+    font-weight: 950;
+    letter-spacing: .18em;
+}
+.btn-gold {
+    background: #c8a24a;
+    color: #111;
+    border: 1px solid #8f6a18;
+    border-radius: 10px;
+    font-weight: 900;
+    padding: .7rem 1rem;
+    text-decoration: none;
+    display: inline-flex;
+    justify-content: center;
+}
+.btn-gold:hover { background: #b79238; color: #111; }
+</style>
+
+<div class="success-shell">
+    <div class="success-card">
+        <div class="success-header">
+            <h1 class="fw-bold mb-1">Tenant / Resident Created</h1>
+            <div class="text-white-50">The resident file and portal login have been created.</div>
+        </div>
+
+        <div class="p-4">
+            <div class="alert alert-success border-0" style="border-radius:14px;">
+                <strong>Success.</strong> Give the resident the portal username, temporary password, and access code below.
+            </div>
+
+            <div class="code-box mb-4">
+                <div class="info-label" style="color:#d4af37;">Invite / Access Code</div>
+                <div class="code-value">{{ created_user.invite_code }}</div>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <div class="info-box">
+                        <div class="info-label">Resident</div>
+                        <div class="info-value">{{ created_application.full_name }}</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="info-box">
+                        <div class="info-label">Username</div>
+                        <div class="info-value">{{ created_user.username }}</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="info-box">
+                        <div class="info-label">Temporary Password</div>
+                        <div class="info-value">{{ temporary_password }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <div class="info-box">
+                        <div class="info-label">Property</div>
+                        <div class="info-value">
+                            {% if created_application.property %}
+                                {{ created_application.property.name }}
+                            {% else %}
+                                No property assigned
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="info-box">
+                        <div class="info-label">Unit / Room</div>
+                        <div class="info-value">{{ created_application.space_type }} {{ created_application.space_label }}</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="info-box">
+                        <div class="info-label">Monthly Rent</div>
+                        <div class="info-value">${{ created_application.monthly_rent }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-warning" style="border-radius:14px;">
+                <strong>Next step:</strong> Have the resident log in at <strong>bowlinglegacy.com/login/</strong>. Keep this page open until you have copied the temporary password. For security, passwords are not stored in readable form after creation.
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 flex-wrap">
+                <a href="{% url 'landlord_create_tenant' %}" class="btn btn-outline-dark rounded-3 fw-bold">Create Another Tenant</a>
+                <a href="{% url 'landlord_dashboard' %}" class="btn-gold">Back to Landlord Dashboard</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
