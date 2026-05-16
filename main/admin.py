@@ -293,6 +293,7 @@ class HousingApplicationAdmin(admin.ModelAdmin):
                 "monthly_rent",
                 "balance",
                 "rent_due_day",
+                "lease_start_date",
                 "deposit_required",
                 "deposit_paid",
                 "utility_monthly",
