@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+.owner-shell {
+    background: #f4f1ea;
+    margin: -1rem;
+    padding: 1.5rem;
+    min-height: 100vh;
+}
+
+.owner-hero {
+    background: linear-gradient(135deg, #050505, #181818);
+    color: white;
+    border-radius: 24px;
+    padding: 2rem;
+    box-shadow: 0 14px 34px rgba(0,0,0,0.22);
+    border-bottom: 5px solid #d4af37;
+}
+
+.owner-hero .brand-mark {
+    width: 58px;
+    height: 58px;
+    border-radius: 18px;
+    background: #d4af37;
+    color: #050505;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-size: 1.4rem;
+    margin-right: 1rem;
+}
+
+.kpi-card,
+.property-card,
+.activity-card {
+    background: #ffffff;
+    border-radius: 22px;
+    border: 1px solid rgba(0,0,0,0.06);
+    box-shadow: 0 10px 26px rgba(0,0,0,0.08);
+}
+
+.kpi-card {
+    padding: 1.35rem;
+    height: 100%;
+}
+
+.kpi-label {
+    color: #6c757d;
+    font-size: .85rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-weight: 800;
+}
+
+.kpi-value {
+    font-size: 1.7rem;
+    font-weight: 900;
+    color: #111;
+}
+
+.property-card {
+    overflow: hidden;
+    height: 100%;
+}
+
+.property-card-header {
+    background: #111;
+    color: #fff;
+    padding: 1.25rem;
+    border-bottom: 4px solid #d4af37;
+}
+
+.metric-row {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid #eee;
+    padding: .6rem 0;
+}
+
+.metric-row:last-child {
+    border-bottom: none;
+}
+
+.btn-gold {
+    background: #d4af37;
+    color: #111;
+    border: none;
+    font-weight: 800;
+    border-radius: 999px;
+}
+
+.btn-gold:hover {
+    background: #c39d22;
+    color: #111;
+}
+
+.btn-dark-pill {
+    background: #111;
+    color: #fff;
+    border-radius: 999px;
+    font-weight: 800;
+}
+
+.btn-dark-pill:hover {
+    background: #333;
+    color: #fff;
+}
+
+.activity-card {
+    padding: 1.25rem;
+}
+
+.activity-item {
+    border-bottom: 1px solid #eee;
+    padding: .8rem 0;
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+
+.empty-state {
+    background: #fff;
+    border-radius: 22px;
+    padding: 2rem;
+    border: 1px dashed #d4af37;
+}
+</style>
+
+<div class="owner-shell">
+
+    <div class="owner-hero mb-4">
+        <div class="d-flex align-items-center flex-wrap gap-2">
+            <div class="brand-mark">BL</div>
+            <div>
+                <h1 class="fw-bold mb-1">Property Owner Dashboard</h1>
+                <p class="mb-0 text-white-50">Portfolio overview, property performance, resident activity, and financial snapshots.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="kpi-card">
+                <div class="kpi-label">Properties</div>
+                <div class="kpi-value">{{ total_properties }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="kpi-card">
+                <div class="kpi-label">Residents</div>
+                <div class="kpi-value">{{ total_residents }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="kpi-card">
+                <div class="kpi-label">Monthly Rent Roll</div>
+                <div class="kpi-value">${{ portfolio_monthly_rent }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="kpi-card">
+                <div class="kpi-label">Open Requests</div>
+                <div class="kpi-value">{{ total_open_messages }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="kpi-card">
+                <div class="kpi-label">Balances Due</div>
+                <div class="kpi-value">${{ portfolio_balances_due }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="kpi-card">
+                <div class="kpi-label">Utilities Due</div>
+                <div class="kpi-value">${{ portfolio_utilities_due }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="kpi-card">
+                <div class="kpi-label">Deposits Held</div>
+                <div class="kpi-value">${{ portfolio_deposits_held }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="kpi-card">
+                <div class="kpi-label">Collected</div>
+                <div class="kpi-value">${{ portfolio_collected }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+            <h2 class="fw-bold mb-1">Properties</h2>
+            <p class="text-muted mb-0">Each card opens the operating dashboard for that property as we build the next layer.</p>
+        </div>
+        <a href="{% url 'landlord_dashboard' %}" class="btn btn-dark-pill px-4">Landlord Tools</a>
+    </div>
+
+    {% if property_cards %}
+    <div class="row g-4 mb-5">
+        {% for card in property_cards %}
+        <div class="col-lg-4 col-md-6">
+            <div class="property-card">
+                <div class="property-card-header">
+                    <h4 class="fw-bold mb-1">{{ card.property.name }}</h4>
+                    <small>{{ card.property.address|default:"No address entered" }}</small>
+                </div>
+                <div class="p-3">
+                    <div class="metric-row"><span>Residents</span><strong>{{ card.resident_count }}</strong></div>
+                    <div class="metric-row"><span>Monthly Rent</span><strong>${{ card.monthly_rent }}</strong></div>
+                    <div class="metric-row"><span>Balances Due</span><strong>${{ card.balances_due }}</strong></div>
+                    <div class="metric-row"><span>Utilities Due</span><strong>${{ card.utilities_due }}</strong></div>
+                    <div class="metric-row"><span>Deposits Held</span><strong>${{ card.deposits_held }}</strong></div>
+                    <div class="metric-row"><span>Total Collected</span><strong>${{ card.total_collected }}</strong></div>
+                    <div class="metric-row"><span>Open Requests</span><strong>{{ card.open_messages }}</strong></div>
+
+                    <div class="d-grid gap-2 mt-3">
+                        <a href="{% url 'property_financials' card.property.name %}" class="btn btn-gold">Open Financials</a>
+                        <a href="{% url 'landlord_dashboard' %}" class="btn btn-outline-dark rounded-pill fw-bold">Open Operations</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+        <div class="empty-state mb-5">
+            <h4 class="fw-bold">No properties are connected to this owner yet.</h4>
+            <p class="text-muted mb-0">Set the property owner email to match this user's login email, or log in as an admin to view all properties.</p>
+        </div>
+    {% endif %}
+
+    <div class="activity-card">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <h3 class="fw-bold mb-0">Recent Resident Activity</h3>
+            <a href="{% url 'landlord_dashboard' %}" class="btn btn-sm btn-dark-pill px-3">View Inbox</a>
+        </div>
+
+        {% for item in recent_messages %}
+            <div class="activity-item">
+                <div class="d-flex justify-content-between flex-wrap gap-2">
+                    <div>
+                        <strong>{{ item.subject }}</strong>
+                        <div class="text-muted small">
+                            {{ item.application.property.name }} · {{ item.application.full_name }} · {{ item.get_message_type_display }}
+                        </div>
+                    </div>
+                    <span class="badge {% if item.status == 'submitted' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                        {{ item.get_status_display }}
+                    </span>
+                </div>
+            </div>
+        {% empty %}
+            <p class="text-muted mb-0">No recent resident messages or requests.</p>
+        {% endfor %}
+    </div>
+
+</div>
+
+{% endblock %}
