@@ -2,208 +2,442 @@
 {% block content %}
 
 <style>
-.card-modern {
-    border-radius: 18px;
-    border: none;
-    transition: all 0.25s ease;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+:root {
+    --rl-black: #050505;
+    --rl-gold: #d4af37;
+    --rl-bg: #f5e8c8;
+    --rl-card: #ecd29a;
+    --rl-card-light: #f9f1dc;
+    --rl-border: #b88b19;
+    --rl-text: #111;
+    --rl-muted: #6b5b35;
 }
 
-.card-modern:hover {
-    transform: translateY(-6px);
-    box-shadow: 0 16px 36px rgba(0,0,0,0.20);
+body {
+    background: var(--rl-bg);
 }
 
-.card-blue { border-top: 6px solid #1e3a5f; background: #f0f5ff; }
-.card-gold { border-top: 6px solid #d4af37; background: #fff8df; }
-.card-green { border-top: 6px solid #198754; background: #ecfdf3; }
-.card-gray { border-top: 6px solid #6c757d; background: #f8f9fa; }
-.card-red { border-top: 6px solid #b02a37; background: #fff5f5; }
+.rl-shell {
+    display: grid;
+    grid-template-columns: 280px minmax(0,1fr);
+    min-height: 100vh;
+    margin: -1rem;
+}
 
-.btn-modern {
-    border-radius: 999px;
+.rl-sidebar {
+    background: #050505;
+    color: white;
+    border-right: 2px solid var(--rl-gold);
+    padding: 1.2rem;
+}
+
+.rl-logo {
+    border-bottom: 1px solid rgba(212,175,55,.45);
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+}
+
+.rl-logo img {
+    width: 86px;
+    height: 86px;
+    object-fit: contain;
+}
+
+.rl-nav-label {
+    color: rgba(212,175,55,.9);
+    font-size: .72rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    font-weight: 900;
+    margin: 1rem .6rem .4rem;
+}
+
+.rl-nav a {
+    display: block;
+    color: rgba(255,255,255,.92);
+    text-decoration: none;
+    padding: .75rem .9rem;
+    border-radius: 12px;
     font-weight: 700;
+    margin-bottom: .3rem;
 }
 
-.btn-blue { background:#1e3a5f; color:white; }
-.btn-blue:hover { background:#16314f; color:white; }
-
-.btn-gold { background:#d4af37; color:#1e3a5f; }
-.btn-green { background:#198754; color:white; }
-.btn-gray { background:#6c757d; color:white; }
-
-.property-folder {
-    border-radius: 18px;
-    border: 1px solid #e2e2e2;
-    background: #ffffff;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+.rl-nav a:hover,
+.rl-nav a.active {
+    border: 1px solid var(--rl-gold);
+    background: rgba(212,175,55,.14);
 }
 
-.folder-header {
-    background: #1e3a5f;
+.rl-header {
+    background: #050505;
     color: white;
-    border-radius: 18px 18px 0 0;
-    padding: 16px 20px;
+    border-bottom: 2px solid var(--rl-gold);
+    padding: 1.4rem 1.6rem;
 }
 
-.badge-new {
-    background: #b02a37;
-    color: white;
+.rl-title {
+    color: var(--rl-gold);
+    font-weight: 950;
+}
+
+.rl-content {
+    padding: 1.5rem;
+}
+
+.rl-card {
+    background: linear-gradient(145deg,var(--rl-card-light),var(--rl-card));
+    border: 1px solid var(--rl-border);
+    border-radius: 16px;
+    box-shadow: 0 8px 18px rgba(0,0,0,.08);
+}
+
+.rl-kpi {
+    padding: 1rem;
+    height: 100%;
+}
+
+.rl-kpi-label {
+    font-size: .76rem;
+    color: var(--rl-muted);
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.rl-kpi-value {
+    font-size: 2rem;
+    font-weight: 950;
+    color: #111;
+}
+
+.rl-btn {
+    background: var(--rl-gold);
+    color: #111;
+    border: 1px solid #8e6705;
+    border-radius: 12px;
+    font-weight: 900;
+    padding: .7rem 1rem;
+    text-decoration: none;
+    display: inline-flex;
+    justify-content: center;
+}
+
+.rl-btn:hover {
+    background: #b88b19;
+    color: #111;
+}
+
+.rl-table thead th {
+    background: rgba(212,175,55,.22);
+    border-bottom: 1px solid var(--rl-border);
+    text-transform: uppercase;
+    font-size: .72rem;
+}
+
+.rl-table td {
+    border-color: rgba(184,139,25,.22);
+    vertical-align: middle;
+}
+
+.rl-status {
     border-radius: 999px;
-    padding: 5px 12px;
-    font-size: 0.8rem;
+    padding: .3rem .7rem;
+    font-size: .76rem;
+    font-weight: 800;
+}
+
+.rl-status-good {
+    background: rgba(25,135,84,.12);
+    color: #157347;
+}
+
+.rl-status-alert {
+    background: rgba(176,42,55,.14);
+    color: #b02a37;
+}
+
+@media (max-width: 1000px) {
+    .rl-shell {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
 
-<h2 class="fw-bold mb-4" style="color:#1e3a5f;">Landlord Dashboard</h2>
+<div class="rl-shell">
 
-<div class="card shadow-sm mb-4" style="border-radius:18px;">
-  <div class="card-body">
-    <p class="lead mb-1">Welcome, {{ user.username }}</p>
-    <p class="text-muted mb-0">Owner tools, resident files, property inbox, and reporting center</p>
-  </div>
-</div>
+    <aside class="rl-sidebar">
 
-{% if new_message_count > 0 %}
-<div class="alert alert-warning shadow-sm" style="border-radius:18px;">
-    <strong>{{ new_message_count }} new resident request/document item{{ new_message_count|pluralize }} filed.</strong>
-    Review the landlord property inbox below.
-</div>
-{% endif %}
-
-<div class="row g-4 mb-5">
-
-  <div class="col-md-4">
-    <div class="card card-modern card-blue h-100">
-      <div class="card-body">
-        <h5 class="fw-bold">Payment Log</h5>
-        <p class="text-muted">Track all payments</p>
-        <a href="{% url 'payment_log' %}" class="btn btn-modern btn-blue w-100">Open</a>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-md-4">
-    <div class="card card-modern card-gold h-100">
-      <div class="card-body">
-        <h5 class="fw-bold">Rent Roll</h5>
-        <p class="text-muted">Residents and balances</p>
-        <a href="{% url 'rent_roll' %}" class="btn btn-modern btn-green w-100">Open</a>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-md-4">
-    <div class="card card-modern card-green h-100">
-      <div class="card-body">
-        <h5 class="fw-bold">T-12 Report</h5>
-        <p class="text-muted">Financial performance</p>
-        <a href="{% url 't12_report' %}" class="btn btn-modern btn-gray w-100">Open</a>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-md-4">
-    <div class="card card-modern card-blue h-100">
-      <div class="card-body">
-        <h5 class="fw-bold">Financial Upload</h5>
-        <p class="text-muted">Upload spreadsheets</p>
-        <a href="{% url 'financial_upload' %}" class="btn btn-modern btn-blue w-100">Upload</a>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-md-4">
-    <div class="card card-modern card-gold h-100">
-      <div class="card-body">
-        <h5 class="fw-bold">Property Financials</h5>
-        <p class="text-muted">Performance dashboard</p>
-        <a href="{% url 'property_financials' 'Painted Lady' %}" class="btn btn-modern btn-green w-100">Open</a>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-md-4">
-    <div class="card card-modern card-gray h-100">
-      <div class="card-body">
-        <h5 class="fw-bold">Admin</h5>
-        <p class="text-muted">System records</p>
-        <a href="/admin/" class="btn btn-modern btn-gray w-100">Open</a>
-      </div>
-    </div>
-  </div>
-
-</div>
-
-<h3 class="fw-bold mb-3" style="color:#1e3a5f;">Landlord Property Inbox</h3>
-<p class="text-muted">
-    Resident maintenance requests, complaints, document questions, and general messages are filed below by property.
-</p>
-
-{% for property_name, messages_for_property in landlord_inbox.items %}
-<div class="property-folder mb-4">
-    <div class="folder-header d-flex justify-content-between align-items-center">
-        <div>
-            <h5 class="fw-bold mb-0">📁 {{ property_name }}</h5>
-            <small>Resident file activity</small>
+        <div class="rl-logo text-center">
+            <img src="/static/images/bl-logo.png" alt="Bowling Legacy Logo">
+            <div class="mt-3 fw-bold" style="letter-spacing:.08em;">BOWLING LEGACY</div>
+            <div style="color:var(--rl-gold); font-size:.75rem; letter-spacing:.22em; text-transform:uppercase;">
+                RentLogic
+            </div>
         </div>
-        <span class="badge bg-light text-dark">
-            {{ messages_for_property|length }} item{{ messages_for_property|length|pluralize }}
-        </span>
-    </div>
 
-    <div class="p-3">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Resident</th>
-                        <th>Unit</th>
-                        <th>Type</th>
-                        <th>Subject</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-         {% for item in messages_for_property %}
-    <tr>
-             <td>{{ item.created_at }}</td>
-            <td>{{ item.application.full_name }}</td>
-            <td>{{ item.application.space_type }} {{ item.application.space_label }}</td>
-            <td>{{ item.get_message_type_display }}</td>
-            <td>
-                <strong>{{ item.subject }}</strong><br>
-                <span class="text-muted small">{{ item.message|truncatechars:90 }}</span>
-    </td>
-    <td>
-        {% if item.status == "submitted" %}
-            <span class="badge-new">New</span>
-        {% else %}
-            <span class="badge bg-secondary">{{ item.get_status_display }}</span>
-        {% endif %}
-  </td>
-  <td>
-        <a href="{% url 'landlord_message_detail' item.id %}"
-           class="btn btn-sm btn-primary rounded-pill">
-            Open
-        </a>
-    </td>
-</tr>
-{% empty %}
-<tr>
-    <td colspan="7" class="text-muted">No items in this property folder yet.</td>
-</tr>
-{% endfor %}
-                </tbody>
-            </table>
+        <nav class="rl-nav">
+            <div class="rl-nav-label">Workspace</div>
+            <a href="{% url 'landlord_dashboard' %}" class="active">Dashboard</a>
+            <a href="{% url 'property_owner_dashboard' %}">Property Owner View</a>
+            <a href="{% url 'landlord_create_tenant' %}">Create Tenant</a>
+            <a href="/admin/main/housingapplication/">Resident Files</a>
+            <a href="#property-inbox">Maintenance & Messages</a>
+
+            <div class="rl-nav-label">Financial</div>
+            <a href="{% url 'payment_log' %}">Payment Log</a>
+            <a href="{% url 'rent_roll' %}">Rent Roll</a>
+            <a href="{% url 't12_report' %}">T-12 Report</a>
+            <a href="{% url 'financial_upload' %}">Expense Upload</a>
+
+            <div class="rl-nav-label">System</div>
+            <a href="/admin/">Admin</a>
+            <a href="{% url 'logout' %}">Logout</a>
+        </nav>
+
+    </aside>
+
+    <main>
+
+        <header class="rl-header">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div>
+                    <h1 class="rl-title">Landlord Dashboard</h1>
+                    <div class="text-white-50">
+                        Resident operations, financial tracking, onboarding, documents, and reporting.
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="{% url 'landlord_create_tenant' %}" class="rl-btn">+ Create Tenant</a>
+                    <a href="{% url 'property_owner_dashboard' %}" class="btn btn-outline-warning fw-bold rounded-3">
+                        Owner View
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <div class="rl-content">
+
+            {% if new_message_count > 0 %}
+            <div class="alert alert-warning border-0 mb-4" style="border-radius:14px;">
+                <strong>{{ new_message_count }} new resident request/document item{{ new_message_count|pluralize }} filed.</strong>
+                Review the Property Inbox below.
+            </div>
+            {% endif %}
+
+            <div class="row g-3 mb-4">
+
+                <div class="col-xl col-md-4 col-sm-6">
+                    <div class="rl-card rl-kpi">
+                        <div class="rl-kpi-label">Properties</div>
+                        <div class="rl-kpi-value">{{ properties|length }}</div>
+                        <div class="small text-muted">Managed properties</div>
+                    </div>
+                </div>
+
+                <div class="col-xl col-md-4 col-sm-6">
+                    <div class="rl-card rl-kpi">
+                        <div class="rl-kpi-label">Residents</div>
+                        <div class="rl-kpi-value">{{ applications|length }}</div>
+                        <div class="small text-muted">Resident files</div>
+                    </div>
+                </div>
+
+                <div class="col-xl col-md-4 col-sm-6">
+                    <div class="rl-card rl-kpi">
+                        <div class="rl-kpi-label">Payments</div>
+                        <div class="rl-kpi-value">{{ payments|length }}</div>
+                        <div class="small text-muted">Recent transactions</div>
+                    </div>
+                </div>
+
+                <div class="col-xl col-md-4 col-sm-6">
+                    <div class="rl-card rl-kpi">
+                        <div class="rl-kpi-label">Open Requests</div>
+                        <div class="rl-kpi-value">{{ new_message_count }}</div>
+                        <div class="small text-muted">Messages & maintenance</div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="row g-3 mb-4">
+
+                <div class="col-lg-4">
+                    <div class="rl-card p-4 h-100">
+                        <h4 class="fw-bold mb-3">Resident Onboarding</h4>
+                        <p class="text-muted">
+                            Create residents, assign units, upload documents, and manage lease onboarding.
+                        </p>
+                        <a href="{% url 'landlord_create_tenant' %}" class="rl-btn w-100">
+                            Start Onboarding
+                        </a>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="rl-card p-4 h-100">
+                        <h4 class="fw-bold mb-3">Financial Operations</h4>
+                        <p class="text-muted">
+                            Rent roll, T-12 reporting, expense uploads, and payment tracking.
+                        </p>
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'payment_log' %}" class="rl-btn">Payment Log</a>
+                            <a href="{% url 't12_report' %}" class="rl-btn">T-12 Report</a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="rl-card p-4 h-100">
+                        <h4 class="fw-bold mb-3">Property Inbox</h4>
+                        <p class="text-muted">
+                            Review maintenance requests, resident messages, and document notifications.
+                        </p>
+                        <a href="#property-inbox" class="rl-btn w-100">
+                            Review Inbox
+                        </a>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="rl-card p-4 rl-table mb-4">
+
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                    <div>
+                        <h3 class="fw-bold mb-1">Resident File Overview</h3>
+                        <div class="text-muted small">
+                            Balances, room assignments, and portal access.
+                        </div>
+                    </div>
+
+                    <a href="/admin/main/housingapplication/" class="rl-btn">
+                        Full Records
+                    </a>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Resident</th>
+                                <th>Property</th>
+                                <th>Unit</th>
+                                <th>Rent</th>
+                                <th>Balance</th>
+                                <th>Portal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                            {% for resident in applications %}
+                            <tr>
+                                <td>
+                                    <strong>{{ resident.full_name }}</strong><br>
+                                    <span class="small text-muted">{{ resident.email }}</span>
+                                </td>
+                                <td>{{ resident.property.name }}</td>
+                                <td>{{ resident.space_type }} {{ resident.space_label }}</td>
+                                <td>${{ resident.monthly_rent }}</td>
+                                <td>
+                                    {% if resident.balance > 0 %}
+                                        <span class="rl-status rl-status-alert">
+                                            ${{ resident.balance }}
+                                        </span>
+                                    {% else %}
+                                        <span class="rl-status rl-status-good">
+                                            Current
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if resident.user %}
+                                        {{ resident.user.invite_code }}
+                                    {% else %}
+                                        No Login
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6">No residents yet.</td>
+                            </tr>
+                            {% endfor %}
+
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="property-inbox" class="rl-card p-4">
+
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                    <div>
+                        <h3 class="fw-bold mb-1">Property Inbox</h3>
+                        <div class="text-muted small">
+                            Resident requests, maintenance, and messages.
+                        </div>
+                    </div>
+                </div>
+
+                {% for property_name, messages_for_property in landlord_inbox.items %}
+
+                    <div class="mb-4">
+                        <h5 class="fw-bold mb-3">{{ property_name }}</h5>
+
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Resident</th>
+                                        <th>Subject</th>
+                                        <th>Status</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+
+                                    {% for item in messages_for_property %}
+                                    <tr>
+                                        <td>{{ item.application.full_name }}</td>
+                                        <td>
+                                            <strong>{{ item.subject }}</strong><br>
+                                            <span class="small text-muted">
+                                                {{ item.message|truncatechars:80 }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if item.status == 'submitted' %}
+                                                <span class="rl-status rl-status-alert">New</span>
+                                            {% else %}
+                                                <span class="rl-status rl-status-good">
+                                                    {{ item.get_status_display }}
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <a href="{% url 'landlord_message_detail' item.id %}" class="rl-btn">
+                                                Open
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                {% empty %}
+                    <div class="text-muted">No resident messages or requests yet.</div>
+                {% endfor %}
+
+            </div>
+
         </div>
-    </div>
+
+    </main>
+
 </div>
-{% empty %}
-<div class="alert alert-light border">
-    No resident messages or maintenance requests have been filed yet.
-</div>
-{% endfor %}
 
 {% endblock %}
