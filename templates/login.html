@@ -1,69 +1,144 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Login | RentLogic</title>
+    <title>Login | Bowling Legacy</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            background: linear-gradient(180deg, #faf6ee 0%, #f2ead9 100%);
+            color: #1f1f1f;
+            min-height: 100vh;
+        }
+
+        .topbar {
+            background: rgba(255,255,255,0.9);
+            border-bottom: 1px solid rgba(188,150,45,0.22);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+        }
+
+        .brand-link {
+            font-family: Georgia, serif;
+            color: #1c1c1c;
+            font-weight: 700;
+            text-decoration: none;
+            font-size: 1.2rem;
+        }
+
+        .brand-logo {
+            height: 58px;
+            width: auto;
+            margin-right: 12px;
+        }
+
+        .login-card {
+            background: rgba(255,255,255,0.88);
+            border: 1px solid rgba(188,150,45,0.12);
+            border-radius: 20px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+        }
+
+        .login-title {
+            font-family: Georgia, serif;
+            color: #1c1c1c;
+            font-size: 2.25rem;
+            font-weight: 700;
+        }
+
+        .login-subtitle {
+            color: #555;
+        }
+
+        label {
+            color: #6f5411;
+            font-weight: 700;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            border-radius: 12px !important;
+            border: 1px solid rgba(188,150,45,0.35) !important;
+            padding: .85rem 1rem !important;
+        }
+
+        input:focus {
+            border-color: #c59a32 !important;
+            box-shadow: 0 0 0 .2rem rgba(197,154,50,.15) !important;
+        }
+
+        .gold-btn {
+            background: linear-gradient(135deg, #c48f22, #d8ab3b);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 0.85rem 1rem;
+            font-weight: 700;
+            width: 100%;
+        }
+
+        .message-btn {
+            background: transparent;
+            border: 1px solid #c59a32;
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+            color: #a57c18;
+            font-weight: 700;
+            text-decoration: none;
+            display: inline-flex;
+            justify-content: center;
+        }
+    </style>
 </head>
+<body>
 
-<body class="bg-light">
-
-<nav class="navbar navbar-light bg-white shadow-sm">
-    <div class="container">
-        <a class="navbar-brand fw-bold" href="/">Bowling Legacy Housing</a>
+<nav class="topbar py-3">
+    <div class="container d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <a class="brand-link d-flex align-items-center" href="/">
+            <img src="/static/images/bl-logo.png" class="brand-logo" alt="Bowling Legacy">
+            Bowling Legacy
+        </a>
+        <a href="/" class="message-btn">Return Home</a>
     </div>
 </nav>
 
 <div class="container my-5">
     <div class="row justify-content-center">
-        <div class="col-md-5">
+        <div class="col-lg-5 col-md-7">
+            <div class="login-card p-4 p-md-5">
+                <h1 class="login-title mb-2">Portal Login</h1>
+                <p class="login-subtitle mb-4">Access your Bowling Legacy resident, landlord, or property workspace.</p>
 
-            <div class="card shadow-sm">
-                <div class="card-body p-4">
+                {% if form.errors %}
+                <div class="alert alert-danger" style="border-radius:14px;">
+                    Invalid username or password.
+                </div>
+                {% endif %}
 
-                    <h2 class="fw-bold mb-3">Tenant Portal Login</h2>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.GET.next|default:'/tenant-dashboard/' }}">
 
-                    {% if form.errors %}
-                    <div class="alert alert-danger">
-                        Invalid username or password.
-                    </div>
-                    {% endif %}
-
-                    <form method="post">
-                        {% csrf_token %}
-
-                        <input type="hidden" name="next" value="{{ request.GET.next|default:'/tenant-dashboard/' }}">
-
-                        <div class="mb-3">
-                            <label class="form-label">Username</label>
-                            {{ form.username }}
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Password</label>
-                            {{ form.password }}
-                        </div>
-
-                        <button type="submit" class="btn btn-primary w-100">
-                            Login
-                        </button>
-                    </form>
-
-                    <div class="text-center mt-3">
-                        <a href="{% url 'password_reset' %}">
-                            Forgot Password?
-                        </a>
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
+                        {{ form.username }}
                     </div>
 
-                    <div class="mt-3 text-center">
-                        <a href="/">Return Home</a>
+                    <div class="mb-4">
+                        <label class="form-label">Password</label>
+                        {{ form.password }}
                     </div>
 
+                    <button type="submit" class="gold-btn">Login</button>
+                </form>
+
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-4">
+                    <a href="{% url 'password_reset' %}" class="message-btn">Forgot Password?</a>
+                    <a href="/" class="message-btn">Home</a>
                 </div>
             </div>
-
         </div>
     </div>
 </div>
