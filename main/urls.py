@@ -1,6 +1,8 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
 from . import views
+from . import owner_views
+from . import landlord_views
 
 urlpatterns = [
     path("", views.home, name="home"),
@@ -33,10 +35,11 @@ urlpatterns = [
     path("password-reset/complete/", auth_views.PasswordResetCompleteView.as_view(
     template_name="password_reset_complete.html"
 ),  name="password_reset_complete"),
-    
 
     path("tenant-dashboard/", views.tenant_dashboard, name="tenant_dashboard"),
     path("landlord-dashboard/", views.landlord_dashboard, name="landlord_dashboard"),
+    path("owner-dashboard/", owner_views.property_owner_dashboard, name="property_owner_dashboard"),
+    path("landlord/create-tenant/", landlord_views.create_tenant, name="landlord_create_tenant"),
     path("landlord-message/<int:message_id>/", views.landlord_message_detail, name="landlord_message_detail"),
 
     path("payment-log/", views.payment_log, name="payment_log"),
@@ -59,7 +62,7 @@ urlpatterns = [
 
     path("lease/sign/", views.lease_sign, name="lease_sign"),
     path("lease/submit/", views.submit_lease_signature, name="submit_lease_signature"),
-    
+
     path("pay/<int:application_id>/", views.create_checkout_session, name="pay_rent"),
     path("pay/<int:application_id>/<str:payment_type>/", views.create_checkout_session, name="pay_by_type"),
 
