@@ -3,235 +3,200 @@
 
 <style>
 .owner-shell {
-    background: #f4f1ea;
+    background: #efe5cb;
     margin: -1rem;
-    padding: 1.5rem;
+    padding: 1.25rem;
     min-height: 100vh;
+    color: #15120b;
+    font-family: inherit;
 }
-
-.owner-hero {
-    background: linear-gradient(135deg, #050505, #181818);
-    color: white;
-    border-radius: 24px;
-    padding: 2rem;
-    box-shadow: 0 14px 34px rgba(0,0,0,0.22);
-    border-bottom: 5px solid #d4af37;
+.owner-header {
+    background: #111;
+    color: #e0bd61;
+    border: 1px solid #9a792d;
+    border-radius: 16px;
+    padding: 1.2rem 1.4rem;
+    margin-bottom: 1rem;
 }
-
-.owner-hero .brand-mark {
-    width: 58px;
-    height: 58px;
-    border-radius: 18px;
-    background: #d4af37;
-    color: #050505;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 900;
-    font-size: 1.4rem;
-    margin-right: 1rem;
-}
-
-.kpi-card,
-.property-card,
+.owner-header p { color: #d9d0bc; }
+.summary-card,
+.property-folder,
 .activity-card {
-    background: #ffffff;
-    border-radius: 22px;
-    border: 1px solid rgba(0,0,0,0.06);
-    box-shadow: 0 10px 26px rgba(0,0,0,0.08);
+    background: #f5ebd3;
+    border: 1px solid #b3913e;
+    border-radius: 16px;
+    box-shadow: 0 6px 16px rgba(65,45,10,.08);
 }
-
-.kpi-card {
-    padding: 1.35rem;
+.summary-card {
+    padding: 1rem;
     height: 100%;
 }
-
-.kpi-label {
-    color: #6c757d;
-    font-size: .85rem;
+.summary-label {
+    color: #5c4a24;
+    font-size: .78rem;
     text-transform: uppercase;
     letter-spacing: .08em;
-    font-weight: 800;
-}
-
-.kpi-value {
-    font-size: 1.7rem;
     font-weight: 900;
-    color: #111;
 }
-
-.property-card {
-    overflow: hidden;
+.summary-value {
+    color: #15120b;
+    font-size: 1.55rem;
+    font-weight: 950;
+}
+.folder-header {
+    background: #171717;
+    color: #e0bd61;
+    border-bottom: 2px solid #9a792d;
+    border-radius: 16px 16px 0 0;
+    padding: 1rem 1.15rem;
+}
+.folder-body { padding: 1rem; }
+.fin-section {
+    background: #ead8ad;
+    border: 1px solid rgba(143,106,24,.55);
+    border-radius: 14px;
+    padding: .85rem;
     height: 100%;
 }
-
-.property-card-header {
-    background: #111;
-    color: #fff;
-    padding: 1.25rem;
-    border-bottom: 4px solid #d4af37;
+.fin-title {
+    color: #15120b;
+    font-weight: 950;
+    font-size: .95rem;
+    margin-bottom: .7rem;
 }
-
-.metric-row {
+.metric-btn {
     display: flex;
     justify-content: space-between;
-    border-bottom: 1px solid #eee;
-    padding: .6rem 0;
-}
-
-.metric-row:last-child {
-    border-bottom: none;
-}
-
-.btn-gold {
-    background: #d4af37;
-    color: #111;
-    border: none;
-    font-weight: 800;
-    border-radius: 999px;
-}
-
-.btn-gold:hover {
-    background: #c39d22;
-    color: #111;
-}
-
-.btn-dark-pill {
-    background: #111;
-    color: #fff;
-    border-radius: 999px;
+    gap: .75rem;
+    width: 100%;
+    text-decoration: none;
+    background: #f8f0dc;
+    border: 1px solid rgba(143,106,24,.55);
+    border-radius: 11px;
+    color: #15120b;
+    padding: .68rem .75rem;
+    margin-bottom: .55rem;
     font-weight: 800;
 }
-
-.btn-dark-pill:hover {
-    background: #333;
-    color: #fff;
+.metric-btn:hover {
+    background: #dfc27e;
+    color: #15120b;
 }
-
-.activity-card {
-    padding: 1.25rem;
+.metric-label { color: #302814; }
+.metric-value { font-weight: 950; white-space: nowrap; }
+.btn-owner {
+    background: #c2a04a;
+    color: #111;
+    border: 1px solid #806116;
+    border-radius: 10px;
+    font-weight: 900;
+    padding: .6rem .9rem;
+    text-decoration: none;
 }
-
+.btn-owner:hover { background: #ae8d38; color: #111; }
+.btn-dark-soft {
+    background: #171717;
+    color: #e0bd61;
+    border: 1px solid #9a792d;
+    border-radius: 10px;
+    font-weight: 800;
+    padding: .55rem .85rem;
+    text-decoration: none;
+}
+.btn-dark-soft:hover { background: #2a2a2a; color: #e0bd61; }
+.activity-card { padding: 1rem; }
 .activity-item {
-    border-bottom: 1px solid #eee;
-    padding: .8rem 0;
+    border-bottom: 1px solid rgba(143,106,24,.25);
+    padding: .7rem 0;
 }
-
-.activity-item:last-child {
-    border-bottom: none;
-}
-
+.activity-item:last-child { border-bottom: none; }
 .empty-state {
-    background: #fff;
-    border-radius: 22px;
-    padding: 2rem;
-    border: 1px dashed #d4af37;
+    background: #f5ebd3;
+    border: 1px dashed #9a792d;
+    border-radius: 16px;
+    padding: 1.25rem;
 }
 </style>
 
 <div class="owner-shell">
-
-    <div class="owner-hero mb-4">
-        <div class="d-flex align-items-center flex-wrap gap-2">
-            <div class="brand-mark">BL</div>
-            <div>
-                <h1 class="fw-bold mb-1">Property Owner Dashboard</h1>
-                <p class="mb-0 text-white-50">Portfolio overview, property performance, resident activity, and financial snapshots.</p>
-            </div>
-        </div>
-    </div>
-
-    <div class="row g-3 mb-4">
-        <div class="col-md-3">
-            <div class="kpi-card">
-                <div class="kpi-label">Properties</div>
-                <div class="kpi-value">{{ total_properties }}</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="kpi-card">
-                <div class="kpi-label">Residents</div>
-                <div class="kpi-value">{{ total_residents }}</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="kpi-card">
-                <div class="kpi-label">Monthly Rent Roll</div>
-                <div class="kpi-value">${{ portfolio_monthly_rent }}</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="kpi-card">
-                <div class="kpi-label">Open Requests</div>
-                <div class="kpi-value">{{ total_open_messages }}</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row g-3 mb-4">
-        <div class="col-md-3">
-            <div class="kpi-card">
-                <div class="kpi-label">Balances Due</div>
-                <div class="kpi-value">${{ portfolio_balances_due }}</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="kpi-card">
-                <div class="kpi-label">Utilities Due</div>
-                <div class="kpi-value">${{ portfolio_utilities_due }}</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="kpi-card">
-                <div class="kpi-label">Deposits Held</div>
-                <div class="kpi-value">${{ portfolio_deposits_held }}</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="kpi-card">
-                <div class="kpi-label">Collected</div>
-                <div class="kpi-value">${{ portfolio_collected }}</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div class="owner-header d-flex justify-content-between align-items-center flex-wrap gap-3">
         <div>
-            <h2 class="fw-bold mb-1">Properties</h2>
-            <p class="text-muted mb-0">Each card opens the operating dashboard for that property as we build the next layer.</p>
+            <h1 class="fw-bold mb-1">Property Owner Dashboard</h1>
+            <p class="mb-0">Portfolio view organized by property financial folders.</p>
         </div>
-        <a href="{% url 'landlord_dashboard' %}" class="btn btn-dark-pill px-4">Landlord Tools</a>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'landlord_dashboard' %}" class="btn-dark-soft">Landlord Operations</a>
+            <a href="{% url 'rent_roll' %}" class="btn-owner">Monthly Rent Roll</a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3 col-sm-6"><div class="summary-card"><div class="summary-label">Properties</div><div class="summary-value">{{ total_properties }}</div></div></div>
+        <div class="col-md-3 col-sm-6"><div class="summary-card"><div class="summary-label">Residents</div><div class="summary-value">{{ total_residents }}</div></div></div>
+        <div class="col-md-3 col-sm-6"><div class="summary-card"><div class="summary-label">Scheduled Rent</div><div class="summary-value">${{ portfolio_monthly_rent }}</div></div></div>
+        <div class="col-md-3 col-sm-6"><div class="summary-card"><div class="summary-label">Collected</div><div class="summary-value">${{ portfolio_collected }}</div></div></div>
+    </div>
+
+    <div class="mb-3">
+        <h2 class="fw-bold mb-1">Property Financials</h2>
+        <p class="text-muted mb-0">Open each property folder to review snapshot, expenses/debt position, and performance. Each item is a reporting button.</p>
     </div>
 
     {% if property_cards %}
-    <div class="row g-4 mb-5">
         {% for card in property_cards %}
-        <div class="col-lg-4 col-md-6">
-            <div class="property-card">
-                <div class="property-card-header">
-                    <h4 class="fw-bold mb-1">{{ card.property.name }}</h4>
-                    <small>{{ card.property.address|default:"No address entered" }}</small>
-                </div>
-                <div class="p-3">
-                    <div class="metric-row"><span>Residents</span><strong>{{ card.resident_count }}</strong></div>
-                    <div class="metric-row"><span>Monthly Rent</span><strong>${{ card.monthly_rent }}</strong></div>
-                    <div class="metric-row"><span>Balances Due</span><strong>${{ card.balances_due }}</strong></div>
-                    <div class="metric-row"><span>Utilities Due</span><strong>${{ card.utilities_due }}</strong></div>
-                    <div class="metric-row"><span>Deposits Held</span><strong>${{ card.deposits_held }}</strong></div>
-                    <div class="metric-row"><span>Total Collected</span><strong>${{ card.total_collected }}</strong></div>
-                    <div class="metric-row"><span>Open Requests</span><strong>{{ card.open_messages }}</strong></div>
-
-                    <div class="d-grid gap-2 mt-3">
-                        <a href="{% url 'property_financials' card.property.name %}" class="btn btn-gold">Open Financials</a>
-                        <a href="{% url 'landlord_dashboard' %}" class="btn btn-outline-dark rounded-pill fw-bold">Open Operations</a>
+        <details class="property-folder mb-4" {% if forloop.first %}open{% endif %}>
+            <summary class="folder-header" style="cursor:pointer; list-style:none;">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <h4 class="fw-bold mb-1">{{ card.property.name }}</h4>
+                        <small style="color:#d9d0bc;">{{ card.property.address|default:"No address entered" }}</small>
+                    </div>
+                    <div class="text-end">
+                        <div class="fw-bold">${{ card.monthly_rent }}</div>
+                        <small style="color:#d9d0bc;">Scheduled Monthly Rent</small>
                     </div>
                 </div>
+            </summary>
+
+            <div class="folder-body">
+                <div class="row g-3">
+                    <div class="col-lg-4">
+                        <div class="fin-section">
+                            <div class="fin-title">Property Snapshot</div>
+                            <a class="metric-btn" href="{% url 'rent_roll' %}"><span class="metric-label">Units / Residents</span><span class="metric-value">{{ card.resident_count }}</span></a>
+                            <a class="metric-btn" href="{% url 'rent_roll' %}"><span class="metric-label">Total Scheduled Rent</span><span class="metric-value">${{ card.monthly_rent }}</span></a>
+                            <a class="metric-btn" href="{% url 'payment_log' %}"><span class="metric-label">Total Collected Rent</span><span class="metric-value">${{ card.total_collected }}</span></a>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-4">
+                        <div class="fin-section">
+                            <div class="fin-title">Expenses & Debt Position</div>
+                            <a class="metric-btn" href="{% url 'property_financials' card.property.name %}"><span class="metric-label">Operating Expenses</span><span class="metric-value">Open</span></a>
+                            <a class="metric-btn" href="{% url 'property_financials' card.property.name %}"><span class="metric-label">Debt Service</span><span class="metric-value">Open</span></a>
+                            <a class="metric-btn" href="{% url 'property_financials' card.property.name %}"><span class="metric-label">Capital Expenses</span><span class="metric-value">Open</span></a>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-4">
+                        <div class="fin-section">
+                            <div class="fin-title">Performance</div>
+                            <a class="metric-btn" href="{% url 'property_financials' card.property.name %}"><span class="metric-label">NOI</span><span class="metric-value">Open</span></a>
+                            <a class="metric-btn" href="{% url 'property_financials' card.property.name %}"><span class="metric-label">Cash Flow After Debt</span><span class="metric-value">Open</span></a>
+                            <a class="metric-btn" href="{% url 'property_financials' card.property.name %}"><span class="metric-label">Occupancy / Collection %</span><span class="metric-value">Open</span></a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 flex-wrap mt-3">
+                    <a href="{% url 'property_financials' card.property.name %}" class="btn-owner">Open {{ card.property.name }} Financials</a>
+                    <a href="{% url 'landlord_dashboard' %}" class="btn-dark-soft">Open Landlord Operations</a>
+                </div>
             </div>
-        </div>
+        </details>
         {% endfor %}
-    </div>
     {% else %}
-        <div class="empty-state mb-5">
+        <div class="empty-state mb-4">
             <h4 class="fw-bold">No properties are connected to this owner yet.</h4>
             <p class="text-muted mb-0">Set the property owner email to match this user's login email, or log in as an admin to view all properties.</p>
         </div>
@@ -240,28 +205,17 @@
     <div class="activity-card">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
             <h3 class="fw-bold mb-0">Recent Resident Activity</h3>
-            <a href="{% url 'landlord_dashboard' %}" class="btn btn-sm btn-dark-pill px-3">View Inbox</a>
+            <a href="{% url 'landlord_dashboard' %}" class="btn-dark-soft">View Inbox</a>
         </div>
-
         {% for item in recent_messages %}
             <div class="activity-item">
-                <div class="d-flex justify-content-between flex-wrap gap-2">
-                    <div>
-                        <strong>{{ item.subject }}</strong>
-                        <div class="text-muted small">
-                            {{ item.application.property.name }} · {{ item.application.full_name }} · {{ item.get_message_type_display }}
-                        </div>
-                    </div>
-                    <span class="badge {% if item.status == 'submitted' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
-                        {{ item.get_status_display }}
-                    </span>
-                </div>
+                <strong>{{ item.subject }}</strong>
+                <div class="text-muted small">{{ item.application.property.name }} · {{ item.application.full_name }} · {{ item.get_message_type_display }}</div>
             </div>
         {% empty %}
             <p class="text-muted mb-0">No recent resident messages or requests.</p>
         {% endfor %}
     </div>
-
 </div>
 
 {% endblock %}
