@@ -136,8 +136,8 @@ class HousingApplication(models.Model):
     monthly_rent = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     rent_due_day = models.IntegerField(default=1)
-    
-    
+    lease_start_date = models.DateField(blank=True, null=True)
+
     deposit_required = models.DecimalField(max_digits=10, decimal_places=2, default=450.00)
     deposit_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
 
@@ -365,8 +365,7 @@ class SignedDocument(models.Model):
             self.utility_fee = self.application.utility_monthly
 
             self.security_deposit = self.application.deposit_required
-            
-            
+
             self.room_space = (
                 f"{self.application.space_type} "
                 f"{self.application.space_label}"
@@ -375,11 +374,12 @@ class SignedDocument(models.Model):
             if self.application.property:
                 self.property_name = self.application.property.name
                 self.property_address = self.application.property.address
-                
-            if not self.lease_start_date:
+
+            if self.application.lease_start_date:
+                self.lease_start_date = self.application.lease_start_date
+            elif not self.lease_start_date:
                 self.lease_start_date = timezone.now().date()
 
-     
         super().save(*args, **kwargs)
 
 
