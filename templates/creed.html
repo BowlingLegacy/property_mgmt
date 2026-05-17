@@ -11,30 +11,51 @@
 
     <style>
         body {
-            font-family: Tahoma, sans-serif;
-            background: #f2efe8;
-            color: #2c2c2c;
+            background: linear-gradient(180deg, #faf6ee 0%, #f2ead9 100%);
+            color: #1f1f1f;
+            min-height: 100vh;
+        }
+
+        .topbar {
+            background: rgba(255,255,255,0.9);
+            border-bottom: 1px solid rgba(188,150,45,0.22);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+        }
+
+        .brand-link {
+            font-family: Georgia, serif;
+            color: #1c1c1c;
+            font-weight: 700;
+            text-decoration: none;
+            font-size: 1.2rem;
+        }
+
+        .brand-logo {
+            height: 58px;
+            width: auto;
+            margin-right: 12px;
         }
 
         .page-wrap {
-            max-width: 900px;
+            max-width: 980px;
             margin: 40px auto;
             padding: 20px;
         }
 
         .creed-paper {
-            background: #fffdf5;
-            border: 8px solid #1e3a5f;
-            outline: 3px solid #d4af37;
-            padding: 50px;
-            box-shadow: 0 12px 35px rgba(0,0,0,0.25);
-            border-radius: 8px;
+            background: rgba(255,255,255,0.88);
+            border: 1px solid rgba(188,150,45,0.18);
+            border-radius: 20px;
+            padding: 48px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.06);
         }
 
         .creed-title {
             text-align: center;
-            color: #1e3a5f;
-            font-weight: 800;
+            font-family: Georgia, serif;
+            color: #1c1c1c;
+            font-size: 3rem;
+            font-weight: 700;
             margin-bottom: 10px;
         }
 
@@ -47,8 +68,9 @@
 
         .creed-list li {
             margin-bottom: 14px;
-            font-size: 1.1rem;
-            line-height: 1.6;
+            font-size: 1.08rem;
+            line-height: 1.65;
+            color: #333;
         }
 
         .signature {
@@ -56,53 +78,52 @@
             text-align: center;
             font-style: italic;
             color: #444;
+            border-top: 1px solid rgba(188,150,45,0.25);
+            padding-top: 24px;
         }
 
-        .print-btn {
+        .button-row {
             margin-top: 25px;
             text-align: center;
         }
 
-        .btn-print {
-            background: linear-gradient(135deg, #d4af37, #f5d76e);
-            color: #1e3a5f;
-            border: 2px solid white;
-            border-radius: 999px;
-            padding: 10px 22px;
+        .gold-btn {
+            background: linear-gradient(135deg, #c48f22, #d8ab3b);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 0.8rem 1rem;
             font-weight: 700;
-            box-shadow: 0 4px 0 rgba(0,0,0,0.25);
+            text-decoration: none;
+            display: inline-flex;
+            justify-content: center;
         }
 
-        .btn-home {
-            background: #1e3a5f;
-            color: white;
-            border: 2px solid white;
-            border-radius: 999px;
-            padding: 10px 22px;
+        .message-btn {
+            background: transparent;
+            border: 1px solid #c59a32;
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+            color: #a57c18;
             font-weight: 700;
-            box-shadow: 0 4px 0 rgba(0,0,0,0.25);
             text-decoration: none;
+            display: inline-flex;
+            justify-content: center;
         }
 
         @media print {
+            .topbar,
+            .button-row {
+                display: none;
+            }
+
             body {
                 background: white;
             }
 
-            .print-btn {
-                display: none;
-            }
-
-            .page-wrap {
-                margin: 0;
-                max-width: 100%;
-            }
-
             .creed-paper {
                 box-shadow: none;
-                border: 5px solid #000;
-                outline: none;
-                page-break-inside: avoid;
+                border: 1px solid #999;
             }
         }
     </style>
@@ -110,12 +131,22 @@
 
 <body>
 
+<nav class="topbar py-3">
+    <div class="container d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <a class="brand-link d-flex align-items-center" href="/">
+            <img src="/static/images/bl-logo.png" class="brand-logo" alt="Bowling Legacy">
+            Bowling Legacy
+        </a>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="/" class="message-btn">Home</a>
+            <a href="{% url 'login' %}?next={% url 'tenant_dashboard' %}" class="message-btn">Portal</a>
+        </div>
+    </div>
+</nav>
+
 <div class="page-wrap">
-
     <div class="creed-paper">
-
         <h1 class="creed-title">The Creed</h1>
-
         <p class="creed-subtitle">
             Created by TRMF — a personal code of principles and values lived by for over 25 years.
         </p>
@@ -139,19 +170,15 @@
         </ol>
 
         <div class="signature">
-            <p>
-                These principles have helped shape my life, my decisions, and the way I serve others.
-            </p>
+            <p>These principles have helped shape my life, my decisions, and the way I serve others.</p>
             <p><strong>— TRMF</strong></p>
         </div>
-
     </div>
 
-    <div class="print-btn">
-        <button onclick="window.print()" class="btn-print">Print The Creed</button>
-        <a href="/" class="btn-home ms-2">Back Home</a>
+    <div class="button-row d-flex justify-content-center gap-2 flex-wrap">
+        <button onclick="window.print()" class="gold-btn">Print The Creed</button>
+        <a href="/" class="message-btn">Back Home</a>
     </div>
-
 </div>
 
 </body>
