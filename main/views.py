@@ -61,7 +61,13 @@ def home(request):
     properties = Property.objects.all()
     posts = BlogPost.objects.all().order_by("-created_at")[:5]
     return render(request, "home.html", {"properties": properties, "posts": posts})
+    
+def properties_list(request):
+    properties = Property.objects.all().order_by("name")
 
+    return render(request, "properties.html", {
+        "properties": properties,
+    })
 
 def creed(request):
     return render(request, "creed.html")
