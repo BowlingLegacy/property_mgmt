@@ -2,168 +2,270 @@
 
 {% block content %}
 
-<div class="soft-card p-4 p-lg-5">
+<style>
+    .admin-hero {
+        background: #080808;
+        border: 2px solid #c59a32;
+        border-radius: 24px;
+        padding: 1rem;
+        box-shadow: 0 16px 38px rgba(0,0,0,.16);
+        margin-bottom: 1.5rem;
+    }
 
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
-        <div>
-            <h1 class="section-title mb-1">
-                Super Admin Control Center
-            </h1>
+    .admin-hero-inner {
+        background: rgba(255,255,255,0.94);
+        border-radius: 18px;
+        padding: 1.6rem;
+    }
 
-            <p class="text-muted mb-0">
-                Central platform operations, reporting, and system management.
-            </p>
+    .admin-kicker {
+        color: #a57c18;
+        letter-spacing: 4px;
+        text-transform: uppercase;
+        font-size: .72rem;
+        font-weight: 800;
+    }
+
+    .admin-card-link {
+        text-decoration: none;
+        color: inherit;
+        display: block;
+        height: 100%;
+    }
+
+    .admin-card-link:hover .soft-card {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 26px rgba(0,0,0,0.10);
+    }
+
+    .admin-card-link .soft-card {
+        transition: all .2s ease;
+    }
+
+    .admin-label {
+        color: #a57c18;
+        font-weight: 800;
+        font-size: .78rem;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+    }
+
+    .admin-value {
+        font-family: Georgia, serif;
+        font-size: 2rem;
+        font-weight: 700;
+        color: #111;
+    }
+</style>
+
+<div class="admin-hero">
+    <div class="admin-hero-inner">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+                <div class="admin-kicker">Platform Mission Control</div>
+                <h1 class="section-title mb-1">Super Admin Control Center</h1>
+                <p class="text-muted mb-0">
+                    Central access for testing, dashboards, public pages, reports, resident files, and system operations.
+                </p>
+            </div>
+
+            <span class="badge text-bg-dark p-3">Super Admin Access</span>
         </div>
+    </div>
+</div>
 
-        <div>
-            <span class="badge text-bg-dark p-3">
-                Super Admin Access
-            </span>
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="soft-card p-4 h-100">
+            <div class="admin-label">Properties</div>
+            <div class="admin-value">{{ properties.count }}</div>
+            <div class="text-muted">Public and managed properties</div>
         </div>
     </div>
 
-    <div class="row g-4">
+    <div class="col-md-4">
+        <div class="soft-card p-4 h-100">
+            <div class="admin-label">Users</div>
+            <div class="admin-value">{{ users.count }}</div>
+            <div class="text-muted">Portal and system users</div>
+        </div>
+    </div>
 
-        <div class="col-lg-3 col-md-6">
+    <div class="col-md-4">
+        <div class="soft-card p-4 h-100">
+            <div class="admin-label">Resident Files</div>
+            <div class="admin-value">{{ applications.count }}</div>
+            <div class="text-muted">Applications / resident records</div>
+        </div>
+    </div>
+</div>
+
+<h2 class="section-title mb-3">Core Workspaces</h2>
+
+<div class="row g-4 mb-5">
+    <div class="col-lg-3 col-md-6">
+        <a href="{% url 'tenant_dashboard' %}" class="admin-card-link">
             <div class="soft-card p-4 h-100">
                 <h5 class="card-title">Tenant Dashboard</h5>
-
-                <p class="text-muted">
-                    View resident-facing experience and portal workflows.
-                </p>
-
-                <a href="{% url 'tenant_dashboard' %}"
-                   class="gold-btn">
-                    Open
-                </a>
+                <p class="text-muted">Test the resident portal, payments, messages, and document flow.</p>
+                <span class="gold-btn">Open</span>
             </div>
-        </div>
+        </a>
+    </div>
 
-        <div class="col-lg-3 col-md-6">
+    <div class="col-lg-3 col-md-6">
+        <a href="{% url 'landlord_dashboard' %}" class="admin-card-link">
             <div class="soft-card p-4 h-100">
                 <h5 class="card-title">Landlord Dashboard</h5>
-
-                <p class="text-muted">
-                    Access operations, resident files, and maintenance workflows.
-                </p>
-
-                <a href="{% url 'landlord_dashboard' %}"
-                   class="gold-btn">
-                    Open
-                </a>
+                <p class="text-muted">Operations, resident files, onboarding, maintenance, and messages.</p>
+                <span class="gold-btn">Open</span>
             </div>
-        </div>
+        </a>
+    </div>
 
-        <div class="col-lg-3 col-md-6">
+    <div class="col-lg-3 col-md-6">
+        <a href="{% url 'property_owner_dashboard' %}" class="admin-card-link">
             <div class="soft-card p-4 h-100">
-                <h5 class="card-title">Property Owner Dashboard</h5>
-
-                <p class="text-muted">
-                    Review financials, NOI, cashflow, and property snapshots.
-                </p>
-
-                <a href="{% url 'property_owner_dashboard' %}"
-                   class="gold-btn">
-                    Open
-                </a>
+                <h5 class="card-title">Owner Dashboard</h5>
+                <p class="text-muted">Property financial folders, rent, expenses, and performance metrics.</p>
+                <span class="gold-btn">Open</span>
             </div>
-        </div>
+        </a>
+    </div>
 
-        <div class="col-lg-3 col-md-6">
+    <div class="col-lg-3 col-md-6">
+        <a href="/admin/" class="admin-card-link">
+            <div class="soft-card p-4 h-100">
+                <h5 class="card-title">Django Admin</h5>
+                <p class="text-muted">Superuser-only backend access for records and system maintenance.</p>
+                <span class="gold-btn">Open</span>
+            </div>
+        </a>
+    </div>
+</div>
+
+<h2 class="section-title mb-3">Public Site & Property Experience</h2>
+
+<div class="row g-4 mb-5">
+    <div class="col-lg-3 col-md-6">
+        <a href="/" class="admin-card-link">
             <div class="soft-card p-4 h-100">
                 <h5 class="card-title">Homepage</h5>
-
-                <p class="text-muted">
-                    Review public-facing branding and property presentation.
-                </p>
-
-                <a href="/"
-                   class="gold-btn">
-                    Open
-                </a>
+                <p class="text-muted">Review the public brand landing page.</p>
+                <span class="message-btn">Open</span>
             </div>
-        </div>
-
+        </a>
     </div>
 
-    <hr class="my-5">
-
-    <div class="row g-4">
-
-        <div class="col-lg-4">
+    <div class="col-lg-3 col-md-6">
+        <a href="{% url 'properties_list' %}" class="admin-card-link">
             <div class="soft-card p-4 h-100">
-                <h4 class="card-title">
-                    Platform Totals
-                </h4>
-
-                <ul class="list-group mt-3">
-                    <li class="list-group-item d-flex justify-content-between">
-                        <span>Properties</span>
-                        <strong>{{ properties.count }}</strong>
-                    </li>
-
-                    <li class="list-group-item d-flex justify-content-between">
-                        <span>Users</span>
-                        <strong>{{ users.count }}</strong>
-                    </li>
-
-                    <li class="list-group-item d-flex justify-content-between">
-                        <span>Applications</span>
-                        <strong>{{ applications.count }}</strong>
-                    </li>
-                </ul>
+                <h5 class="card-title">Properties Page</h5>
+                <p class="text-muted">Review all public property cards.</p>
+                <span class="message-btn">Open</span>
             </div>
-        </div>
-
-        <div class="col-lg-8">
-            <div class="soft-card p-4 h-100">
-
-                <h4 class="card-title mb-4">
-                    Property Overview
-                </h4>
-
-                <div class="table-responsive">
-
-                    <table class="table align-middle">
-
-                        <thead>
-                            <tr>
-                                <th>Property</th>
-                                <th>Description</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-
-                            {% for property in properties %}
-                            <tr>
-                                <td>
-                                    <strong>{{ property.name }}</strong>
-                                </td>
-
-                                <td>
-                                    {{ property.description|truncatewords:18 }}
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="2">
-                                    No properties found.
-                                </td>
-                            </tr>
-                            {% endfor %}
-
-                        </tbody>
-
-                    </table>
-
-                </div>
-
-            </div>
-        </div>
-
+        </a>
     </div>
 
+    <div class="col-lg-3 col-md-6">
+        <a href="/creed/" class="admin-card-link">
+            <div class="soft-card p-4 h-100">
+                <h5 class="card-title">The Creed</h5>
+                <p class="text-muted">Review the framed Creed page and branding.</p>
+                <span class="message-btn">Open</span>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-lg-3 col-md-6">
+        <a href="{% url 'login' %}" class="admin-card-link">
+            <div class="soft-card p-4 h-100">
+                <h5 class="card-title">Portal Login</h5>
+                <p class="text-muted">Test the public login gateway.</p>
+                <span class="message-btn">Open</span>
+            </div>
+        </a>
+    </div>
+</div>
+
+<h2 class="section-title mb-3">Financial & Reporting</h2>
+
+<div class="row g-4 mb-5">
+    <div class="col-lg-3 col-md-6">
+        <a href="{% url 'payment_log' %}" class="admin-card-link">
+            <div class="soft-card p-4 h-100">
+                <h5 class="card-title">Payment Log</h5>
+                <p class="text-muted">Review payments and Stripe activity.</p>
+                <span class="gold-btn">Open</span>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-lg-3 col-md-6">
+        <a href="{% url 'rent_roll' %}" class="admin-card-link">
+            <div class="soft-card p-4 h-100">
+                <h5 class="card-title">Rent Roll</h5>
+                <p class="text-muted">Review residents, rent, and balances.</p>
+                <span class="gold-btn">Open</span>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-lg-3 col-md-6">
+        <a href="{% url 't12_report' %}" class="admin-card-link">
+            <div class="soft-card p-4 h-100">
+                <h5 class="card-title">T-12 Report</h5>
+                <p class="text-muted">Review trailing twelve month reporting.</p>
+                <span class="gold-btn">Open</span>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-lg-3 col-md-6">
+        <a href="{% url 'financial_upload' %}" class="admin-card-link">
+            <div class="soft-card p-4 h-100">
+                <h5 class="card-title">Financial Upload</h5>
+                <p class="text-muted">Upload and parse operating/debt expenses.</p>
+                <span class="gold-btn">Open</span>
+            </div>
+        </a>
+    </div>
+</div>
+
+<div class="soft-card p-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+        <div>
+            <h2 class="section-title mb-1">Property Overview</h2>
+            <p class="text-muted mb-0">Quick links into each public property page and financial view.</p>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Property</th>
+                    <th>Description</th>
+                    <th>Public Page</th>
+                    <th>Financials</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for property in properties %}
+                <tr>
+                    <td><strong>{{ property.name }}</strong></td>
+                    <td>{{ property.description|truncatewords:18 }}</td>
+                    <td><a href="{% url 'property_detail' property.pk %}" class="message-btn">Open</a></td>
+                    <td><a href="{% url 'property_financials' property.name %}" class="gold-btn">Open</a></td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4">No properties found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 
 {% endblock %}
