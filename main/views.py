@@ -171,8 +171,29 @@ def landlord_dashboard(request):
         "landlord_inbox": landlord_inbox,
         "new_message_count": new_message_count,
     })
+    
+@login_required
+@user_passes_test(staff_required)
+def superadmin_dashboard(request):
 
+    if not request.user.is_superuser and request.user.role != "admin":
+        return redirect("tenant_dashboard")
 
+    properties = Property.objects.all()
+    users = User.objects.all()
+    applications = HousingApplication.objects.all()
+
+    context = {
+        "properties": properties,
+        "users": users,
+        "applications": applications,
+    }
+
+    return render(
+        request,
+        "superadmin_dashboard.html",
+        context
+    )
 @login_required
 @user_passes_test(staff_required)
 def landlord_message_detail(request, message_id):
