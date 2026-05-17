@@ -17,44 +17,56 @@
         }
 
         .topbar {
-            background: rgba(255,255,255,0.9);
-            border-bottom: 1px solid rgba(188,150,45,0.22);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+            background: #070707;
+            border-bottom: 2px solid #c59a32;
+            box-shadow: 0 8px 22px rgba(0,0,0,0.18);
         }
 
         .brand-link {
             font-family: Georgia, serif;
-            color: #1c1c1c;
+            color: #f6ead1;
             font-weight: 700;
             text-decoration: none;
-            font-size: 1.2rem;
+            font-size: 1.25rem;
+        }
+
+        .brand-link:hover {
+            color: #f6ead1;
         }
 
         .brand-logo {
-            height: 58px;
+            height: 68px;
             width: auto;
-            margin-right: 12px;
+            margin-right: 14px;
         }
 
         .page-wrap {
-            max-width: 980px;
+            max-width: 1000px;
             margin: 40px auto;
             padding: 20px;
         }
 
+        .creed-frame {
+            background: #080808;
+            border: 2px solid #c59a32;
+            border-radius: 24px;
+            padding: 18px;
+            box-shadow: 0 14px 34px rgba(0,0,0,0.18);
+        }
+
         .creed-paper {
-            background: rgba(255,255,255,0.88);
-            border: 1px solid rgba(188,150,45,0.18);
-            border-radius: 20px;
+            background: rgba(255,255,255,0.94);
+            border: 1px solid rgba(188,150,45,0.28);
+            border-radius: 18px;
             padding: 48px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+            box-shadow: inset 0 0 0 1px rgba(197,154,50,0.08);
         }
 
         .creed-title {
             text-align: center;
             font-family: Georgia, serif;
             color: #1c1c1c;
-            font-size: 3rem;
+            font-size: 3.1rem;
             font-weight: 700;
             margin-bottom: 10px;
         }
@@ -78,7 +90,7 @@
             text-align: center;
             font-style: italic;
             color: #444;
-            border-top: 1px solid rgba(188,150,45,0.25);
+            border-top: 1px solid rgba(188,150,45,0.3);
             padding-top: 24px;
         }
 
@@ -104,11 +116,34 @@
             border: 1px solid #c59a32;
             border-radius: 12px;
             padding: 0.75rem 1rem;
-            color: #a57c18;
+            color: #c59a32;
             font-weight: 700;
             text-decoration: none;
             display: inline-flex;
             justify-content: center;
+        }
+
+        .topbar .message-btn:hover {
+            color: #f6ead1;
+            background: rgba(197,154,50,0.12);
+        }
+
+        .button-row .message-btn {
+            color: #a57c18;
+        }
+
+        @media (max-width: 768px) {
+            .creed-paper {
+                padding: 28px;
+            }
+
+            .creed-title {
+                font-size: 2.25rem;
+            }
+
+            .brand-logo {
+                height: 56px;
+            }
         }
 
         @media print {
@@ -119,6 +154,13 @@
 
             body {
                 background: white;
+            }
+
+            .creed-frame {
+                background: white;
+                border: none;
+                box-shadow: none;
+                padding: 0;
             }
 
             .creed-paper {
@@ -133,52 +175,80 @@
 
 <nav class="topbar py-3">
     <div class="container d-flex justify-content-between align-items-center flex-wrap gap-3">
+
         <a class="brand-link d-flex align-items-center" href="/">
-            <img src="/static/images/bl-logo.png" class="brand-logo" alt="Bowling Legacy">
+            <img src="/static/images/bl-logo.png"
+                 class="brand-logo"
+                 alt="Bowling Legacy">
             Bowling Legacy
         </a>
+
         <div class="d-flex gap-2 flex-wrap">
             <a href="/" class="message-btn">Home</a>
-            <a href="{% url 'login' %}?next={% url 'tenant_dashboard' %}" class="message-btn">Portal</a>
+
+            <a href="{% url 'login' %}?next={% url 'tenant_dashboard' %}"
+               class="message-btn">
+                Portal
+            </a>
         </div>
+
     </div>
 </nav>
 
 <div class="page-wrap">
-    <div class="creed-paper">
-        <h1 class="creed-title">The Creed</h1>
-        <p class="creed-subtitle">
-            Created by TRMF — a personal code of principles and values lived by for over 25 years.
-        </p>
 
-        <ol class="creed-list">
-            <li>Always do the right thing, even when no one is looking.</li>
-            <li>Protect and serve those unable to protect and serve themselves.</li>
-            <li>Don't let hate take root in your heart; life is too short for negativity.</li>
-            <li>Always be respectful to and of others.</li>
-            <li>Forgive and move on; don't harbor ill will.</li>
-            <li>Don't lie — you only deceive yourself.</li>
-            <li>Be part of the solution, not the problem.</li>
-            <li>Help your brother or sister whenever you can.</li>
-            <li>Remember: the best leaders are the best followers first.</li>
-            <li>Make everyone around you important, and you become important to them.</li>
-            <li>Be thankful for each day — even the worst ones.</li>
-            <li>Listen to understand, not to respond.</li>
-            <li>Be the one who makes things happen.</li>
-            <li>Never break a promise.</li>
-            <li>Believe in a life without hate or anger; there is something positive in every situation.</li>
-        </ol>
+    <div class="creed-frame">
 
-        <div class="signature">
-            <p>These principles have helped shape my life, my decisions, and the way I serve others.</p>
-            <p><strong>— TRMF</strong></p>
+        <div class="creed-paper">
+
+            <h1 class="creed-title">The Creed</h1>
+
+            <p class="creed-subtitle">
+                Created by TRMF — a personal code of principles and values lived by for over 25 years.
+            </p>
+
+            <ol class="creed-list">
+                <li>Always do the right thing, even when no one is looking.</li>
+                <li>Protect and serve those unable to protect and serve themselves.</li>
+                <li>Don't let hate take root in your heart; life is too short for negativity.</li>
+                <li>Always be respectful to and of others.</li>
+                <li>Forgive and move on; don't harbor ill will.</li>
+                <li>Don't lie — you only deceive yourself.</li>
+                <li>Be part of the solution, not the problem.</li>
+                <li>Help your brother or sister whenever you can.</li>
+                <li>Remember: the best leaders are the best followers first.</li>
+                <li>Make everyone around you important, and you become important to them.</li>
+                <li>Be thankful for each day — even the worst ones.</li>
+                <li>Listen to understand, not to respond.</li>
+                <li>Be the one who makes things happen.</li>
+                <li>Never break a promise.</li>
+                <li>Believe in a life without hate or anger; there is something positive in every situation.</li>
+            </ol>
+
+            <div class="signature">
+                <p>
+                    These principles have helped shape my life, my decisions, and the way I serve others.
+                </p>
+
+                <p><strong>— TRMF</strong></p>
+            </div>
+
         </div>
+
     </div>
 
     <div class="button-row d-flex justify-content-center gap-2 flex-wrap">
-        <button onclick="window.print()" class="gold-btn">Print The Creed</button>
-        <a href="/" class="message-btn">Back Home</a>
+
+        <button onclick="window.print()" class="gold-btn">
+            Print The Creed
+        </button>
+
+        <a href="/" class="message-btn">
+            Back Home
+        </a>
+
     </div>
+
 </div>
 
 </body>
