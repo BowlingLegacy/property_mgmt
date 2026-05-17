@@ -14,7 +14,7 @@ urlpatterns = [
     path("enter-invite-code/", views.enter_invite_code, name="enter_invite_code"),
 
     path("signup/", views.signup, name="signup"),
-    path("login/", auth_views.LoginView.as_view(template_name="login.html"), name="login"),
+    path("login/", views.role_login, name="login"),
     path("logout/", views.logout_view, name="logout"),
 
     path("password-reset/", auth_views.PasswordResetView.as_view(
