@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="soft-card p-4 p-lg-5">
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+        <div>
+            <h1 class="section-title mb-1">
+                Super Admin Control Center
+            </h1>
+
+            <p class="text-muted mb-0">
+                Central platform operations, reporting, and system management.
+            </p>
+        </div>
+
+        <div>
+            <span class="badge text-bg-dark p-3">
+                Super Admin Access
+            </span>
+        </div>
+    </div>
+
+    <div class="row g-4">
+
+        <div class="col-lg-3 col-md-6">
+            <div class="soft-card p-4 h-100">
+                <h5 class="card-title">Tenant Dashboard</h5>
+
+                <p class="text-muted">
+                    View resident-facing experience and portal workflows.
+                </p>
+
+                <a href="{% url 'tenant_dashboard' %}"
+                   class="gold-btn">
+                    Open
+                </a>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <div class="soft-card p-4 h-100">
+                <h5 class="card-title">Landlord Dashboard</h5>
+
+                <p class="text-muted">
+                    Access operations, resident files, and maintenance workflows.
+                </p>
+
+                <a href="{% url 'landlord_dashboard' %}"
+                   class="gold-btn">
+                    Open
+                </a>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <div class="soft-card p-4 h-100">
+                <h5 class="card-title">Property Owner Dashboard</h5>
+
+                <p class="text-muted">
+                    Review financials, NOI, cashflow, and property snapshots.
+                </p>
+
+                <a href="{% url 'property_owner_dashboard' %}"
+                   class="gold-btn">
+                    Open
+                </a>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <div class="soft-card p-4 h-100">
+                <h5 class="card-title">Homepage</h5>
+
+                <p class="text-muted">
+                    Review public-facing branding and property presentation.
+                </p>
+
+                <a href="/"
+                   class="gold-btn">
+                    Open
+                </a>
+            </div>
+        </div>
+
+    </div>
+
+    <hr class="my-5">
+
+    <div class="row g-4">
+
+        <div class="col-lg-4">
+            <div class="soft-card p-4 h-100">
+                <h4 class="card-title">
+                    Platform Totals
+                </h4>
+
+                <ul class="list-group mt-3">
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Properties</span>
+                        <strong>{{ properties.count }}</strong>
+                    </li>
+
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Users</span>
+                        <strong>{{ users.count }}</strong>
+                    </li>
+
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Applications</span>
+                        <strong>{{ applications.count }}</strong>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="soft-card p-4 h-100">
+
+                <h4 class="card-title mb-4">
+                    Property Overview
+                </h4>
+
+                <div class="table-responsive">
+
+                    <table class="table align-middle">
+
+                        <thead>
+                            <tr>
+                                <th>Property</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                            {% for property in properties %}
+                            <tr>
+                                <td>
+                                    <strong>{{ property.name }}</strong>
+                                </td>
+
+                                <td>
+                                    {{ property.description|truncatewords:18 }}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="2">
+                                    No properties found.
+                                </td>
+                            </tr>
+                            {% endfor %}
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
