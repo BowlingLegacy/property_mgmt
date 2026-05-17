@@ -356,11 +356,9 @@
         <nav class="nav-wrap d-flex gap-2 flex-wrap align-items-center">
             <a href="/" class="nav-link-bl active">Home</a>
             <a href="/creed/" class="nav-link-bl">The Creed</a>
-            {% if properties %}
-                {% for property in properties|slice:":1" %}
-                    <a href="{% url 'property_detail' property.pk %}" class="nav-link-bl">Painted Lady</a>
-                {% endfor %}
-            {% endif %}
+            <a href="{% url 'properties_list' %}" class="dark-btn">
+                View Properties
+            </a>
             <a href="{% url 'login' %}?next={% url 'tenant_dashboard' %}" class="nav-link-bl">Portal</a>
         </nav>
     </div>
