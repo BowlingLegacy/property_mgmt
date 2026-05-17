@@ -6,6 +6,7 @@ from . import landlord_views
 
 urlpatterns = [
     path("", views.home, name="home"),
+    path("properties/", views.properties_list, name="properties_list"),
     path("creed/", views.creed, name="creed"),
 
     path("apply/", views.apply, name="apply"),
