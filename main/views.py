@@ -182,13 +182,20 @@ def superadmin_dashboard(request):
     properties = Property.objects.all()
     users = User.objects.all()
     applications = HousingApplication.objects.all()
-
+    
+    recent_messages = (
+    ResidentMessage.objects
+    .select_related("application", "application__property")
+    .all()
+    .order_by("-created_at")[:10]
+)
+    
     context = {
-        "properties": properties,
-        "users": users,
-        "applications": applications,
-    }
-
+    "properties": properties,
+    "users": users,
+    "applications": applications,
+    "recent_messages": recent_messages,
+}
     return render(
         request,
         "superadmin_dashboard.html",
