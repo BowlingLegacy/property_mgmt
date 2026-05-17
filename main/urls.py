@@ -3,6 +3,7 @@ from django.contrib.auth import views as auth_views
 from . import views
 from . import owner_views
 from . import landlord_views
+from . import auth_views as portal_auth_views
 
 urlpatterns = [
     path("", views.home, name="home"),
@@ -14,32 +15,33 @@ urlpatterns = [
     path("enter-invite-code/", views.enter_invite_code, name="enter_invite_code"),
 
     path("signup/", views.signup, name="signup"),
-    path("login/", views.role_login, name="login"),
+    path("login/", portal_auth_views.role_login, name="login"),
     path("logout/", views.logout_view, name="logout"),
 
     path("password-reset/", auth_views.PasswordResetView.as_view(
-    template_name="password_reset.html",
-    email_template_name="password_reset_email.html",
-    subject_template_name="password_reset_subject.txt",
-    success_url="/password-reset/done/"
-),  name="password_reset"),
+        template_name="password_reset.html",
+        email_template_name="password_reset_email.html",
+        subject_template_name="password_reset_subject.txt",
+        success_url="/password-reset/done/"
+    ), name="password_reset"),
 
     path("password-reset/done/", auth_views.PasswordResetDoneView.as_view(
-    template_name="password_reset_done.html"
-),  name="password_reset_done"),
+        template_name="password_reset_done.html"
+    ), name="password_reset_done"),
 
     path("password-reset-confirm/<uidb64>/<token>/", auth_views.PasswordResetConfirmView.as_view(
-    template_name="password_reset_confirm.html",
-    success_url="/password-reset/complete/"
-),  name="password_reset_confirm"),
+        template_name="password_reset_confirm.html",
+        success_url="/password-reset/complete/"
+    ), name="password_reset_confirm"),
 
     path("password-reset/complete/", auth_views.PasswordResetCompleteView.as_view(
-    template_name="password_reset_complete.html"
-),  name="password_reset_complete"),
+        template_name="password_reset_complete.html"
+    ), name="password_reset_complete"),
 
     path("tenant-dashboard/", views.tenant_dashboard, name="tenant_dashboard"),
     path("landlord-dashboard/", views.landlord_dashboard, name="landlord_dashboard"),
     path("owner-dashboard/", owner_views.property_owner_dashboard, name="property_owner_dashboard"),
+    path("superadmin-dashboard/", views.superadmin_dashboard, name="superadmin_dashboard"),
     path("landlord/create-tenant/", landlord_views.create_tenant, name="landlord_create_tenant"),
     path("landlord-message/<int:message_id>/", views.landlord_message_detail, name="landlord_message_detail"),
 
