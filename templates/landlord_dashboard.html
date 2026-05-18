@@ -88,13 +88,19 @@ body {
     color: #fff;
 }
 
-.ops-main { min-width: 0; }
+.ops-main {
+    min-width: 0;
+}
 
-.ops-hero {
+.ops-hero,
+.soft-card {
     background: rgba(255,255,255,0.88);
     border: 1px solid rgba(188,150,45,0.12);
     border-radius: 20px;
     box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+}
+
+.ops-hero {
     padding: 1.5rem;
     margin-bottom: 1.5rem;
 }
@@ -120,13 +126,6 @@ body {
 .ops-text {
     color: #555;
     font-size: 1.05rem;
-}
-
-.soft-card {
-    background: rgba(255,255,255,0.88);
-    border: 1px solid rgba(188,150,45,0.12);
-    border-radius: 20px;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.06);
 }
 
 .kpi-card {
@@ -155,39 +154,54 @@ body {
     color: #1c1c1c;
 }
 
-.card-title { font-size: 1.45rem; }
-.section-title { font-size: 1.7rem; }
+.card-title {
+    font-size: 1.45rem;
+}
+
+.section-title {
+    font-size: 1.7rem;
+}
 
 .gold-btn {
     background: linear-gradient(135deg, #c48f22, #d8ab3b);
     color: white;
     border: none;
     border-radius: 10px;
-    padding: .75rem 1rem;
+    padding: .65rem 1rem;
     font-weight: 700;
     text-decoration: none;
     display: inline-flex;
     justify-content: center;
+    align-items: center;
 }
 
-.gold-btn:hover { color: white; filter: brightness(.96); }
+.gold-btn:hover {
+    color: white;
+    filter: brightness(.96);
+}
 
 .message-btn {
     background: transparent;
     border: 1px solid #c59a32;
-    border-radius: 12px;
-    padding: .75rem 1rem;
+    border-radius: 10px;
+    padding: .65rem 1rem;
     color: #a57c18;
     font-weight: 700;
     text-decoration: none;
     display: inline-flex;
     justify-content: center;
+    align-items: center;
 }
 
-.message-btn:hover { color: #7d5c0b; background: rgba(197,154,50,0.08); }
+.message-btn:hover {
+    color: #7d5c0b;
+    background: rgba(197,154,50,0.08);
+}
 
-.table { margin-bottom: 0; }
-.table thead { background: #f3ead7; }
+.table thead {
+    background: #f3ead7;
+}
+
 .table th {
     color: #6f5411;
     border-bottom: none;
@@ -195,8 +209,8 @@ body {
     text-transform: uppercase;
     letter-spacing: .04em;
 }
+
 .table td {
-    color: #333;
     vertical-align: middle;
 }
 
@@ -208,22 +222,35 @@ body {
     display: inline-flex;
 }
 
-.status-current { background: rgba(25,135,84,.12); color: #157347; }
-.status-alert { background: rgba(176,42,55,.12); color: #b02a37; }
-.status-gold { background: #f0e5ca; color: #a57c18; }
-
-@media (max-width: 992px) {
-    .ops-shell { grid-template-columns: 1fr; }
-    .ops-sidebar { min-height: auto; }
+.status-current {
+    background: rgba(25,135,84,.12);
+    color: #157347;
 }
 
-@media (max-width: 768px) {
-    .ops-title { font-size: 2rem; }
+.status-alert {
+    background: rgba(176,42,55,.12);
+    color: #b02a37;
+}
+
+.status-gold {
+    background: #f0e5ca;
+    color: #a57c18;
+}
+
+@media (max-width: 992px) {
+    .ops-shell {
+        grid-template-columns: 1fr;
+    }
+
+    .ops-sidebar {
+        min-height: auto;
+    }
 }
 </style>
 
 <div class="ops-wrap">
     <div class="ops-shell">
+
         <aside class="ops-sidebar">
             <div class="ops-logo">
                 <img src="/static/images/bl-logo.png" alt="Bowling Legacy Logo">
@@ -233,106 +260,167 @@ body {
 
             <nav class="ops-nav">
                 <div class="ops-nav-label">Workspace</div>
-                <a href="{% url 'landlord_dashboard' %}" class="active">Dashboard</a>
-                <a href="{% url 'landlord_create_tenant' %}">Create Tenant</a>
-                <a href="{% url 'rent_roll' %}">Resident Files</a>
-                <a href="#property-inbox">Maintenance & Messages</a>
+
+                <a href="{% url 'landlord_dashboard' %}" class="active">
+                    Dashboard
+                </a>
+
+                <a href="{% url 'landlord_create_tenant' %}">
+                    Create Tenant
+                </a>
+
+                <a href="{% url 'rent_roll' %}">
+                    Resident Files
+                </a>
 
                 <div class="ops-nav-label">Financial</div>
-                <a href="{% url 'payment_log' %}">Payment Log</a>
-                <a href="{% url 'rent_roll' %}">Rent Roll</a>
-                <a href="{% url 't12_report' %}">T-12 Report</a>
-                <a href="{% url 'financial_upload' %}">Expense Upload</a>
+
+                <a href="{% url 'payment_log' %}">
+                    Payment Log
+                </a>
+
+                <a href="{% url 't12_report' %}">
+                    T-12 Report
+                </a>
 
                 <div class="ops-nav-label">Account</div>
-                <a href="{% url 'logout' %}">Logout</a>
+
+                <a href="{% url 'logout' %}">
+                    Logout
+                </a>
             </nav>
         </aside>
 
         <main class="ops-main">
+
             <section class="ops-hero">
-                <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-                    <div>
-                        <div class="ops-eyebrow">Landlord Operations</div>
-                        <h1 class="ops-title">Welcome back, {{ user.username }}</h1>
-                        <p class="ops-text mb-0">Manage resident files, payments, requests, and property operations from one calm workspace.</p>
-                    </div>
-                    <div class="d-flex gap-2 flex-wrap">
-                        <a href="{% url 'landlord_create_tenant' %}" class="gold-btn">Create Tenant</a>
-                        <a href="{% url 'rent_roll' %}" class="message-btn">Resident Files</a>
-                    </div>
+                <div class="ops-eyebrow">
+                    Landlord Operations
                 </div>
+
+                <h1 class="ops-title">
+                    Welcome back, {{ user.username }}
+                </h1>
+
+                <p class="ops-text mb-0">
+                    Manage resident files, applications, requests, and payments.
+                </p>
             </section>
 
-            {% if new_message_count > 0 %}
-            <div class="alert alert-warning border-0 mb-4" style="border-radius:14px;">
-                <strong>{{ new_message_count }} new resident request/document item{{ new_message_count|pluralize }} filed.</strong>
-                Review the Property Inbox below.
-            </div>
-            {% endif %}
-
-            <div class="row g-4 mb-4">
-                <div class="col-xl col-md-4 col-sm-6"><div class="soft-card kpi-card"><div class="kpi-label">Properties</div><div class="kpi-value">{{ properties|length }}</div><div class="small text-muted">Managed properties</div></div></div>
-                <div class="col-xl col-md-4 col-sm-6"><div class="soft-card kpi-card"><div class="kpi-label">Residents</div><div class="kpi-value">{{ applications|length }}</div><div class="small text-muted">Resident files</div></div></div>
-                <div class="col-xl col-md-4 col-sm-6"><div class="soft-card kpi-card"><div class="kpi-label">Payments</div><div class="kpi-value">{{ payments|length }}</div><div class="small text-muted">Recent transactions</div></div></div>
-                <div class="col-xl col-md-4 col-sm-6"><div class="soft-card kpi-card"><div class="kpi-label">Open Requests</div><div class="kpi-value">{{ new_message_count }}</div><div class="small text-muted">Messages & maintenance</div></div></div>
-            </div>
-
-            <div class="row g-4 mb-4">
-                <div class="col-lg-4"><div class="soft-card p-4 h-100"><h4 class="card-title">Resident Onboarding</h4><p class="text-muted">Create residents, assign units, set rent, and prepare lease onboarding.</p><a href="{% url 'landlord_create_tenant' %}" class="gold-btn w-100">Start Onboarding</a></div></div>
-                <div class="col-lg-4"><div class="soft-card p-4 h-100"><h4 class="card-title">Financial Operations</h4><p class="text-muted">Open rent roll, payment logs, T-12 reporting, and upload expenses.</p><div class="d-grid gap-2"><a href="{% url 'payment_log' %}" class="message-btn">Payment Log</a><a href="{% url 't12_report' %}" class="message-btn">T-12 Report</a></div></div></div>
-                <div class="col-lg-4"><div class="soft-card p-4 h-100"><h4 class="card-title">Property Inbox</h4><p class="text-muted">Review maintenance requests, resident messages, and document notices.</p><a href="#property-inbox" class="message-btn w-100">Review Inbox</a></div></div>
-            </div>
-
             <section class="soft-card p-4 mb-4">
-                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                    <div><h3 class="section-title mb-1">Resident File Overview</h3><div class="text-muted small">Balances, room assignments, and portal access.</div></div>
-                    <a href="{% url 'rent_roll' %}" class="message-btn">Open Rent Roll</a>
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h3 class="section-title mb-1">
+                            Resident File Overview
+                        </h3>
+
+                        <div class="text-muted small">
+                            Applications, balances, room assignments, and portal access.
+                        </div>
+                    </div>
                 </div>
 
                 <div class="table-responsive">
+
                     <table class="table table-hover align-middle">
-                        <thead><tr><th>Resident</th><th>Property</th><th>Unit</th><th>Rent</th><th>Balance</th><th>Portal</th></tr></thead>
+
+                        <thead>
+                            <tr>
+                                <th>Resident</th>
+                                <th>Property</th>
+                                <th>Unit</th>
+                                <th>Rent</th>
+                                <th>Balance</th>
+                                <th>Portal</th>
+                                <th>Application</th>
+                            </tr>
+                        </thead>
+
                         <tbody>
+
                             {% for resident in applications %}
                             <tr>
-                                <td><strong>{{ resident.full_name }}</strong><br><span class="small text-muted">{{ resident.email }}</span></td>
-                                <td>{{ resident.property.name }}</td>
-                                <td>{{ resident.space_type }} {{ resident.space_label }}</td>
-                                <td>${{ resident.monthly_rent }}</td>
-                                <td>{% if resident.balance > 0 %}<span class="status-pill status-alert">${{ resident.balance }}</span>{% else %}<span class="status-pill status-current">Current</span>{% endif %}</td>
-                                <td>{% if resident.user %}<span class="status-pill status-gold">{{ resident.user.invite_code }}</span>{% else %}<span class="status-pill status-alert">No Login</span>{% endif %}</td>
+
+                                <td>
+                                    <strong>{{ resident.full_name }}</strong><br>
+                                    <span class="small text-muted">
+                                        {{ resident.email }}
+                                    </span>
+                                </td>
+
+                                <td>
+                                    {{ resident.property.name }}
+                                </td>
+
+                                <td>
+                                    {{ resident.space_type }} {{ resident.space_label }}
+                                </td>
+
+                                <td>
+                                    ${{ resident.monthly_rent }}
+                                </td>
+
+                                <td>
+                                    {% if resident.balance > 0 %}
+                                        <span class="status-pill status-alert">
+                                            ${{ resident.balance }}
+                                        </span>
+                                    {% else %}
+                                        <span class="status-pill status-current">
+                                            Current
+                                        </span>
+                                    {% endif %}
+                                </td>
+
+                                <td>
+                                    {% if resident.user %}
+                                        <span class="status-pill status-gold">
+                                            {{ resident.user.invite_code }}
+                                        </span>
+                                    {% else %}
+                                        <span class="status-pill status-alert">
+                                            No Login
+                                        </span>
+                                    {% endif %}
+                                </td>
+
+                                <td>
+                                    <div class="d-flex gap-2">
+
+                                        <a href="{% url 'application_detail' resident.id %}"
+                                           class="message-btn">
+                                            Open
+                                        </a>
+
+                                        <a href="{% url 'printable_application' resident.id %}"
+                                           class="gold-btn">
+                                            Print
+                                        </a>
+
+                                    </div>
+                                </td>
+
                             </tr>
-                            {% empty %}<tr><td colspan="6">No residents yet.</td></tr>{% endfor %}
+
+                            {% empty %}
+                            <tr>
+                                <td colspan="7">
+                                    No residents yet.
+                                </td>
+                            </tr>
+                            {% endfor %}
+
                         </tbody>
+
                     </table>
+
                 </div>
+
             </section>
 
-            <section id="property-inbox" class="soft-card p-4">
-                <div class="mb-3"><h3 class="section-title mb-1">Property Inbox</h3><div class="text-muted small">Resident requests, maintenance, and messages.</div></div>
-                {% for property_name, messages_for_property in landlord_inbox.items %}
-                    <div class="mb-4">
-                        <h5 class="card-title mb-3">{{ property_name }}</h5>
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle">
-                                <thead><tr><th>Resident</th><th>Subject</th><th>Status</th><th></th></tr></thead>
-                                <tbody>
-                                    {% for item in messages_for_property %}
-                                    <tr>
-                                        <td>{{ item.application.full_name }}</td>
-                                        <td><strong>{{ item.subject }}</strong><br><span class="small text-muted">{{ item.message|truncatechars:80 }}</span></td>
-                                        <td>{% if item.status == 'submitted' %}<span class="status-pill status-alert">New</span>{% else %}<span class="status-pill status-current">{{ item.get_status_display }}</span>{% endif %}</td>
-                                        <td><a href="{% url 'landlord_message_detail' item.id %}" class="message-btn">Open</a></td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                {% empty %}<div class="text-muted">No resident messages or requests yet.</div>{% endfor %}
-            </section>
         </main>
+
     </div>
 </div>
 
