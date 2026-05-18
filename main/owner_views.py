@@ -5,13 +5,13 @@ from django.db.models import Sum
 from django.shortcuts import render
 
 from .models import Property, HousingApplication, Payment, ResidentMessage
-from .views import staff_required
+from .permissions import can_access_owner_dashboard, is_super_admin, is_assistant_admin
 
 
 @login_required
-@user_passes_test(staff_required)
+@user_passes_test(can_access_owner_dashboard)
 def property_owner_dashboard(request):
-    if request.user.is_superuser or getattr(request.user, "role", "") == "admin":
+    if is_super_admin(request.user) or is_assistant_admin(request.user):
         properties = Property.objects.all().order_by("name")
     else:
         properties = Property.objects.filter(owner_email__iexact=request.user.email).order_by("name")
