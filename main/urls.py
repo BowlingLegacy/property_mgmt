@@ -61,6 +61,7 @@ urlpatterns = [
     path("journal/<int:pk>/", views.blog_detail, name="blog_detail"),
     path("blog/<int:post_id>/comment/", views.add_blog_comment, name="add_blog_comment"),
 
+    path("application/<int:pk>/view/", views.printable_application, name="application_detail"),
     path("application/<int:pk>/print/", views.printable_application, name="printable_application"),
 
     path("lease/sign/", views.lease_sign, name="lease_sign"),
