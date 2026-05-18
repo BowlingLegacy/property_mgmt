@@ -1,19 +1,94 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Application Received</title>
-    <style>
-        body { font-family: Arial, sans-serif; background: #fafafa; padding: 40px; text-align: center; }
-        .box { background: white; padding: 40px; max-width: 600px; margin: auto; border-radius: 8px; }
-        h1 { color: #4a6fa5; }
-    </style>
-</head>
-<body>
+{% extends "base.html" %}
+{% block content %}
 
-<div class="box">
-    <h1>Thank You</h1>
-    <p>Your application has been received. We will review it and contact you soon.</p>
+<style>
+.success-wrap {
+    max-width: 850px;
+    margin: 3rem auto;
+    padding: 0 1rem;
+}
+
+.success-card {
+    background: rgba(255,255,255,0.94);
+    border: 1px solid rgba(188,150,45,0.18);
+    border-radius: 24px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.08);
+    overflow: hidden;
+}
+
+.success-header {
+    background: #111;
+    padding: 2rem;
+    text-align: center;
+    border-bottom: 2px solid #c59a32;
+}
+
+.success-header img {
+    width: 95px;
+    height: 95px;
+    object-fit: contain;
+    margin-bottom: 1rem;
+}
+
+.success-title {
+    font-family: Georgia, serif;
+    color: #f6ead1;
+    font-size: 2.4rem;
+    font-weight: 700;
+}
+
+.success-body {
+    padding: 2rem;
+    text-align: center;
+}
+
+.success-body p {
+    font-size: 1.1rem;
+    color: #444;
+}
+
+.gold-btn {
+    background: linear-gradient(135deg, #c48f22, #d8ab3b);
+    color: white;
+    border-radius: 12px;
+    padding: .85rem 1.2rem;
+    font-weight: 700;
+    text-decoration: none;
+    display: inline-flex;
+    margin-top: 1rem;
+}
+
+.gold-btn:hover {
+    color: white;
+}
+</style>
+
+<div class="success-wrap">
+    <div class="success-card">
+
+        <div class="success-header">
+            <img src="/static/images/bl-logo.png" alt="Bowling Legacy Logo">
+
+            <h1 class="success-title">
+                Application Received
+            </h1>
+        </div>
+
+        <div class="success-body">
+            <p>
+                Thank you. Your application has been submitted and received by Bowling Legacy.
+            </p>
+
+            <p>
+                We will review your application and contact you about the next step in the onboarding process.
+            </p>
+
+            <a href="/" class="gold-btn">
+                Return Home
+            </a>
+        </div>
+
+    </div>
 </div>
 
-</body>
-</html>
+{% endblock %}
