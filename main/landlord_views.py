@@ -1,6 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import get_object_or_404, render
 
 from .forms import LandlordCreateTenantForm
 from .models import HousingApplication
@@ -35,7 +35,10 @@ def create_tenant(request):
 
             application.save()
 
-            messages.success(request, "Application approved and resident onboarding initialized.")
+            messages.success(
+                request,
+                "Application approved and resident onboarding initialized."
+            )
 
             return render(request, "landlord_create_tenant_success.html", {
                 "application": application,
@@ -47,4 +50,13 @@ def create_tenant(request):
             "balance": application.balance,
             "deposit_required": application.deposit_required,
             "deposit_paid": application.deposit_paid,
+            "utility_monthly": application.utility_monthly,
+            "utility_balance": application.utility_balance,
+            "space_type": application.space_type,
+            "space_label": application.space_label,
+        })
+
+    return render(request, "landlord_create_tenant.html", {
+        "form": form,
+        "application": application,
     })
