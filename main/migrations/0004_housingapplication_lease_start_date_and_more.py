@@ -3,6 +3,48 @@
 from django.db import migrations, models
 
 
+def add_lease_start_date_if_missing(apps, schema_editor):
+    table_name = "main_housingapplication"
+
+    with schema_editor.connection.cursor() as cursor:
+        existing_columns = {
+            column.name
+            for column in schema_editor.connection.introspection.get_table_description(
+                cursor,
+                table_name,
+            )
+        }
+
+    if "lease_start_date" in existing_columns:
+        return
+
+    HousingApplication = apps.get_model("main", "HousingApplication")
+    field = models.DateField(blank=True, null=True)
+    field.set_attributes_from_name("lease_start_date")
+    schema_editor.add_field(HousingApplication, field)
+
+
+def remove_lease_start_date_if_present(apps, schema_editor):
+    table_name = "main_housingapplication"
+
+    with schema_editor.connection.cursor() as cursor:
+        existing_columns = {
+            column.name
+            for column in schema_editor.connection.introspection.get_table_description(
+                cursor,
+                table_name,
+            )
+        }
+
+    if "lease_start_date" not in existing_columns:
+        return
+
+    HousingApplication = apps.get_model("main", "HousingApplication")
+    field = models.DateField(blank=True, null=True)
+    field.set_attributes_from_name("lease_start_date")
+    schema_editor.remove_field(HousingApplication, field)
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -10,10 +52,20 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='housingapplication',
-            name='lease_start_date',
-            field=models.DateField(blank=True, null=True),
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunPython(
+                    add_lease_start_date_if_missing,
+                    remove_lease_start_date_if_present,
+                ),
+            ],
+            state_operations=[
+                migrations.AddField(
+                    model_name='housingapplication',
+                    name='lease_start_date',
+                    field=models.DateField(blank=True, null=True),
+                ),
+            ],
         ),
         migrations.AlterField(
             model_name='signeddocument',
