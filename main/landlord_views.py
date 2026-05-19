@@ -1,9 +1,10 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.shortcuts import get_object_or_404, render
+from django.utils.text import slugify
 
 from .forms import LandlordCreateTenantForm
-from .models import HousingApplication
+from .models import HousingApplication, User
 from .views import staff_required
 
 
@@ -33,15 +34,38 @@ def create_tenant(request):
             application.utility_balance = form.cleaned_data.get("utility_balance") or 0
             application.additional_notes = form.cleaned_data.get("additional_notes") or ""
 
+            if not application.user:
+                base_username = slugify(application.full_name) or "resident"
+                username = f"{base_username}-{application.id}"
+
+                counter = 1
+                original_username = username
+
+                while User.objects.filter(username=username).exists():
+                    counter += 1
+                    username = f"{original_username}-{counter}"
+
+                created_user = User.objects.create_user(
+                    username=username,
+                    email=application.email,
+                    password=None,
+                    role="tenant",
+                    is_staff=False,
+                    is_superuser=False,
+                )
+
+                application.user = created_user
+
             application.save()
 
             messages.success(
                 request,
-                "Application approved and resident onboarding initialized."
+                "Application approved and resident onboarding invite created."
             )
 
             return render(request, "landlord_create_tenant_success.html", {
                 "application": application,
+                "created_user": application.user,
             })
 
     else:
