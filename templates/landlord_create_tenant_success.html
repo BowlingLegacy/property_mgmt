@@ -87,9 +87,20 @@
 
         <div class="p-4">
 
+            {% if email_sent %}
             <div class="alert alert-success">
-                The resident application has been approved and an onboarding invite email should be sent to the applicant.
+                The resident application has been approved and the onboarding invite email was sent.
             </div>
+            {% else %}
+            <div class="alert alert-warning">
+                The resident application has been approved, but the invite email was not confirmed. Use the backup invite code below.
+                {% if email_error %}
+                    <div class="small mt-2">
+                        Email error: {{ email_error }}
+                    </div>
+                {% endif %}
+            </div>
+            {% endif %}
 
             {% if created_user and created_user.invite_code %}
             <div class="invite-box mb-4">

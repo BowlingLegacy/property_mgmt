@@ -1,11 +1,39 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.conf import settings
+from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404, render
 from django.utils.text import slugify
 
 from .forms import LandlordCreateTenantForm
 from .models import HousingApplication, User
 from .views import staff_required
+
+
+def send_resident_invite_email(application):
+    if not application.user or not application.user.email:
+        return False
+
+    send_mail(
+        "Your Bowling Legacy Resident Portal Access Code",
+        f"""Hello {application.full_name},
+
+Your Bowling Legacy resident portal access code is:
+
+{application.user.invite_code}
+
+Portal setup:
+https://bowlinglegacy.com/enter-invite-code/
+
+Thank you,
+Bowling Legacy Housing
+""",
+        getattr(settings, "DEFAULT_FROM_EMAIL", None),
+        [application.user.email],
+        fail_silently=False,
+    )
+
+    return True
 
 
 @login_required
@@ -34,6 +62,8 @@ def create_tenant(request):
             application.utility_balance = form.cleaned_data.get("utility_balance") or 0
             application.additional_notes = form.cleaned_data.get("additional_notes") or ""
 
+            created_user = None
+
             if not application.user:
                 base_username = slugify(application.full_name) or "resident"
                 username = f"{base_username}-{application.id}"
@@ -58,14 +88,30 @@ def create_tenant(request):
 
             application.save()
 
-            messages.success(
-                request,
-                "Application approved and resident onboarding invite created."
-            )
+            email_sent = False
+            email_error = ""
+
+            try:
+                email_sent = send_resident_invite_email(application)
+            except Exception as exc:
+                email_error = str(exc)
+
+            if email_sent:
+                messages.success(
+                    request,
+                    "Application approved and resident onboarding invite email sent.",
+                )
+            else:
+                messages.warning(
+                    request,
+                    "Application approved, but the invite email was not sent. Use the backup invite code below.",
+                )
 
             return render(request, "landlord_create_tenant_success.html", {
                 "application": application,
                 "created_user": application.user,
+                "email_sent": email_sent,
+                "email_error": email_error,
             })
 
     else:

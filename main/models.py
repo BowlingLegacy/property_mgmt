@@ -1,7 +1,5 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
-from django.core.mail import send_mail
-from django.conf import settings
 from django.utils import timezone
 import random
 import string
@@ -54,26 +52,6 @@ class User(AbstractUser):
             self.is_superuser = False
 
         super().save(*args, **kwargs)
-
-        if is_new and self.email and self.invite_code and not self.has_usable_password():
-            send_mail(
-                "Your Bowling Legacy Resident Portal Access Code",
-                f"""Hello {self.username},
-
-Your Bowling Legacy resident portal access code is:
-
-{self.invite_code}
-
-Portal setup:
-https://bowlinglegacy.com/enter-invite-code/
-
-Thank you,
-Bowling Legacy Housing
-""",
-                getattr(settings, "DEFAULT_FROM_EMAIL", None),
-                [self.email],
-                fail_silently=True,
-            )
 
     def generate_unique_code(self):
         while True:

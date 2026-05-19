@@ -1,6 +1,7 @@
 from decimal import Decimal
 from unittest.mock import patch
 
+from django.core import mail
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
@@ -40,6 +41,49 @@ class LiveFlowTests(TestCase):
         application = HousingApplication.objects.get(email="applicant@example.com")
         self.assertEqual(application.property, property_obj)
 
+    def test_printable_application_includes_full_intake_details(self):
+        application = HousingApplication.objects.create(
+            full_name="Detailed Applicant",
+            phone="555-0100",
+            email="detailed@example.com",
+            age=42,
+            current_address="123 Current Street",
+            current_address_length="Two years",
+            previous_address_1="Shared housing in Salem",
+            previous_address_1_length="Needed stable sober housing",
+            income_source="Employment and benefits",
+            monthly_income=Decimal("2500.00"),
+            employer_name="Local Employer",
+            employment_length="18 months",
+            previous_evictions="No evictions, one late payment history note.",
+            in_recovery=True,
+            drug_of_choice="Needs recovery-friendly support.",
+            on_parole=True,
+            parole_officer_name="Officer Smith",
+            parole_officer_phone="555-0199",
+            felony_history="Applicant disclosed past conviction context.",
+            odoc_time_served=True,
+            reference_1_name="Reference One",
+            reference_1_phone="555-0111",
+            reference_1_relationship="Case manager",
+            reference_2_name="Reference Two",
+            reference_2_phone="555-0222",
+            reference_2_relationship="Employer",
+            housing_need="Needs a vacant room this month.",
+            sobriety_acknowledgment=True,
+            unconditional_regard_acknowledgment=True,
+        )
+
+        response = self.client.get(reverse("application_detail", args=[application.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Shared housing in Salem")
+        self.assertContains(response, "No evictions, one late payment history note.")
+        self.assertContains(response, "Employment and benefits")
+        self.assertContains(response, "Officer Smith")
+        self.assertContains(response, "Reference One")
+        self.assertContains(response, "Needs a vacant room this month.")
+
     def test_invite_code_allows_resident_to_create_account_and_pay(self):
         temp_user = User.objects.create_user(
             username="new-applicant-1",
@@ -77,6 +121,49 @@ class LiveFlowTests(TestCase):
         application.refresh_from_db()
         self.assertEqual(application.user.username, "resident")
         self.assertFalse(User.objects.filter(id=temp_user.id).exists())
+
+    def test_approving_application_sends_invite_email(self):
+        staff_user = User.objects.create_user(
+            username="staff",
+            email="staff@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        application = HousingApplication.objects.create(
+            full_name="Email Applicant",
+            phone="555-0100",
+            email="email-applicant@example.com",
+            age=42,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Needs a room.",
+        )
+
+        self.client.login(username="staff", password="StrongPass123!")
+
+        response = self.client.post(
+            f"{reverse('landlord_create_tenant')}?application={application.id}",
+            {
+                "monthly_rent": "900.00",
+                "balance": "900.00",
+                "rent_due_day": "1",
+                "deposit_required": "450.00",
+                "deposit_paid": "0.00",
+                "utility_monthly": "66.00",
+                "utility_balance": "0.00",
+                "space_type": "Room",
+                "space_label": "3",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        application.refresh_from_db()
+        self.assertIsNotNone(application.user)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(application.user.invite_code, mail.outbox[0].body)
+        self.assertIn("https://bowlinglegacy.com/enter-invite-code/", mail.outbox[0].body)
 
     @patch("main.views.stripe.checkout.Session.create")
     def test_resident_can_start_own_rent_payment(self, create_session):
