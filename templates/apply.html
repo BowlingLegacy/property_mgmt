@@ -125,6 +125,10 @@
         <form method="POST" enctype="multipart/form-data">
             {% csrf_token %}
 
+            {% if property %}
+                <input type="hidden" name="property" value="{{ property.id }}">
+            {% endif %}
+
             {% if form.non_field_errors %}
                 <div class="alert alert-danger">
                     {{ form.non_field_errors }}

@@ -55,7 +55,7 @@ class User(AbstractUser):
 
         super().save(*args, **kwargs)
 
-        if is_new and self.email and self.invite_code:
+        if is_new and self.email and self.invite_code and not self.has_usable_password():
             send_mail(
                 "Your Bowling Legacy Resident Portal Access Code",
                 f"""Hello {self.username},
@@ -64,8 +64,8 @@ Your Bowling Legacy resident portal access code is:
 
 {self.invite_code}
 
-Portal login:
-https://bowlinglegacy.com/login/
+Portal setup:
+https://bowlinglegacy.com/enter-invite-code/
 
 Thank you,
 Bowling Legacy Housing

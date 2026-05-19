@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 import csv
 
@@ -23,6 +23,7 @@ from .forms import (
     BlogCommentForm,
     HousingApplicationForm,
     FinancialUploadForm,
+    SignUpForm,
 )
 
 from .models import (
@@ -76,14 +77,26 @@ def creed(request):
 
 
 def apply(request):
+    property_id = request.GET.get("property") or request.POST.get("property")
+    property_obj = None
+
+    if property_id:
+        property_obj = get_object_or_404(Property, pk=property_id)
+
     if request.method == "POST":
         form = HousingApplicationForm(request.POST, request.FILES)
         if form.is_valid():
-            form.save()
+            application = form.save(commit=False)
+            if property_obj:
+                application.property = property_obj
+            application.save()
             return redirect("apply_success")
     else:
         form = HousingApplicationForm()
-    return render(request, "apply.html", {"form": form})
+    return render(request, "apply.html", {
+        "form": form,
+        "property": property_obj,
+    })
 
 
 def apply_success(request):
@@ -97,10 +110,46 @@ def logout_view(request):
 
 
 def signup(request):
-    return render(request, "signup.html")
+    pending_user_id = request.session.get("pending_resident_user_id")
+    pending_profile_id = request.session.get("pending_resident_profile_id")
+
+    if not pending_user_id or not pending_profile_id:
+        messages.error(request, "Please enter your invite code before creating an account.")
+        return redirect("enter_invite_code")
+
+    pending_user = get_object_or_404(User, id=pending_user_id)
+    profile = get_object_or_404(HousingApplication, id=pending_profile_id)
+
+    if request.method == "POST":
+        form = SignUpForm(request.POST)
+
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.role = "tenant"
+            user.email = form.cleaned_data.get("email") or profile.email
+            user.save()
+
+            profile.user = user
+            profile.save()
+
+            if not pending_user.has_usable_password() and pending_user.id != user.id:
+                pending_user.delete()
+
+            request.session.pop("pending_resident_user_id", None)
+            request.session.pop("pending_resident_profile_id", None)
+
+            login(request, user)
+            messages.success(request, "Your resident portal account is ready.")
+            return redirect("tenant_dashboard")
+    else:
+        form = SignUpForm(initial={"email": profile.email})
+
+    return render(request, "signup.html", {
+        "form": form,
+        "application": profile,
+    })
 
 
-@login_required
 def enter_invite_code(request):
     form = InviteCodeForm(request.POST or None)
 
@@ -121,11 +170,11 @@ def enter_invite_code(request):
             messages.error(request, "No resident file is connected to this code yet.")
             return redirect("enter_invite_code")
 
-        profile.user = request.user
-        profile.save()
+        request.session["pending_resident_user_id"] = user_with_code.id
+        request.session["pending_resident_profile_id"] = profile.id
 
-        messages.success(request, "Resident file linked successfully.")
-        return redirect("tenant_dashboard")
+        messages.success(request, "Invite code accepted. Create your login to finish setup.")
+        return redirect("signup")
 
     return render(request, "enter_invite_code.html", {"form": form})
 
@@ -732,6 +781,19 @@ def submit_lease_signature(request):
 @login_required 
 def create_checkout_session(request, application_id, payment_type="rent"):
     application = get_object_or_404(HousingApplication, id=application_id)
+
+    if not staff_required(request.user):
+        user_application = getattr(request.user, "resident_profile", None)
+        if not user_application or user_application.id != application.id:
+            return JsonResponse({"error": "You are not authorized to pay this account."}, status=403)
+
+    stale_before = timezone.now() - timedelta(minutes=30)
+    Payment.objects.filter(
+        application=application,
+        payment_type=payment_type,
+        status="pending",
+        created_at__lt=stale_before,
+    ).update(status="failed")
 
     existing_pending = Payment.objects.filter(
         application=application,
