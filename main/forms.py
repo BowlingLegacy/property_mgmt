@@ -45,8 +45,58 @@ class FinancialUploadForm(forms.ModelForm):
 
 
 class LandlordCreateTenantForm(forms.Form):
+    lease_start_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={
             "class": "form-control",
-            "step": "0.01"
+            "type": "date",
+        }),
+    )
+
+    monthly_rent = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        initial=0,
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+            "step": "0.01",
+        }),
+    )
+
+    balance = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        initial=0,
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+            "step": "0.01",
+        }),
+    )
+
+    rent_due_day = forms.IntegerField(
+        initial=1,
+        min_value=1,
+        max_value=31,
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+        }),
+    )
+
+    lease_end_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={
+            "class": "form-control",
+            "type": "date",
+        }),
+    )
+
+    deposit_required = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        initial=450,
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+            "step": "0.01",
         }),
     )
 
@@ -56,7 +106,7 @@ class LandlordCreateTenantForm(forms.Form):
         initial=0,
         widget=forms.NumberInput(attrs={
             "class": "form-control",
-            "step": "0.01"
+            "step": "0.01",
         }),
     )
 
@@ -66,7 +116,7 @@ class LandlordCreateTenantForm(forms.Form):
         initial=66,
         widget=forms.NumberInput(attrs={
             "class": "form-control",
-            "step": "0.01"
+            "step": "0.01",
         }),
     )
 
@@ -76,7 +126,7 @@ class LandlordCreateTenantForm(forms.Form):
         initial=0,
         widget=forms.NumberInput(attrs={
             "class": "form-control",
-            "step": "0.01"
+            "step": "0.01",
         }),
     )
 
@@ -85,7 +135,7 @@ class LandlordCreateTenantForm(forms.Form):
         required=False,
         widget=forms.TextInput(attrs={
             "class": "form-control",
-            "placeholder": "Room, Unit, Space, Suite"
+            "placeholder": "Room, Unit, Space, Suite",
         }),
     )
 
@@ -94,7 +144,7 @@ class LandlordCreateTenantForm(forms.Form):
         required=False,
         widget=forms.TextInput(attrs={
             "class": "form-control",
-            "placeholder": "Example: A, 101, Suite 2"
+            "placeholder": "Example: A, 101, Suite 2",
         }),
     )
 
@@ -103,7 +153,7 @@ class LandlordCreateTenantForm(forms.Form):
         widget=forms.Textarea(attrs={
             "class": "form-control",
             "rows": 3,
-            "placeholder": "Landlord notes"
+            "placeholder": "Landlord notes",
         }),
     )
 
