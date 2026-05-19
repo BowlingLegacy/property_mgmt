@@ -54,4 +54,75 @@
     padding: .8rem 1.2rem;
     text-decoration: none;
 }
+</style>
+
+<div class="success-shell">
+    <div class="success-card">
+
+        <div class="success-header">
+            <h1 class="fw-bold mb-1">
+                Application Approved
+            </h1>
+
+            <div class="text-white-50">
+                Resident onboarding has been initialized.
+            </div>
+        </div>
+
+        <div class="p-4">
+
+            <div class="alert alert-success">
+                The resident application has been approved successfully.
+            </div>
+
+            <div class="row g-3 mb-4">
+
+                <div class="col-md-4">
+                    <div class="info-box">
+                        <div class="info-label">Resident</div>
+                        <div class="info-value">
+                            {{ application.full_name }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="info-box">
+                        <div class="info-label">Property</div>
+                        <div class="info-value">
+                            {% if application.property %}
+                                {{ application.property.name }}
+                            {% else %}
+                                Not assigned
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="info-box">
+                        <div class="info-label">Unit</div>
+                        <div class="info-value">
+                            {{ application.space_type }} {{ application.space_label }}
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="alert alert-warning">
+                Next step: resident creates their own username and password through the onboarding invite flow.
+            </div>
+
+            <div class="d-flex justify-content-end gap-2">
+                <a href="{% url 'landlord_dashboard' %}" class="btn-gold">
+                    Back To Dashboard
+                </a>
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
 {% endblock %}
