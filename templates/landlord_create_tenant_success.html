@@ -44,6 +44,22 @@
     font-size: 1.15rem;
     font-weight: 800;
     color: #111;
+    overflow-wrap: anywhere;
+}
+
+.invite-box {
+    background: #090909;
+    color: #f3d27a;
+    border: 2px solid #a98226;
+    border-radius: 18px;
+    padding: 1.25rem;
+    text-align: center;
+}
+
+.invite-code {
+    font-size: 2.3rem;
+    font-weight: 950;
+    letter-spacing: .18em;
 }
 
 .btn-gold {
@@ -65,15 +81,31 @@
             </h1>
 
             <div class="text-white-50">
-                Resident onboarding has been initialized.
+                Resident onboarding invite has been created.
             </div>
         </div>
 
         <div class="p-4">
 
             <div class="alert alert-success">
-                The resident application has been approved successfully.
+                The resident application has been approved and an onboarding invite email should be sent to the applicant.
             </div>
+
+            {% if created_user and created_user.invite_code %}
+            <div class="invite-box mb-4">
+                <div class="info-label" style="color:#d4af37;">
+                    Backup Invite Code
+                </div>
+
+                <div class="invite-code">
+                    {{ created_user.invite_code }}
+                </div>
+
+                <div class="small mt-2">
+                    Keep this code only as a backup in case the applicant does not receive the email.
+                </div>
+            </div>
+            {% endif %}
 
             <div class="row g-3 mb-4">
 
@@ -82,6 +114,15 @@
                         <div class="info-label">Resident</div>
                         <div class="info-value">
                             {{ application.full_name }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="info-box">
+                        <div class="info-label">Email</div>
+                        <div class="info-value">
+                            {{ application.email }}
                         </div>
                     </div>
                 </div>
@@ -108,10 +149,28 @@
                     </div>
                 </div>
 
+                <div class="col-md-4">
+                    <div class="info-box">
+                        <div class="info-label">Monthly Rent</div>
+                        <div class="info-value">
+                            ${{ application.monthly_rent }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="info-box">
+                        <div class="info-label">Move-In Deposit</div>
+                        <div class="info-value">
+                            ${{ application.deposit_required }}
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
             <div class="alert alert-warning">
-                Next step: resident creates their own username and password through the onboarding invite flow.
+                Next step: the resident follows the invite instructions, enters the code, creates their own username and password, then logs into the resident portal.
             </div>
 
             <div class="d-flex justify-content-end gap-2">
