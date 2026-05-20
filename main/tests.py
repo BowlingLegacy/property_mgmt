@@ -568,6 +568,24 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "Inspect Resident")
         self.assertContains(response, "Back to Super Admin Dashboard")
 
+    def test_superadmin_owners_page_lists_properties_without_owner_email(self):
+        User.objects.create_user(
+            username="superadmin",
+            email="super@example.com",
+            password="StrongPass123!",
+            role="admin",
+            is_staff=True,
+        )
+        Property.objects.create(name="Painted Lady Inn", owner_email="")
+
+        self.client.login(username="superadmin", password="StrongPass123!")
+
+        response = self.client.get(reverse("superadmin_owners"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Unassigned Owner")
+        self.assertContains(response, "Painted Lady Inn")
+
     def test_staff_can_create_property_blog_and_approve_comment(self):
         staff_user = User.objects.create_user(
             username="staff-blog",

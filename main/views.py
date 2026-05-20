@@ -349,22 +349,23 @@ def get_superadmin_workspace_context():
     completed_payments = Payment.objects.filter(status="completed")
     site_payment_total = completed_payments.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
 
-    owner_groups = []
-    owner_rows = (
-        Property.objects
-        .exclude(owner_email="")
-        .values("owner_email")
-        .annotate(property_count=Count("id"))
-        .order_by("owner_email")
-    )
+    owner_buckets = OrderedDict()
 
-    for owner_row in owner_rows:
-        owner_properties = properties.filter(owner_email__iexact=owner_row["owner_email"])
-        owner_groups.append({
-            "email": owner_row["owner_email"],
-            "property_count": owner_row["property_count"],
+    for property_obj in properties:
+        owner_email = (property_obj.owner_email or "").strip()
+        owner_label = owner_email or "Unassigned Owner"
+
+        owner_buckets.setdefault(owner_label, [])
+        owner_buckets[owner_label].append(property_obj)
+
+    owner_groups = [
+        {
+            "email": owner_label,
+            "property_count": len(owner_properties),
             "properties": owner_properties,
-        })
+        }
+        for owner_label, owner_properties in owner_buckets.items()
+    ]
     
     recent_messages = (
         ResidentMessage.objects
@@ -381,6 +382,8 @@ def get_superadmin_workspace_context():
         "owner_groups": owner_groups,
         "site_payment_total": site_payment_total,
     }
+
+    return context
 
 
 @login_required
