@@ -15,6 +15,9 @@ def send_resident_invite_email(application):
     if not application.user or not application.user.email:
         return False
 
+    if not application.user.invite_code or application.user.invite_code_used_at:
+        application.user.refresh_invite_code()
+
     send_mail(
         "Your Bowling Legacy Resident Portal Access Code",
         f"""Hello {application.full_name},
@@ -25,6 +28,8 @@ Your Bowling Legacy resident portal access code is:
 
 Portal setup:
 https://bowlinglegacy.com/enter-invite-code/
+
+This code is single-use and expires 30 minutes after it is issued. If it expires, request a new code from the invite-code page.
 
 Thank you,
 Bowling Legacy Housing
@@ -116,10 +121,13 @@ def create_tenant(request):
                     is_staff=False,
                     is_superuser=False,
                 )
+                created_user.refresh_invite_code()
 
                 application.user = created_user
 
             application.save()
+            if application.user and not application.user.has_usable_password():
+                application.user.refresh_invite_code()
             ensure_onboarding_documents(application)
 
             email_sent = False

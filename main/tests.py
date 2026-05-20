@@ -7,6 +7,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from .models import ApplicantDocument, BlogComment, BlogPost, HousingApplication, Payment, Property, ResidentMessage, SignedDocument, User
 
@@ -94,6 +95,7 @@ class LiveFlowTests(TestCase):
             password=None,
             role="tenant",
         )
+        temp_user.refresh_invite_code()
         application = HousingApplication.objects.create(
             user=temp_user,
             full_name="New Applicant",
@@ -124,6 +126,63 @@ class LiveFlowTests(TestCase):
         application.refresh_from_db()
         self.assertEqual(application.user.username, "resident")
         self.assertFalse(User.objects.filter(id=temp_user.id).exists())
+
+    def test_invite_code_expires_after_30_minutes(self):
+        temp_user = User.objects.create_user(
+            username="expired-applicant",
+            email="expired@example.com",
+            password=None,
+            role="tenant",
+        )
+        temp_user.refresh_invite_code()
+        temp_user.invite_code_created_at = timezone.now() - timezone.timedelta(minutes=31)
+        temp_user.save(update_fields=["invite_code_created_at"])
+        HousingApplication.objects.create(
+            user=temp_user,
+            full_name="Expired Applicant",
+            phone="555-0100",
+            email="expired@example.com",
+            age=42,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Needs a room.",
+        )
+
+        response = self.client.post(reverse("enter_invite_code"), {
+            "invite_code": temp_user.invite_code,
+        })
+
+        self.assertRedirects(response, reverse("request_invite_code"))
+
+    def test_unregistered_user_can_request_replacement_invite_code(self):
+        temp_user = User.objects.create_user(
+            username="replacement-applicant",
+            email="replacement@example.com",
+            password=None,
+            role="tenant",
+        )
+        temp_user.refresh_invite_code()
+        old_code = temp_user.invite_code
+        HousingApplication.objects.create(
+            user=temp_user,
+            full_name="Replacement Applicant",
+            phone="555-0100",
+            email="replacement@example.com",
+            age=42,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Needs a room.",
+        )
+
+        response = self.client.post(reverse("request_invite_code"), {
+            "email": "replacement@example.com",
+        })
+
+        self.assertRedirects(response, reverse("enter_invite_code"))
+        temp_user.refresh_from_db()
+        self.assertNotEqual(temp_user.invite_code, old_code)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(temp_user.invite_code, mail.outbox[0].body)
 
     def test_approving_application_sends_invite_email(self):
         staff_user = User.objects.create_user(
@@ -290,16 +349,22 @@ class LiveFlowTests(TestCase):
             "notes": "Confirmed in bank portal.",
         })
 
-        self.assertRedirects(response, reverse("payment_log"))
+        payment = Payment.objects.get(application=application)
+        self.assertRedirects(response, reverse("payment_receipt", args=[payment.id]))
 
         application.refresh_from_db()
         self.assertEqual(application.balance, Decimal("650.00"))
 
-        payment = Payment.objects.get(application=application)
         self.assertEqual(payment.status, "completed")
         self.assertEqual(payment.payment_method, "bank_transfer")
         self.assertEqual(payment.reference_number, "BANK-123")
         self.assertEqual(payment.recorded_by, staff_user)
+
+        response = self.client.get(reverse("payment_receipt", args=[payment.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Payment Receipt")
+        self.assertContains(response, "BANK-123")
 
     def test_staff_can_record_manual_cashapp_deposit_payment(self):
         staff_user = User.objects.create_user(
@@ -332,12 +397,12 @@ class LiveFlowTests(TestCase):
             "description": "Cash App deposit payment",
         })
 
-        self.assertRedirects(response, reverse("payment_log"))
+        payment = Payment.objects.get(application=application)
+        self.assertRedirects(response, reverse("payment_receipt", args=[payment.id]))
 
         application.refresh_from_db()
         self.assertEqual(application.deposit_paid, Decimal("300.00"))
 
-        payment = Payment.objects.get(application=application)
         self.assertEqual(payment.payment_method, "cashapp")
         self.assertEqual(payment.recorded_by, staff_user)
 

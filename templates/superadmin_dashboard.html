@@ -2,103 +2,173 @@
 {% block content %}
 
 <style>
-.admin-shell { max-width: 1180px; margin: 0 auto; }
 .admin-hero {
-    background: #111;
-    color: #f3d27a;
-    border: 1px solid #b89238;
-    border-radius: 16px;
-    padding: 1.25rem;
-    margin-bottom: 1rem;
+    background: #080808;
+    border: 2px solid #c59a32;
+    border-radius: 24px;
+    padding: 1rem;
+    box-shadow: 0 16px 38px rgba(0,0,0,.16);
+    margin-bottom: 1.5rem;
 }
-.metric-grid,
-.menu-grid {
+.admin-hero-inner {
+    background: rgba(255,255,255,.94);
+    border-radius: 18px;
+    padding: 1.6rem;
+}
+.admin-kicker {
+    color: #a57c18;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    font-size: .72rem;
+    font-weight: 800;
+}
+.admin-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 1rem;
+    margin-bottom: 1.5rem;
 }
-.metric,
-.menu-card {
-    background: #fffaf0;
-    border: 1px solid rgba(184,146,56,.35);
-    border-radius: 14px;
-    padding: 1rem;
+.admin-card {
+    background: rgba(255,255,255,.9);
+    border: 1px solid rgba(188,150,45,.16);
+    border-radius: 18px;
     box-shadow: 0 8px 20px rgba(0,0,0,.06);
+    padding: 1rem;
 }
-.metric-label { color: #7b5c12; font-size: .72rem; text-transform: uppercase; font-weight: 900; }
-.metric-value { font-size: 1.85rem; font-weight: 950; }
-.menu-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 1rem; }
-.menu-card {
+.admin-card-link {
     display: block;
-    min-height: 150px;
+    min-height: 160px;
+    background: rgba(255,255,255,.9);
+    border: 1px solid rgba(188,150,45,.18);
+    border-radius: 18px;
+    box-shadow: 0 8px 20px rgba(0,0,0,.06);
+    padding: 1rem;
+    color: #17130a;
     text-decoration: none;
+}
+.admin-card-link:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 26px rgba(0,0,0,.10);
     color: #17130a;
 }
-.menu-card:hover { background: #f2e3bd; color: #17130a; }
-.menu-card h2 { font-family: Georgia, serif; font-size: 1.35rem; font-weight: 800; }
-@media (max-width: 900px) { .metric-grid, .menu-grid { grid-template-columns: 1fr; } }
+.admin-label {
+    color: #a57c18;
+    font-weight: 800;
+    font-size: .78rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+}
+.admin-value {
+    font-family: Georgia, serif;
+    font-size: 2rem;
+    font-weight: 700;
+    color: #111;
+}
+.admin-card-link h2 {
+    font-family: Georgia, serif;
+    font-size: 1.35rem;
+    font-weight: 800;
+    margin-bottom: .45rem;
+}
+.workspace-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+@media (max-width: 992px) {
+    .admin-grid, .workspace-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 576px) {
+    .admin-grid, .workspace-grid { grid-template-columns: 1fr; }
+}
 </style>
 
-<div class="admin-shell">
-    <section class="admin-hero">
-        <div class="small text-uppercase fw-bold">Platform Mission Control</div>
-        <h1 class="mb-1">Super Admin</h1>
-        <p class="mb-0 text-white-50">Choose one workspace. Each menu item opens its own page.</p>
-    </section>
-
-    <div class="metric-grid">
-        <div class="metric"><div class="metric-label">Owners</div><div class="metric-value">{{ owner_groups|length }}</div></div>
-        <div class="metric"><div class="metric-label">Properties</div><div class="metric-value">{{ properties.count }}</div></div>
-        <div class="metric"><div class="metric-label">Resident Files</div><div class="metric-value">{{ applications.count }}</div></div>
-        <div class="metric"><div class="metric-label">Site Payments</div><div class="metric-value">${{ site_payment_total }}</div></div>
+<div class="admin-hero">
+    <div class="admin-hero-inner">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+                <div class="admin-kicker">Platform Mission Control</div>
+                <h1 class="section-title mb-1">Super Admin Control Center</h1>
+                <p class="text-muted mb-0">
+                    Inspect owners, properties, resident files, payments, dashboards, and system tools from one clean command screen.
+                </p>
+            </div>
+            <span class="badge text-bg-dark p-3">Super Admin Access</span>
+        </div>
     </div>
+</div>
 
-    <div class="menu-grid">
-        <a href="{% url 'superadmin_owners' %}" class="menu-card">
-            <h2>Owners & Properties</h2>
-            <p class="text-muted mb-0">Open each owner and drill into their properties.</p>
-        </a>
-
-        <a href="{% url 'superadmin_residents' %}" class="menu-card">
-            <h2>Resident Inspection</h2>
-            <p class="text-muted mb-0">Open tenant dashboards without logging out.</p>
-        </a>
-
-        <a href="{% url 'landlord_dashboard' %}" class="menu-card">
-            <h2>Landlord Operations</h2>
-            <p class="text-muted mb-0">Applications, messages, resident files, and payment operations.</p>
-        </a>
-
-        <a href="{% url 'property_owner_dashboard' %}" class="menu-card">
-            <h2>Owner Dashboard</h2>
-            <p class="text-muted mb-0">Portfolio and property-owner financial view.</p>
-        </a>
-
-        <a href="{% url 'payment_log' %}" class="menu-card">
-            <h2>Money Matters</h2>
-            <p class="text-muted mb-0">Payments received through the site and manual records.</p>
-        </a>
-
-        <a href="{% url 'property_blog_manager' %}" class="menu-card">
-            <h2>Property Blogs</h2>
-            <p class="text-muted mb-0">Create property posts and approve comments.</p>
-        </a>
-
-        <a href="{% url 'properties_list' %}" class="menu-card">
-            <h2>Public Properties</h2>
-            <p class="text-muted mb-0">Review the public property experience.</p>
-        </a>
-
-        <a href="{% url 'financial_upload' %}" class="menu-card">
-            <h2>Accounting Imports</h2>
-            <p class="text-muted mb-0">Upload source files and financial exports.</p>
-        </a>
-
-        <a href="/admin/" class="menu-card">
-            <h2>Django Admin</h2>
-            <p class="text-muted mb-0">Fallback backend access when needed.</p>
-        </a>
+<div class="admin-grid">
+    <div class="admin-card">
+        <div class="admin-label">Owners</div>
+        <div class="admin-value">{{ owner_groups|length }}</div>
+        <div class="text-muted">Property owner groups</div>
     </div>
+    <div class="admin-card">
+        <div class="admin-label">Properties</div>
+        <div class="admin-value">{{ properties.count }}</div>
+        <div class="text-muted">Public and managed properties</div>
+    </div>
+    <div class="admin-card">
+        <div class="admin-label">Resident Files</div>
+        <div class="admin-value">{{ applications.count }}</div>
+        <div class="text-muted">Applications / resident records</div>
+    </div>
+    <div class="admin-card">
+        <div class="admin-label">Site Payments</div>
+        <div class="admin-value">${{ site_payment_total }}</div>
+        <div class="text-muted">Completed payments recorded</div>
+    </div>
+</div>
+
+<h2 class="section-title mb-3">Workspaces</h2>
+
+<div class="workspace-grid">
+    <a href="{% url 'superadmin_owners' %}" class="admin-card-link">
+        <h2>Owners & Properties</h2>
+        <p class="text-muted mb-0">Open owners and drill into each property.</p>
+    </a>
+
+    <a href="{% url 'superadmin_residents' %}" class="admin-card-link">
+        <h2>Resident Inspection</h2>
+        <p class="text-muted mb-0">Open any tenant dashboard without logging out or changing users.</p>
+    </a>
+
+    <a href="{% url 'landlord_dashboard' %}" class="admin-card-link">
+        <h2>Landlord Operations</h2>
+        <p class="text-muted mb-0">Applications, resident files, messages, documents, and payments.</p>
+    </a>
+
+    <a href="{% url 'property_owner_dashboard' %}" class="admin-card-link">
+        <h2>Owner Dashboard</h2>
+        <p class="text-muted mb-0">Portfolio view for owner financial review.</p>
+    </a>
+
+    <a href="{% url 'payment_log' %}" class="admin-card-link">
+        <h2>Money Matters</h2>
+        <p class="text-muted mb-0">Payments made through the site, manual receipts, and exports.</p>
+    </a>
+
+    <a href="{% url 'property_blog_manager' %}" class="admin-card-link">
+        <h2>Property Blogs</h2>
+        <p class="text-muted mb-0">Create property updates and approve submitted comments.</p>
+    </a>
+
+    <a href="{% url 'properties_list' %}" class="admin-card-link">
+        <h2>Public Properties</h2>
+        <p class="text-muted mb-0">Review the public property experience.</p>
+    </a>
+
+    <a href="{% url 'financial_upload' %}" class="admin-card-link">
+        <h2>Accounting Imports</h2>
+        <p class="text-muted mb-0">Upload accounting exports and source files.</p>
+    </a>
+
+    <a href="/admin/" class="admin-card-link">
+        <h2>Django Admin</h2>
+        <p class="text-muted mb-0">Fallback backend access when raw record editing is needed.</p>
+    </a>
 </div>
 
 {% endblock %}

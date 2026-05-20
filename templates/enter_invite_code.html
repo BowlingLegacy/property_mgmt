@@ -63,6 +63,11 @@
         <input type="text" name="invite_code" placeholder="Enter your code" required>
         <button type="submit">Continue</button>
     </form>
+
+    <p style="margin-top:18px;">
+        Code expired?
+        <a href="{% url 'request_invite_code' %}">Request a new invite code</a>
+    </p>
 </div>
 
 </body>

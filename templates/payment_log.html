@@ -72,6 +72,7 @@
                                         <th>Deposit Paid</th>
                                         <th>Date / Time Paid</th>
                                         <th>Status</th>
+                                        <th>Receipt</th>
                                     </tr>
                                 </thead>
 
@@ -99,6 +100,11 @@
                                             <td>${{ payment.application.deposit_paid }}</td>
                                             <td>{{ payment.created_at }}</td>
                                             <td>{{ payment.get_status_display }}</td>
+                                            <td>
+                                                <a href="{% url 'payment_receipt' payment.id %}" class="btn btn-outline-dark btn-sm">
+                                                    Print
+                                                </a>
+                                            </td>
                                         </tr>
                                     {% endfor %}
                                 </tbody>

@@ -369,6 +369,16 @@ class InviteCodeForm(forms.Form):
     )
 
 
+class ReplacementInviteCodeForm(forms.Form):
+    email = forms.EmailField(
+        label="Email on your application",
+        widget=forms.EmailInput(attrs={
+            "class": "form-control",
+            "placeholder": "Enter the email used on your application",
+        }),
+    )
+
+
 class SignUpForm(UserCreationForm):
     class Meta:
         model = User

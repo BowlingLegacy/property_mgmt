@@ -2,85 +2,245 @@
 {% block content %}
 
 <style>
-.dash-shell { max-width: 1180px; margin: 0 auto; }
-.dash-hero {
-    background: #111;
-    color: #f3d27a;
-    border: 1px solid #b89238;
-    border-radius: 16px;
-    padding: 1.25rem;
+body {
+    background: linear-gradient(180deg, #faf6ee 0%, #f2ead9 100%);
+    color: #1f1f1f;
+}
+.page-shell {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+.ops-wrap { padding-bottom: 2rem; }
+.ops-shell {
+    display: grid;
+    grid-template-columns: 255px minmax(0, 1fr);
+    gap: 1.5rem;
+}
+.ops-sidebar {
+    background: rgba(24,24,24,.96);
+    border: 1px solid rgba(197,154,50,.34);
+    border-radius: 20px;
+    padding: 1.2rem;
+    min-height: calc(100vh - 160px);
+    box-shadow: 0 8px 20px rgba(0,0,0,.08);
+}
+.ops-logo {
+    text-align: center;
+    border-bottom: 1px solid rgba(197,154,50,.35);
+    padding-bottom: 1rem;
     margin-bottom: 1rem;
 }
-.dash-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1rem;
+.ops-logo img { width: 118px; height: 118px; object-fit: contain; }
+.ops-logo-title {
+    font-family: Georgia, serif;
+    color: #f6ead1;
+    font-weight: 700;
+    font-size: 1.1rem;
+    margin-top: .6rem;
 }
-.dash-card {
+.ops-logo-subtitle {
+    color: #c59a32;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    font-size: .68rem;
+}
+.ops-nav-label {
+    color: #c59a32;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    font-size: .68rem;
+    font-weight: 700;
+    margin: 1rem .55rem .4rem;
+}
+.ops-nav a {
     display: block;
-    min-height: 150px;
-    background: #fffaf0;
-    border: 1px solid rgba(184,146,56,.35);
-    border-radius: 14px;
-    padding: 1rem;
+    color: #f7f0df;
     text-decoration: none;
-    color: #17130a;
+    padding: .72rem .85rem;
+    border-radius: 12px;
+    font-weight: 700;
+    margin-bottom: .25rem;
+    border: 1px solid transparent;
+}
+.ops-nav a:hover,
+.ops-nav a.active {
+    border-color: rgba(197,154,50,.65);
+    background: rgba(197,154,50,.12);
+    color: #fff;
+}
+.ops-main { min-width: 0; }
+.ops-hero,
+.soft-card,
+.workspace-card {
+    background: rgba(255,255,255,.9);
+    border: 1px solid rgba(188,150,45,.15);
+    border-radius: 20px;
     box-shadow: 0 8px 20px rgba(0,0,0,.06);
 }
-.dash-card:hover { background: #f2e3bd; color: #17130a; }
-.dash-card h2 { font-family: Georgia, serif; font-size: 1.35rem; font-weight: 800; margin-bottom: .4rem; }
-.dash-count { font-size: 2rem; font-weight: 900; color: #9a7419; }
-.top-actions { display: flex; gap: .6rem; flex-wrap: wrap; justify-content: flex-end; margin-bottom: 1rem; }
-@media (max-width: 900px) { .dash-grid { grid-template-columns: 1fr; } }
+.ops-hero {
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+.ops-eyebrow {
+    color: #a57c18;
+    letter-spacing: 5px;
+    font-size: .72rem;
+    text-transform: uppercase;
+    font-weight: 700;
+    margin-bottom: .4rem;
+}
+.ops-title {
+    font-family: Georgia, serif;
+    color: #1c1c1c;
+    font-size: 2.7rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: .35rem;
+}
+.ops-text { color: #555; font-size: 1.05rem; }
+.metric-grid,
+.workspace-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+.metric-card {
+    background: #fff;
+    border: 1px solid rgba(188,150,45,.18);
+    border-radius: 18px;
+    padding: 1rem;
+    box-shadow: 0 8px 20px rgba(0,0,0,.05);
+}
+.metric-label {
+    color: #a57c18;
+    font-size: .72rem;
+    font-weight: 900;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+.metric-value {
+    font-family: Georgia, serif;
+    font-size: 2rem;
+    font-weight: 700;
+    color: #111;
+}
+.workspace-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.workspace-card {
+    display: block;
+    min-height: 165px;
+    padding: 1.1rem;
+    text-decoration: none;
+    color: #17130a;
+}
+.workspace-card:hover { background: #fff7e8; color: #17130a; }
+.workspace-card h2 {
+    font-family: Georgia, serif;
+    font-size: 1.4rem;
+    font-weight: 800;
+    margin-bottom: .45rem;
+}
+.badge-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 999px;
+    background: #111;
+    color: #f3d27a;
+    font-weight: 900;
+    margin-bottom: .65rem;
+}
+@media (max-width: 992px) {
+    .ops-shell { grid-template-columns: 1fr; }
+    .ops-sidebar { min-height: auto; }
+    .metric-grid, .workspace-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 576px) {
+    .metric-grid, .workspace-grid { grid-template-columns: 1fr; }
+}
 </style>
 
-<div class="dash-shell">
-    <div class="top-actions">
-        {% if request.user.is_superuser or request.user.role == "admin" %}
-            <a href="{% url 'superadmin_dashboard' %}" class="btn btn-outline-dark">Back to Super Admin</a>
-        {% endif %}
-        <a href="{% url 'logout' %}" class="btn btn-outline-secondary">Logout</a>
-    </div>
+<div class="ops-wrap">
+    <div class="ops-shell">
+        <aside class="ops-sidebar">
+            <div class="ops-logo">
+                <img src="/static/images/bl-logo.png" alt="Bowling Legacy Logo">
+                <div class="ops-logo-title">Bowling Legacy</div>
+                <div class="ops-logo-subtitle">RentLogic</div>
+            </div>
 
-    <section class="dash-hero">
-        <div class="small text-uppercase fw-bold">Landlord Operations</div>
-        <h1 class="mb-1">Choose a Workspace</h1>
-        <p class="mb-0 text-white-50">Open one category at a time. Nothing is hidden down-page.</p>
-    </section>
+            <nav class="ops-nav">
+                <div class="ops-nav-label">Operations</div>
+                <a href="{% url 'landlord_dashboard' %}" class="active">Dashboard</a>
+                <a href="{% url 'landlord_attention' %}">Needs Attention</a>
+                <a href="{% url 'landlord_resident_files' %}">Resident Files</a>
 
-    <div class="dash-grid">
-        <a href="{% url 'landlord_attention' %}" class="dash-card">
-            <h2>Needs Attention</h2>
-            <div class="dash-count">{{ attention_count }}</div>
-            <p class="text-muted mb-0">New applications, messages, and uploaded documents.</p>
-        </a>
+                <div class="ops-nav-label">Money Matters</div>
+                <a href="{% url 'payment_log' %}">Payment Log</a>
+                <a href="{% url 'record_manual_payment' %}">Record Payment</a>
+                <a href="{% url 'rent_roll' %}">Rent Roll</a>
+                <a href="{% url 'financial_upload' %}">Expense Imports</a>
 
-        <a href="{% url 'landlord_resident_files' %}" class="dash-card">
-            <h2>Resident Files</h2>
-            <div class="dash-count">{{ applications.count }}</div>
-            <p class="text-muted mb-0">Resident records, applications, room setup, and portal access.</p>
-        </a>
+                <div class="ops-nav-label">Account</div>
+                {% if request.user.is_superuser or request.user.role == "admin" %}
+                    <a href="{% url 'superadmin_dashboard' %}">Back to Super Admin</a>
+                {% endif %}
+                <a href="{% url 'logout' %}">Logout</a>
+            </nav>
+        </aside>
 
-        <a href="{% url 'payment_log' %}" class="dash-card">
-            <h2>Rent Payment Matters</h2>
-            <div class="dash-count">{{ payments.count }}</div>
-            <p class="text-muted mb-0">Online payments, manual payments, bank transfers, and Cash App tracking.</p>
-        </a>
+        <main class="ops-main">
+            <section class="ops-hero">
+                <div class="ops-eyebrow">Landlord Operations</div>
+                <h1 class="ops-title">Welcome back, {{ user.username }}</h1>
+                <p class="ops-text mb-0">Choose a workspace below. Each item opens its own page so the dashboard stays clean.</p>
+            </section>
 
-        <a href="{% url 'record_manual_payment' %}" class="dash-card">
-            <h2>Record Payment</h2>
-            <p class="text-muted mb-0">Enter a bank, Cash App, cash, check, or other payment received outside Stripe.</p>
-        </a>
+            <div class="metric-grid">
+                <div class="metric-card"><div class="metric-label">Needs Attention</div><div class="metric-value">{{ attention_count }}</div></div>
+                <div class="metric-card"><div class="metric-label">New Applications</div><div class="metric-value">{{ new_application_count }}</div></div>
+                <div class="metric-card"><div class="metric-label">New Messages</div><div class="metric-value">{{ new_message_count }}</div></div>
+                <div class="metric-card"><div class="metric-label">Resident Files</div><div class="metric-value">{{ applications.count }}</div></div>
+            </div>
 
-        <a href="{% url 'financial_upload' %}" class="dash-card">
-            <h2>Operating / Capital Expenses</h2>
-            <p class="text-muted mb-0">Upload accounting exports and expense source files.</p>
-        </a>
+            <div class="workspace-grid">
+                <a href="{% url 'landlord_attention' %}" class="workspace-card">
+                    <div class="badge-count">{{ attention_count }}</div>
+                    <h2>Needs Attention</h2>
+                    <p class="text-muted mb-0">New applications, messages, and incoming documents.</p>
+                </a>
 
-        <a href="{% url 'property_blog_manager' %}" class="dash-card">
-            <h2>Property Blogs</h2>
-            <p class="text-muted mb-0">Create property updates and approve comments.</p>
-        </a>
+                <a href="{% url 'landlord_resident_files' %}" class="workspace-card">
+                    <div class="badge-count">{{ applications.count }}</div>
+                    <h2>Resident Files</h2>
+                    <p class="text-muted mb-0">Applications, balances, rooms, and tenant dashboard inspection.</p>
+                </a>
+
+                <a href="{% url 'payment_log' %}" class="workspace-card">
+                    <h2>Rent Payment Matters</h2>
+                    <p class="text-muted mb-0">Stripe payments, manual payments, receipts, bank transfers, and Cash App tracking.</p>
+                </a>
+
+                <a href="{% url 'record_manual_payment' %}" class="workspace-card">
+                    <h2>Record Payment</h2>
+                    <p class="text-muted mb-0">Enter payments received outside Stripe and print receipts.</p>
+                </a>
+
+                <a href="{% url 'financial_upload' %}" class="workspace-card">
+                    <h2>Operating / Capital Expenses</h2>
+                    <p class="text-muted mb-0">Upload accounting exports and source documents.</p>
+                </a>
+
+                <a href="{% url 'property_blog_manager' %}" class="workspace-card">
+                    <h2>Property Blogs</h2>
+                    <p class="text-muted mb-0">Post property updates and approve comments.</p>
+                </a>
+            </div>
+        </main>
     </div>
 </div>
 

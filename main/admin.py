@@ -28,6 +28,8 @@ class CustomUserAdmin(UserAdmin):
                 "email",
                 "role",
                 "invite_code",
+                "invite_code_created_at",
+                "invite_code_used_at",
                 "is_active",
             )
         }),
@@ -63,6 +65,8 @@ class CustomUserAdmin(UserAdmin):
 
     readonly_fields = (
         "invite_code",
+        "invite_code_created_at",
+        "invite_code_used_at",
         "linked_resident_profile",
         "resident_property",
         "resident_unit",

@@ -26,6 +26,7 @@ from .forms import (
     SignUpForm,
     ManualPaymentForm,
     ResidentProfilePhotoForm,
+    ReplacementInviteCodeForm,
 )
 
 from .models import (
@@ -154,6 +155,12 @@ def signup(request):
     pending_user = get_object_or_404(User, id=pending_user_id)
     profile = get_object_or_404(HousingApplication, id=pending_profile_id)
 
+    if not pending_user.invite_code_is_valid():
+        request.session.pop("pending_resident_user_id", None)
+        request.session.pop("pending_resident_profile_id", None)
+        messages.error(request, "That invite code expired. Request a new code to continue.")
+        return redirect("request_invite_code")
+
     if request.method == "POST":
         form = SignUpForm(request.POST)
 
@@ -168,6 +175,8 @@ def signup(request):
 
             if not pending_user.has_usable_password() and pending_user.id != user.id:
                 pending_user.delete()
+            else:
+                pending_user.mark_invite_code_used()
 
             request.session.pop("pending_resident_user_id", None)
             request.session.pop("pending_resident_profile_id", None)
@@ -195,6 +204,10 @@ def enter_invite_code(request):
             messages.error(request, "Invalid access code.")
             return redirect("enter_invite_code")
 
+        if not user_with_code.invite_code_is_valid():
+            messages.error(request, "That invite code expired. Request a new code to continue.")
+            return redirect("request_invite_code")
+
         profile = HousingApplication.objects.filter(user=user_with_code).first()
 
         if not profile:
@@ -211,6 +224,35 @@ def enter_invite_code(request):
         return redirect("signup")
 
     return render(request, "enter_invite_code.html", {"form": form})
+
+
+def request_invite_code(request):
+    form = ReplacementInviteCodeForm(request.POST or None)
+
+    if request.method == "POST" and form.is_valid():
+        email = form.cleaned_data["email"].strip()
+        profile = (
+            HousingApplication.objects
+            .select_related("user")
+            .filter(email__iexact=email, user__isnull=False)
+            .first()
+        )
+
+        if profile and profile.user and not profile.user.has_usable_password():
+            try:
+                profile.user.refresh_invite_code()
+                from .landlord_views import send_resident_invite_email
+                send_resident_invite_email(profile)
+            except Exception:
+                pass
+
+        messages.success(
+            request,
+            "If an approved unregistered resident file matches that email, a new invite code has been sent.",
+        )
+        return redirect("enter_invite_code")
+
+    return render(request, "request_invite_code.html", {"form": form})
 
 def get_landlord_workspace_context():
     applications = (
@@ -657,7 +699,7 @@ def record_manual_payment(request):
             apply_completed_payment_to_balance(payment)
 
             messages.success(request, "Manual payment recorded and resident balance updated.")
-            return redirect("payment_log")
+            return redirect("payment_receipt", payment_id=payment.id)
     else:
         initial = {}
         application_id = request.GET.get("application")
@@ -668,6 +710,17 @@ def record_manual_payment(request):
         form = ManualPaymentForm(initial=initial)
 
     return render(request, "record_manual_payment.html", {"form": form})
+
+
+@login_required
+@user_passes_test(staff_required)
+def payment_receipt(request, payment_id):
+    payment = get_object_or_404(
+        Payment.objects.select_related("application", "application__property", "recorded_by"),
+        id=payment_id,
+    )
+
+    return render(request, "payment_receipt.html", {"payment": payment})
 
 
 @login_required

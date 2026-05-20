@@ -54,24 +54,39 @@ class User(AbstractUser):
 
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="tenant")
     invite_code = models.CharField(max_length=6, blank=True, null=True, unique=True)
+    invite_code_created_at = models.DateTimeField(blank=True, null=True)
+    invite_code_used_at = models.DateTimeField(blank=True, null=True)
 
     def save(self, *args, **kwargs):
-        is_new = self.pk is None
-
-        if not self.invite_code:
-            self.invite_code = self.generate_unique_code()
-
         if self.role == "tenant":
             self.is_staff = False
             self.is_superuser = False
 
         super().save(*args, **kwargs)
 
-    def generate_unique_code(self):
+    @classmethod
+    def generate_unique_code(cls):
         while True:
             code = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
-            if not User.objects.filter(invite_code=code).exists():
+            if not cls.objects.filter(invite_code=code).exists():
                 return code
+
+    def refresh_invite_code(self):
+        self.invite_code = self.generate_unique_code()
+        self.invite_code_created_at = timezone.now()
+        self.invite_code_used_at = None
+        self.save(update_fields=["invite_code", "invite_code_created_at", "invite_code_used_at"])
+
+    def invite_code_is_valid(self):
+        if not self.invite_code or self.invite_code_used_at or not self.invite_code_created_at:
+            return False
+
+        return timezone.now() <= self.invite_code_created_at + timezone.timedelta(minutes=30)
+
+    def mark_invite_code_used(self):
+        self.invite_code_used_at = timezone.now()
+        self.invite_code = None
+        self.save(update_fields=["invite_code", "invite_code_used_at"])
 
     def __str__(self):
         return self.username

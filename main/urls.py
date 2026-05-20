@@ -14,6 +14,7 @@ urlpatterns = [
     path("apply/", views.apply, name="apply"),
     path("apply/success/", views.apply_success, name="apply_success"),
     path("enter-invite-code/", views.enter_invite_code, name="enter_invite_code"),
+    path("request-invite-code/", views.request_invite_code, name="request_invite_code"),
 
     path("signup/", views.signup, name="signup"),
     path("login/", portal_auth_views.role_login, name="login"),
@@ -57,6 +58,7 @@ urlpatterns = [
 
     path("payment-log/", views.payment_log, name="payment_log"),
     path("record-payment/", views.record_manual_payment, name="record_manual_payment"),
+    path("payment/<int:payment_id>/receipt/", views.payment_receipt, name="payment_receipt"),
     path("rent-roll/", views.rent_roll, name="rent_roll"),
     path("t12-report/", views.t12_report, name="t12_report"),
     path("financial-upload/", views.financial_upload, name="financial_upload"),
