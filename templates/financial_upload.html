@@ -24,18 +24,27 @@
 
 <div class="container my-5">
 
-    <h1 class="fw-bold mb-4">Financial Upload</h1>
+    <h1 class="fw-bold mb-2">Accounting Data Import</h1>
+    <p class="text-muted mb-4">
+        Bring in rent rolls, income ledgers, expense exports, bank activity, and accounting reports from QuickBooks,
+        Google Sheets exports, property management software, bank portals, or other commercial property systems.
+    </p>
 
     <div class="card shadow-sm mb-4">
         <div class="card-body">
-            <h4 class="fw-bold mb-3">Upload Excel Workbook</h4>
+            <h4 class="fw-bold mb-2">Upload Source File</h4>
+            <p class="text-muted">
+                Use this intake point for CSV, Excel, Google Sheets exports, QuickBooks reports, rent rolls,
+                owner statements, and other accounting-system exports. Imported data should be reviewed before it is
+                treated as final books.
+            </p>
 
             <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
                 {{ form.as_p }}
 
                 <button type="submit" class="btn btn-primary">
-                    Upload and Parse
+                    Upload For Review
                 </button>
             </form>
         </div>
@@ -43,7 +52,7 @@
 
     <div class="card shadow-sm">
         <div class="card-body">
-            <h4 class="fw-bold mb-3">Previous Uploads</h4>
+            <h4 class="fw-bold mb-3">Import History</h4>
 
             {% if uploads %}
                 <div class="table-responsive">
@@ -52,7 +61,7 @@
                             <tr>
                                 <th>Name</th>
                                 <th>Uploaded</th>
-                                <th>Parsed</th>
+                                <th>Reviewed</th>
                                 <th>Entries</th>
                             </tr>
                         </thead>
@@ -69,7 +78,7 @@
                     </table>
                 </div>
             {% else %}
-                <p class="text-muted">No financial uploads yet.</p>
+                <p class="text-muted">No accounting imports yet.</p>
             {% endif %}
         </div>
     </div>

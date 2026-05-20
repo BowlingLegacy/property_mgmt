@@ -4,6 +4,7 @@ from . import views
 from . import owner_views
 from . import landlord_views
 from . import auth_views as portal_auth_views
+from . import blog_views
 
 urlpatterns = [
     path("", views.home, name="home"),
@@ -39,13 +40,19 @@ urlpatterns = [
     ), name="password_reset_complete"),
 
     path("tenant-dashboard/", views.tenant_dashboard, name="tenant_dashboard"),
+    path("tenant-dashboard/profile-photo/", views.update_resident_profile_photo, name="update_resident_profile_photo"),
     path("landlord-dashboard/", views.landlord_dashboard, name="landlord_dashboard"),
     path("owner-dashboard/", owner_views.property_owner_dashboard, name="property_owner_dashboard"),
     path("superadmin-dashboard/", views.superadmin_dashboard, name="superadmin_dashboard"),
+    path("property-blogs/", blog_views.blog_manager, name="property_blog_manager"),
+    path("property-blogs/create/", blog_views.blog_create, name="property_blog_create"),
+    path("property-blogs/comments/<int:comment_id>/approve/", blog_views.approve_blog_comment, name="approve_blog_comment"),
     path("landlord/create-tenant/", landlord_views.create_tenant, name="landlord_create_tenant"),
     path("landlord-message/<int:message_id>/", views.landlord_message_detail, name="landlord_message_detail"),
+    path("document/<int:document_id>/reviewed/", views.mark_document_reviewed, name="mark_document_reviewed"),
 
     path("payment-log/", views.payment_log, name="payment_log"),
+    path("record-payment/", views.record_manual_payment, name="record_manual_payment"),
     path("rent-roll/", views.rent_roll, name="rent_roll"),
     path("t12-report/", views.t12_report, name="t12_report"),
     path("financial-upload/", views.financial_upload, name="financial_upload"),
@@ -66,6 +73,8 @@ urlpatterns = [
 
     path("lease/sign/", views.lease_sign, name="lease_sign"),
     path("lease/submit/", views.submit_lease_signature, name="submit_lease_signature"),
+    path("onboarding/document/<int:document_id>/", views.onboarding_document, name="onboarding_document"),
+    path("onboarding/document/<int:document_id>/submit/", views.submit_onboarding_document, name="submit_onboarding_document"),
 
     path("pay/<int:application_id>/", views.create_checkout_session, name="pay_rent"),
     path("pay/<int:application_id>/<str:payment_type>/", views.create_checkout_session, name="pay_by_type"),

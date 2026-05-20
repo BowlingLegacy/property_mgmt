@@ -14,6 +14,7 @@ from .models import (
     FinancialUpload,
     FinancialEntry,
     ResidentMessage,
+    SignedDocument,
 )
 
 
@@ -201,6 +202,26 @@ class ResidentMessageInline(admin.TabularInline):
     )
 
 
+class SignedDocumentInline(admin.TabularInline):
+    model = SignedDocument
+    extra = 0
+    can_delete = False
+
+    readonly_fields = (
+        "document_type",
+        "title",
+        "resident_signature",
+        "signed_at",
+        "locked",
+        "created_at",
+    )
+
+    fields = readonly_fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
 class PaymentInline(admin.TabularInline):
     model = Payment
     extra = 0
@@ -208,9 +229,13 @@ class PaymentInline(admin.TabularInline):
 
     readonly_fields = (
         "payment_type",
+        "payment_method",
         "description",
+        "reference_number",
         "amount",
         "status",
+        "recorded_by",
+        "received_at",
         "created_at",
     )
 
@@ -241,6 +266,7 @@ class RentHistoryInline(admin.TabularInline):
 class HousingApplicationAdmin(admin.ModelAdmin):
     inlines = [
         ApplicantDocumentInline,
+        SignedDocumentInline,
         ResidentMessageInline,
         PaymentInline,
         RentHistoryInline,
@@ -422,13 +448,16 @@ class ResidentMessageAdmin(admin.ModelAdmin):
 
 @admin.register(BlogPost)
 class BlogPostAdmin(admin.ModelAdmin):
-    list_display = ("title", "created_at")
+    list_display = ("title", "property", "author", "created_at")
+    list_filter = ("property", "created_at")
+    search_fields = ("title", "body", "property__name", "author__username")
 
 
 @admin.register(BlogComment)
 class BlogCommentAdmin(admin.ModelAdmin):
     list_display = ("name", "post", "approved", "created_at")
-    list_filter = ("approved",)
+    list_filter = ("approved", "post__property")
+    search_fields = ("name", "email", "comment", "post__title", "post__property__name")
 
 
 @admin.register(Payment)
@@ -436,7 +465,17 @@ class PaymentAdmin(admin.ModelAdmin):
     list_display = (
         "application",
         "payment_type",
+        "payment_method",
         "amount",
+        "status",
+        "reference_number",
+        "recorded_by",
+        "created_at",
+    )
+
+    list_filter = (
+        "payment_type",
+        "payment_method",
         "status",
         "created_at",
     )
@@ -444,9 +483,14 @@ class PaymentAdmin(admin.ModelAdmin):
     readonly_fields = (
         "application",
         "payment_type",
+        "payment_method",
         "description",
+        "reference_number",
+        "notes",
         "amount",
         "status",
+        "recorded_by",
+        "received_at",
         "stripe_session_id",
         "stripe_payment_intent",
         "created_at",

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container my-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+        <div>
+            <h1 class="fw-bold mb-1">Property Blogs</h1>
+            <p class="text-muted mb-0">Create property-specific updates and approve submitted comments.</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            {% if request.user.is_superuser %}
+                <a href="{% url 'superadmin_dashboard' %}" class="btn btn-outline-dark">Back to Super Admin</a>
+            {% endif %}
+            <a href="{% url 'property_blog_create' %}" class="btn btn-primary">Create Blog Post</a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h3 class="fw-bold mb-3">Posts</h3>
+                    {% for post in posts %}
+                        <div class="border rounded p-3 mb-3">
+                            <div class="text-muted small">{{ post.property.name|default:"No Property" }} | {{ post.created_at|date:"M j, Y" }}</div>
+                            <h4 class="fw-bold">{{ post.title }}</h4>
+                            <p class="mb-0">{{ post.body|truncatewords:35 }}</p>
+                        </div>
+                    {% empty %}
+                        <p class="text-muted">No property blog posts yet.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h3 class="fw-bold mb-3">Comments Waiting Approval</h3>
+                    {% for comment in pending_comments %}
+                        <div class="border rounded p-3 mb-3">
+                            <div class="text-muted small">{{ comment.post.property.name|default:"No Property" }} | {{ comment.created_at|date:"M j, Y" }}</div>
+                            <strong>{{ comment.name }}</strong>
+                            <p>{{ comment.comment|linebreaks }}</p>
+                            <form method="post" action="{% url 'approve_blog_comment' comment.id %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-success btn-sm">Approve Comment</button>
+                            </form>
+                        </div>
+                    {% empty %}
+                        <p class="text-muted">No comments waiting for approval.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

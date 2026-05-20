@@ -2,11 +2,12 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.conf import settings
 from django.core.mail import send_mail
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.utils.text import slugify
 
 from .forms import LandlordCreateTenantForm
-from .models import HousingApplication, User
+from .models import HousingApplication, SignedDocument, User
 from .views import staff_required
 
 
@@ -36,10 +37,41 @@ Bowling Legacy Housing
     return True
 
 
+def ensure_onboarding_documents(application):
+    document_specs = [
+        ("lease", "Resident Lease Agreement"),
+        ("emergency_contact", "Emergency Contact Sheet"),
+        ("painted_lady_acknowledgment", "Who We Are / Painted Lady Acknowledgment"),
+    ]
+
+    for document_type, title in document_specs:
+        document, _ = SignedDocument.objects.get_or_create(
+            application=application,
+            document_type=document_type,
+            defaults={
+                "title": title,
+                "lease_sent_date": timezone.localdate(),
+                "landlord_name": "Michael Bowling",
+                "landlord_signature": "Michael Bowling",
+            },
+        )
+
+        if not document.locked:
+            document.title = title
+            document.lease_sent_date = document.lease_sent_date or timezone.localdate()
+            document.landlord_name = document.landlord_name or "Michael Bowling"
+            document.landlord_signature = document.landlord_signature or "Michael Bowling"
+            document.save()
+
+
 @login_required
 @user_passes_test(staff_required)
 def create_tenant(request):
     application_id = request.GET.get("application")
+
+    if not application_id:
+        messages.warning(request, "Choose an application before creating a resident file.")
+        return redirect("landlord_dashboard")
 
     application = get_object_or_404(
         HousingApplication,
@@ -58,6 +90,7 @@ def create_tenant(request):
             application.lease_start_date = form.cleaned_data.get("lease_start_date")
             application.deposit_required = form.cleaned_data.get("deposit_required") or 0
             application.deposit_paid = form.cleaned_data.get("deposit_paid") or 0
+            application.deposit_payment_plan = form.cleaned_data.get("deposit_payment_plan") or "paid_in_full"
             application.utility_monthly = form.cleaned_data.get("utility_monthly") or 0
             application.utility_balance = form.cleaned_data.get("utility_balance") or 0
             application.additional_notes = form.cleaned_data.get("additional_notes") or ""
@@ -87,6 +120,7 @@ def create_tenant(request):
                 application.user = created_user
 
             application.save()
+            ensure_onboarding_documents(application)
 
             email_sent = False
             email_error = ""
@@ -120,6 +154,7 @@ def create_tenant(request):
             "balance": application.balance,
             "deposit_required": application.deposit_required,
             "deposit_paid": application.deposit_paid,
+            "deposit_payment_plan": application.deposit_payment_plan,
             "utility_monthly": application.utility_monthly,
             "utility_balance": application.utility_balance,
             "space_type": application.space_type,

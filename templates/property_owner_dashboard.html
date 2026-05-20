@@ -125,6 +125,10 @@
             <p class="mb-0">Portfolio view organized by property financial folders.</p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
+            {% if request.user.is_superuser %}
+                <a href="{% url 'superadmin_dashboard' %}" class="btn-dark-soft">Back to Super Admin</a>
+            {% endif %}
+            <a href="{% url 'property_blog_manager' %}" class="btn-dark-soft">Property Blogs</a>
             <a href="{% url 'landlord_dashboard' %}" class="btn-dark-soft">Landlord Operations</a>
             <a href="{% url 'rent_roll' %}" class="btn-owner">Monthly Rent Roll</a>
         </div>

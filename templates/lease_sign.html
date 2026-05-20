@@ -188,15 +188,32 @@
                             ${{ signed_document.security_deposit }}
                         </div>
 
+                        <div class="col-md-6 mb-3">
+                            <strong>Deposit Payment Terms:</strong><br>
+                            {{ signed_document.get_deposit_payment_plan_display }}
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <strong>Landlord Signature:</strong><br>
+                            {{ signed_document.landlord_signature }}
+                        </div>
+
                     </div>
 
                 </div>
 
             </div>
 
+            {% if signed_document.locked %}
+                <div class="alert alert-success">
+                    This lease has been signed and filed. It is viewable but no longer editable.
+                </div>
+            {% endif %}
+
             <form method="POST" action="{% url 'submit_lease_signature' %}">
 
                 {% csrf_token %}
+                <fieldset {% if signed_document.locked %}disabled{% endif %}>
 
                 <div class="lease-section">
                     <h3>1. Premises and Purpose</h3>
@@ -231,6 +248,25 @@
                         <li>Returned Check Fee: $50.00 pursuant to ORS 90.302</li>
                     </ul>
 
+                    <p>
+                        This lease becomes binding after move-in costs are paid and the resident has signed and
+                        submitted all required onboarding documents. No key will be issued until the first month's
+                        rent is paid.
+                    </p>
+
+                    <p>
+                        The security deposit is due in full at move-in unless the 90-day deposit payment plan is
+                        approved in writing.
+                    </p>
+
+                    {% if signed_document.deposit_payment_plan == "ninety_day_plan" %}
+                        <div class="alert alert-warning">
+                            <strong>Deposit Payment Amendment:</strong>
+                            The resident has elected to pay the security deposit in no more than three payments over
+                            90 days. Failure to complete the deposit payment schedule is a lease compliance issue.
+                        </div>
+                    {% endif %}
+
                     <label class="fw-bold">
                         Resident Initials
                     </label>
@@ -239,6 +275,7 @@
                            name="rent_initials"
                            class="form-control initial-box"
                            maxlength="10"
+                           value="{{ signed_document.rent_initials }}"
                            required>
 
                 </div>
@@ -292,6 +329,7 @@
                            name="cleanliness_initials"
                            class="form-control initial-box"
                            maxlength="10"
+                           value="{{ signed_document.cleanliness_initials }}"
                            required>
 
                 </div>
@@ -346,6 +384,7 @@
                            name="sobriety_initials"
                            class="form-control initial-box"
                            maxlength="10"
+                           value="{{ signed_document.sobriety_initials }}"
                            required>
 
                 </div>
@@ -391,6 +430,7 @@
                            name="testing_initials"
                            class="form-control initial-box"
                            maxlength="10"
+                           value="{{ signed_document.testing_initials }}"
                            required>
 
                 </div>
@@ -417,6 +457,7 @@
                            name="guest_policy_initials"
                            class="form-control initial-box"
                            maxlength="10"
+                           value="{{ signed_document.guest_policy_initials }}"
                            required>
 
                 </div>
@@ -439,6 +480,7 @@
                            name="disclosure_initials"
                            class="form-control initial-box"
                            maxlength="10"
+                           value="{{ signed_document.disclosure_initials }}"
                            required>
 
                 </div>
@@ -474,6 +516,7 @@
                         <input type="text"
                                name="resident_signature"
                                class="form-control"
+                               value="{{ signed_document.resident_signature }}"
                                required>
                     </div>
 
@@ -483,6 +526,7 @@
                                type="checkbox"
                                name="signature_agreement"
                                id="signatureAgreement"
+                               {% if signed_document.signature_agreement %}checked{% endif %}
                                required>
 
                         <label class="form-check-label"
@@ -495,14 +539,17 @@
 
                     </div>
 
-                    <button type="submit"
-                            class="btn btn-dark btn-lg rounded-pill px-5">
+                    {% if not signed_document.locked %}
+                        <button type="submit"
+                                class="btn btn-dark btn-lg rounded-pill px-5">
 
-                        Sign & Submit Lease
+                            Sign & Submit Lease
 
-                    </button>
+                        </button>
+                    {% endif %}
 
                 </div>
+                </fieldset>
 
             </form>
 

@@ -24,6 +24,8 @@ from .forms import (
     HousingApplicationForm,
     FinancialUploadForm,
     SignUpForm,
+    ManualPaymentForm,
+    ResidentProfilePhotoForm,
 )
 
 from .models import (
@@ -60,9 +62,41 @@ def staff_required(user):
     return user.is_authenticated and (user.is_staff or user.is_superuser)
 
 
+def apply_completed_payment_to_balance(payment):
+    application = payment.application
+
+    if payment.payment_type == "rent":
+        application.balance = max(Decimal("0.00"), application.balance - payment.amount)
+
+    elif payment.payment_type == "deposit":
+        application.deposit_paid = min(application.deposit_required, application.deposit_paid + payment.amount)
+
+    elif payment.payment_type == "utility":
+        application.utility_balance = max(Decimal("0.00"), application.utility_balance - payment.amount)
+
+    elif payment.payment_type == "other" and "combined" in payment.description.lower():
+        remaining = payment.amount
+
+        rent_due = application.balance if application.balance > 0 else Decimal("0.00")
+        rent_paid = min(rent_due, remaining)
+        application.balance = max(Decimal("0.00"), application.balance - rent_paid)
+        remaining -= rent_paid
+
+        deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
+        deposit_paid = min(deposit_due, remaining)
+        application.deposit_paid = min(application.deposit_required, application.deposit_paid + deposit_paid)
+        remaining -= deposit_paid
+
+        utility_due = application.utility_balance if application.utility_balance > 0 else Decimal("0.00")
+        utility_paid = min(utility_due, remaining)
+        application.utility_balance = max(Decimal("0.00"), application.utility_balance - utility_paid)
+
+    application.save()
+
+
 def home(request):
     properties = Property.objects.all()
-    posts = BlogPost.objects.all().order_by("-created_at")[:5]
+    posts = BlogPost.objects.select_related("property").all().order_by("-created_at")[:5]
     return render(request, "home.html", {"properties": properties, "posts": posts})
     
 def properties_list(request):
@@ -199,6 +233,27 @@ def landlord_dashboard(request):
         .order_by("application__property__name", "-created_at")
     )
 
+    new_applications = (
+        HousingApplication.objects
+        .select_related("property", "user")
+        .filter(user__isnull=True)
+        .order_by("-created_at")
+    )
+
+    new_messages = (
+        ResidentMessage.objects
+        .select_related("application", "application__property")
+        .filter(status="submitted")
+        .order_by("-created_at")
+    )
+
+    new_documents = (
+        ApplicantDocument.objects
+        .select_related("application", "application__property")
+        .filter(status="uploaded", landlord_notified=False)
+        .order_by("-created_at")
+    )
+
     landlord_inbox = OrderedDict()
 
     for resident_message in resident_messages:
@@ -211,7 +266,7 @@ def landlord_dashboard(request):
         landlord_inbox.setdefault(property_name, [])
         landlord_inbox[property_name].append(resident_message)
 
-    new_message_count = resident_messages.filter(status="submitted").count()
+    new_message_count = new_messages.count()
 
     return render(request, "landlord_dashboard.html", {
         "applications": applications,
@@ -219,6 +274,16 @@ def landlord_dashboard(request):
         "payments": payments,
         "landlord_inbox": landlord_inbox,
         "new_message_count": new_message_count,
+        "new_applications": new_applications,
+        "new_application_count": new_applications.count(),
+        "new_messages": new_messages,
+        "new_documents": new_documents,
+        "new_document_count": new_documents.count(),
+        "attention_count": (
+            new_applications.count()
+            + new_message_count
+            + new_documents.count()
+        ),
     })
     
 @login_required
@@ -275,6 +340,21 @@ def landlord_message_detail(request, message_id):
 
 
 @login_required
+@user_passes_test(staff_required)
+def mark_document_reviewed(request, document_id):
+    document = get_object_or_404(
+        ApplicantDocument.objects.select_related("application"),
+        id=document_id,
+    )
+
+    document.landlord_notified = True
+    document.save(update_fields=["landlord_notified"])
+
+    messages.success(request, f"{document.name} marked reviewed.")
+    return redirect("landlord_dashboard")
+
+
+@login_required
 def tenant_dashboard(request):
     request.session.set_expiry(0)
 
@@ -282,11 +362,13 @@ def tenant_dashboard(request):
 
     payments = []
     resident_messages = []
+    profile_photo_form = None
     total_due = Decimal("0.00")
 
     if application:
         payments = application.payments.all().order_by("-created_at")
         resident_messages = application.resident_messages.all().order_by("-created_at")
+        profile_photo_form = ResidentProfilePhotoForm(instance=application)
 
         rent_due = application.balance if application.balance > 0 else Decimal("0.00")
         deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
@@ -298,9 +380,32 @@ def tenant_dashboard(request):
         "application": application,
         "payments": payments,
         "resident_messages": resident_messages,
+        "profile_photo_form": profile_photo_form,
         "total_due": total_due,
         "stripe_public_key": settings.STRIPE_PUBLIC_KEY,
     })
+
+
+@login_required
+def update_resident_profile_photo(request):
+    if request.method != "POST":
+        return redirect("tenant_dashboard")
+
+    application = getattr(request.user, "resident_profile", None)
+
+    if not application:
+        messages.error(request, "No resident file connected.")
+        return redirect("tenant_dashboard")
+
+    form = ResidentProfilePhotoForm(request.POST, request.FILES, instance=application)
+
+    if form.is_valid():
+        form.save()
+        messages.success(request, "Profile photo updated.")
+    else:
+        messages.error(request, "Please choose a valid image file.")
+
+    return redirect("tenant_dashboard")
 
 
 @login_required
@@ -463,6 +568,40 @@ def payment_log(request):
         })
 
     return render(request, "payment_log.html", {"payment_log": payment_log_data})
+
+
+@login_required
+@user_passes_test(staff_required)
+def record_manual_payment(request):
+    if request.method == "POST":
+        form = ManualPaymentForm(request.POST)
+
+        if form.is_valid():
+            payment = form.save(commit=False)
+            payment.status = "completed"
+            payment.recorded_by = request.user
+
+            if not payment.received_at:
+                payment.received_at = timezone.now()
+
+            if not payment.description:
+                payment.description = f"Manual {payment.get_payment_method_display()} payment"
+
+            payment.save()
+            apply_completed_payment_to_balance(payment)
+
+            messages.success(request, "Manual payment recorded and resident balance updated.")
+            return redirect("payment_log")
+    else:
+        initial = {}
+        application_id = request.GET.get("application")
+
+        if application_id:
+            initial["application"] = application_id
+
+        form = ManualPaymentForm(initial=initial)
+
+    return render(request, "record_manual_payment.html", {"form": form})
 
 
 @login_required
@@ -658,10 +797,12 @@ def property_financials(request, property_name):
 def property_detail(request, pk):
     property_obj = get_object_or_404(Property, pk=pk)
     gallery_images = property_obj.images.all()
+    posts = property_obj.blog_posts.prefetch_related("comments").select_related("author").order_by("-created_at")
 
     return render(request, "property_detail.html", {
         "property": property_obj,
         "gallery_images": gallery_images,
+        "posts": posts,
     })
 
 
@@ -689,6 +830,21 @@ def printable_application(request, pk):
     application = get_object_or_404(HousingApplication, pk=pk)
     return render(request, "printable_application.html", {"application": application})
 
+
+def get_resident_signed_document(request, document_id):
+    application = getattr(request.user, "resident_profile", None)
+
+    if not application:
+        messages.error(request, "No resident file connected.")
+        return None
+
+    return get_object_or_404(
+        SignedDocument,
+        id=document_id,
+        application=application,
+    )
+
+
 @login_required
 def lease_sign(request):
 
@@ -703,10 +859,6 @@ def lease_sign(request):
         document_type="lease",
     ).first()
 
-    if signed_document and signed_document.locked:
-        messages.info(request, "Your lease has already been signed.")
-        return redirect("tenant_dashboard")
-
     if not signed_document:
         signed_document = SignedDocument.objects.create(
             application=application,
@@ -719,6 +871,25 @@ def lease_sign(request):
         "application": application,
         "signed_document": signed_document,
     })
+
+
+@login_required
+def onboarding_document(request, document_id):
+    signed_document = get_resident_signed_document(request, document_id)
+
+    if not signed_document:
+        return redirect("tenant_dashboard")
+
+    template_name = "lease_sign.html"
+
+    if signed_document.document_type != "lease":
+        template_name = "onboarding_document_sign.html"
+
+    return render(request, template_name, {
+        "application": signed_document.application,
+        "signed_document": signed_document,
+    })
+
 
 @login_required
 def submit_lease_signature(request):
@@ -777,6 +948,52 @@ def submit_lease_signature(request):
     )
 
     return redirect("tenant_dashboard")
+
+
+@login_required
+def submit_onboarding_document(request, document_id):
+    if request.method != "POST":
+        return redirect("tenant_dashboard")
+
+    signed_document = get_resident_signed_document(request, document_id)
+
+    if not signed_document:
+        return redirect("tenant_dashboard")
+
+    if signed_document.locked:
+        messages.info(request, "This document has already been signed and filed.")
+        return redirect("tenant_dashboard")
+
+    if signed_document.document_type == "lease":
+        return submit_lease_signature(request)
+
+    signed_document.emergency_contact_name = request.POST.get("emergency_contact_name", "").strip()
+    signed_document.emergency_contact_phone = request.POST.get("emergency_contact_phone", "").strip()
+    signed_document.emergency_contact_relationship = request.POST.get("emergency_contact_relationship", "").strip()
+    signed_document.emergency_medical_notes = request.POST.get("emergency_medical_notes", "").strip()
+    signed_document.resident_signature = request.POST.get("resident_signature", "").strip()
+    signed_document.signature_agreement = bool(request.POST.get("signature_agreement"))
+
+    if signed_document.document_type == "emergency_contact":
+        if not signed_document.emergency_contact_name or not signed_document.emergency_contact_phone:
+            messages.error(request, "Emergency contact name and phone are required.")
+            return redirect("onboarding_document", document_id=signed_document.id)
+
+    if not signed_document.resident_signature:
+        messages.error(request, "Signature is required.")
+        return redirect("onboarding_document", document_id=signed_document.id)
+
+    if not signed_document.signature_agreement:
+        messages.error(request, "You must agree to electronically sign.")
+        return redirect("onboarding_document", document_id=signed_document.id)
+
+    signed_document.signed_at = timezone.now()
+    signed_document.locked = True
+    signed_document.save()
+
+    messages.success(request, "Document signed and filed.")
+    return redirect("tenant_dashboard")
+
 
 @login_required 
 def create_checkout_session(request, application_id, payment_type="rent"):
@@ -844,13 +1061,14 @@ def create_checkout_session(request, application_id, payment_type="rent"):
     payment = Payment.objects.create(
         application=application,
         payment_type=payment_type,
+        payment_method="stripe_card",
         description=description,
         amount=amount,
         status="pending",
     )
 
     session = stripe.checkout.Session.create(
-        payment_method_types=["card"],
+        payment_method_types=["card", "cashapp"],
         mode="payment",
         line_items=[{
             "price_data": {
@@ -903,36 +1121,14 @@ def stripe_webhook(request):
     payment.stripe_payment_intent = session["payment_intent"]
     payment.save()
 
+    payment_method_types = session.get("payment_method_types", [])
+    if "cashapp" in payment_method_types:
+        payment.payment_method = "stripe_cashapp"
+        payment.save()
+
+    apply_completed_payment_to_balance(payment)
+
     application = payment.application
-
-    if payment.payment_type == "rent":
-        application.balance = max(Decimal("0.00"), application.balance - payment.amount)
-
-    elif payment.payment_type == "deposit":
-        application.deposit_paid = min(application.deposit_required, application.deposit_paid + payment.amount)
-
-    elif payment.payment_type == "utility":
-        application.utility_balance = max(Decimal("0.00"), application.utility_balance - payment.amount)
-
-    elif payment.payment_type == "other" and "combined" in payment.description.lower():
-        remaining = payment.amount
-
-        rent_due = application.balance if application.balance > 0 else Decimal("0.00")
-        rent_paid = min(rent_due, remaining)
-        application.balance = max(Decimal("0.00"), application.balance - rent_paid)
-        remaining -= rent_paid
-
-        deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
-        deposit_paid = min(deposit_due, remaining)
-        application.deposit_paid = min(application.deposit_required, application.deposit_paid + deposit_paid)
-        remaining -= deposit_paid
-
-        utility_due = application.utility_balance if application.utility_balance > 0 else Decimal("0.00")
-        utility_paid = min(utility_due, remaining)
-        application.utility_balance = max(Decimal("0.00"), application.utility_balance - utility_paid)
-
-    application.save()
-
     owner_email = "BowlingLegacyLLC@outlook.com"
 
     if application.property and application.property.owner_email:

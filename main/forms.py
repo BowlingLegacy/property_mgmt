@@ -9,6 +9,7 @@ from .models import (
     ResidentMessage,
     ApplicantDocument,
     Property,
+    Payment,
 )
 
 
@@ -37,11 +38,57 @@ class FinancialUploadForm(forms.ModelForm):
     class Meta:
         model = FinancialUpload
         fields = ["name", "file", "notes"]
+        labels = {
+            "name": "Import name",
+            "file": "Accounting export or data file",
+            "notes": "Source system / import notes",
+        }
+        help_texts = {
+            "name": "Example: QuickBooks May 2026 P&L, AppFolio rent roll, Google Sheets export.",
+            "file": "Upload CSV, XLSX, exported spreadsheet, ledger report, rent roll, or accounting-system export.",
+            "notes": "Add the source system, property, date range, and anything needed to classify the data correctly.",
+        }
         widgets = {
             "name": forms.TextInput(attrs={"class": "form-control"}),
             "file": forms.ClearableFileInput(attrs={"class": "form-control"}),
             "notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
         }
+
+
+class ManualPaymentForm(forms.ModelForm):
+    class Meta:
+        model = Payment
+        fields = [
+            "application",
+            "payment_type",
+            "payment_method",
+            "amount",
+            "received_at",
+            "reference_number",
+            "description",
+            "notes",
+        ]
+        widgets = {
+            "application": forms.Select(attrs={"class": "form-select"}),
+            "payment_type": forms.Select(attrs={"class": "form-select"}),
+            "payment_method": forms.Select(attrs={"class": "form-select"}),
+            "amount": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0.01"}),
+            "received_at": forms.DateTimeInput(attrs={"class": "form-control", "type": "datetime-local"}),
+            "reference_number": forms.TextInput(attrs={
+                "class": "form-control",
+                "placeholder": "Bank confirmation, Cash App note, check number, etc.",
+            }),
+            "description": forms.TextInput(attrs={"class": "form-control"}),
+            "notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["application"].queryset = (
+            HousingApplication.objects
+            .select_related("property")
+            .order_by("property__name", "space_label", "full_name")
+        )
 
 
 class LandlordCreateTenantForm(forms.Form):
@@ -110,6 +157,15 @@ class LandlordCreateTenantForm(forms.Form):
         }),
     )
 
+    deposit_payment_plan = forms.ChoiceField(
+        choices=HousingApplication.DEPOSIT_PAYMENT_PLAN_CHOICES,
+        initial="paid_in_full",
+        widget=forms.Select(attrs={
+            "class": "form-select",
+        }),
+        help_text="If the 90-day plan is selected, the lease will include a deposit payment amendment.",
+    )
+
     utility_monthly = forms.DecimalField(
         max_digits=10,
         decimal_places=2,
@@ -169,6 +225,21 @@ class ResidentDocumentUploadForm(forms.ModelForm):
                 "placeholder": "Example: May pay stub, Social Security award letter, bank statement",
             }),
             "file": forms.ClearableFileInput(attrs={"class": "form-control"}),
+        }
+
+
+class ResidentProfilePhotoForm(forms.ModelForm):
+    class Meta:
+        model = HousingApplication
+        fields = ["profile_photo"]
+        labels = {
+            "profile_photo": "Profile photo",
+        }
+        widgets = {
+            "profile_photo": forms.ClearableFileInput(attrs={
+                "class": "form-control",
+                "accept": "image/*",
+            }),
         }
 
 

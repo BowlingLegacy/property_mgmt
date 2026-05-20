@@ -31,6 +31,10 @@
         <h1 class="fw-bold">Payment Log</h1>
 
         <div class="d-flex gap-2 mt-3">
+            <a href="{% url 'record_manual_payment' %}" class="btn btn-primary">
+                Record Manual Payment
+            </a>
+
             <a href="{% url 'export_payment_log_csv' %}" class="btn btn-success">
                 Download CSV
             </a>
@@ -59,7 +63,9 @@
                                         <th>Room / Unit</th>
                                         <th>Resident</th>
                                         <th>Payment Type</th>
+                                        <th>Method</th>
                                         <th>Description</th>
+                                        <th>Reference</th>
                                         <th>Amount Paid</th>
                                         <th>Rent Balance Owed</th>
                                         <th>Utility Balance Owed</th>
@@ -84,7 +90,9 @@
 
                                             <td>{{ payment.application.full_name }}</td>
                                             <td>{{ payment.get_payment_type_display }}</td>
+                                            <td>{{ payment.get_payment_method_display }}</td>
                                             <td>{{ payment.description }}</td>
+                                            <td>{{ payment.reference_number }}</td>
                                             <td>${{ payment.amount }}</td>
                                             <td>${{ payment.application.balance }}</td>
                                             <td>${{ payment.application.utility_balance }}</td>

@@ -6,6 +6,20 @@ import string
 
 
 class BlogPost(models.Model):
+    property = models.ForeignKey(
+        "Property",
+        on_delete=models.CASCADE,
+        related_name="blog_posts",
+        null=True,
+        blank=True,
+    )
+    author = models.ForeignKey(
+        "User",
+        on_delete=models.SET_NULL,
+        related_name="blog_posts",
+        null=True,
+        blank=True,
+    )
     title = models.CharField(max_length=255)
     body = models.TextField()
     image = models.ImageField(upload_to="blog_images/", blank=True, null=True)
@@ -100,6 +114,11 @@ class PropertyImage(models.Model):
 
 
 class HousingApplication(models.Model):
+    DEPOSIT_PAYMENT_PLAN_CHOICES = [
+        ("paid_in_full", "Paid in full at move-in"),
+        ("ninety_day_plan", "Three payments over 90 days"),
+    ]
+
     property = models.ForeignKey(Property, on_delete=models.SET_NULL, null=True, blank=True, related_name="applications")
     user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="resident_profile")
 
@@ -107,6 +126,7 @@ class HousingApplication(models.Model):
     phone = models.CharField(max_length=20)
     email = models.EmailField(blank=True)
     age = models.PositiveIntegerField()
+    profile_photo = models.ImageField(upload_to="resident_profile_photos/", blank=True, null=True)
 
     space_type = models.CharField(max_length=50, blank=True)
     space_label = models.CharField(max_length=50, blank=True)
@@ -118,6 +138,11 @@ class HousingApplication(models.Model):
 
     deposit_required = models.DecimalField(max_digits=10, decimal_places=2, default=450.00)
     deposit_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    deposit_payment_plan = models.CharField(
+        max_length=30,
+        choices=DEPOSIT_PAYMENT_PLAN_CHOICES,
+        default="paid_in_full",
+    )
 
     utility_monthly = models.DecimalField(max_digits=10, decimal_places=2, default=66.00)
     utility_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
@@ -280,6 +305,12 @@ class SignedDocument(models.Model):
         default=0.00
     )
 
+    deposit_payment_plan = models.CharField(
+        max_length=30,
+        choices=HousingApplication.DEPOSIT_PAYMENT_PLAN_CHOICES,
+        default="paid_in_full",
+    )
+
     lease_start_date = models.DateField(blank=True, null=True)
 
     landlord_name = models.CharField(
@@ -308,6 +339,11 @@ class SignedDocument(models.Model):
     cleanliness_initials = models.CharField(max_length=10, blank=True)
 
     disclosure_initials = models.CharField(max_length=10, blank=True)
+
+    emergency_contact_name = models.CharField(max_length=255, blank=True)
+    emergency_contact_phone = models.CharField(max_length=50, blank=True)
+    emergency_contact_relationship = models.CharField(max_length=255, blank=True)
+    emergency_medical_notes = models.TextField(blank=True)
 
     # ---------------------------------------------------------
     # SIGNATURES
@@ -343,6 +379,8 @@ class SignedDocument(models.Model):
             self.utility_fee = self.application.utility_monthly
 
             self.security_deposit = self.application.deposit_required
+
+            self.deposit_payment_plan = self.application.deposit_payment_plan
 
             self.room_space = (
                 f"{self.application.space_type} "
@@ -386,9 +424,33 @@ class Payment(models.Model):
         ("other", "Other"),
     ]
 
+    PAYMENT_METHOD_CHOICES = [
+        ("stripe_card", "Stripe Card"),
+        ("stripe_cashapp", "Stripe Cash App Pay"),
+        ("bank_transfer", "Bank Transfer"),
+        ("cashapp", "Cash App"),
+        ("cash", "Cash"),
+        ("check", "Check"),
+        ("money_order", "Money Order"),
+        ("zelle", "Zelle"),
+        ("ach", "ACH"),
+        ("other", "Other"),
+    ]
+
     application = models.ForeignKey(HousingApplication, on_delete=models.CASCADE, related_name="payments")
     payment_type = models.CharField(max_length=30, choices=PAYMENT_TYPE_CHOICES, default="rent")
+    payment_method = models.CharField(max_length=30, choices=PAYMENT_METHOD_CHOICES, default="stripe_card")
     description = models.CharField(max_length=255, blank=True)
+    reference_number = models.CharField(max_length=255, blank=True)
+    notes = models.TextField(blank=True)
+    recorded_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="recorded_payments",
+    )
+    received_at = models.DateTimeField(blank=True, null=True)
 
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")

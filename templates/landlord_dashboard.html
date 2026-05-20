@@ -237,6 +237,50 @@ body {
     color: #a57c18;
 }
 
+.attention-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.attention-card {
+    background: #fff;
+    border: 1px solid rgba(188,150,45,0.18);
+    border-radius: 18px;
+    padding: 1rem;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+}
+
+.attention-card.alert-card {
+    border-color: rgba(176,42,55,0.35);
+    background: #fff7f7;
+}
+
+.attention-label {
+    color: #a57c18;
+    font-size: .72rem;
+    font-weight: 900;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+.attention-value {
+    font-family: Georgia, serif;
+    font-size: 2rem;
+    font-weight: 700;
+    color: #111;
+}
+
+.attention-row {
+    background: #fffaf0;
+}
+
+.status-new {
+    background: rgba(176,42,55,.12);
+    color: #b02a37;
+}
+
 @media (max-width: 992px) {
     .ops-shell {
         grid-template-columns: 1fr;
@@ -244,6 +288,16 @@ body {
 
     .ops-sidebar {
         min-height: auto;
+    }
+
+    .attention-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 576px) {
+    .attention-grid {
+        grid-template-columns: 1fr;
     }
 }
 </style>
@@ -265,11 +319,11 @@ body {
                     Dashboard
                 </a>
 
-                <a href="{% url 'landlord_create_tenant' %}">
-                    Create Tenant
+                <a href="#applications">
+                    Applications
                 </a>
 
-                <a href="{% url 'rent_roll' %}">
+                <a href="#resident-files">
                     Resident Files
                 </a>
 
@@ -277,6 +331,10 @@ body {
 
                 <a href="{% url 'payment_log' %}">
                     Payment Log
+                </a>
+
+                <a href="{% url 'record_manual_payment' %}">
+                    Record Payment
                 </a>
 
                 <a href="{% url 't12_report' %}">
@@ -292,6 +350,13 @@ body {
         </aside>
 
         <main class="ops-main">
+            {% if request.user.is_superuser %}
+                <div class="mb-3 text-end">
+                    <a href="{% url 'superadmin_dashboard' %}" class="btn btn-outline-dark rounded-pill">
+                        Back to Super Admin Dashboard
+                    </a>
+                </div>
+            {% endif %}
 
             <section class="ops-hero">
                 <div class="ops-eyebrow">
@@ -307,7 +372,180 @@ body {
                 </p>
             </section>
 
-            <section class="soft-card p-4 mb-4">
+            <div class="attention-grid">
+                <div class="attention-card {% if attention_count %}alert-card{% endif %}">
+                    <div class="attention-label">Needs Attention</div>
+                    <div class="attention-value">{{ attention_count }}</div>
+                    <div class="text-muted small">New applications, messages, and documents.</div>
+                </div>
+
+                <div class="attention-card">
+                    <div class="attention-label">New Applications</div>
+                    <div class="attention-value">{{ new_application_count }}</div>
+                    <div class="text-muted small">Not approved or linked yet.</div>
+                </div>
+
+                <div class="attention-card">
+                    <div class="attention-label">New Messages</div>
+                    <div class="attention-value">{{ new_message_count }}</div>
+                    <div class="text-muted small">Resident messages still submitted.</div>
+                </div>
+
+                <div class="attention-card">
+                    <div class="attention-label">New Documents</div>
+                    <div class="attention-value">{{ new_document_count }}</div>
+                    <div class="text-muted small">Uploaded documents not reviewed.</div>
+                </div>
+            </div>
+
+            <section class="soft-card p-4 mb-4" id="applications">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h3 class="section-title mb-1">
+                            Needs Attention
+                        </h3>
+                        <div class="text-muted small">
+                            New intake items are grouped here so they do not get buried in resident files.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4">
+                    <div class="col-xl-4">
+                        <h5 class="fw-bold mb-3">Applications</h5>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Applicant</th>
+                                        <th>Property</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for application in new_applications %}
+                                    <tr class="attention-row">
+                                        <td>
+                                            <strong>{{ application.full_name }}</strong><br>
+                                            <span class="small text-muted">{{ application.created_at|date:"M j, g:i A" }}</span>
+                                        </td>
+                                        <td>
+                                            {% if application.property %}
+                                                {{ application.property.name }}
+                                            {% else %}
+                                                <span class="status-pill status-new">No Property</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="d-flex gap-2">
+                                                <a href="{% url 'application_detail' application.id %}" class="message-btn">
+                                                    Open
+                                                </a>
+                                                <a href="{% url 'landlord_create_tenant' %}?application={{ application.id }}" class="gold-btn">
+                                                    Create File
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="3" class="text-muted">No new applications.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-4">
+                        <h5 class="fw-bold mb-3">Messages</h5>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Resident</th>
+                                        <th>Subject</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for resident_message in new_messages %}
+                                    <tr class="attention-row">
+                                        <td>
+                                            <strong>{{ resident_message.application.full_name }}</strong><br>
+                                            <span class="small text-muted">{{ resident_message.created_at|date:"M j, g:i A" }}</span>
+                                        </td>
+                                        <td>
+                                            {{ resident_message.subject }}<br>
+                                            <span class="small text-muted">{{ resident_message.get_message_type_display }}</span>
+                                        </td>
+                                        <td>
+                                            <a href="{% url 'landlord_message_detail' resident_message.id %}" class="message-btn">
+                                                Open
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="3" class="text-muted">No new messages.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-4">
+                        <h5 class="fw-bold mb-3">Documents</h5>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Resident</th>
+                                        <th>Document</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for document in new_documents %}
+                                    <tr class="attention-row">
+                                        <td>
+                                            <strong>{{ document.application.full_name }}</strong><br>
+                                            <span class="small text-muted">{{ document.created_at|date:"M j, g:i A" }}</span>
+                                        </td>
+                                        <td>
+                                            {{ document.name }}<br>
+                                            <span class="small text-muted">{{ document.get_document_type_display }}</span>
+                                        </td>
+                                        <td>
+                                            {% if document.file %}
+                                                <a href="{{ document.file.url }}" target="_blank" class="message-btn">
+                                                    Open
+                                                </a>
+                                                <form method="post" action="{% url 'mark_document_reviewed' document.id %}" class="mt-2">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="gold-btn">
+                                                        Mark Reviewed
+                                                    </button>
+                                                </form>
+                                            {% else %}
+                                                <span class="text-muted">No file</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="3" class="text-muted">No new documents.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="soft-card p-4 mb-4" id="resident-files">
 
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <div>
@@ -340,13 +578,16 @@ body {
                         <tbody>
 
                             {% for resident in applications %}
-                            <tr>
+                            <tr class="{% if not resident.user %}attention-row{% endif %}">
 
                                 <td>
                                     <strong>{{ resident.full_name }}</strong><br>
                                     <span class="small text-muted">
                                         {{ resident.email }}
                                     </span>
+                                    {% if not resident.user %}
+                                        <br><span class="status-pill status-new mt-1">New Application</span>
+                                    {% endif %}
                                 </td>
 
                                 <td>
@@ -397,6 +638,18 @@ body {
                                            class="gold-btn">
                                             Print
                                         </a>
+
+                                        <a href="{% url 'record_manual_payment' %}?application={{ resident.id }}"
+                                           class="message-btn">
+                                            Record Payment
+                                        </a>
+
+                                        {% if not resident.user %}
+                                            <a href="{% url 'landlord_create_tenant' %}?application={{ resident.id }}"
+                                               class="gold-btn">
+                                                Create File
+                                            </a>
+                                        {% endif %}
 
                                     </div>
                                 </td>

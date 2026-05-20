@@ -109,6 +109,13 @@ body {
     font-family: Georgia, serif;
     font-size: 3.3rem;
     margin: 1rem auto;
+    overflow: hidden;
+}
+
+.profile-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .profile-name {
@@ -222,6 +229,13 @@ body {
 {% if application %}
 
 <div class="dashboard-wrap">
+    {% if request.user.is_superuser %}
+        <div class="mb-3 text-end">
+            <a href="{% url 'superadmin_dashboard' %}" class="btn btn-outline-dark rounded-pill">
+                Back to Super Admin Dashboard
+            </a>
+        </div>
+    {% endif %}
 
     <div class="row align-items-center hero-row g-4">
         <div class="col-lg-2 text-center">
@@ -260,8 +274,25 @@ body {
                 <div class="card-title">Resident Profile</div>
 
                 <div class="profile-photo">
-                    {{ application.full_name|first|upper }}
+                    {% if application.profile_photo %}
+                        <img id="profilePhotoPreview" src="{{ application.profile_photo.url }}" alt="{{ application.full_name }}">
+                    {% else %}
+                        <span id="profilePhotoInitial">{{ application.full_name|first|upper }}</span>
+                        <img id="profilePhotoPreview" src="" alt="{{ application.full_name }}" style="display:none;">
+                    {% endif %}
                 </div>
+
+                <form method="post"
+                      action="{% url 'update_resident_profile_photo' %}"
+                      enctype="multipart/form-data"
+                      class="mb-3">
+                    {% csrf_token %}
+                    <label class="form-label fw-bold">Profile Photo</label>
+                    {{ profile_photo_form.profile_photo }}
+                    <button type="submit" class="message-btn mt-2">
+                        Save Photo
+                    </button>
+                </form>
 
                 <div class="text-center">
                     <div class="profile-name">{{ application.full_name }}</div>
@@ -391,6 +422,33 @@ body {
                         <div class="table-responsive">
                             <table class="table">
                                 <tbody>
+                                    {% for signed_document in application.signed_documents.all %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ signed_document.title }}</strong><br>
+                                            <small>{{ signed_document.get_document_type_display }}</small>
+                                        </td>
+                                        <td>
+                                            {% if signed_document.locked %}
+                                                Locked Final
+                                            {% else %}
+                                                Needs Signature
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if signed_document.document_type == "lease" %}
+                                                <a href="{% url 'lease_sign' %}" class="gold-link">
+                                                    {% if signed_document.locked %}View{% else %}Sign{% endif %}
+                                                </a>
+                                            {% else %}
+                                                <a href="{% url 'onboarding_document' signed_document.id %}" class="gold-link">
+                                                    {% if signed_document.locked %}View{% else %}Sign{% endif %}
+                                                </a>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+
                                     {% for document in application.documents.all %}
                                     <tr>
                                         <td>
@@ -419,7 +477,7 @@ body {
                                     </tr>
                                     {% endfor %}
 
-                                    {% if not application.documents.all and not resident_messages %}
+                                    {% if not application.documents.all and not application.signed_documents.all and not resident_messages %}
                                     <tr>
                                         <td class="p-4 text-muted" colspan="3">
                                             No inbox items yet.
@@ -574,5 +632,28 @@ body {
 <a href="/" class="btn btn-outline-secondary rounded-pill">Return Home</a>
 
 {% endif %}
+
+<script>
+const profilePhotoInput = document.querySelector('input[name="profile_photo"]');
+const profilePhotoPreview = document.getElementById("profilePhotoPreview");
+const profilePhotoInitial = document.getElementById("profilePhotoInitial");
+
+if (profilePhotoInput && profilePhotoPreview) {
+    profilePhotoInput.addEventListener("change", function () {
+        const file = this.files && this.files[0];
+
+        if (!file) {
+            return;
+        }
+
+        profilePhotoPreview.src = URL.createObjectURL(file);
+        profilePhotoPreview.style.display = "block";
+
+        if (profilePhotoInitial) {
+            profilePhotoInitial.style.display = "none";
+        }
+    });
+}
+</script>
 
 {% endblock %}
