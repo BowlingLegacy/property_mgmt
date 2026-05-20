@@ -125,7 +125,7 @@
             <p class="mb-0">Portfolio view organized by property financial folders.</p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
-            {% if request.user.is_superuser %}
+            {% if request.user.is_superuser or request.user.role == "admin" %}
                 <a href="{% url 'superadmin_dashboard' %}" class="btn-dark-soft">Back to Super Admin</a>
             {% endif %}
             <a href="{% url 'property_blog_manager' %}" class="btn-dark-soft">Property Blogs</a>

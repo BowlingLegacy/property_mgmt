@@ -477,6 +477,32 @@ class LiveFlowTests(TestCase):
         application.refresh_from_db()
         self.assertTrue(application.profile_photo.name)
 
+    def test_superadmin_can_inspect_tenant_dashboard_by_resident_file(self):
+        superuser = User.objects.create_user(
+            username="superadmin",
+            email="super@example.com",
+            password="StrongPass123!",
+            role="admin",
+            is_staff=True,
+        )
+        application = HousingApplication.objects.create(
+            full_name="Inspect Resident",
+            phone="555-0112",
+            email="inspect@example.com",
+            age=53,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+        )
+
+        self.client.login(username="superadmin", password="StrongPass123!")
+
+        response = self.client.get(f"{reverse('tenant_dashboard')}?resident={application.id}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Inspect Resident")
+        self.assertContains(response, "Back to Super Admin Dashboard")
+
     def test_staff_can_create_property_blog_and_approve_comment(self):
         staff_user = User.objects.create_user(
             username="staff-blog",

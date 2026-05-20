@@ -276,6 +276,19 @@ body {
     background: #fffaf0;
 }
 
+.category-panel {
+    margin-bottom: 1rem;
+}
+
+.category-panel > summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+.category-panel > summary::-webkit-details-marker {
+    display: none;
+}
+
 .status-new {
     background: rgba(176,42,55,.12);
     color: #b02a37;
@@ -327,6 +340,10 @@ body {
                     Resident Files
                 </a>
 
+                <a href="#money-matters">
+                    Money Matters
+                </a>
+
                 <div class="ops-nav-label">Financial</div>
 
                 <a href="{% url 'payment_log' %}">
@@ -350,7 +367,7 @@ body {
         </aside>
 
         <main class="ops-main">
-            {% if request.user.is_superuser %}
+            {% if request.user.is_superuser or request.user.role == "admin" %}
                 <div class="mb-3 text-end">
                     <a href="{% url 'superadmin_dashboard' %}" class="btn btn-outline-dark rounded-pill">
                         Back to Super Admin Dashboard
@@ -398,17 +415,41 @@ body {
                 </div>
             </div>
 
-            <section class="soft-card p-4 mb-4" id="applications">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <div>
-                        <h3 class="section-title mb-1">
-                            Needs Attention
-                        </h3>
-                        <div class="text-muted small">
-                            New intake items are grouped here so they do not get buried in resident files.
-                        </div>
+            <section class="soft-card p-4 mb-4" id="money-matters">
+                <h3 class="section-title mb-3">Money Matters</h3>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <a href="{% url 'payment_log' %}" class="message-btn w-100">Rent Payment Matters</a>
+                    </div>
+                    <div class="col-md-4">
+                        <a href="{% url 'record_manual_payment' %}" class="message-btn w-100">Record Payment</a>
+                    </div>
+                    <div class="col-md-4">
+                        <a href="{% url 'financial_upload' %}" class="message-btn w-100">Operating / Capital Expenses</a>
+                    </div>
+                    <div class="col-md-4">
+                        <a href="{% url 'rent_roll' %}" class="gold-btn w-100">Rent Roll</a>
+                    </div>
+                    <div class="col-md-4">
+                        <a href="{% url 't12_report' %}" class="gold-btn w-100">T-12 Report</a>
                     </div>
                 </div>
+            </section>
+
+            <details class="soft-card p-4 category-panel" id="applications" open>
+                <summary>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h3 class="section-title mb-1">
+                                Needs Attention
+                            </h3>
+                            <div class="text-muted small">
+                                New intake items are grouped here so they do not get buried in resident files.
+                            </div>
+                        </div>
+                        <span class="status-pill status-alert">{{ attention_count }}</span>
+                    </div>
+                </summary>
 
                 <div class="row g-4">
                     <div class="col-xl-4">
@@ -543,21 +584,22 @@ body {
                         </div>
                     </div>
                 </div>
-            </section>
+            </details>
 
-            <section class="soft-card p-4 mb-4" id="resident-files">
+            <details class="soft-card p-4 category-panel" id="resident-files">
+                <summary>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h3 class="section-title mb-1">
+                                Resident File Overview
+                            </h3>
 
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <div>
-                        <h3 class="section-title mb-1">
-                            Resident File Overview
-                        </h3>
-
-                        <div class="text-muted small">
-                            Applications, balances, room assignments, and portal access.
+                            <div class="text-muted small">
+                                Applications, balances, room assignments, and portal access.
+                            </div>
                         </div>
                     </div>
-                </div>
+                </summary>
 
                 <div class="table-responsive">
 
@@ -670,7 +712,7 @@ body {
 
                 </div>
 
-            </section>
+            </details>
 
         </main>
 

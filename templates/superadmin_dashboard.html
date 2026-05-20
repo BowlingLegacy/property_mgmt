@@ -3,276 +3,251 @@
 {% block content %}
 
 <style>
-    .admin-hero {
-        background: #080808;
-        border: 2px solid #c59a32;
-        border-radius: 24px;
-        padding: 1rem;
-        box-shadow: 0 16px 38px rgba(0,0,0,.16);
-        margin-bottom: 1.5rem;
-    }
-
-    .admin-hero-inner {
-        background: rgba(255,255,255,0.94);
-        border-radius: 18px;
-        padding: 1.6rem;
-    }
-
-    .admin-kicker {
-        color: #a57c18;
-        letter-spacing: 4px;
-        text-transform: uppercase;
-        font-size: .72rem;
-        font-weight: 800;
-    }
-
-    .admin-card-link {
-        text-decoration: none;
-        color: inherit;
-        display: block;
-        height: 100%;
-    }
-
-    .admin-card-link:hover .soft-card {
-        transform: translateY(-2px);
-        box-shadow: 0 12px 26px rgba(0,0,0,0.10);
-    }
-
-    .admin-card-link .soft-card {
-        transition: all .2s ease;
-    }
-
-    .admin-label {
-        color: #a57c18;
-        font-weight: 800;
-        font-size: .78rem;
-        text-transform: uppercase;
-        letter-spacing: .08em;
-    }
-
-    .admin-value {
-        font-family: Georgia, serif;
-        font-size: 2rem;
-        font-weight: 700;
-        color: #111;
-    }
+.admin-shell {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 1.25rem;
+}
+.admin-menu {
+    background: #101010;
+    border: 1px solid #b89238;
+    border-radius: 16px;
+    padding: 1rem;
+    align-self: start;
+    position: sticky;
+    top: 1rem;
+}
+.admin-menu-title {
+    color: #f3d27a;
+    font-family: Georgia, serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: .85rem;
+}
+.admin-menu a {
+    display: block;
+    color: #f8f0dc;
+    text-decoration: none;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    padding: .65rem .75rem;
+    font-weight: 800;
+}
+.admin-menu a:hover {
+    border-color: #b89238;
+    background: rgba(184,146,56,.12);
+}
+.admin-hero,
+.admin-panel {
+    background: rgba(255,255,255,.92);
+    border: 1px solid rgba(184,146,56,.22);
+    border-radius: 16px;
+    box-shadow: 0 8px 20px rgba(0,0,0,.06);
+}
+.admin-hero {
+    padding: 1.35rem;
+    margin-bottom: 1rem;
+}
+.admin-kicker {
+    color: #9a7419;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    font-size: .72rem;
+    font-weight: 900;
+}
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .85rem;
+    margin-bottom: 1rem;
+}
+.metric {
+    background: #fbf5e8;
+    border: 1px solid rgba(184,146,56,.22);
+    border-radius: 12px;
+    padding: .9rem;
+}
+.metric-label {
+    color: #7b5c12;
+    font-size: .72rem;
+    text-transform: uppercase;
+    font-weight: 900;
+    letter-spacing: .06em;
+}
+.metric-value {
+    font-family: Georgia, serif;
+    font-size: 1.8rem;
+    font-weight: 800;
+}
+.admin-panel {
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+.panel-title {
+    font-family: Georgia, serif;
+    font-size: 1.45rem;
+    font-weight: 800;
+    margin-bottom: .75rem;
+}
+.action-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .75rem;
+}
+.action-link {
+    display: block;
+    min-height: 92px;
+    text-decoration: none;
+    color: #17130a;
+    background: #f8f0dc;
+    border: 1px solid rgba(184,146,56,.32);
+    border-radius: 12px;
+    padding: .85rem;
+}
+.action-link:hover {
+    background: #ead8ad;
+    color: #17130a;
+}
+.action-title {
+    font-weight: 950;
+    margin-bottom: .25rem;
+}
+.owner-folder {
+    border: 1px solid rgba(184,146,56,.32);
+    border-radius: 12px;
+    margin-bottom: .65rem;
+    background: #fffaf0;
+}
+.owner-folder summary {
+    cursor: pointer;
+    padding: .8rem .9rem;
+    font-weight: 950;
+}
+.owner-body {
+    border-top: 1px solid rgba(184,146,56,.22);
+    padding: .85rem;
+}
+@media (max-width: 992px) {
+    .admin-shell { grid-template-columns: 1fr; }
+    .admin-menu { position: static; }
+    .metric-grid, .action-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 576px) {
+    .metric-grid, .action-grid { grid-template-columns: 1fr; }
+}
 </style>
 
-<div class="admin-hero">
-    <div class="admin-hero-inner">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-            <div>
-                <div class="admin-kicker">Platform Mission Control</div>
-                <h1 class="section-title mb-1">Super Admin Control Center</h1>
-                <p class="text-muted mb-0">
-                    Central access for testing, dashboards, public pages, reports, resident files, and system operations.
-                </p>
-            </div>
+<div class="admin-shell">
+    <aside class="admin-menu">
+        <div class="admin-menu-title">Super Admin</div>
+        <a href="#operations">Operations</a>
+        <a href="#money">Money Matters</a>
+        <a href="#owners">Owners & Properties</a>
+        <a href="#residents">Resident Inspection</a>
+        <a href="#public">Public Site</a>
+        <a href="#system">System</a>
+    </aside>
 
-            <span class="badge text-bg-dark p-3">Super Admin Access</span>
+    <main>
+        <section class="admin-hero">
+            <div class="admin-kicker">Platform Mission Control</div>
+            <h1 class="section-title mb-1">Super Admin Control Center</h1>
+            <p class="text-muted mb-0">Inspect every dashboard, owner, property, resident file, payment area, and public page from one categorized screen.</p>
+        </section>
+
+        <div class="metric-grid">
+            <div class="metric"><div class="metric-label">Owners</div><div class="metric-value">{{ owner_groups|length }}</div></div>
+            <div class="metric"><div class="metric-label">Properties</div><div class="metric-value">{{ properties.count }}</div></div>
+            <div class="metric"><div class="metric-label">Resident Files</div><div class="metric-value">{{ applications.count }}</div></div>
+            <div class="metric"><div class="metric-label">Site Payments</div><div class="metric-value">${{ site_payment_total }}</div></div>
         </div>
-    </div>
-</div>
 
-<div class="row g-4 mb-4">
-    <div class="col-md-4">
-        <div class="soft-card p-4 h-100">
-            <div class="admin-label">Properties</div>
-            <div class="admin-value">{{ properties.count }}</div>
-            <div class="text-muted">Public and managed properties</div>
-        </div>
-    </div>
-
-    <div class="col-md-4">
-        <div class="soft-card p-4 h-100">
-            <div class="admin-label">Users</div>
-            <div class="admin-value">{{ users.count }}</div>
-            <div class="text-muted">Portal and system users</div>
-        </div>
-    </div>
-
-    <div class="col-md-4">
-        <div class="soft-card p-4 h-100">
-            <div class="admin-label">Resident Files</div>
-            <div class="admin-value">{{ applications.count }}</div>
-            <div class="text-muted">Applications / resident records</div>
-        </div>
-    </div>
-</div>
-
-<h2 class="section-title mb-3">Core Workspaces</h2>
-
-<div class="row g-4 mb-5">
-    <div class="col-lg-3 col-md-6">
-        <a href="{% url 'tenant_dashboard' %}" class="admin-card-link">
-            <div class="soft-card p-4 h-100">
-                <h5 class="card-title">Tenant Dashboard</h5>
-                <p class="text-muted">Test the resident portal, payments, messages, and document flow.</p>
-                <span class="gold-btn">Open</span>
+        <section class="admin-panel" id="operations">
+            <div class="panel-title">Operations</div>
+            <div class="action-grid">
+                <a href="{% url 'landlord_dashboard' %}" class="action-link"><div class="action-title">Landlord Dashboard</div><div class="text-muted small">Applications, resident files, messages, and documents.</div></a>
+                <a href="{% url 'property_owner_dashboard' %}" class="action-link"><div class="action-title">Owner Dashboard</div><div class="text-muted small">Owner/property portfolio view.</div></a>
+                <a href="{% url 'property_blog_manager' %}" class="action-link"><div class="action-title">Property Blogs</div><div class="text-muted small">Post updates and approve comments.</div></a>
             </div>
-        </a>
-    </div>
+        </section>
 
-    <div class="col-lg-3 col-md-6">
-        <a href="{% url 'landlord_dashboard' %}" class="admin-card-link">
-            <div class="soft-card p-4 h-100">
-                <h5 class="card-title">Landlord Dashboard</h5>
-                <p class="text-muted">Operations, resident files, onboarding, maintenance, and messages.</p>
-                <span class="gold-btn">Open</span>
+        <section class="admin-panel" id="money">
+            <div class="panel-title">Money Matters</div>
+            <div class="action-grid">
+                <a href="{% url 'payment_log' %}" class="action-link"><div class="action-title">Payment Log</div><div class="text-muted small">All online and recorded payments.</div></a>
+                <a href="{% url 'record_manual_payment' %}" class="action-link"><div class="action-title">Record Payment</div><div class="text-muted small">Bank, Cash App, check, cash, and other manual receipts.</div></a>
+                <a href="{% url 'rent_roll' %}" class="action-link"><div class="action-title">Rent Roll</div><div class="text-muted small">Rent, balances, deposits, and resident rows.</div></a>
+                <a href="{% url 't12_report' %}" class="action-link"><div class="action-title">T-12</div><div class="text-muted small">Trailing twelve month reporting.</div></a>
+                <a href="{% url 'financial_upload' %}" class="action-link"><div class="action-title">Accounting Imports</div><div class="text-muted small">Financial exports and source files.</div></a>
             </div>
-        </a>
-    </div>
+        </section>
 
-    <div class="col-lg-3 col-md-6">
-        <a href="{% url 'property_owner_dashboard' %}" class="admin-card-link">
-            <div class="soft-card p-4 h-100">
-                <h5 class="card-title">Owner Dashboard</h5>
-                <p class="text-muted">Property financial folders, rent, expenses, and performance metrics.</p>
-                <span class="gold-btn">Open</span>
+        <section class="admin-panel" id="owners">
+            <div class="panel-title">Owners & Properties</div>
+            {% for owner in owner_groups %}
+                <details class="owner-folder">
+                    <summary>{{ owner.email }} — {{ owner.property_count }} propert{{ owner.property_count|pluralize:"y,ies" }}</summary>
+                    <div class="owner-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle">
+                                <thead><tr><th>Property</th><th>Public</th><th>Financials</th></tr></thead>
+                                <tbody>
+                                    {% for property in owner.properties %}
+                                        <tr>
+                                            <td><strong>{{ property.name }}</strong></td>
+                                            <td><a href="{% url 'property_detail' property.pk %}" class="btn btn-outline-secondary btn-sm">Open</a></td>
+                                            <td><a href="{% url 'property_financials' property.name %}" class="btn btn-outline-primary btn-sm">Open</a></td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </details>
+            {% empty %}
+                <p class="text-muted">No owner emails are assigned to properties yet.</p>
+            {% endfor %}
+        </section>
+
+        <section class="admin-panel" id="residents">
+            <div class="panel-title">Resident Inspection</div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead><tr><th>Resident</th><th>Property</th><th>Portal</th><th>Inspect</th></tr></thead>
+                    <tbody>
+                        {% for application in applications %}
+                            <tr>
+                                <td><strong>{{ application.full_name }}</strong><br><span class="text-muted small">{{ application.email }}</span></td>
+                                <td>{{ application.property.name|default:"No Property" }}</td>
+                                <td>{% if application.user %}Linked{% else %}No Login{% endif %}</td>
+                                <td><a href="{% url 'tenant_dashboard' %}?resident={{ application.id }}" class="btn btn-outline-dark btn-sm">Inspect Tenant Dashboard</a></td>
+                            </tr>
+                        {% empty %}
+                            <tr><td colspan="4">No resident files found.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-        </a>
-    </div>
+        </section>
 
-    <div class="col-lg-3 col-md-6">
-        <a href="/admin/" class="admin-card-link">
-            <div class="soft-card p-4 h-100">
-                <h5 class="card-title">Django Admin</h5>
-                <p class="text-muted">Superuser-only backend access for records and system maintenance.</p>
-                <span class="gold-btn">Open</span>
+        <section class="admin-panel" id="public">
+            <div class="panel-title">Public Site</div>
+            <div class="action-grid">
+                <a href="/" class="action-link"><div class="action-title">Homepage</div><div class="text-muted small">Public landing page.</div></a>
+                <a href="{% url 'properties_list' %}" class="action-link"><div class="action-title">Properties</div><div class="text-muted small">Public property list.</div></a>
+                <a href="{% url 'login' %}" class="action-link"><div class="action-title">Portal Login</div><div class="text-muted small">Login gateway.</div></a>
+                <a href="/creed/" class="action-link"><div class="action-title">Creed</div><div class="text-muted small">Public creed page.</div></a>
             </div>
-        </a>
-    </div>
-</div>
+        </section>
 
-<h2 class="section-title mb-3">Public Site & Property Experience</h2>
-
-<div class="row g-4 mb-5">
-    <div class="col-lg-3 col-md-6">
-        <a href="/" class="admin-card-link">
-            <div class="soft-card p-4 h-100">
-                <h5 class="card-title">Homepage</h5>
-                <p class="text-muted">Review the public brand landing page.</p>
-                <span class="message-btn">Open</span>
+        <section class="admin-panel" id="system">
+            <div class="panel-title">System</div>
+            <div class="action-grid">
+                <a href="/admin/" class="action-link"><div class="action-title">Django Admin</div><div class="text-muted small">Raw backend admin when needed.</div></a>
+                <a href="{% url 'logout' %}" class="action-link"><div class="action-title">Logout</div><div class="text-muted small">End this admin session.</div></a>
             </div>
-        </a>
-    </div>
-
-    <div class="col-lg-3 col-md-6">
-        <a href="{% url 'properties_list' %}" class="admin-card-link">
-            <div class="soft-card p-4 h-100">
-                <h5 class="card-title">Properties Page</h5>
-                <p class="text-muted">Review all public property cards.</p>
-                <span class="message-btn">Open</span>
-            </div>
-        </a>
-    </div>
-
-    <div class="col-lg-3 col-md-6">
-        <a href="/creed/" class="admin-card-link">
-            <div class="soft-card p-4 h-100">
-                <h5 class="card-title">The Creed</h5>
-                <p class="text-muted">Review the framed Creed page and branding.</p>
-                <span class="message-btn">Open</span>
-            </div>
-        </a>
-    </div>
-
-    <div class="col-lg-3 col-md-6">
-        <a href="{% url 'login' %}" class="admin-card-link">
-            <div class="soft-card p-4 h-100">
-                <h5 class="card-title">Portal Login</h5>
-                <p class="text-muted">Test the public login gateway.</p>
-                <span class="message-btn">Open</span>
-            </div>
-        </a>
-    </div>
-</div>
-
-<h2 class="section-title mb-3">Financial & Reporting</h2>
-
-<div class="row g-4 mb-5">
-    <div class="col-lg-3 col-md-6">
-        <a href="{% url 'payment_log' %}" class="admin-card-link">
-            <div class="soft-card p-4 h-100">
-                <h5 class="card-title">Payment Log</h5>
-                <p class="text-muted">Review payments and Stripe activity.</p>
-                <span class="gold-btn">Open</span>
-            </div>
-        </a>
-    </div>
-
-    <div class="col-lg-3 col-md-6">
-        <a href="{% url 'rent_roll' %}" class="admin-card-link">
-            <div class="soft-card p-4 h-100">
-                <h5 class="card-title">Rent Roll</h5>
-                <p class="text-muted">Review residents, rent, and balances.</p>
-                <span class="gold-btn">Open</span>
-            </div>
-        </a>
-    </div>
-
-    <div class="col-lg-3 col-md-6">
-        <a href="{% url 't12_report' %}" class="admin-card-link">
-            <div class="soft-card p-4 h-100">
-                <h5 class="card-title">T-12 Report</h5>
-                <p class="text-muted">Review trailing twelve month reporting.</p>
-                <span class="gold-btn">Open</span>
-            </div>
-        </a>
-    </div>
-
-    <div class="col-lg-3 col-md-6">
-        <a href="{% url 'property_blog_manager' %}" class="admin-card-link">
-            <div class="admin-card">
-                <h3>Property Blogs</h3>
-                <p>Create property updates and approve comments without using Django admin.</p>
-            </div>
-        </a>
-
-        <a href="{% url 'financial_upload' %}" class="admin-card-link">
-            <div class="soft-card p-4 h-100">
-                <h5 class="card-title">Financial Upload</h5>
-                <p class="text-muted">Upload and parse operating/debt expenses.</p>
-                <span class="gold-btn">Open</span>
-            </div>
-        </a>
-    </div>
-</div>
-
-<div class="soft-card p-4">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
-        <div>
-            <h2 class="section-title mb-1">Property Overview</h2>
-            <p class="text-muted mb-0">Quick links into each public property page and financial view.</p>
-        </div>
-    </div>
-
-    <div class="table-responsive">
-        <table class="table align-middle">
-            <thead>
-                <tr>
-                    <th>Property</th>
-                    <th>Description</th>
-                    <th>Public Page</th>
-                    <th>Financials</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for property in properties %}
-                <tr>
-                    <td><strong>{{ property.name }}</strong></td>
-                    <td>{{ property.description|truncatewords:18 }}</td>
-                    <td><a href="{% url 'property_detail' property.pk %}" class="message-btn">Open</a></td>
-                    <td><a href="{% url 'property_financials' property.name %}" class="gold-btn">Open</a></td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="4">No properties found.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+        </section>
+    </main>
 </div>
 
 {% endblock %}

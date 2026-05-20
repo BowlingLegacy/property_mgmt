@@ -12,7 +12,7 @@ from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.mail import send_mail
-from django.db.models import Sum
+from django.db.models import Count, Sum
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
@@ -293,9 +293,28 @@ def superadmin_dashboard(request):
     if not request.user.is_superuser and request.user.role != "admin":
         return redirect("tenant_dashboard")
 
-    properties = Property.objects.all()
-    users = User.objects.all()
-    applications = HousingApplication.objects.all()
+    properties = Property.objects.all().order_by("name")
+    users = User.objects.all().order_by("username")
+    applications = HousingApplication.objects.select_related("property", "user").all().order_by("property__name", "space_label", "full_name")
+    completed_payments = Payment.objects.filter(status="completed")
+    site_payment_total = completed_payments.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+
+    owner_groups = []
+    owner_rows = (
+        Property.objects
+        .exclude(owner_email="")
+        .values("owner_email")
+        .annotate(property_count=Count("id"))
+        .order_by("owner_email")
+    )
+
+    for owner_row in owner_rows:
+        owner_properties = properties.filter(owner_email__iexact=owner_row["owner_email"])
+        owner_groups.append({
+            "email": owner_row["owner_email"],
+            "property_count": owner_row["property_count"],
+            "properties": owner_properties,
+        })
     
     recent_messages = (
         ResidentMessage.objects
@@ -309,6 +328,8 @@ def superadmin_dashboard(request):
         "users": users,
         "applications": applications,
         "recent_messages": recent_messages,
+        "owner_groups": owner_groups,
+        "site_payment_total": site_payment_total,
 }
     return render(
         request,
@@ -359,6 +380,14 @@ def tenant_dashboard(request):
     request.session.set_expiry(0)
 
     application = getattr(request.user, "resident_profile", None)
+    is_superadmin_inspecting = False
+
+    if (request.user.is_superuser or getattr(request.user, "role", "") == "admin") and request.GET.get("resident"):
+        application = get_object_or_404(
+            HousingApplication.objects.select_related("property", "user"),
+            id=request.GET.get("resident"),
+        )
+        is_superadmin_inspecting = True
 
     payments = []
     resident_messages = []
@@ -368,7 +397,8 @@ def tenant_dashboard(request):
     if application:
         payments = application.payments.all().order_by("-created_at")
         resident_messages = application.resident_messages.all().order_by("-created_at")
-        profile_photo_form = ResidentProfilePhotoForm(instance=application)
+        if not is_superadmin_inspecting:
+            profile_photo_form = ResidentProfilePhotoForm(instance=application)
 
         rent_due = application.balance if application.balance > 0 else Decimal("0.00")
         deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
@@ -381,6 +411,7 @@ def tenant_dashboard(request):
         "payments": payments,
         "resident_messages": resident_messages,
         "profile_photo_form": profile_photo_form,
+        "is_superadmin_inspecting": is_superadmin_inspecting,
         "total_due": total_due,
         "stripe_public_key": settings.STRIPE_PUBLIC_KEY,
     })

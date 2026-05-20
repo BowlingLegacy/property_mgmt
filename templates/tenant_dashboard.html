@@ -229,7 +229,7 @@ body {
 {% if application %}
 
 <div class="dashboard-wrap">
-    {% if request.user.is_superuser %}
+    {% if request.user.is_superuser or request.user.role == "admin" %}
         <div class="mb-3 text-end">
             <a href="{% url 'superadmin_dashboard' %}" class="btn btn-outline-dark rounded-pill">
                 Back to Super Admin Dashboard
@@ -282,17 +282,19 @@ body {
                     {% endif %}
                 </div>
 
-                <form method="post"
-                      action="{% url 'update_resident_profile_photo' %}"
-                      enctype="multipart/form-data"
-                      class="mb-3">
-                    {% csrf_token %}
-                    <label class="form-label fw-bold">Profile Photo</label>
-                    {{ profile_photo_form.profile_photo }}
-                    <button type="submit" class="message-btn mt-2">
-                        Save Photo
-                    </button>
-                </form>
+                {% if profile_photo_form %}
+                    <form method="post"
+                          action="{% url 'update_resident_profile_photo' %}"
+                          enctype="multipart/form-data"
+                          class="mb-3">
+                        {% csrf_token %}
+                        <label class="form-label fw-bold">Profile Photo</label>
+                        {{ profile_photo_form.profile_photo }}
+                        <button type="submit" class="message-btn mt-2">
+                            Save Photo
+                        </button>
+                    </form>
+                {% endif %}
 
                 <div class="text-center">
                     <div class="profile-name">{{ application.full_name }}</div>
