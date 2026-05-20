@@ -376,7 +376,7 @@ class LiveFlowTests(TestCase):
 
         self.client.login(username="staff", password="StrongPass123!")
 
-        response = self.client.get(reverse("landlord_dashboard"))
+        response = self.client.get(reverse("landlord_attention"))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Needs Attention")

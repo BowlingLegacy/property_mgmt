@@ -212,10 +212,7 @@ def enter_invite_code(request):
 
     return render(request, "enter_invite_code.html", {"form": form})
 
-
-@login_required
-@user_passes_test(staff_required)
-def landlord_dashboard(request):
+def get_landlord_workspace_context():
     applications = (
         HousingApplication.objects
         .select_related("property", "user")
@@ -268,7 +265,7 @@ def landlord_dashboard(request):
 
     new_message_count = new_messages.count()
 
-    return render(request, "landlord_dashboard.html", {
+    return {
         "applications": applications,
         "properties": properties,
         "payments": payments,
@@ -284,15 +281,26 @@ def landlord_dashboard(request):
             + new_message_count
             + new_documents.count()
         ),
-    })
-    
+    }
+
+
 @login_required
 @user_passes_test(staff_required)
-def superadmin_dashboard(request):
+def landlord_dashboard(request):
+    return render(request, "landlord_dashboard.html", get_landlord_workspace_context())
 
-    if not request.user.is_superuser and request.user.role != "admin":
-        return redirect("tenant_dashboard")
 
+@login_required
+@user_passes_test(staff_required)
+def landlord_attention(request):
+    return render(request, "landlord_attention.html", get_landlord_workspace_context())
+
+
+@login_required
+@user_passes_test(staff_required)
+def landlord_resident_files(request):
+    return render(request, "landlord_resident_files.html", get_landlord_workspace_context())
+def get_superadmin_workspace_context():
     properties = Property.objects.all().order_by("name")
     users = User.objects.all().order_by("username")
     applications = HousingApplication.objects.select_related("property", "user").all().order_by("property__name", "space_label", "full_name")
@@ -330,12 +338,39 @@ def superadmin_dashboard(request):
         "recent_messages": recent_messages,
         "owner_groups": owner_groups,
         "site_payment_total": site_payment_total,
-}
+    }
+
+
+@login_required
+@user_passes_test(staff_required)
+def superadmin_dashboard(request):
+
+    if not request.user.is_superuser and request.user.role != "admin":
+        return redirect("tenant_dashboard")
+
     return render(
         request,
         "superadmin_dashboard.html",
-        context
+        get_superadmin_workspace_context()
     )
+
+
+@login_required
+@user_passes_test(staff_required)
+def superadmin_owners(request):
+    if not request.user.is_superuser and request.user.role != "admin":
+        return redirect("tenant_dashboard")
+
+    return render(request, "superadmin_owners.html", get_superadmin_workspace_context())
+
+
+@login_required
+@user_passes_test(staff_required)
+def superadmin_residents(request):
+    if not request.user.is_superuser and request.user.role != "admin":
+        return redirect("tenant_dashboard")
+
+    return render(request, "superadmin_residents.html", get_superadmin_workspace_context())
 @login_required
 @user_passes_test(staff_required)
 def landlord_message_detail(request, message_id):

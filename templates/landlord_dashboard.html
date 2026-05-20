@@ -2,720 +2,85 @@
 {% block content %}
 
 <style>
-body {
-    background: linear-gradient(180deg, #faf6ee 0%, #f2ead9 100%);
-    color: #1f1f1f;
-}
-
-.page-shell {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-}
-
-.ops-wrap {
-    padding-bottom: 2rem;
-}
-
-.ops-shell {
-    display: grid;
-    grid-template-columns: 255px minmax(0, 1fr);
-    gap: 1.5rem;
-}
-
-.ops-sidebar {
-    background: rgba(24, 24, 24, 0.96);
-    border: 1px solid rgba(197,154,50,0.34);
-    border-radius: 20px;
-    padding: 1.2rem;
-    min-height: calc(100vh - 160px);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
-}
-
-.ops-logo {
-    text-align: center;
-    border-bottom: 1px solid rgba(197,154,50,0.35);
-    padding-bottom: 1rem;
+.dash-shell { max-width: 1180px; margin: 0 auto; }
+.dash-hero {
+    background: #111;
+    color: #f3d27a;
+    border: 1px solid #b89238;
+    border-radius: 16px;
+    padding: 1.25rem;
     margin-bottom: 1rem;
 }
-
-.ops-logo img {
-    width: 118px;
-    height: 118px;
-    object-fit: contain;
-}
-
-.ops-logo-title {
-    font-family: Georgia, serif;
-    color: #f6ead1;
-    font-weight: 700;
-    font-size: 1.1rem;
-    margin-top: .6rem;
-}
-
-.ops-logo-subtitle {
-    color: #c59a32;
-    letter-spacing: 4px;
-    text-transform: uppercase;
-    font-size: .68rem;
-}
-
-.ops-nav-label {
-    color: #c59a32;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    font-size: .68rem;
-    font-weight: 700;
-    margin: 1rem .55rem .4rem;
-}
-
-.ops-nav a {
-    display: block;
-    color: #f7f0df;
-    text-decoration: none;
-    padding: .72rem .85rem;
-    border-radius: 12px;
-    font-weight: 700;
-    margin-bottom: .25rem;
-    border: 1px solid transparent;
-}
-
-.ops-nav a:hover,
-.ops-nav a.active {
-    border-color: rgba(197,154,50,0.65);
-    background: rgba(197,154,50,0.12);
-    color: #fff;
-}
-
-.ops-main {
-    min-width: 0;
-}
-
-.ops-hero,
-.soft-card {
-    background: rgba(255,255,255,0.88);
-    border: 1px solid rgba(188,150,45,0.12);
-    border-radius: 20px;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.06);
-}
-
-.ops-hero {
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-}
-
-.ops-eyebrow {
-    color: #a57c18;
-    letter-spacing: 5px;
-    font-size: .72rem;
-    text-transform: uppercase;
-    font-weight: 700;
-    margin-bottom: .4rem;
-}
-
-.ops-title {
-    font-family: Georgia, serif;
-    color: #1c1c1c;
-    font-size: 2.7rem;
-    font-weight: 700;
-    line-height: 1;
-    margin-bottom: .35rem;
-}
-
-.ops-text {
-    color: #555;
-    font-size: 1.05rem;
-}
-
-.kpi-card {
-    padding: 1.15rem;
-    height: 100%;
-}
-
-.kpi-label {
-    color: #a57c18;
-    letter-spacing: 3px;
-    font-size: .68rem;
-    text-transform: uppercase;
-    font-weight: 800;
-}
-
-.kpi-value {
-    font-family: Georgia, serif;
-    font-size: 2.05rem;
-    font-weight: 700;
-    color: #111;
-}
-
-.card-title,
-.section-title {
-    font-family: Georgia, serif;
-    color: #1c1c1c;
-}
-
-.card-title {
-    font-size: 1.45rem;
-}
-
-.section-title {
-    font-size: 1.7rem;
-}
-
-.gold-btn {
-    background: linear-gradient(135deg, #c48f22, #d8ab3b);
-    color: white;
-    border: none;
-    border-radius: 10px;
-    padding: .65rem 1rem;
-    font-weight: 700;
-    text-decoration: none;
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.gold-btn:hover {
-    color: white;
-    filter: brightness(.96);
-}
-
-.message-btn {
-    background: transparent;
-    border: 1px solid #c59a32;
-    border-radius: 10px;
-    padding: .65rem 1rem;
-    color: #a57c18;
-    font-weight: 700;
-    text-decoration: none;
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.message-btn:hover {
-    color: #7d5c0b;
-    background: rgba(197,154,50,0.08);
-}
-
-.table thead {
-    background: #f3ead7;
-}
-
-.table th {
-    color: #6f5411;
-    border-bottom: none;
-    font-size: .78rem;
-    text-transform: uppercase;
-    letter-spacing: .04em;
-}
-
-.table td {
-    vertical-align: middle;
-}
-
-.status-pill {
-    border-radius: 999px;
-    padding: .34rem .72rem;
-    font-size: .78rem;
-    font-weight: 700;
-    display: inline-flex;
-}
-
-.status-current {
-    background: rgba(25,135,84,.12);
-    color: #157347;
-}
-
-.status-alert {
-    background: rgba(176,42,55,.12);
-    color: #b02a37;
-}
-
-.status-gold {
-    background: #f0e5ca;
-    color: #a57c18;
-}
-
-.attention-grid {
+.dash-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 1rem;
-    margin-bottom: 1.5rem;
 }
-
-.attention-card {
-    background: #fff;
-    border: 1px solid rgba(188,150,45,0.18);
-    border-radius: 18px;
-    padding: 1rem;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.05);
-}
-
-.attention-card.alert-card {
-    border-color: rgba(176,42,55,0.35);
-    background: #fff7f7;
-}
-
-.attention-label {
-    color: #a57c18;
-    font-size: .72rem;
-    font-weight: 900;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-}
-
-.attention-value {
-    font-family: Georgia, serif;
-    font-size: 2rem;
-    font-weight: 700;
-    color: #111;
-}
-
-.attention-row {
+.dash-card {
+    display: block;
+    min-height: 150px;
     background: #fffaf0;
+    border: 1px solid rgba(184,146,56,.35);
+    border-radius: 14px;
+    padding: 1rem;
+    text-decoration: none;
+    color: #17130a;
+    box-shadow: 0 8px 20px rgba(0,0,0,.06);
 }
-
-.category-panel {
-    margin-bottom: 1rem;
-}
-
-.category-panel > summary {
-    cursor: pointer;
-    list-style: none;
-}
-
-.category-panel > summary::-webkit-details-marker {
-    display: none;
-}
-
-.status-new {
-    background: rgba(176,42,55,.12);
-    color: #b02a37;
-}
-
-@media (max-width: 992px) {
-    .ops-shell {
-        grid-template-columns: 1fr;
-    }
-
-    .ops-sidebar {
-        min-height: auto;
-    }
-
-    .attention-grid {
-        grid-template-columns: 1fr 1fr;
-    }
-}
-
-@media (max-width: 576px) {
-    .attention-grid {
-        grid-template-columns: 1fr;
-    }
-}
+.dash-card:hover { background: #f2e3bd; color: #17130a; }
+.dash-card h2 { font-family: Georgia, serif; font-size: 1.35rem; font-weight: 800; margin-bottom: .4rem; }
+.dash-count { font-size: 2rem; font-weight: 900; color: #9a7419; }
+.top-actions { display: flex; gap: .6rem; flex-wrap: wrap; justify-content: flex-end; margin-bottom: 1rem; }
+@media (max-width: 900px) { .dash-grid { grid-template-columns: 1fr; } }
 </style>
 
-<div class="ops-wrap">
-    <div class="ops-shell">
+<div class="dash-shell">
+    <div class="top-actions">
+        {% if request.user.is_superuser or request.user.role == "admin" %}
+            <a href="{% url 'superadmin_dashboard' %}" class="btn btn-outline-dark">Back to Super Admin</a>
+        {% endif %}
+        <a href="{% url 'logout' %}" class="btn btn-outline-secondary">Logout</a>
+    </div>
 
-        <aside class="ops-sidebar">
-            <div class="ops-logo">
-                <img src="/static/images/bl-logo.png" alt="Bowling Legacy Logo">
-                <div class="ops-logo-title">Bowling Legacy</div>
-                <div class="ops-logo-subtitle">RentLogic</div>
-            </div>
+    <section class="dash-hero">
+        <div class="small text-uppercase fw-bold">Landlord Operations</div>
+        <h1 class="mb-1">Choose a Workspace</h1>
+        <p class="mb-0 text-white-50">Open one category at a time. Nothing is hidden down-page.</p>
+    </section>
 
-            <nav class="ops-nav">
-                <div class="ops-nav-label">Workspace</div>
+    <div class="dash-grid">
+        <a href="{% url 'landlord_attention' %}" class="dash-card">
+            <h2>Needs Attention</h2>
+            <div class="dash-count">{{ attention_count }}</div>
+            <p class="text-muted mb-0">New applications, messages, and uploaded documents.</p>
+        </a>
 
-                <a href="{% url 'landlord_dashboard' %}" class="active">
-                    Dashboard
-                </a>
+        <a href="{% url 'landlord_resident_files' %}" class="dash-card">
+            <h2>Resident Files</h2>
+            <div class="dash-count">{{ applications.count }}</div>
+            <p class="text-muted mb-0">Resident records, applications, room setup, and portal access.</p>
+        </a>
 
-                <a href="#applications">
-                    Applications
-                </a>
+        <a href="{% url 'payment_log' %}" class="dash-card">
+            <h2>Rent Payment Matters</h2>
+            <div class="dash-count">{{ payments.count }}</div>
+            <p class="text-muted mb-0">Online payments, manual payments, bank transfers, and Cash App tracking.</p>
+        </a>
 
-                <a href="#resident-files">
-                    Resident Files
-                </a>
+        <a href="{% url 'record_manual_payment' %}" class="dash-card">
+            <h2>Record Payment</h2>
+            <p class="text-muted mb-0">Enter a bank, Cash App, cash, check, or other payment received outside Stripe.</p>
+        </a>
 
-                <a href="#money-matters">
-                    Money Matters
-                </a>
+        <a href="{% url 'financial_upload' %}" class="dash-card">
+            <h2>Operating / Capital Expenses</h2>
+            <p class="text-muted mb-0">Upload accounting exports and expense source files.</p>
+        </a>
 
-                <div class="ops-nav-label">Financial</div>
-
-                <a href="{% url 'payment_log' %}">
-                    Payment Log
-                </a>
-
-                <a href="{% url 'record_manual_payment' %}">
-                    Record Payment
-                </a>
-
-                <a href="{% url 't12_report' %}">
-                    T-12 Report
-                </a>
-
-                <div class="ops-nav-label">Account</div>
-
-                <a href="{% url 'logout' %}">
-                    Logout
-                </a>
-            </nav>
-        </aside>
-
-        <main class="ops-main">
-            {% if request.user.is_superuser or request.user.role == "admin" %}
-                <div class="mb-3 text-end">
-                    <a href="{% url 'superadmin_dashboard' %}" class="btn btn-outline-dark rounded-pill">
-                        Back to Super Admin Dashboard
-                    </a>
-                </div>
-            {% endif %}
-
-            <section class="ops-hero">
-                <div class="ops-eyebrow">
-                    Landlord Operations
-                </div>
-
-                <h1 class="ops-title">
-                    Welcome back, {{ user.username }}
-                </h1>
-
-                <p class="ops-text mb-0">
-                    Manage resident files, applications, requests, and payments.
-                </p>
-            </section>
-
-            <div class="attention-grid">
-                <div class="attention-card {% if attention_count %}alert-card{% endif %}">
-                    <div class="attention-label">Needs Attention</div>
-                    <div class="attention-value">{{ attention_count }}</div>
-                    <div class="text-muted small">New applications, messages, and documents.</div>
-                </div>
-
-                <div class="attention-card">
-                    <div class="attention-label">New Applications</div>
-                    <div class="attention-value">{{ new_application_count }}</div>
-                    <div class="text-muted small">Not approved or linked yet.</div>
-                </div>
-
-                <div class="attention-card">
-                    <div class="attention-label">New Messages</div>
-                    <div class="attention-value">{{ new_message_count }}</div>
-                    <div class="text-muted small">Resident messages still submitted.</div>
-                </div>
-
-                <div class="attention-card">
-                    <div class="attention-label">New Documents</div>
-                    <div class="attention-value">{{ new_document_count }}</div>
-                    <div class="text-muted small">Uploaded documents not reviewed.</div>
-                </div>
-            </div>
-
-            <section class="soft-card p-4 mb-4" id="money-matters">
-                <h3 class="section-title mb-3">Money Matters</h3>
-                <div class="row g-3">
-                    <div class="col-md-4">
-                        <a href="{% url 'payment_log' %}" class="message-btn w-100">Rent Payment Matters</a>
-                    </div>
-                    <div class="col-md-4">
-                        <a href="{% url 'record_manual_payment' %}" class="message-btn w-100">Record Payment</a>
-                    </div>
-                    <div class="col-md-4">
-                        <a href="{% url 'financial_upload' %}" class="message-btn w-100">Operating / Capital Expenses</a>
-                    </div>
-                    <div class="col-md-4">
-                        <a href="{% url 'rent_roll' %}" class="gold-btn w-100">Rent Roll</a>
-                    </div>
-                    <div class="col-md-4">
-                        <a href="{% url 't12_report' %}" class="gold-btn w-100">T-12 Report</a>
-                    </div>
-                </div>
-            </section>
-
-            <details class="soft-card p-4 category-panel" id="applications" open>
-                <summary>
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div>
-                            <h3 class="section-title mb-1">
-                                Needs Attention
-                            </h3>
-                            <div class="text-muted small">
-                                New intake items are grouped here so they do not get buried in resident files.
-                            </div>
-                        </div>
-                        <span class="status-pill status-alert">{{ attention_count }}</span>
-                    </div>
-                </summary>
-
-                <div class="row g-4">
-                    <div class="col-xl-4">
-                        <h5 class="fw-bold mb-3">Applications</h5>
-                        <div class="table-responsive">
-                            <table class="table table-sm align-middle">
-                                <thead>
-                                    <tr>
-                                        <th>Applicant</th>
-                                        <th>Property</th>
-                                        <th></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for application in new_applications %}
-                                    <tr class="attention-row">
-                                        <td>
-                                            <strong>{{ application.full_name }}</strong><br>
-                                            <span class="small text-muted">{{ application.created_at|date:"M j, g:i A" }}</span>
-                                        </td>
-                                        <td>
-                                            {% if application.property %}
-                                                {{ application.property.name }}
-                                            {% else %}
-                                                <span class="status-pill status-new">No Property</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            <div class="d-flex gap-2">
-                                                <a href="{% url 'application_detail' application.id %}" class="message-btn">
-                                                    Open
-                                                </a>
-                                                <a href="{% url 'landlord_create_tenant' %}?application={{ application.id }}" class="gold-btn">
-                                                    Create File
-                                                </a>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {% empty %}
-                                    <tr>
-                                        <td colspan="3" class="text-muted">No new applications.</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div class="col-xl-4">
-                        <h5 class="fw-bold mb-3">Messages</h5>
-                        <div class="table-responsive">
-                            <table class="table table-sm align-middle">
-                                <thead>
-                                    <tr>
-                                        <th>Resident</th>
-                                        <th>Subject</th>
-                                        <th></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for resident_message in new_messages %}
-                                    <tr class="attention-row">
-                                        <td>
-                                            <strong>{{ resident_message.application.full_name }}</strong><br>
-                                            <span class="small text-muted">{{ resident_message.created_at|date:"M j, g:i A" }}</span>
-                                        </td>
-                                        <td>
-                                            {{ resident_message.subject }}<br>
-                                            <span class="small text-muted">{{ resident_message.get_message_type_display }}</span>
-                                        </td>
-                                        <td>
-                                            <a href="{% url 'landlord_message_detail' resident_message.id %}" class="message-btn">
-                                                Open
-                                            </a>
-                                        </td>
-                                    </tr>
-                                    {% empty %}
-                                    <tr>
-                                        <td colspan="3" class="text-muted">No new messages.</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div class="col-xl-4">
-                        <h5 class="fw-bold mb-3">Documents</h5>
-                        <div class="table-responsive">
-                            <table class="table table-sm align-middle">
-                                <thead>
-                                    <tr>
-                                        <th>Resident</th>
-                                        <th>Document</th>
-                                        <th></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for document in new_documents %}
-                                    <tr class="attention-row">
-                                        <td>
-                                            <strong>{{ document.application.full_name }}</strong><br>
-                                            <span class="small text-muted">{{ document.created_at|date:"M j, g:i A" }}</span>
-                                        </td>
-                                        <td>
-                                            {{ document.name }}<br>
-                                            <span class="small text-muted">{{ document.get_document_type_display }}</span>
-                                        </td>
-                                        <td>
-                                            {% if document.file %}
-                                                <a href="{{ document.file.url }}" target="_blank" class="message-btn">
-                                                    Open
-                                                </a>
-                                                <form method="post" action="{% url 'mark_document_reviewed' document.id %}" class="mt-2">
-                                                    {% csrf_token %}
-                                                    <button type="submit" class="gold-btn">
-                                                        Mark Reviewed
-                                                    </button>
-                                                </form>
-                                            {% else %}
-                                                <span class="text-muted">No file</span>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% empty %}
-                                    <tr>
-                                        <td colspan="3" class="text-muted">No new documents.</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </details>
-
-            <details class="soft-card p-4 category-panel" id="resident-files">
-                <summary>
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div>
-                            <h3 class="section-title mb-1">
-                                Resident File Overview
-                            </h3>
-
-                            <div class="text-muted small">
-                                Applications, balances, room assignments, and portal access.
-                            </div>
-                        </div>
-                    </div>
-                </summary>
-
-                <div class="table-responsive">
-
-                    <table class="table table-hover align-middle">
-
-                        <thead>
-                            <tr>
-                                <th>Resident</th>
-                                <th>Property</th>
-                                <th>Unit</th>
-                                <th>Rent</th>
-                                <th>Balance</th>
-                                <th>Portal</th>
-                                <th>Application</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-
-                            {% for resident in applications %}
-                            <tr class="{% if not resident.user %}attention-row{% endif %}">
-
-                                <td>
-                                    <strong>{{ resident.full_name }}</strong><br>
-                                    <span class="small text-muted">
-                                        {{ resident.email }}
-                                    </span>
-                                    {% if not resident.user %}
-                                        <br><span class="status-pill status-new mt-1">New Application</span>
-                                    {% endif %}
-                                </td>
-
-                                <td>
-                                    {{ resident.property.name }}
-                                </td>
-
-                                <td>
-                                    {{ resident.space_type }} {{ resident.space_label }}
-                                </td>
-
-                                <td>
-                                    ${{ resident.monthly_rent }}
-                                </td>
-
-                                <td>
-                                    {% if resident.balance > 0 %}
-                                        <span class="status-pill status-alert">
-                                            ${{ resident.balance }}
-                                        </span>
-                                    {% else %}
-                                        <span class="status-pill status-current">
-                                            Current
-                                        </span>
-                                    {% endif %}
-                                </td>
-
-                                <td>
-                                    {% if resident.user %}
-                                        <span class="status-pill status-gold">
-                                            {{ resident.user.invite_code }}
-                                        </span>
-                                    {% else %}
-                                        <span class="status-pill status-alert">
-                                            No Login
-                                        </span>
-                                    {% endif %}
-                                </td>
-
-                                <td>
-                                    <div class="d-flex gap-2">
-
-                                        <a href="{% url 'application_detail' resident.id %}"
-                                           class="message-btn">
-                                            Open
-                                        </a>
-
-                                        <a href="{% url 'printable_application' resident.id %}"
-                                           class="gold-btn">
-                                            Print
-                                        </a>
-
-                                        <a href="{% url 'record_manual_payment' %}?application={{ resident.id }}"
-                                           class="message-btn">
-                                            Record Payment
-                                        </a>
-
-                                        {% if not resident.user %}
-                                            <a href="{% url 'landlord_create_tenant' %}?application={{ resident.id }}"
-                                               class="gold-btn">
-                                                Create File
-                                            </a>
-                                        {% endif %}
-
-                                    </div>
-                                </td>
-
-                            </tr>
-
-                            {% empty %}
-                            <tr>
-                                <td colspan="7">
-                                    No residents yet.
-                                </td>
-                            </tr>
-                            {% endfor %}
-
-                        </tbody>
-
-                    </table>
-
-                </div>
-
-            </details>
-
-        </main>
-
+        <a href="{% url 'property_blog_manager' %}" class="dash-card">
+            <h2>Property Blogs</h2>
+            <p class="text-muted mb-0">Create property updates and approve comments.</p>
+        </a>
     </div>
 </div>
 
