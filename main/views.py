@@ -104,7 +104,22 @@ def apply_completed_payment_to_balance(payment):
 def home(request):
     properties = Property.objects.all()
     posts = BlogPost.objects.filter(property__isnull=True).order_by("-created_at")[:5]
-    return render(request, "home.html", {"properties": properties, "posts": posts})
+    painted_lady_profile_property = (
+        properties
+        .filter(name__icontains="painted lady")
+        .order_by("name")
+        .first()
+    )
+
+    return render(request, "home.html", {
+        "properties": properties,
+        "posts": posts,
+        "painted_lady_profile_property": painted_lady_profile_property,
+        "painted_lady_profile_open": bool(
+            painted_lady_profile_property
+            and property_existing_resident_intake_open(painted_lady_profile_property)
+        ),
+    })
     
 def properties_list(request):
     properties = Property.objects.all().order_by("name")

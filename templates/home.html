@@ -24,6 +24,23 @@
         .brand-subtitle { color: #c59a32; letter-spacing: 7px; text-transform: uppercase; font-size: .72rem; margin-left: 6px; margin-top: .3rem; }
         .nav-link-bl { color: #f6ead1; text-decoration: none; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: .86rem; padding: .75rem .85rem; border-bottom: 2px solid transparent; }
         .nav-link-bl:hover, .nav-link-bl.active { color: #d8ab3b; border-bottom-color: #c59a32; }
+        .resident-start {
+            background: #111;
+            border-bottom: 2px solid #c59a32;
+            color: #f6ead1;
+        }
+        .resident-start .container {
+            align-items: center;
+            display: flex;
+            gap: 1rem;
+            justify-content: space-between;
+            padding-bottom: 1rem;
+            padding-top: 1rem;
+        }
+        .resident-start-title { color: #f3d27a; font-family: Georgia, serif; font-size: 1.35rem; font-weight: 700; }
+        .resident-start-copy { color: #f6ead1; margin: 0; }
+        .resident-start-btn { background: #d8ab3b; border-radius: 12px; color: #080808; font-weight: 900; min-height: 54px; padding: .9rem 1.2rem; text-align: center; text-decoration: none; }
+        .resident-start-btn:hover { background: #ebc868; color: #080808; }
         .hero-section { padding: 4rem 0 2rem; }
         .hero-kicker { font-family: Georgia, serif; font-style: italic; font-size: 1.55rem; color: #1f1f1f; margin-bottom: .25rem; }
         .hero-title { font-family: Georgia, serif; color: #080808; font-size: clamp(2.75rem, 6vw, 4.9rem); line-height: .95; letter-spacing: .04em; text-transform: uppercase; margin-bottom: 1.35rem; }
@@ -68,8 +85,15 @@
             .hero-section { padding-top: 2.5rem; }
         }
         @media (max-width: 768px) {
-            .brand-logo { height: 64px; }
-            .brand-script { font-size: 20px; }
+            .site-header { padding-bottom: .55rem !important; padding-top: .55rem !important; }
+            .site-header .container { gap: .45rem !important; }
+            .brand-logo { height: 46px; margin-right: 10px; }
+            .brand-script { font-size: 18px; }
+            .brand-subtitle { font-size: .58rem; letter-spacing: 4px; margin-top: .1rem; }
+            .nav-link-bl { font-size: .72rem; padding: .35rem .45rem; }
+            .resident-start .container { align-items: stretch; flex-direction: column; padding-bottom: .85rem; padding-top: .85rem; text-align: center; }
+            .resident-start-title { font-size: 1.2rem; }
+            .resident-start-btn { width: 100%; }
             .hero-title { font-size: 2.6rem; }
             .hero-image { min-height: 260px; }
             .image-plaque { position: static; margin-top: .8rem; }
@@ -96,6 +120,20 @@
     </div>
 </header>
 
+{% if painted_lady_profile_open %}
+<section class="resident-start">
+    <div class="container">
+        <div>
+            <div class="resident-start-title">Already live at The Painted Lady Inn?</div>
+            <p class="resident-start-copy">Start here first. Set up your resident profile so we can prepare your RentLogic access.</p>
+        </div>
+        <a href="{% url 'existing_resident_intake' painted_lady_profile_property.pk %}" class="resident-start-btn">
+            Set Up My Profile
+        </a>
+    </div>
+</section>
+{% endif %}
+
 <section class="hero-section">
     <div class="container">
         <div class="row align-items-center g-5">
@@ -106,6 +144,9 @@
                 <div class="hero-tagline">Building More Than Properties.<br>Building a Legacy.</div>
                 <p class="hero-copy">Bowling Legacy provides long-term, dignified housing for adults 55+ at risk of homelessness, creating safe, stable environments built on respect, structure, accountability, and community.</p>
                 <div class="d-flex gap-3 flex-wrap mt-4">
+                    {% if painted_lady_profile_open %}
+                        <a href="{% url 'existing_resident_intake' painted_lady_profile_property.pk %}" class="gold-btn">Resident Profile Setup</a>
+                    {% endif %}
                     <a href="{% url 'properties_list' %}" class="dark-btn">View Properties</a>
                     <a href="{% url 'login' %}?next={% url 'tenant_dashboard' %}" class="outline-btn">Tenant Portal</a>
                 </div>

@@ -743,6 +743,22 @@ class LiveFlowTests(TestCase):
         intake_response = self.client.get(reverse("existing_resident_intake", args=[property_obj.id]))
         self.assertRedirects(intake_response, reverse("property_detail", args=[property_obj.id]))
 
+    def test_homepage_shows_painted_lady_profile_setup_during_intake_window(self):
+        property_obj = Property.objects.create(name="The Painted Lady Inn")
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Already live at The Painted Lady Inn?")
+        self.assertContains(response, reverse("existing_resident_intake", args=[property_obj.id]))
+
+        property_obj.created_at = timezone.now() - timezone.timedelta(days=31)
+        property_obj.save(update_fields=["created_at"])
+
+        closed_response = self.client.get(reverse("home"))
+
+        self.assertNotContains(closed_response, "Set Up My Profile")
+
     def test_admin_can_issue_property_owner_invite_from_intake(self):
         invite_admin = User.objects.create_superuser(
             username="invite-admin",
