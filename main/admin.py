@@ -243,27 +243,31 @@ class PropertyOwnerIntakeAdmin(admin.ModelAdmin):
 class LandlordIntakeAdmin(PropertyOwnerIntakeAdmin):
     list_display = (
         "full_name",
-        "company_name",
         "email",
+        "phone",
+        "address",
         "status",
         "portal_invite_code",
-        "property_count",
-        "total_units",
-        "needs_applications",
-        "needs_resident_files",
         "created_at",
     )
     list_filter = (
         "status",
-        "needs_applications",
-        "needs_resident_files",
-        "needs_documents",
-        "needs_maintenance",
+        "created_at",
+    )
+    search_fields = ("full_name", "email", "phone", "address")
+    fields = (
+        "email",
+        "full_name",
+        "phone",
+        "address",
+        "status",
+        "portal_invite_code",
+        "invite_sent_at",
         "created_at",
     )
     actions = ("send_landlord_portal_invites",)
 
-    @admin.action(description="Approve selected landlord intakes and send portal invite")
+    @admin.action(description="Send selected landlord portal invite")
     def send_landlord_portal_invites(self, request, queryset):
         self.send_portal_invites(request, queryset, "landlord", "Landlord")
 

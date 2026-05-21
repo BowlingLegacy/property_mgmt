@@ -29,7 +29,7 @@ from .forms import (
     ResidentProfilePhotoForm,
     ReplacementInviteCodeForm,
     PropertyOwnerIntakeForm,
-    LandlordIntakeForm,
+    LandlordSignUpForm,
 )
 
 from .models import (
@@ -135,21 +135,6 @@ def property_owner_intake_success(request):
     return render(request, "property_owner_intake_success.html")
 
 
-def landlord_intake(request):
-    form = LandlordIntakeForm(request.POST or None)
-
-    if request.method == "POST" and form.is_valid():
-        form.save()
-        messages.success(request, "Your landlord questionnaire has been submitted.")
-        return redirect("landlord_intake_success")
-
-    return render(request, "landlord_intake.html", {"form": form})
-
-
-def landlord_intake_success(request):
-    return render(request, "landlord_intake_success.html")
-
-
 def apply(request):
     property_id = request.GET.get("property") or request.POST.get("property")
     property_obj = None
@@ -214,7 +199,8 @@ def signup(request):
         return redirect("request_invite_code")
 
     if request.method == "POST":
-        form = SignUpForm(request.POST)
+        form_class = LandlordSignUpForm if pending_user.role == "landlord" else SignUpForm
+        form = form_class(request.POST)
 
         if form.is_valid():
             user = form.save(commit=False)
@@ -234,9 +220,12 @@ def signup(request):
                 owner_intake.save(update_fields=["user", "status"])
 
             if landlord_intake_obj:
+                landlord_intake_obj.full_name = form.cleaned_data.get("full_name", "")
+                landlord_intake_obj.phone = form.cleaned_data.get("phone", "")
+                landlord_intake_obj.address = form.cleaned_data.get("address", "")
                 landlord_intake_obj.user = user
                 landlord_intake_obj.status = "registered"
-                landlord_intake_obj.save(update_fields=["user", "status"])
+                landlord_intake_obj.save(update_fields=["full_name", "phone", "address", "user", "status"])
 
             if not pending_user.has_usable_password() and pending_user.id != user.id:
                 pending_user.delete()
@@ -252,7 +241,17 @@ def signup(request):
             from .auth_views import dashboard_for_user
             return redirect(dashboard_for_user(user))
     else:
-        form = SignUpForm(initial={"email": pending_user.email})
+        form_class = LandlordSignUpForm if pending_user.role == "landlord" else SignUpForm
+        initial = {"email": pending_user.email}
+
+        if landlord_intake_obj:
+            initial.update({
+                "full_name": landlord_intake_obj.full_name,
+                "phone": landlord_intake_obj.phone,
+                "address": landlord_intake_obj.address,
+            })
+
+        form = form_class(initial=initial)
 
     return render(request, "signup.html", {
         "form": form,

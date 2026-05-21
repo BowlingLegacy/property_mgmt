@@ -34,7 +34,7 @@ def send_portal_access_invite_email(user, full_name, role_label):
 
     send_mail(
         f"Your Bowling Legacy {role_label} Portal Access Code",
-        f"""Hello {full_name},
+        f"""Hello {full_name or role_label},
 
 Your Bowling Legacy {role_label.lower()} portal access code is:
 

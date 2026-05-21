@@ -11,7 +11,6 @@ from .models import (
     Property,
     Payment,
     PropertyOwnerIntake,
-    LandlordIntake,
 )
 
 
@@ -162,82 +161,6 @@ class PropertyOwnerIntakeForm(forms.ModelForm):
             intake.save()
 
         return intake
-
-
-class LandlordIntakeForm(forms.ModelForm):
-    class Meta:
-        model = LandlordIntake
-        fields = [
-            "full_name",
-            "company_name",
-            "email",
-            "phone",
-            "property_count",
-            "total_units",
-            "properties_managed",
-            "current_software",
-            "current_pain_points",
-            "migration_notes",
-            "needs_rent_collection",
-            "needs_applications",
-            "needs_resident_files",
-            "needs_documents",
-            "needs_maintenance",
-            "needs_resident_communication",
-            "needs_screening",
-            "needs_accounting_access",
-            "dashboard_goals",
-            "additional_notes",
-        ]
-        labels = {
-            "property_count": "How many properties will you manage in RentLogic?",
-            "total_units": "Approximate units under management",
-            "properties_managed": "Property names or portfolio notes",
-            "current_software": "Current software or tracking system",
-            "current_pain_points": "What work is hardest today?",
-            "migration_notes": "Records that need to be migrated or preserved",
-            "needs_rent_collection": "Rent collection and payment records",
-            "needs_applications": "Applications and applicant review",
-            "needs_resident_files": "Resident files, balances, and rent roll",
-            "needs_documents": "Leases, signatures, uploads, and document storage",
-            "needs_maintenance": "Maintenance requests and work tracking",
-            "needs_resident_communication": "Resident messages and announcements",
-            "needs_screening": "Rental scoring and screening workflow",
-            "needs_accounting_access": "Accounting and owner reporting access",
-            "dashboard_goals": "What should your landlord dashboard make easy?",
-        }
-        widgets = {
-            "full_name": forms.TextInput(attrs={"class": "form-control"}),
-            "company_name": forms.TextInput(attrs={"class": "form-control"}),
-            "email": forms.EmailInput(attrs={"class": "form-control"}),
-            "phone": forms.TextInput(attrs={"class": "form-control"}),
-            "property_count": forms.NumberInput(attrs={"class": "form-control", "min": "1"}),
-            "total_units": forms.NumberInput(attrs={"class": "form-control", "min": "0"}),
-            "properties_managed": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
-            "current_software": forms.TextInput(attrs={
-                "class": "form-control",
-                "placeholder": "AppFolio, Buildium, spreadsheets, none, etc.",
-            }),
-            "current_pain_points": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
-            "migration_notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
-            "dashboard_goals": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
-            "additional_notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        for field_name in [
-            "needs_rent_collection",
-            "needs_applications",
-            "needs_resident_files",
-            "needs_documents",
-            "needs_maintenance",
-            "needs_resident_communication",
-            "needs_screening",
-            "needs_accounting_access",
-        ]:
-            self.fields[field_name].widget.attrs["class"] = "form-check-input"
 
 
 class ManualPaymentForm(forms.ModelForm):
@@ -572,3 +495,18 @@ class SignUpForm(UserCreationForm):
             "username": forms.TextInput(attrs={"class": "form-control"}),
             "email": forms.EmailInput(attrs={"class": "form-control"}),
         }
+
+
+class LandlordSignUpForm(SignUpForm):
+    full_name = forms.CharField(
+        max_length=255,
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    phone = forms.CharField(
+        max_length=50,
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    address = forms.CharField(
+        max_length=255,
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )

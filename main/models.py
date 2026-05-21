@@ -552,10 +552,11 @@ class PropertyOwnerIntake(models.Model):
 class LandlordIntake(models.Model):
     STATUS_CHOICES = PropertyOwnerIntake.STATUS_CHOICES
 
-    full_name = models.CharField(max_length=255)
+    full_name = models.CharField(max_length=255, blank=True)
     company_name = models.CharField(max_length=255, blank=True)
     email = models.EmailField()
-    phone = models.CharField(max_length=50)
+    phone = models.CharField(max_length=50, blank=True)
+    address = models.CharField(max_length=255, blank=True)
     property_count = models.PositiveIntegerField(default=1)
     total_units = models.PositiveIntegerField(default=0)
     properties_managed = models.TextField(blank=True)
@@ -587,6 +588,8 @@ class LandlordIntake(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        verbose_name = "Landlord Invite / Profile"
+        verbose_name_plural = "Landlord Invites / Profiles"
 
     def __str__(self):
         return f"{self.full_name} - {self.company_name or self.email}"

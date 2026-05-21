@@ -209,6 +209,9 @@ class LiveFlowTests(TestCase):
         self.assertRedirects(response, reverse("signup"))
 
         response = self.client.post(reverse("signup"), {
+            "full_name": "New Landlord",
+            "phone": "555-0131",
+            "address": "12 Landlord Lane",
             "username": "new-landlord",
             "email": "new-landlord@example.com",
             "password1": "StrongPass123!",
@@ -218,6 +221,9 @@ class LiveFlowTests(TestCase):
         self.assertRedirects(response, reverse("landlord_dashboard"))
         intake.refresh_from_db()
         self.assertEqual(intake.user.username, "new-landlord")
+        self.assertEqual(intake.full_name, "New Landlord")
+        self.assertEqual(intake.phone, "555-0131")
+        self.assertEqual(intake.address, "12 Landlord Lane")
         self.assertTrue(intake.user.is_staff)
         self.assertEqual(intake.status, "registered")
 
@@ -700,30 +706,6 @@ class LiveFlowTests(TestCase):
         self.assertEqual(intake.property_types, "multifamily,commercial")
         self.assertTrue(intake.needs_accounting)
         self.assertTrue(intake.needs_data_migration)
-
-    def test_landlord_intake_questionnaire_saves_system_needs(self):
-        form_response = self.client.get(reverse("landlord_intake"))
-        self.assertEqual(form_response.status_code, 200)
-        self.assertContains(form_response, "Tell us what your landlord workspace needs.")
-
-        response = self.client.post(reverse("landlord_intake"), {
-            "full_name": "Portfolio Landlord",
-            "company_name": "Daily Operations LLC",
-            "email": "landlord-intake@example.com",
-            "phone": "555-0192",
-            "property_count": "2",
-            "total_units": "48",
-            "properties_managed": "Main Street and River House",
-            "needs_applications": "on",
-            "needs_resident_files": "on",
-            "dashboard_goals": "See new messages and unpaid rent first.",
-        })
-
-        self.assertRedirects(response, reverse("landlord_intake_success"))
-        intake = LandlordIntake.objects.get(email="landlord-intake@example.com")
-        self.assertEqual(intake.total_units, 48)
-        self.assertTrue(intake.needs_applications)
-        self.assertTrue(intake.needs_resident_files)
 
     def test_admin_can_issue_property_owner_invite_from_intake(self):
         invite_admin = User.objects.create_superuser(
