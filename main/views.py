@@ -556,20 +556,16 @@ def mark_document_reviewed(request, document_id):
 def tenant_dashboard(request):
     request.session.set_expiry(0)
 
-    application = getattr(request.user, "resident_profile", None)
-    is_superadmin_inspecting = False
-
-    if (request.user.is_superuser or getattr(request.user, "role", "") == "admin") and request.GET.get("resident"):
-        application = get_object_or_404(
-            HousingApplication.objects.select_related("property", "user"),
-            id=request.GET.get("resident"),
-        )
-        is_superadmin_inspecting = True
+    application, is_superadmin_inspecting = get_resident_portal_application(request)
 
     payments = []
     resident_messages = []
     profile_photo_form = None
+    property_blog_posts = []
     total_due = Decimal("0.00")
+    rent_due = Decimal("0.00")
+    deposit_due = Decimal("0.00")
+    utility_due = Decimal("0.00")
 
     if application:
         payments = application.payments.all().order_by("-created_at")
@@ -582,15 +578,103 @@ def tenant_dashboard(request):
         utility_due = application.utility_balance if application.utility_balance > 0 else Decimal("0.00")
 
         total_due = rent_due + deposit_due + utility_due
+        if application.property:
+            property_blog_posts = (
+                application.property.blog_posts
+                .prefetch_related("comments")
+                .select_related("author")
+                .order_by("-created_at")[:3]
+            )
 
     return render(request, "tenant_dashboard.html", {
         "application": application,
         "payments": payments,
         "resident_messages": resident_messages,
+        "property_blog_posts": property_blog_posts,
         "profile_photo_form": profile_photo_form,
         "is_superadmin_inspecting": is_superadmin_inspecting,
         "total_due": total_due,
+        "rent_due": rent_due,
+        "deposit_due": deposit_due,
+        "utility_due": utility_due,
         "stripe_public_key": settings.STRIPE_PUBLIC_KEY,
+        "resident_balance_url": resident_portal_url("resident_balance_detail", is_superadmin_inspecting, application),
+        "resident_payment_history_url": resident_portal_url("resident_payment_history", is_superadmin_inspecting, application),
+        "resident_requests_url": resident_portal_url("resident_requests", is_superadmin_inspecting, application),
+    })
+
+
+def get_resident_portal_application(request):
+    application = getattr(request.user, "resident_profile", None)
+    is_superadmin_inspecting = False
+
+    if (request.user.is_superuser or getattr(request.user, "role", "") == "admin") and request.GET.get("resident"):
+        application = get_object_or_404(
+            HousingApplication.objects.select_related("property", "user"),
+            id=request.GET.get("resident"),
+        )
+        is_superadmin_inspecting = True
+
+    return application, is_superadmin_inspecting
+
+
+def resident_portal_url(view_name, is_superadmin_inspecting, application):
+    url = reverse(view_name)
+    if is_superadmin_inspecting and application:
+        return f"{url}?resident={application.id}"
+    return url
+
+
+@login_required
+def resident_balance_detail(request):
+    application, is_superadmin_inspecting = get_resident_portal_application(request)
+
+    if not application:
+        messages.error(request, "No resident file connected.")
+        return redirect("tenant_dashboard")
+
+    rent_due = application.balance if application.balance > 0 else Decimal("0.00")
+    deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
+    utility_due = application.utility_balance if application.utility_balance > 0 else Decimal("0.00")
+
+    return render(request, "resident_balance_detail.html", {
+        "application": application,
+        "rent_due": rent_due,
+        "deposit_due": deposit_due,
+        "utility_due": utility_due,
+        "total_due": rent_due + deposit_due + utility_due,
+        "dashboard_url": resident_portal_url("tenant_dashboard", is_superadmin_inspecting, application),
+        "is_superadmin_inspecting": is_superadmin_inspecting,
+    })
+
+
+@login_required
+def resident_payment_history(request):
+    application, is_superadmin_inspecting = get_resident_portal_application(request)
+
+    if not application:
+        messages.error(request, "No resident file connected.")
+        return redirect("tenant_dashboard")
+
+    return render(request, "resident_payment_history.html", {
+        "application": application,
+        "payments": application.payments.all().order_by("-created_at"),
+        "dashboard_url": resident_portal_url("tenant_dashboard", is_superadmin_inspecting, application),
+    })
+
+
+@login_required
+def resident_requests(request):
+    application, is_superadmin_inspecting = get_resident_portal_application(request)
+
+    if not application:
+        messages.error(request, "No resident file connected.")
+        return redirect("tenant_dashboard")
+
+    return render(request, "resident_requests.html", {
+        "application": application,
+        "requests": application.resident_messages.all().order_by("-created_at"),
+        "dashboard_url": resident_portal_url("tenant_dashboard", is_superadmin_inspecting, application),
     })
 
 
@@ -628,8 +712,13 @@ def upload_resident_document(request):
         return redirect("tenant_dashboard")
 
     document_type = request.POST.get("document_type", "other")
+    resident_upload_types = {"id", "income", "bank", "other"}
     name = request.POST.get("name", "").strip()
     uploaded_file = request.FILES.get("file")
+
+    if document_type not in resident_upload_types:
+        messages.error(request, "Choose a valid resident upload document type.")
+        return redirect("tenant_dashboard")
 
     if not name or not uploaded_file:
         messages.error(request, "Document name and file are required.")
@@ -1017,6 +1106,7 @@ def property_detail(request, pk):
     property_obj = get_object_or_404(Property, pk=pk)
     gallery_images = property_obj.images.all()
     can_view_property_blog = user_can_view_property_blog(request.user, property_obj)
+    can_manage_property_blog = user_can_manage_property_blog(request.user, property_obj)
     posts = BlogPost.objects.none()
 
     if can_view_property_blog:
@@ -1027,6 +1117,7 @@ def property_detail(request, pk):
         "gallery_images": gallery_images,
         "posts": posts,
         "can_view_property_blog": can_view_property_blog,
+        "can_manage_property_blog": can_manage_property_blog,
         "existing_resident_intake_open": property_existing_resident_intake_open(property_obj),
     })
 
@@ -1048,6 +1139,20 @@ def user_can_view_property_blog(user, property_obj):
 
     application = getattr(user, "resident_profile", None)
     return bool(application and application.property_id == property_obj.id)
+
+
+def user_can_manage_property_blog(user, property_obj):
+    if not user.is_authenticated:
+        return False
+
+    if staff_required(user) or getattr(user, "role", "") == "admin":
+        return True
+
+    return bool(
+        property_obj.owner_email
+        and user.email
+        and property_obj.owner_email.lower() == user.email.lower()
+    )
 
 
 def property_existing_resident_intake_open(property_obj):

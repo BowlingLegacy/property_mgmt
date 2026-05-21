@@ -3,7 +3,7 @@
 
 <style>
     body {
-        background: #f4f6f9;
+        background: #faf6ee;
     }
 
     .lease-wrapper {
@@ -12,8 +12,9 @@
     }
 
     .lease-document {
-        background: white;
-        border-radius: 24px;
+        background: #fffaf0;
+        border: 1px solid rgba(169,130,38,.35);
+        border-radius: 16px;
         box-shadow: 0 10px 30px rgba(0,0,0,0.12);
         overflow: hidden;
         margin-bottom: 2rem;
@@ -21,8 +22,8 @@
 
     .lease-header {
         position: relative;
-        background: linear-gradient(135deg, #050505, #111111);
-        color: white;
+        background: #090909;
+        color: #f3d27a;
         padding: 2rem 2rem 3.5rem;
         text-align: center;
         overflow: hidden;
@@ -35,7 +36,7 @@
         right: 0;
         bottom: -1px;
         height: 55px;
-        background: white;
+        background: #fffaf0;
         clip-path: polygon(0 70%, 50% 100%, 100% 70%, 100% 100%, 0 100%);
         border-top: 4px solid #d4af37;
     }
@@ -72,7 +73,7 @@
     }
 
     .lease-section h3 {
-        color: #1e3a5f;
+        color: #1c1c1c;
         font-weight: 700;
         margin-bottom: 1rem;
         border-bottom: 2px solid #d4af37;
@@ -91,14 +92,14 @@
     }
 
     .signature-box {
-        background: #f8f9fb;
+        background: #f4ead2;
         border-radius: 18px;
         padding: 1.5rem;
         border: 1px solid #dee2e6;
     }
 
     .info-card {
-        background: #f8f9fb;
+        background: #fff;
         border-radius: 18px;
         padding: 1.25rem;
         border: 1px solid #e1e4e8;
@@ -126,9 +127,29 @@
             border-radius: 16px;
         }
     }
+
+    @media print {
+        .footer,
+        .no-print {
+            display: none !important;
+        }
+
+        body {
+            background: #fff;
+        }
+
+        .lease-document {
+            border-radius: 0;
+            box-shadow: none;
+        }
+    }
 </style>
 
 <div class="container my-4 lease-wrapper">
+    <div class="d-flex justify-content-end gap-2 mb-3 no-print">
+        <a href="{% url 'tenant_dashboard' %}" class="btn btn-outline-dark">Back to Dashboard</a>
+        <button type="button" onclick="window.print()" class="btn btn-dark">Print</button>
+    </div>
 
     <div class="lease-document">
 
@@ -558,5 +579,13 @@
     </div>
 
 </div>
+
+{% if request.GET.print %}
+<script>
+window.addEventListener("load", function () {
+    window.print();
+});
+</script>
+{% endif %}
 
 {% endblock %}

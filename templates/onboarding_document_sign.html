@@ -27,9 +27,24 @@
     border-radius: 12px;
     padding: 1rem;
 }
+@media print {
+    .footer,
+    .no-print {
+        display: none !important;
+    }
+    .doc-card {
+        border-radius: 0;
+        box-shadow: none;
+    }
+}
 </style>
 
 <div class="doc-shell">
+    <div class="d-flex justify-content-end gap-2 mb-3 no-print">
+        <a href="{% url 'tenant_dashboard' %}" class="btn btn-outline-dark">Back to Dashboard</a>
+        <button type="button" onclick="window.print()" class="btn btn-dark">Print</button>
+    </div>
+
     <div class="doc-card">
         <div class="doc-header">
             <h1 class="fw-bold mb-1">{{ signed_document.title }}</h1>
@@ -125,5 +140,13 @@
         </div>
     </div>
 </div>
+
+{% if request.GET.print %}
+<script>
+window.addEventListener("load", function () {
+    window.print();
+});
+</script>
+{% endif %}
 
 {% endblock %}

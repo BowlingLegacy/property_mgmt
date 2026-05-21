@@ -881,6 +881,110 @@ class LiveFlowTests(TestCase):
         self.assertEqual(resident_response.status_code, 200)
         self.assertContains(resident_response, "Residents only notice")
 
+    def test_resident_property_blog_does_not_show_manager_link_or_other_property_updates(self):
+        resident_property = Property.objects.create(name="Resident Property")
+        other_property = Property.objects.create(name="Other Property")
+        BlogPost.objects.create(property=resident_property, title="Resident update", body="Private notice.")
+        BlogPost.objects.create(property=other_property, title="Other resident update", body="Do not show.")
+        resident_user = User.objects.create_user(
+            username="dashboard-blog-resident",
+            email="dashboard-blog-resident@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        HousingApplication.objects.create(
+            property=resident_property,
+            user=resident_user,
+            full_name="Dashboard Blog Resident",
+            phone="555-0134",
+            email="dashboard-blog-resident@example.com",
+            age=46,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+
+        self.client.login(username="dashboard-blog-resident", password="StrongPass123!")
+
+        detail_response = self.client.get(reverse("property_detail", args=[resident_property.id]))
+        dashboard_response = self.client.get(reverse("tenant_dashboard"))
+
+        self.assertNotContains(detail_response, "Manage Blog")
+        self.assertContains(dashboard_response, "Resident update")
+        self.assertNotContains(dashboard_response, "Other resident update")
+
+    def test_resident_balance_history_and_requests_pages_are_resident_scoped(self):
+        resident_user = User.objects.create_user(
+            username="balance-resident",
+            email="balance-resident@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        application = HousingApplication.objects.create(
+            user=resident_user,
+            full_name="Balance Resident",
+            phone="555-0135",
+            email="balance-resident@example.com",
+            age=44,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+            balance=Decimal("725.00"),
+            utility_balance=Decimal("66.00"),
+        )
+        Payment.objects.create(
+            application=application,
+            payment_type="rent",
+            amount=Decimal("725.00"),
+            status="completed",
+        )
+        ResidentMessage.objects.create(
+            application=application,
+            message_type="maintenance",
+            subject="Sink request",
+            message="Check the sink.",
+        )
+
+        self.client.login(username="balance-resident", password="StrongPass123!")
+
+        balance_response = self.client.get(reverse("resident_balance_detail"))
+        history_response = self.client.get(reverse("resident_payment_history"))
+        requests_response = self.client.get(reverse("resident_requests"))
+
+        self.assertContains(balance_response, "Rent Due")
+        self.assertContains(balance_response, "Pay Utilities")
+        self.assertContains(history_response, "Payment History")
+        self.assertContains(requests_response, "Sink request")
+
+    def test_resident_upload_rejects_lease_document_type(self):
+        resident_user = User.objects.create_user(
+            username="document-upload-resident",
+            email="document-upload-resident@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        HousingApplication.objects.create(
+            user=resident_user,
+            full_name="Document Upload Resident",
+            phone="555-0136",
+            email="document-upload-resident@example.com",
+            age=43,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        document = SimpleUploadedFile("lease.pdf", b"not a signed lease", content_type="application/pdf")
+
+        self.client.login(username="document-upload-resident", password="StrongPass123!")
+        response = self.client.post(reverse("upload_resident_document"), {
+            "document_type": "lease",
+            "name": "Lease Upload",
+            "file": document,
+        })
+
+        self.assertRedirects(response, reverse("tenant_dashboard"))
+        self.assertFalse(ApplicantDocument.objects.filter(name="Lease Upload").exists())
+
     def test_staff_can_mark_uploaded_document_reviewed(self):
         staff_user = User.objects.create_user(
             username="staff",

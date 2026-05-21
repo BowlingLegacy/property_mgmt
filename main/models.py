@@ -225,6 +225,8 @@ class ApplicantDocument(models.Model):
         ("lease", "Lease Agreement"),
         ("application_pdf", "Application PDF"),
         ("id", "Identification"),
+        ("income", "Proof of Income"),
+        ("bank", "Bank Statement / Deposit Verification"),
         ("onboarding", "Onboarding Document"),
         ("other", "Other"),
     ]

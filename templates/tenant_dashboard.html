@@ -23,8 +23,8 @@ body {
 }
 
 .house-thumb {
-    width: 145px;
-    height: 105px;
+    width: min(100%, 220px);
+    height: 150px;
     object-fit: cover;
     border-radius: 16px;
     box-shadow: 0 10px 22px rgba(0,0,0,0.14);
@@ -141,6 +141,16 @@ body {
     color: #111;
 }
 
+.account-card {
+    min-height: 360px;
+    display: flex;
+    flex-direction: column;
+}
+
+.account-card .card-actions {
+    margin-top: auto;
+}
+
 .gold-btn {
     background: linear-gradient(135deg, #c48f22, #d8ab3b);
     color: white;
@@ -222,6 +232,11 @@ body {
 
     .profile-card {
         min-height: auto;
+    }
+
+    .house-thumb {
+        width: 145px;
+        height: 105px;
     }
 }
 </style>
@@ -325,11 +340,6 @@ body {
                     Active Resident
                 </div>
 
-                <div class="mt-4">
-                    <a href="#resident-inbox" class="message-btn d-block text-center text-decoration-none">
-                        View My File
-                    </a>
-                </div>
             </div>
         </div>
 
@@ -338,7 +348,7 @@ body {
             <div class="row g-4 mb-4">
 
                 <div class="col-lg-4">
-                    <div class="soft-card p-4">
+                    <div class="soft-card account-card p-4">
                         <div class="card-title">Current Balance</div>
 
                         <div class="amount text-center mt-4">
@@ -349,43 +359,54 @@ body {
                             Total amount currently due
                         </p>
 
-                        {% if total_due > 0 %}
-                        <a href="{% url 'pay_by_type' application.id 'total' %}"
-                           class="gold-btn d-block text-center text-decoration-none mt-3">
-                            Make a Payment
-                        </a>
-                        {% endif %}
-
-                        <div class="text-center mt-3">
-                            <a href="#payment-history" class="gold-link">
-                                View Payment History
-                            </a>
+                        <div class="card-actions">
+                            {% if total_due > 0 %}
+                                <a href="{% url 'pay_by_type' application.id 'total' %}"
+                                   class="gold-btn d-block text-center text-decoration-none mt-3">
+                                    Pay Total Due
+                                </a>
+                            {% endif %}
+                            <div class="text-center mt-3">
+                                <a href="{{ resident_balance_url }}" class="gold-link">
+                                    View Balance Details
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <div class="col-lg-4">
-                    <div class="soft-card p-4">
-                        <div class="card-title">Next Payment</div>
+                    <div class="soft-card account-card p-4">
+                        <div class="card-title">Utilities</div>
 
                         <div class="amount text-center mt-4">
-                            1st
+                            ${% if utility_due > 0 %}{{ utility_due }}{% else %}{{ application.utility_monthly }}{% endif %}
                         </div>
 
                         <p class="text-center text-muted">
-                            Rent is due on the 1st and collected on the 3rd.
+                            {% if utility_due > 0 %}
+                                Utility balance currently due.
+                            {% else %}
+                                Current monthly utility fee.
+                            {% endif %}
                         </p>
 
-                        <div class="text-center mt-3">
-                            <a href="#payment-history" class="gold-link">
-                                View Payment Details
+                        <div class="card-actions text-center">
+                            {% if utility_due > 0 %}
+                                <a href="{% url 'pay_by_type' application.id 'utility' %}"
+                                   class="gold-btn d-block text-center text-decoration-none mt-3">
+                                    Pay Utilities
+                                </a>
+                            {% endif %}
+                            <a href="{{ resident_balance_url }}" class="gold-link d-inline-block mt-3">
+                                View Utility Details
                             </a>
                         </div>
                     </div>
                 </div>
 
                 <div class="col-lg-4">
-                    <div class="soft-card p-4">
+                    <div class="soft-card account-card p-4">
                         <div class="card-title">Maintenance</div>
 
                         <p class="text-center mt-4" style="font-size:1.2rem;">
@@ -398,8 +419,8 @@ body {
                             Submit a Request
                         </button>
 
-                        <div class="text-center mt-3">
-                            <a href="#resident-inbox" class="gold-link">
+                        <div class="card-actions text-center mt-3">
+                            <a href="{{ resident_requests_url }}" class="gold-link">
                                 View My Requests
                             </a>
                         </div>
@@ -447,6 +468,14 @@ body {
                                                     {% if signed_document.locked %}View{% else %}Sign{% endif %}
                                                 </a>
                                             {% endif %}
+                                            {% if signed_document.locked %}
+                                                |
+                                                <a href="{% if signed_document.document_type == 'lease' %}{% url 'lease_sign' %}{% else %}{% url 'onboarding_document' signed_document.id %}{% endif %}?print=1"
+                                                   target="_blank"
+                                                   class="gold-link">
+                                                    Print
+                                                </a>
+                                            {% endif %}
                                         </td>
                                     </tr>
                                     {% endfor %}
@@ -460,7 +489,9 @@ body {
                                         <td>{{ document.get_status_display }}</td>
                                         <td>
                                             {% if document.file %}
-                                            <a href="{{ document.file.url }}" target="_blank" class="gold-link">Open</a>
+                                            <a href="{{ document.file.url }}" target="_blank" class="gold-link">View</a>
+                                            |
+                                            <a href="{{ document.file.url }}" target="_blank" class="gold-link">Print</a>
                                             {% else %}
                                             —
                                             {% endif %}
@@ -494,8 +525,9 @@ body {
 
                 <div class="col-lg-6">
                     <div id="payment-history" class="soft-card h-100">
-                        <div class="p-4 border-bottom">
+                        <div class="p-4 border-bottom d-flex justify-content-between align-items-center gap-2">
                             <div class="section-title">Payment History</div>
+                            <a href="{{ resident_payment_history_url }}" class="gold-link">Print History</a>
                         </div>
 
                         <div class="table-responsive">
@@ -531,6 +563,62 @@ body {
                 </div>
 
             </div>
+
+            {% if application.property %}
+                <div class="soft-card mt-4">
+                    <div class="p-4 border-bottom">
+                        <div class="section-title">Private Property Updates</div>
+                        <p class="text-muted mb-0">
+                            Visible only to residents of {{ application.property.name }} and property management.
+                        </p>
+                    </div>
+
+                    <div class="p-4">
+                        {% for post in property_blog_posts %}
+                            <article class="border rounded p-3 mb-3 bg-light">
+                                <h3 class="h5 fw-bold">{{ post.title }}</h3>
+                                <p class="small text-muted mb-2">
+                                    {{ post.created_at|date:"M j, Y" }}
+                                    {% if post.author %} by {{ post.author.username }}{% endif %}
+                                </p>
+                                {% if post.image %}
+                                    <img src="{{ post.image.url }}" class="img-fluid rounded mb-3" alt="{{ post.title }}">
+                                {% endif %}
+                                <div>{{ post.body|linebreaks }}</div>
+
+                                <hr>
+                                <div class="fw-bold mb-2">Approved Comments</div>
+                                {% for comment in post.comments.all %}
+                                    {% if comment.approved %}
+                                        <div class="border rounded bg-white p-2 mb-2">
+                                            <strong>{{ comment.name }}</strong>
+                                            <div>{{ comment.comment|linebreaks }}</div>
+                                        </div>
+                                    {% endif %}
+                                {% empty %}
+                                    <p class="text-muted">No comments yet.</p>
+                                {% endfor %}
+
+                                <form method="post" action="{% url 'add_blog_comment' post.id %}" class="mt-3">
+                                    {% csrf_token %}
+                                    <div class="row g-2">
+                                        <div class="col-md-6">
+                                            <input type="text" name="name" class="form-control" placeholder="Your name" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <input type="email" name="email" class="form-control" placeholder="Your email optional">
+                                        </div>
+                                    </div>
+                                    <textarea name="comment" class="form-control my-2" rows="3" placeholder="Write a comment for approval." required></textarea>
+                                    <button type="submit" class="message-btn">Submit Comment</button>
+                                </form>
+                            </article>
+                        {% empty %}
+                            <p class="text-muted mb-0">No private property updates yet.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
 
         </div>
 
@@ -599,8 +687,6 @@ body {
                             <option value="id">Identification</option>
                             <option value="income">Proof of Income / Pay Stub / SSI / SSDI</option>
                             <option value="bank">Bank Statements / Deposit Verification</option>
-                            <option value="lease">Lease / Agreement</option>
-                            <option value="onboarding">Onboarding Document</option>
                             <option value="other">Other</option>
                         </select>
                     </div>
