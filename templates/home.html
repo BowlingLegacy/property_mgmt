@@ -44,12 +44,11 @@
         .section-title { font-family: Georgia, serif; color: #1c1c1c; font-size: 2.15rem; font-weight: 700; }
         .soft-card { background: rgba(255,255,255,0.88); border: 1px solid rgba(188,150,45,0.18); border-radius: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.06); }
         .value-card { padding: 1.35rem; height: 100%; }
+        .value-card-link { color: inherit; cursor: pointer; display: block; text-decoration: none; transition: transform .18s ease, box-shadow .18s ease; width: 100%; }
+        .value-card-link:hover { color: inherit; transform: translateY(-2px); box-shadow: 0 12px 28px rgba(0,0,0,.12); }
         .value-icon { width: 54px; height: 54px; min-width: 54px; border-radius: 999px; background: #080808; border: 1px solid #c59a32; color: #d8ab3b; display: flex; align-items: center; justify-content: center; font-size: 1.45rem; margin-bottom: 1rem; }
         .value-title { font-family: Georgia, serif; color: #1c1c1c; font-weight: 700; font-size: 1.1rem; text-transform: uppercase; letter-spacing: .05em; }
-        .founder-card { overflow: hidden; cursor: pointer; transition: transform .18s ease, box-shadow .18s ease; }
-        .founder-card:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(0,0,0,.12); }
-        .founder-photo { width: 100%; height: 100%; min-height: 210px; object-fit: cover; }
-        .founder-modal-photo { width: 100%; max-height: 360px; object-fit: cover; border-radius: 14px; border: 1px solid #c59a32; }
+        .founder-modal-photo { width: 150px; height: 150px; object-fit: cover; border-radius: 14px; border: 1px solid #c59a32; float: left; margin: 0 1.25rem 1rem 0; }
         .founder-kicker { color: #a57c18; letter-spacing: 3px; text-transform: uppercase; font-size: .72rem; font-weight: 900; }
         .founder-contact { background: #080808; color: #f6ead1; border-radius: 14px; padding: 1rem; border: 1px solid #c59a32; }
         .founder-contact a { color: #d8ab3b; font-weight: 800; }
@@ -129,31 +128,35 @@
 
 <section class="container my-5">
     <div class="row g-4">
-        <div class="col-md-3"><div class="soft-card value-card"><div class="value-icon">⌂</div><div class="value-title">Quality Housing</div><p class="text-muted mb-0">Well-maintained homes designed for comfort, safety, and long-term value.</p></div></div>
-        <div class="col-md-3"><div class="soft-card value-card"><div class="value-icon">◇</div><div class="value-title">Who We Serve</div><p class="text-muted mb-0">Adults 55+ seeking stable, dignified housing and a respectful community environment.</p></div></div>
-        <div class="col-md-3"><div class="soft-card value-card"><div class="value-icon">✓</div><div class="value-title">Integrity & Trust</div><p class="text-muted mb-0">Guided by doing the right thing, transparent records, and responsible stewardship.</p></div></div>
-        <div class="col-md-3"><div class="soft-card value-card"><div class="value-icon">▣</div><div class="value-title">RentLogic</div><p class="text-muted mb-0">Technology built from real property operations to simplify management for residents, owners, and operators.</p></div></div>
-    </div>
-</section>
-
-<section class="container my-5">
-    <button class="soft-card founder-card border-0 text-start w-100" type="button" data-bs-toggle="modal" data-bs-target="#founderModal">
-        <div class="row g-0 align-items-center">
-            <div class="col-md-3">
-                <img src="{% static 'images/a pic of me.JPG' %}" class="founder-photo" alt="Michael Bowling, founder of Bowling Legacy">
-            </div>
-            <div class="col-md-9">
-                <div class="p-4">
-                    <div class="founder-kicker mb-2">About the Founder</div>
-                    <h2 class="section-title mb-2">Michael Bowling</h2>
-                    <p class="text-muted fs-5 mb-2">
-                        Bowling Legacy was created to support mission-driven housing and the long-term future of The Painted Lady Inn.
-                    </p>
-                    <span class="outline-btn">Open Founder Note</span>
-                </div>
-            </div>
+        <div class="col-md-3">
+            <a href="#founderModal" class="soft-card value-card value-card-link" role="button" data-bs-toggle="modal" data-bs-target="#founderModal">
+                <div class="value-icon">▣</div>
+                <div class="value-title">About the Founder</div>
+                <p class="text-muted mb-0">A brief note from Michael Bowling about Bowling Legacy and The Painted Lady Inn.</p>
+            </a>
         </div>
-    </button>
+        <div class="col-md-3">
+            <a href="{% url 'who_we_serve' %}" class="soft-card value-card value-card-link">
+                <div class="value-icon">◇</div>
+                <div class="value-title">Who We Serve</div>
+                <p class="text-muted mb-0">A public version of the community values residents receive during onboarding.</p>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <a href="{% url 'creed' %}" class="soft-card value-card value-card-link">
+                <div class="value-icon">✓</div>
+                <div class="value-title">Integrity & Trust</div>
+                <p class="text-muted mb-0">Open the creed that guides how Bowling Legacy serves residents and owners.</p>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <a href="#rentlogicModal" class="soft-card value-card value-card-link" role="button" data-bs-toggle="modal" data-bs-target="#rentlogicModal">
+                <div class="value-icon">⌂</div>
+                <div class="value-title">RentLogic</div>
+                <p class="text-muted mb-0">Technology built from real property operations to simplify management.</p>
+            </a>
+        </div>
+    </div>
 </section>
 
 <div class="modal fade" id="founderModal" tabindex="-1" aria-labelledby="founderModalLabel" aria-hidden="true">
@@ -191,6 +194,32 @@
                     <div><a href="mailto:michael@bowlinglegacy.com">michael@bowlinglegacy.com</a></div>
                     <div><a href="https://bowlinglegacy.com">bowlinglegacy.com</a></div>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="rentlogicModal" tabindex="-1" aria-labelledby="rentlogicModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content soft-card">
+            <div class="modal-header border-0">
+                <div>
+                    <div class="founder-kicker mb-1">RentLogic</div>
+                    <h2 class="section-title mb-0" id="rentlogicModalLabel">Built From Real Property Operations</h2>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body pt-0">
+                <p class="text-muted fs-5">
+                    RentLogic is growing out of the daily operating needs of Bowling Legacy and The Painted Lady Inn.
+                    The goal is a comprehensive commercial multifamily management system that keeps the interface clear
+                    for residents, property owners, landlords, and operators.
+                </p>
+                <p class="text-muted mb-0">
+                    The long-term system is being built around simple navigation, reliable records, rent collection,
+                    resident files, owner reporting, property communication, and accounting tools that make large
+                    property operations easier to manage without losing important data.
+                </p>
             </div>
         </div>
     </div>

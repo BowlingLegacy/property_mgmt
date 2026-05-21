@@ -35,6 +35,9 @@ def can_manage_property_blog(user, property_obj):
     if can_manage_all_property_blogs(user):
         return True
 
+    if not property_obj:
+        return False
+
     return bool(property_obj.owner_email and property_obj.owner_email.lower() == user.email.lower())
 
 
@@ -94,4 +97,18 @@ def approve_blog_comment(request, comment_id):
     comment.approved = True
     comment.save(update_fields=["approved"])
     messages.success(request, "Comment approved.")
+    return redirect("property_blog_manager")
+
+
+@login_required
+def delete_blog_comment(request, comment_id):
+    comment = get_object_or_404(BlogComment.objects.select_related("post", "post__property"), id=comment_id)
+
+    if not can_manage_property_blog(request.user, comment.post.property):
+        return redirect("tenant_dashboard")
+
+    if request.method == "POST":
+        comment.delete()
+        messages.success(request, "Comment deleted.")
+
     return redirect("property_blog_manager")

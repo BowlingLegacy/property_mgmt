@@ -17,6 +17,7 @@ from .models import ApplicantDocument, BlogComment, BlogPost, HousingApplication
     STRIPE_SECRET_KEY="sk_test_local",
     STRIPE_PUBLIC_KEY="pk_test_local",
     STRIPE_WEBHOOK_SECRET="whsec_local",
+    STATICFILES_STORAGE="django.contrib.staticfiles.storage.StaticFilesStorage",
 )
 class LiveFlowTests(TestCase):
     def application_payload(self):
@@ -622,6 +623,79 @@ class LiveFlowTests(TestCase):
         self.assertRedirects(response, reverse("property_blog_manager"))
         comment.refresh_from_db()
         self.assertTrue(comment.approved)
+
+    def test_staff_can_delete_pending_blog_comment(self):
+        staff_user = User.objects.create_user(
+            username="staff-delete-comment",
+            email="staff-delete-comment@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Comment Property")
+        post = BlogPost.objects.create(
+            property=property_obj,
+            author=staff_user,
+            title="Resident notice",
+            body="Private property update.",
+        )
+        comment = BlogComment.objects.create(
+            post=post,
+            name="Bad Comment",
+            email="bad-comment@example.com",
+            comment="Do not approve.",
+            approved=False,
+        )
+
+        self.client.login(username="staff-delete-comment", password="StrongPass123!")
+
+        response = self.client.post(reverse("delete_blog_comment", args=[comment.id]))
+
+        self.assertRedirects(response, reverse("property_blog_manager"))
+        self.assertFalse(BlogComment.objects.filter(id=comment.id).exists())
+
+    def test_homepage_only_shows_public_blog_posts(self):
+        property_obj = Property.objects.create(name="Private Blog Property")
+        BlogPost.objects.create(title="Public update", body="Public news.")
+        BlogPost.objects.create(property=property_obj, title="Private resident update", body="Residents only.")
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Public update")
+        self.assertNotContains(response, "Private resident update")
+
+    def test_property_blog_is_private_to_residents_of_that_property(self):
+        property_obj = Property.objects.create(name="Resident Blog Property")
+        BlogPost.objects.create(property=property_obj, title="Residents only notice", body="Private update.")
+
+        anonymous_response = self.client.get(reverse("property_detail", args=[property_obj.id]))
+        self.assertEqual(anonymous_response.status_code, 200)
+        self.assertNotContains(anonymous_response, "Residents only notice")
+
+        resident_user = User.objects.create_user(
+            username="property-resident",
+            email="property-resident@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Property Resident",
+            phone="555-0133",
+            email="property-resident@example.com",
+            age=45,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+
+        self.client.login(username="property-resident", password="StrongPass123!")
+        resident_response = self.client.get(reverse("property_detail", args=[property_obj.id]))
+
+        self.assertEqual(resident_response.status_code, 200)
+        self.assertContains(resident_response, "Residents only notice")
 
     def test_staff_can_mark_uploaded_document_reviewed(self):
         staff_user = User.objects.create_user(

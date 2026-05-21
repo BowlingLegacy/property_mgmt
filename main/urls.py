@@ -10,6 +10,7 @@ urlpatterns = [
     path("", views.home, name="home"),
     path("properties/", views.properties_list, name="properties_list"),
     path("creed/", views.creed, name="creed"),
+    path("who-we-serve/", views.who_we_serve, name="who_we_serve"),
 
     path("apply/", views.apply, name="apply"),
     path("apply/success/", views.apply_success, name="apply_success"),
@@ -52,6 +53,7 @@ urlpatterns = [
     path("property-blogs/", blog_views.blog_manager, name="property_blog_manager"),
     path("property-blogs/create/", blog_views.blog_create, name="property_blog_create"),
     path("property-blogs/comments/<int:comment_id>/approve/", blog_views.approve_blog_comment, name="approve_blog_comment"),
+    path("property-blogs/comments/<int:comment_id>/delete/", blog_views.delete_blog_comment, name="delete_blog_comment"),
     path("landlord/create-tenant/", landlord_views.create_tenant, name="landlord_create_tenant"),
     path("landlord-message/<int:message_id>/", views.landlord_message_detail, name="landlord_message_detail"),
     path("document/<int:document_id>/reviewed/", views.mark_document_reviewed, name="mark_document_reviewed"),

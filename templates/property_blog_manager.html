@@ -42,10 +42,16 @@
                             <div class="text-muted small">{{ comment.post.property.name|default:"No Property" }} | {{ comment.created_at|date:"M j, Y" }}</div>
                             <strong>{{ comment.name }}</strong>
                             <p>{{ comment.comment|linebreaks }}</p>
-                            <form method="post" action="{% url 'approve_blog_comment' comment.id %}">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-success btn-sm">Approve Comment</button>
-                            </form>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <form method="post" action="{% url 'approve_blog_comment' comment.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-success btn-sm">Approve Comment</button>
+                                </form>
+                                <form method="post" action="{% url 'delete_blog_comment' comment.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-outline-danger btn-sm">Delete Comment</button>
+                                </form>
+                            </div>
                         </div>
                     {% empty %}
                         <p class="text-muted">No comments waiting for approval.</p>

@@ -15,6 +15,7 @@ from django.core.mail import send_mail
 from django.db.models import Count, Sum
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
@@ -97,7 +98,7 @@ def apply_completed_payment_to_balance(payment):
 
 def home(request):
     properties = Property.objects.all()
-    posts = BlogPost.objects.select_related("property").all().order_by("-created_at")[:5]
+    posts = BlogPost.objects.filter(property__isnull=True).order_by("-created_at")[:5]
     return render(request, "home.html", {"properties": properties, "posts": posts})
     
 def properties_list(request):
@@ -109,6 +110,10 @@ def properties_list(request):
 
 def creed(request):
     return render(request, "creed.html")
+
+
+def who_we_serve(request):
+    return render(request, "who_we_serve.html")
 
 
 def apply(request):
@@ -919,12 +924,17 @@ def property_financials(request, property_name):
 def property_detail(request, pk):
     property_obj = get_object_or_404(Property, pk=pk)
     gallery_images = property_obj.images.all()
-    posts = property_obj.blog_posts.prefetch_related("comments").select_related("author").order_by("-created_at")
+    can_view_property_blog = user_can_view_property_blog(request.user, property_obj)
+    posts = BlogPost.objects.none()
+
+    if can_view_property_blog:
+        posts = property_obj.blog_posts.prefetch_related("comments").select_related("author").order_by("-created_at")
 
     return render(request, "property_detail.html", {
         "property": property_obj,
         "gallery_images": gallery_images,
         "posts": posts,
+        "can_view_property_blog": can_view_property_blog,
     })
 
 
@@ -933,8 +943,25 @@ def blog_detail(request, pk):
     return render(request, "blog_detail.html", {"post": post})
 
 
+def user_can_view_property_blog(user, property_obj):
+    if not user.is_authenticated:
+        return False
+
+    if staff_required(user) or getattr(user, "role", "") == "admin":
+        return True
+
+    if property_obj.owner_email and user.email and property_obj.owner_email.lower() == user.email.lower():
+        return True
+
+    application = getattr(user, "resident_profile", None)
+    return bool(application and application.property_id == property_obj.id)
+
+
 def add_blog_comment(request, post_id):
     post = get_object_or_404(BlogPost, id=post_id)
+
+    if post.property and not user_can_view_property_blog(request.user, post.property):
+        return redirect(f"{reverse('login')}?next={reverse('property_detail', args=[post.property.id])}")
 
     if request.method == "POST":
         form = BlogCommentForm(request.POST)
@@ -944,6 +971,9 @@ def add_blog_comment(request, post_id):
             comment.post = post
             comment.approved = False
             comment.save()
+
+    if post.property:
+        return redirect("property_detail", pk=post.property.id)
 
     return redirect("home")
 
