@@ -28,6 +28,7 @@ from .forms import (
     ManualPaymentForm,
     ResidentProfilePhotoForm,
     ReplacementInviteCodeForm,
+    PropertyOwnerIntakeForm,
 )
 
 from .models import (
@@ -114,6 +115,21 @@ def creed(request):
 
 def who_we_serve(request):
     return render(request, "who_we_serve.html")
+
+
+def property_owner_intake(request):
+    form = PropertyOwnerIntakeForm(request.POST or None)
+
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Your property owner questionnaire has been submitted.")
+        return redirect("property_owner_intake_success")
+
+    return render(request, "property_owner_intake.html", {"form": form})
+
+
+def property_owner_intake_success(request):
+    return render(request, "property_owner_intake_success.html")
 
 
 def apply(request):

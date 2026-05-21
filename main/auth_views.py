@@ -9,6 +9,9 @@ def dashboard_for_user(user):
     if user.is_superuser or getattr(user, "role", "") == "admin":
         return "superadmin_dashboard"
 
+    if getattr(user, "role", "") == "property_owner":
+        return "property_owner_dashboard"
+
     if user.email and Property.objects.filter(owner_email__iexact=user.email).exists():
         return "property_owner_dashboard"
 

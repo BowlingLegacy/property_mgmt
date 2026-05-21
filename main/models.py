@@ -47,6 +47,7 @@ class BlogComment(models.Model):
 class User(AbstractUser):
     ROLE_CHOICES = [
         ("tenant", "Tenant / Applicant"),
+        ("property_owner", "Property Owner"),
         ("landlord", "Landlord / Property Manager"),
         ("assistant", "Assistant"),
         ("admin", "Platform Admin"),
@@ -58,7 +59,7 @@ class User(AbstractUser):
     invite_code_used_at = models.DateTimeField(blank=True, null=True)
 
     def save(self, *args, **kwargs):
-        if self.role == "tenant":
+        if self.role in ["tenant", "property_owner"]:
             self.is_staff = False
             self.is_superuser = False
 
@@ -488,6 +489,49 @@ class FinancialUpload(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.uploaded_at.date()})"
+
+
+class PropertyOwnerIntake(models.Model):
+    PROPERTY_TYPE_CHOICES = [
+        ("multifamily", "Multifamily"),
+        ("commercial", "Commercial"),
+        ("mixed_use", "Mixed Use"),
+        ("single_family", "Single-Family Rentals"),
+        ("specialty", "Specialty / Other"),
+    ]
+
+    full_name = models.CharField(max_length=255)
+    company_name = models.CharField(max_length=255, blank=True)
+    email = models.EmailField()
+    phone = models.CharField(max_length=50)
+    property_count = models.PositiveIntegerField(default=1)
+    total_units = models.PositiveIntegerField(default=0)
+    property_types = models.CharField(max_length=255, blank=True)
+    current_software = models.CharField(max_length=255, blank=True)
+    current_pain_points = models.TextField(blank=True)
+    migration_notes = models.TextField(blank=True)
+
+    needs_rent_collection = models.BooleanField(default=False)
+    needs_accounting = models.BooleanField(default=False)
+    needs_owner_reporting = models.BooleanField(default=False)
+    needs_data_migration = models.BooleanField(default=False)
+    needs_resident_files = models.BooleanField(default=False)
+    needs_documents = models.BooleanField(default=False)
+    needs_maintenance = models.BooleanField(default=False)
+    needs_resident_communication = models.BooleanField(default=False)
+    needs_screening = models.BooleanField(default=False)
+    needs_property_websites = models.BooleanField(default=False)
+
+    onboarding_timeline = models.CharField(max_length=255, blank=True)
+    dashboard_goals = models.TextField(blank=True)
+    additional_notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.full_name} - {self.company_name or self.email}"
 
 
 class FinancialEntry(models.Model):

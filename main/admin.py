@@ -15,6 +15,7 @@ from .models import (
     FinancialEntry,
     ResidentMessage,
     SignedDocument,
+    PropertyOwnerIntake,
 )
 
 
@@ -137,7 +138,7 @@ class CustomUserAdmin(UserAdmin):
         return "No balance due" if profile.balance <= 0 else f"${profile.balance}"
 
     def save_model(self, request, obj, form, change):
-        if obj.role == "tenant":
+        if obj.role in ["tenant", "property_owner"]:
             obj.is_staff = False
             obj.is_superuser = False
 
@@ -158,6 +159,35 @@ class PropertyImageInline(admin.TabularInline):
 class PropertyAdmin(admin.ModelAdmin):
     inlines = [PropertyImageInline]
     list_display = ("name", "availability_status", "available_date", "owner_email")
+
+
+@admin.register(PropertyOwnerIntake)
+class PropertyOwnerIntakeAdmin(admin.ModelAdmin):
+    list_display = (
+        "full_name",
+        "company_name",
+        "email",
+        "property_count",
+        "total_units",
+        "needs_accounting",
+        "needs_data_migration",
+        "created_at",
+    )
+    list_filter = (
+        "needs_accounting",
+        "needs_data_migration",
+        "needs_rent_collection",
+        "needs_screening",
+        "created_at",
+    )
+    search_fields = (
+        "full_name",
+        "company_name",
+        "email",
+        "phone",
+        "current_software",
+    )
+    readonly_fields = ("created_at",)
 
 
 class ApplicantDocumentInline(admin.TabularInline):

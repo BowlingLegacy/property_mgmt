@@ -11,6 +11,8 @@ urlpatterns = [
     path("properties/", views.properties_list, name="properties_list"),
     path("creed/", views.creed, name="creed"),
     path("who-we-serve/", views.who_we_serve, name="who_we_serve"),
+    path("property-owner-intake/", views.property_owner_intake, name="property_owner_intake"),
+    path("property-owner-intake/success/", views.property_owner_intake_success, name="property_owner_intake_success"),
 
     path("apply/", views.apply, name="apply"),
     path("apply/success/", views.apply_success, name="apply_success"),

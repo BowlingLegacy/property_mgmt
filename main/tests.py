@@ -9,7 +9,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import ApplicantDocument, BlogComment, BlogPost, HousingApplication, Payment, Property, ResidentMessage, SignedDocument, User
+from .models import ApplicantDocument, BlogComment, BlogPost, HousingApplication, Payment, Property, PropertyOwnerIntake, ResidentMessage, SignedDocument, User
 
 
 @override_settings(
@@ -586,6 +586,54 @@ class LiveFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Unassigned Owner")
         self.assertContains(response, "Painted Lady Inn")
+
+    def test_property_owner_role_can_open_empty_owner_dashboard(self):
+        User.objects.create_user(
+            username="portfolio-owner",
+            email="owner@example.com",
+            password="StrongPass123!",
+            role="property_owner",
+        )
+
+        response = self.client.post(reverse("login"), {
+            "username": "portfolio-owner",
+            "password": "StrongPass123!",
+        })
+
+        self.assertRedirects(response, reverse("property_owner_dashboard"))
+
+        dashboard_response = self.client.get(reverse("property_owner_dashboard"))
+        self.assertEqual(dashboard_response.status_code, 200)
+        self.assertContains(dashboard_response, "No properties are connected to this owner yet.")
+
+    def test_property_owner_intake_questionnaire_saves_system_needs(self):
+        form_response = self.client.get(reverse("property_owner_intake"))
+        self.assertEqual(form_response.status_code, 200)
+        self.assertContains(form_response, "Tell us what your dashboard needs to do.")
+        self.assertContains(form_response, "Submit Questionnaire")
+
+        response = self.client.post(reverse("property_owner_intake"), {
+            "full_name": "Portfolio Owner",
+            "company_name": "North Street Holdings",
+            "email": "portfolio@example.com",
+            "phone": "555-0191",
+            "property_count": "4",
+            "total_units": "120",
+            "property_types": ["multifamily", "commercial"],
+            "current_software": "QuickBooks and spreadsheets",
+            "needs_rent_collection": "on",
+            "needs_accounting": "on",
+            "needs_data_migration": "on",
+            "dashboard_goals": "Show NOI and rent collection by property.",
+        })
+
+        self.assertRedirects(response, reverse("property_owner_intake_success"))
+        intake = PropertyOwnerIntake.objects.get(email="portfolio@example.com")
+        self.assertEqual(intake.property_count, 4)
+        self.assertEqual(intake.total_units, 120)
+        self.assertEqual(intake.property_types, "multifamily,commercial")
+        self.assertTrue(intake.needs_accounting)
+        self.assertTrue(intake.needs_data_migration)
 
     def test_staff_can_create_property_blog_and_approve_comment(self):
         staff_user = User.objects.create_user(

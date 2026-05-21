@@ -10,6 +10,7 @@ from .models import (
     ApplicantDocument,
     Property,
     Payment,
+    PropertyOwnerIntake,
 )
 
 
@@ -53,6 +54,113 @@ class FinancialUploadForm(forms.ModelForm):
             "file": forms.ClearableFileInput(attrs={"class": "form-control"}),
             "notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
         }
+
+
+class PropertyOwnerIntakeForm(forms.ModelForm):
+    property_types = forms.MultipleChoiceField(
+        choices=PropertyOwnerIntake.PROPERTY_TYPE_CHOICES,
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        label="Property types",
+    )
+
+    class Meta:
+        model = PropertyOwnerIntake
+        fields = [
+            "full_name",
+            "company_name",
+            "email",
+            "phone",
+            "property_count",
+            "total_units",
+            "property_types",
+            "current_software",
+            "current_pain_points",
+            "migration_notes",
+            "needs_rent_collection",
+            "needs_accounting",
+            "needs_owner_reporting",
+            "needs_data_migration",
+            "needs_resident_files",
+            "needs_documents",
+            "needs_maintenance",
+            "needs_resident_communication",
+            "needs_screening",
+            "needs_property_websites",
+            "onboarding_timeline",
+            "dashboard_goals",
+            "additional_notes",
+        ]
+        labels = {
+            "property_count": "How many properties do you manage or own?",
+            "total_units": "Approximate total units",
+            "current_software": "Current software or accounting system",
+            "current_pain_points": "What is hardest in your current process?",
+            "migration_notes": "Data that must be migrated or preserved",
+            "needs_rent_collection": "Online rent and fee collection",
+            "needs_accounting": "Accounting, ledgers, and commercial property reports",
+            "needs_owner_reporting": "Owner statements, NOI, T-12, and rent roll reporting",
+            "needs_data_migration": "Migration from current software or spreadsheets",
+            "needs_resident_files": "Resident files, balances, and payment records",
+            "needs_documents": "Leases, signatures, document storage, and forms",
+            "needs_maintenance": "Maintenance requests and work tracking",
+            "needs_resident_communication": "Resident messaging and property announcements",
+            "needs_screening": "Rental applications, scoring support, and screening workflow",
+            "needs_property_websites": "Property pages, availability, and application intake",
+            "onboarding_timeline": "When do you need to start?",
+            "dashboard_goals": "What should your dashboard make easy?",
+        }
+        widgets = {
+            "full_name": forms.TextInput(attrs={"class": "form-control"}),
+            "company_name": forms.TextInput(attrs={"class": "form-control"}),
+            "email": forms.EmailInput(attrs={"class": "form-control"}),
+            "phone": forms.TextInput(attrs={"class": "form-control"}),
+            "property_count": forms.NumberInput(attrs={"class": "form-control", "min": "1"}),
+            "total_units": forms.NumberInput(attrs={"class": "form-control", "min": "0"}),
+            "current_software": forms.TextInput(attrs={
+                "class": "form-control",
+                "placeholder": "QuickBooks, AppFolio, Buildium, spreadsheets, none, etc.",
+            }),
+            "current_pain_points": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "migration_notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "onboarding_timeline": forms.TextInput(attrs={
+                "class": "form-control",
+                "placeholder": "Example: this month, next quarter, evaluating options",
+            }),
+            "dashboard_goals": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
+            "additional_notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.instance and self.instance.pk and self.instance.property_types:
+            self.initial["property_types"] = self.instance.property_types.split(",")
+
+        feature_fields = [
+            "needs_rent_collection",
+            "needs_accounting",
+            "needs_owner_reporting",
+            "needs_data_migration",
+            "needs_resident_files",
+            "needs_documents",
+            "needs_maintenance",
+            "needs_resident_communication",
+            "needs_screening",
+            "needs_property_websites",
+        ]
+
+        for field_name in feature_fields:
+            self.fields[field_name].widget.attrs["class"] = "form-check-input"
+
+    def save(self, commit=True):
+        intake = super().save(commit=False)
+        intake.property_types = ",".join(self.cleaned_data.get("property_types", []))
+
+        if commit:
+            intake.save()
+
+        return intake
 
 
 class ManualPaymentForm(forms.ModelForm):
