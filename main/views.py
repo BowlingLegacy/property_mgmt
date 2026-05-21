@@ -30,6 +30,7 @@ from .forms import (
     ReplacementInviteCodeForm,
     PropertyOwnerIntakeForm,
     LandlordSignUpForm,
+    ExistingResidentIntakeForm,
 )
 
 from .models import (
@@ -1026,6 +1027,7 @@ def property_detail(request, pk):
         "gallery_images": gallery_images,
         "posts": posts,
         "can_view_property_blog": can_view_property_blog,
+        "existing_resident_intake_open": property_existing_resident_intake_open(property_obj),
     })
 
 
@@ -1046,6 +1048,36 @@ def user_can_view_property_blog(user, property_obj):
 
     application = getattr(user, "resident_profile", None)
     return bool(application and application.property_id == property_obj.id)
+
+
+def property_existing_resident_intake_open(property_obj):
+    return timezone.now() <= property_obj.created_at + timedelta(days=30)
+
+
+def existing_resident_intake(request, pk):
+    property_obj = get_object_or_404(Property, pk=pk)
+
+    if not property_existing_resident_intake_open(property_obj):
+        messages.info(request, "Existing resident profile intake has closed for this property.")
+        return redirect("property_detail", pk=property_obj.id)
+
+    form = ExistingResidentIntakeForm(request.POST or None, request.FILES or None)
+
+    if request.method == "POST" and form.is_valid():
+        intake = form.save(commit=False)
+        intake.property = property_obj
+        intake.save()
+        return redirect("existing_resident_intake_success", pk=property_obj.id)
+
+    return render(request, "existing_resident_intake.html", {
+        "form": form,
+        "property": property_obj,
+    })
+
+
+def existing_resident_intake_success(request, pk):
+    property_obj = get_object_or_404(Property, pk=pk)
+    return render(request, "existing_resident_intake_success.html", {"property": property_obj})
 
 
 def add_blog_comment(request, post_id):

@@ -75,6 +75,8 @@ urlpatterns = [
     path("export/t12/", views.export_t12_csv, name="export_t12_csv"),
 
     path("property/<int:pk>/", views.property_detail, name="property_detail"),
+    path("property/<int:pk>/existing-resident-profile/", views.existing_resident_intake, name="existing_resident_intake"),
+    path("property/<int:pk>/existing-resident-profile/success/", views.existing_resident_intake_success, name="existing_resident_intake_success"),
     path("journal/<int:pk>/", views.blog_detail, name="blog_detail"),
     path("blog/<int:post_id>/comment/", views.add_blog_comment, name="add_blog_comment"),
 

@@ -11,6 +11,7 @@ from .models import (
     Property,
     Payment,
     PropertyOwnerIntake,
+    ExistingResidentIntake,
 )
 
 
@@ -161,6 +162,47 @@ class PropertyOwnerIntakeForm(forms.ModelForm):
             intake.save()
 
         return intake
+
+
+class ExistingResidentIntakeForm(forms.ModelForm):
+    class Meta:
+        model = ExistingResidentIntake
+        fields = [
+            "first_name",
+            "middle_name",
+            "last_name",
+            "email",
+            "phone",
+            "profile_photo",
+            "has_valid_odl",
+            "years_at_residence",
+            "move_in_month",
+            "additional_notes",
+        ]
+        labels = {
+            "middle_name": "Middle name",
+            "profile_photo": "Selfie or profile photo",
+            "has_valid_odl": "I have a valid Oregon driver's license",
+            "years_at_residence": "Years at this residence",
+            "move_in_month": "Month you moved in",
+            "additional_notes": "Anything we should know for your profile",
+        }
+        widgets = {
+            "first_name": forms.TextInput(attrs={"class": "form-control"}),
+            "middle_name": forms.TextInput(attrs={"class": "form-control"}),
+            "last_name": forms.TextInput(attrs={"class": "form-control"}),
+            "email": forms.EmailInput(attrs={"class": "form-control"}),
+            "phone": forms.TextInput(attrs={"class": "form-control"}),
+            "profile_photo": forms.ClearableFileInput(attrs={
+                "class": "form-control",
+                "accept": "image/*",
+                "capture": "user",
+            }),
+            "has_valid_odl": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "years_at_residence": forms.NumberInput(attrs={"class": "form-control", "min": "0"}),
+            "move_in_month": forms.TextInput(attrs={"class": "form-control", "type": "month"}),
+            "additional_notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+        }
 
 
 class ManualPaymentForm(forms.ModelForm):

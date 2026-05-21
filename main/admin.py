@@ -17,6 +17,7 @@ from .models import (
     SignedDocument,
     PropertyOwnerIntake,
     LandlordIntake,
+    ExistingResidentIntake,
 )
 from django.utils import timezone
 
@@ -270,6 +271,23 @@ class LandlordIntakeAdmin(PropertyOwnerIntakeAdmin):
     @admin.action(description="Send selected landlord portal invite")
     def send_landlord_portal_invites(self, request, queryset):
         self.send_portal_invites(request, queryset, "landlord", "Landlord")
+
+
+@admin.register(ExistingResidentIntake)
+class ExistingResidentIntakeAdmin(admin.ModelAdmin):
+    list_display = (
+        "full_name",
+        "property",
+        "email",
+        "phone",
+        "has_valid_odl",
+        "years_at_residence",
+        "move_in_month",
+        "created_at",
+    )
+    list_filter = ("property", "has_valid_odl", "created_at")
+    search_fields = ("first_name", "middle_name", "last_name", "email", "phone", "property__name")
+    readonly_fields = ("created_at",)
 
 
 class ApplicantDocumentInline(admin.TabularInline):

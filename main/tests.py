@@ -10,7 +10,7 @@ from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import ApplicantDocument, BlogComment, BlogPost, HousingApplication, LandlordIntake, Payment, Property, PropertyOwnerIntake, ResidentMessage, SignedDocument, User
+from .models import ApplicantDocument, BlogComment, BlogPost, ExistingResidentIntake, HousingApplication, LandlordIntake, Payment, Property, PropertyOwnerIntake, ResidentMessage, SignedDocument, User
 
 
 @override_settings(
@@ -706,6 +706,42 @@ class LiveFlowTests(TestCase):
         self.assertEqual(intake.property_types, "multifamily,commercial")
         self.assertTrue(intake.needs_accounting)
         self.assertTrue(intake.needs_data_migration)
+
+    def test_existing_resident_intake_button_opens_for_new_property_and_saves_profile(self):
+        property_obj = Property.objects.create(name="Painted Lady Inn")
+
+        property_response = self.client.get(reverse("property_detail", args=[property_obj.id]))
+        self.assertEqual(property_response.status_code, 200)
+        self.assertContains(property_response, "Existing Resident Profile")
+
+        response = self.client.post(reverse("existing_resident_intake", args=[property_obj.id]), {
+            "first_name": "Existing",
+            "middle_name": "R",
+            "last_name": "Resident",
+            "email": "existing@example.com",
+            "phone": "555-0195",
+            "has_valid_odl": "on",
+            "years_at_residence": "3",
+            "move_in_month": "2023-07",
+        })
+
+        self.assertRedirects(response, reverse("existing_resident_intake_success", args=[property_obj.id]))
+        intake = ExistingResidentIntake.objects.get(email="existing@example.com")
+        self.assertEqual(intake.property, property_obj)
+        self.assertEqual(intake.full_name(), "Existing R Resident")
+        self.assertEqual(intake.move_in_month, "2023-07")
+        self.assertTrue(intake.has_valid_odl)
+
+    def test_existing_resident_intake_closes_after_property_window(self):
+        property_obj = Property.objects.create(name="Older Property")
+        property_obj.created_at = timezone.now() - timezone.timedelta(days=31)
+        property_obj.save(update_fields=["created_at"])
+
+        property_response = self.client.get(reverse("property_detail", args=[property_obj.id]))
+        self.assertNotContains(property_response, "Existing Resident Profile")
+
+        intake_response = self.client.get(reverse("existing_resident_intake", args=[property_obj.id]))
+        self.assertRedirects(intake_response, reverse("property_detail", args=[property_obj.id]))
 
     def test_admin_can_issue_property_owner_invite_from_intake(self):
         invite_admin = User.objects.create_superuser(

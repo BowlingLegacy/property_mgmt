@@ -98,6 +98,7 @@ class Property(models.Model):
     address = models.CharField(max_length=255, blank=True)
     description = models.TextField(blank=True)
     photo = models.ImageField(upload_to="property_photos/", blank=True, null=True)
+    created_at = models.DateTimeField(default=timezone.now, editable=False)
 
     owner_email = models.EmailField(blank=True)
 
@@ -547,6 +548,34 @@ class PropertyOwnerIntake(models.Model):
 
     def __str__(self):
         return f"{self.full_name} - {self.company_name or self.email}"
+
+
+class ExistingResidentIntake(models.Model):
+    property = models.ForeignKey(
+        "Property",
+        on_delete=models.CASCADE,
+        related_name="existing_resident_intakes",
+    )
+    first_name = models.CharField(max_length=100)
+    middle_name = models.CharField(max_length=100, blank=True)
+    last_name = models.CharField(max_length=100)
+    email = models.EmailField()
+    phone = models.CharField(max_length=50)
+    profile_photo = models.ImageField(upload_to="existing_resident_intake_photos/", blank=True, null=True)
+    has_valid_odl = models.BooleanField(default=False)
+    years_at_residence = models.PositiveIntegerField(default=0)
+    move_in_month = models.CharField(max_length=7, blank=True)
+    additional_notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def full_name(self):
+        return " ".join(part for part in [self.first_name, self.middle_name, self.last_name] if part)
+
+    def __str__(self):
+        return f"{self.full_name()} - {self.property.name}"
 
 
 class LandlordIntake(models.Model):
