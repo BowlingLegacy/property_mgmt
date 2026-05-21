@@ -492,6 +492,12 @@ class FinancialUpload(models.Model):
 
 
 class PropertyOwnerIntake(models.Model):
+    STATUS_CHOICES = [
+        ("submitted", "Submitted"),
+        ("invited", "Invite Sent"),
+        ("registered", "Registered"),
+    ]
+
     PROPERTY_TYPE_CHOICES = [
         ("multifamily", "Multifamily"),
         ("commercial", "Commercial"),
@@ -525,6 +531,58 @@ class PropertyOwnerIntake(models.Model):
     onboarding_timeline = models.CharField(max_length=255, blank=True)
     dashboard_goals = models.TextField(blank=True)
     additional_notes = models.TextField(blank=True)
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="submitted")
+    user = models.ForeignKey(
+        "User",
+        on_delete=models.SET_NULL,
+        related_name="property_owner_intakes",
+        blank=True,
+        null=True,
+    )
+    invite_sent_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.full_name} - {self.company_name or self.email}"
+
+
+class LandlordIntake(models.Model):
+    STATUS_CHOICES = PropertyOwnerIntake.STATUS_CHOICES
+
+    full_name = models.CharField(max_length=255)
+    company_name = models.CharField(max_length=255, blank=True)
+    email = models.EmailField()
+    phone = models.CharField(max_length=50)
+    property_count = models.PositiveIntegerField(default=1)
+    total_units = models.PositiveIntegerField(default=0)
+    properties_managed = models.TextField(blank=True)
+    current_software = models.CharField(max_length=255, blank=True)
+    current_pain_points = models.TextField(blank=True)
+    migration_notes = models.TextField(blank=True)
+
+    needs_rent_collection = models.BooleanField(default=False)
+    needs_applications = models.BooleanField(default=False)
+    needs_resident_files = models.BooleanField(default=False)
+    needs_documents = models.BooleanField(default=False)
+    needs_maintenance = models.BooleanField(default=False)
+    needs_resident_communication = models.BooleanField(default=False)
+    needs_screening = models.BooleanField(default=False)
+    needs_accounting_access = models.BooleanField(default=False)
+
+    dashboard_goals = models.TextField(blank=True)
+    additional_notes = models.TextField(blank=True)
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="submitted")
+    user = models.ForeignKey(
+        "User",
+        on_delete=models.SET_NULL,
+        related_name="landlord_intakes",
+        blank=True,
+        null=True,
+    )
+    invite_sent_at = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

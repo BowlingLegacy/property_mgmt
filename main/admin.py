@@ -16,7 +16,11 @@ from .models import (
     ResidentMessage,
     SignedDocument,
     PropertyOwnerIntake,
+    LandlordIntake,
 )
+from django.utils import timezone
+
+from .invite_utils import create_pending_portal_user, send_portal_access_invite_email
 
 
 @admin.register(User)
@@ -167,6 +171,8 @@ class PropertyOwnerIntakeAdmin(admin.ModelAdmin):
         "full_name",
         "company_name",
         "email",
+        "status",
+        "portal_invite_code",
         "property_count",
         "total_units",
         "needs_accounting",
@@ -187,7 +193,79 @@ class PropertyOwnerIntakeAdmin(admin.ModelAdmin):
         "phone",
         "current_software",
     )
-    readonly_fields = ("created_at",)
+    readonly_fields = ("portal_invite_code", "invite_sent_at", "created_at")
+    actions = ("send_property_owner_portal_invites",)
+
+    def portal_invite_code(self, obj):
+        if obj.user and obj.user.invite_code:
+            return obj.user.invite_code
+        if obj.status == "registered":
+            return "Account created"
+        return "Not issued"
+
+    @admin.action(description="Approve selected owner intakes and send portal invite")
+    def send_property_owner_portal_invites(self, request, queryset):
+        self.send_portal_invites(request, queryset, "property_owner", "Property Owner")
+
+    def send_portal_invites(self, request, queryset, role, role_label):
+        sent = 0
+        codes = []
+
+        for intake in queryset:
+            user = intake.user
+
+            if user and user.has_usable_password():
+                continue
+
+            if not user:
+                user = create_pending_portal_user(intake.full_name, intake.email, role, intake.id)
+                intake.user = user
+
+            user.refresh_invite_code()
+            intake.status = "invited"
+            intake.invite_sent_at = timezone.now()
+            intake.save(update_fields=["user", "status", "invite_sent_at"])
+            codes.append(f"{intake.email}: {user.invite_code}")
+
+            try:
+                if send_portal_access_invite_email(user, intake.full_name, role_label):
+                    sent += 1
+            except Exception as exc:
+                self.message_user(request, f"Invite email failed for {intake.email}: {exc}", level="warning")
+
+        if codes:
+            self.message_user(request, f"Invite codes issued: {' | '.join(codes)}")
+
+        self.message_user(request, f"{sent} {role_label.lower()} invite email(s) sent.")
+
+
+@admin.register(LandlordIntake)
+class LandlordIntakeAdmin(PropertyOwnerIntakeAdmin):
+    list_display = (
+        "full_name",
+        "company_name",
+        "email",
+        "status",
+        "portal_invite_code",
+        "property_count",
+        "total_units",
+        "needs_applications",
+        "needs_resident_files",
+        "created_at",
+    )
+    list_filter = (
+        "status",
+        "needs_applications",
+        "needs_resident_files",
+        "needs_documents",
+        "needs_maintenance",
+        "created_at",
+    )
+    actions = ("send_landlord_portal_invites",)
+
+    @admin.action(description="Approve selected landlord intakes and send portal invite")
+    def send_landlord_portal_invites(self, request, queryset):
+        self.send_portal_invites(request, queryset, "landlord", "Landlord")
 
 
 class ApplicantDocumentInline(admin.TabularInline):

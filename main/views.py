@@ -29,6 +29,7 @@ from .forms import (
     ResidentProfilePhotoForm,
     ReplacementInviteCodeForm,
     PropertyOwnerIntakeForm,
+    LandlordIntakeForm,
 )
 
 from .models import (
@@ -42,6 +43,8 @@ from .models import (
     ResidentMessage,
     ApplicantDocument,
     SignedDocument,
+    PropertyOwnerIntake,
+    LandlordIntake,
 )
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -132,6 +135,21 @@ def property_owner_intake_success(request):
     return render(request, "property_owner_intake_success.html")
 
 
+def landlord_intake(request):
+    form = LandlordIntakeForm(request.POST or None)
+
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Your landlord questionnaire has been submitted.")
+        return redirect("landlord_intake_success")
+
+    return render(request, "landlord_intake.html", {"form": form})
+
+
+def landlord_intake_success(request):
+    return render(request, "landlord_intake_success.html")
+
+
 def apply(request):
     property_id = request.GET.get("property") or request.POST.get("property")
     property_obj = None
@@ -166,17 +184,30 @@ def logout_view(request):
 
 
 def signup(request):
-    pending_user_id = request.session.get("pending_resident_user_id")
+    pending_user_id = request.session.get("pending_portal_user_id") or request.session.get("pending_resident_user_id")
     pending_profile_id = request.session.get("pending_resident_profile_id")
 
-    if not pending_user_id or not pending_profile_id:
+    if not pending_user_id:
         messages.error(request, "Please enter your invite code before creating an account.")
         return redirect("enter_invite_code")
 
     pending_user = get_object_or_404(User, id=pending_user_id)
-    profile = get_object_or_404(HousingApplication, id=pending_profile_id)
+    profile = None
+    owner_intake = None
+    landlord_intake_obj = None
+
+    if pending_profile_id:
+        profile = get_object_or_404(HousingApplication, id=pending_profile_id)
+    elif pending_user.role == "property_owner":
+        owner_intake = get_object_or_404(PropertyOwnerIntake, user=pending_user)
+    elif pending_user.role == "landlord":
+        landlord_intake_obj = get_object_or_404(LandlordIntake, user=pending_user)
+    else:
+        messages.error(request, "No portal intake is connected to this code yet.")
+        return redirect("enter_invite_code")
 
     if not pending_user.invite_code_is_valid():
+        request.session.pop("pending_portal_user_id", None)
         request.session.pop("pending_resident_user_id", None)
         request.session.pop("pending_resident_profile_id", None)
         messages.error(request, "That invite code expired. Request a new code to continue.")
@@ -187,30 +218,46 @@ def signup(request):
 
         if form.is_valid():
             user = form.save(commit=False)
-            user.role = "tenant"
-            user.email = form.cleaned_data.get("email") or profile.email
+            user.role = pending_user.role
+            user.email = form.cleaned_data.get("email") or pending_user.email
+            user.is_staff = user.role in ["landlord", "assistant"]
+            user.is_superuser = False
             user.save()
 
-            profile.user = user
-            profile.save()
+            if profile:
+                profile.user = user
+                profile.save()
+
+            if owner_intake:
+                owner_intake.user = user
+                owner_intake.status = "registered"
+                owner_intake.save(update_fields=["user", "status"])
+
+            if landlord_intake_obj:
+                landlord_intake_obj.user = user
+                landlord_intake_obj.status = "registered"
+                landlord_intake_obj.save(update_fields=["user", "status"])
 
             if not pending_user.has_usable_password() and pending_user.id != user.id:
                 pending_user.delete()
             else:
                 pending_user.mark_invite_code_used()
 
+            request.session.pop("pending_portal_user_id", None)
             request.session.pop("pending_resident_user_id", None)
             request.session.pop("pending_resident_profile_id", None)
 
             login(request, user)
-            messages.success(request, "Your resident portal account is ready.")
-            return redirect("tenant_dashboard")
+            messages.success(request, "Your portal account is ready.")
+            from .auth_views import dashboard_for_user
+            return redirect(dashboard_for_user(user))
     else:
-        form = SignUpForm(initial={"email": profile.email})
+        form = SignUpForm(initial={"email": pending_user.email})
 
     return render(request, "signup.html", {
         "form": form,
         "application": profile,
+        "pending_role": pending_user.get_role_display(),
     })
 
 
@@ -230,16 +277,22 @@ def enter_invite_code(request):
             return redirect("request_invite_code")
 
         profile = HousingApplication.objects.filter(user=user_with_code).first()
-
-        if not profile:
+        if not profile and user_with_code.role == "tenant":
             profile = HousingApplication.objects.filter(email=user_with_code.email).first()
 
-        if not profile:
-            messages.error(request, "No resident file is connected to this code yet.")
+        owner_intake = PropertyOwnerIntake.objects.filter(user=user_with_code).first()
+        landlord_intake_obj = LandlordIntake.objects.filter(user=user_with_code).first()
+
+        if not profile and not owner_intake and not landlord_intake_obj:
+            messages.error(request, "No approved portal intake is connected to this code yet.")
             return redirect("enter_invite_code")
 
+        request.session["pending_portal_user_id"] = user_with_code.id
         request.session["pending_resident_user_id"] = user_with_code.id
-        request.session["pending_resident_profile_id"] = profile.id
+        if profile:
+            request.session["pending_resident_profile_id"] = profile.id
+        else:
+            request.session.pop("pending_resident_profile_id", None)
 
         messages.success(request, "Invite code accepted. Create your login to finish setup.")
         return redirect("signup")
@@ -266,10 +319,33 @@ def request_invite_code(request):
                 send_resident_invite_email(profile)
             except Exception:
                 pass
+        else:
+            portal_intake = (
+                PropertyOwnerIntake.objects.select_related("user")
+                .filter(email__iexact=email, user__isnull=False)
+                .first()
+            )
+            role_label = "Property Owner"
+
+            if not portal_intake:
+                portal_intake = (
+                    LandlordIntake.objects.select_related("user")
+                    .filter(email__iexact=email, user__isnull=False)
+                    .first()
+                )
+                role_label = "Landlord"
+
+            if portal_intake and portal_intake.user and not portal_intake.user.has_usable_password():
+                try:
+                    portal_intake.user.refresh_invite_code()
+                    from .invite_utils import send_portal_access_invite_email
+                    send_portal_access_invite_email(portal_intake.user, portal_intake.full_name, role_label)
+                except Exception:
+                    pass
 
         messages.success(
             request,
-            "If an approved unregistered resident file matches that email, a new invite code has been sent.",
+            "If an approved unregistered portal intake matches that email, a new invite code has been sent.",
         )
         return redirect("enter_invite_code")
 

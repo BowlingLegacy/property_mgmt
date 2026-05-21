@@ -2,14 +2,15 @@ from decimal import Decimal
 from io import StringIO
 from unittest.mock import patch
 
+from django.contrib import admin
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import TestCase, override_settings
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import ApplicantDocument, BlogComment, BlogPost, HousingApplication, Payment, Property, PropertyOwnerIntake, ResidentMessage, SignedDocument, User
+from .models import ApplicantDocument, BlogComment, BlogPost, HousingApplication, LandlordIntake, Payment, Property, PropertyOwnerIntake, ResidentMessage, SignedDocument, User
 
 
 @override_settings(
@@ -154,6 +155,71 @@ class LiveFlowTests(TestCase):
         })
 
         self.assertRedirects(response, reverse("request_invite_code"))
+
+    def test_property_owner_invite_code_creates_owner_login(self):
+        temp_user = User.objects.create_user(
+            username="pending-owner",
+            email="new-owner@example.com",
+            password=None,
+            role="property_owner",
+        )
+        temp_user.refresh_invite_code()
+        intake = PropertyOwnerIntake.objects.create(
+            full_name="New Owner",
+            email="new-owner@example.com",
+            phone="555-0130",
+            user=temp_user,
+            status="invited",
+        )
+
+        response = self.client.post(reverse("enter_invite_code"), {"invite_code": temp_user.invite_code})
+        self.assertRedirects(response, reverse("signup"))
+
+        response = self.client.post(reverse("signup"), {
+            "username": "new-owner",
+            "email": "new-owner@example.com",
+            "password1": "StrongPass123!",
+            "password2": "StrongPass123!",
+        })
+
+        self.assertRedirects(response, reverse("property_owner_dashboard"))
+        intake.refresh_from_db()
+        self.assertEqual(intake.user.username, "new-owner")
+        self.assertEqual(intake.status, "registered")
+        self.assertFalse(User.objects.filter(id=temp_user.id).exists())
+
+    def test_landlord_invite_code_creates_staff_landlord_login(self):
+        temp_user = User.objects.create_user(
+            username="pending-landlord",
+            email="new-landlord@example.com",
+            password=None,
+            role="landlord",
+            is_staff=True,
+        )
+        temp_user.refresh_invite_code()
+        intake = LandlordIntake.objects.create(
+            full_name="New Landlord",
+            email="new-landlord@example.com",
+            phone="555-0131",
+            user=temp_user,
+            status="invited",
+        )
+
+        response = self.client.post(reverse("enter_invite_code"), {"invite_code": temp_user.invite_code})
+        self.assertRedirects(response, reverse("signup"))
+
+        response = self.client.post(reverse("signup"), {
+            "username": "new-landlord",
+            "email": "new-landlord@example.com",
+            "password1": "StrongPass123!",
+            "password2": "StrongPass123!",
+        })
+
+        self.assertRedirects(response, reverse("landlord_dashboard"))
+        intake.refresh_from_db()
+        self.assertEqual(intake.user.username, "new-landlord")
+        self.assertTrue(intake.user.is_staff)
+        self.assertEqual(intake.status, "registered")
 
     def test_unregistered_user_can_request_replacement_invite_code(self):
         temp_user = User.objects.create_user(
@@ -634,6 +700,58 @@ class LiveFlowTests(TestCase):
         self.assertEqual(intake.property_types, "multifamily,commercial")
         self.assertTrue(intake.needs_accounting)
         self.assertTrue(intake.needs_data_migration)
+
+    def test_landlord_intake_questionnaire_saves_system_needs(self):
+        form_response = self.client.get(reverse("landlord_intake"))
+        self.assertEqual(form_response.status_code, 200)
+        self.assertContains(form_response, "Tell us what your landlord workspace needs.")
+
+        response = self.client.post(reverse("landlord_intake"), {
+            "full_name": "Portfolio Landlord",
+            "company_name": "Daily Operations LLC",
+            "email": "landlord-intake@example.com",
+            "phone": "555-0192",
+            "property_count": "2",
+            "total_units": "48",
+            "properties_managed": "Main Street and River House",
+            "needs_applications": "on",
+            "needs_resident_files": "on",
+            "dashboard_goals": "See new messages and unpaid rent first.",
+        })
+
+        self.assertRedirects(response, reverse("landlord_intake_success"))
+        intake = LandlordIntake.objects.get(email="landlord-intake@example.com")
+        self.assertEqual(intake.total_units, 48)
+        self.assertTrue(intake.needs_applications)
+        self.assertTrue(intake.needs_resident_files)
+
+    def test_admin_can_issue_property_owner_invite_from_intake(self):
+        invite_admin = User.objects.create_superuser(
+            username="invite-admin",
+            email="invite-admin@example.com",
+            password="StrongPass123!",
+        )
+        intake = PropertyOwnerIntake.objects.create(
+            full_name="Invite Owner",
+            email="invite-owner@example.com",
+            phone="555-0193",
+        )
+        request = RequestFactory().post("/")
+        request.user = invite_admin
+        intake_admin = admin.site._registry[PropertyOwnerIntake]
+
+        with patch.object(intake_admin, "message_user"):
+            intake_admin.send_property_owner_portal_invites(
+                request,
+                PropertyOwnerIntake.objects.filter(id=intake.id),
+            )
+
+        intake.refresh_from_db()
+        self.assertEqual(intake.status, "invited")
+        self.assertIsNotNone(intake.user)
+        self.assertTrue(intake.user.invite_code)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(intake.user.invite_code, mail.outbox[0].body)
 
     def test_staff_can_create_property_blog_and_approve_comment(self):
         staff_user = User.objects.create_user(
