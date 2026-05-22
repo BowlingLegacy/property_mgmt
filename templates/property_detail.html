@@ -21,11 +21,8 @@
         }
 
         .brand-link {
-            font-family: Georgia, serif;
             color: #f6ead1;
-            font-weight: 700;
             text-decoration: none;
-            font-size: 1.25rem;
         }
         .brand-link:hover { color: #f6ead1; }
 
@@ -33,6 +30,22 @@
             height: 68px;
             width: auto;
             margin-right: 14px;
+        }
+
+        .brand-script {
+            color: #d8ab3b;
+            font-family: "Lucida Calligraphy", "Brush Script MT", Georgia, serif;
+            font-size: 22px;
+            line-height: 1;
+        }
+
+        .brand-subtitle {
+            color: #c59a32;
+            font-size: .68rem;
+            letter-spacing: 6px;
+            margin-left: 4px;
+            margin-top: .3rem;
+            text-transform: uppercase;
         }
 
         .message-btn {
@@ -222,7 +235,11 @@
         }
 
         @media (max-width:768px) {
-            .brand-logo { height:56px; }
+            .topbar { padding-bottom: .55rem !important; padding-top: .55rem !important; }
+            .topbar .container { gap: .45rem !important; }
+            .brand-logo { height:44px; margin-right: 10px; }
+            .brand-script { font-size:18px; }
+            .brand-subtitle { font-size: .58rem; letter-spacing: 4px; margin-top: .1rem; }
             .property-title { font-size:2.15rem; }
             .main-photo { max-height:320px; }
             .container.my-5 { margin-top: 1.25rem !important; }
@@ -238,7 +255,10 @@
     <div class="container d-flex justify-content-between align-items-center flex-wrap gap-3">
         <a class="brand-link d-flex align-items-center" href="/">
             <img src="/static/images/bl-logo.png" class="brand-logo" alt="Bowling Legacy">
-            Bowling Legacy
+            <div>
+                <div class="brand-script">Bowling Legacy</div>
+                <div class="brand-subtitle">RentLogic</div>
+            </div>
         </a>
         <div class="d-flex gap-2 flex-wrap">
             <a href="/" class="message-btn">Home</a>

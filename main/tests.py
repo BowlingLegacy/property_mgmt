@@ -795,7 +795,7 @@ class LiveFlowTests(TestCase):
             role="landlord",
             is_staff=True,
         )
-        property_obj = Property.objects.create(name="Blog Property")
+        property_obj = Property.objects.create(name="Blog Property", landlord_email="staff-blog@example.com")
 
         self.client.login(username="staff-blog", password="StrongPass123!")
 
@@ -832,7 +832,7 @@ class LiveFlowTests(TestCase):
             role="landlord",
             is_staff=True,
         )
-        property_obj = Property.objects.create(name="Comment Property")
+        property_obj = Property.objects.create(name="Comment Property", landlord_email="staff-delete-comment@example.com")
         post = BlogPost.objects.create(
             property=property_obj,
             author=staff_user,
@@ -864,6 +864,41 @@ class LiveFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Public update")
         self.assertNotContains(response, "Private resident update")
+
+    def test_owner_and_landlord_blog_forms_only_offer_assigned_properties(self):
+        owner_property = Property.objects.create(name="Owner Property", owner_email="owner-blog@example.com")
+        landlord_property = Property.objects.create(name="Landlord Property", landlord_email="landlord-blog@example.com")
+        Property.objects.create(name="Other Property", owner_email="other@example.com", landlord_email="other@example.com")
+        BlogPost.objects.create(title="Public website note", body="Superuser only.")
+
+        User.objects.create_user(
+            username="owner-blog",
+            email="owner-blog@example.com",
+            password="StrongPass123!",
+            role="property_owner",
+        )
+        User.objects.create_user(
+            username="landlord-blog",
+            email="landlord-blog@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+
+        self.client.login(username="owner-blog", password="StrongPass123!")
+        owner_form = self.client.get(reverse("property_blog_create"))
+        owner_manager = self.client.get(reverse("property_blog_manager"))
+        self.assertContains(owner_form, owner_property.name)
+        self.assertNotContains(owner_form, landlord_property.name)
+        self.assertNotContains(owner_manager, "Public website note")
+
+        self.client.logout()
+        self.client.login(username="landlord-blog", password="StrongPass123!")
+        landlord_form = self.client.get(reverse("property_blog_create"))
+        landlord_manager = self.client.get(reverse("property_blog_manager"))
+        self.assertContains(landlord_form, landlord_property.name)
+        self.assertNotContains(landlord_form, owner_property.name)
+        self.assertNotContains(landlord_manager, "Public website note")
 
     def test_property_blog_is_private_to_residents_of_that_property(self):
         property_obj = Property.objects.create(name="Resident Blog Property")
@@ -1135,3 +1170,62 @@ class LiveFlowTests(TestCase):
         self.assertEqual(ResidentMessage.objects.count(), 0)
         self.assertEqual(ApplicantDocument.objects.count(), 0)
         self.assertEqual(Payment.objects.count(), 0)
+
+    def test_cleanup_preserves_felicia_name_and_only_completed_one_dollar_payment(self):
+        felicia = HousingApplication.objects.create(
+            full_name="Felicia Valdez",
+            phone="555-0110",
+            email="felicia@example.com",
+            age=51,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Real application.",
+        )
+        paid_application = HousingApplication.objects.create(
+            full_name="Real Payment Resident",
+            phone="555-0111",
+            email="paid@example.com",
+            age=52,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Real payment.",
+        )
+        test_application = HousingApplication.objects.create(
+            full_name="Delete Test",
+            phone="555-0112",
+            email="delete@example.com",
+            age=53,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Delete me.",
+        )
+        kept_payment = Payment.objects.create(
+            application=paid_application,
+            payment_type="rent",
+            payment_method="stripe_card",
+            amount=Decimal("1.00"),
+            status="completed",
+        )
+        Payment.objects.create(
+            application=test_application,
+            payment_type="rent",
+            payment_method="cash",
+            amount=Decimal("20.00"),
+            status="completed",
+        )
+
+        output = StringIO()
+        call_command(
+            "cleanup_test_portal_data",
+            "--confirm",
+            "--preserve-name",
+            "Felicia Valdez",
+            "--preserve-only-completed-one-dollar-payment",
+            "--keep-users",
+            stdout=output,
+        )
+
+        self.assertTrue(HousingApplication.objects.filter(id=felicia.id).exists())
+        self.assertTrue(HousingApplication.objects.filter(id=paid_application.id).exists())
+        self.assertFalse(HousingApplication.objects.filter(id=test_application.id).exists())
+        self.assertTrue(Payment.objects.filter(id=kept_payment.id).exists())

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
@@ -27,6 +29,32 @@ class Command(BaseCommand):
             ),
         )
         parser.add_argument(
+            "--preserve-name",
+            action="append",
+            default=[],
+            help="Application full name to keep. Can be supplied more than once.",
+        )
+        parser.add_argument(
+            "--preserve-payment-id",
+            action="append",
+            type=int,
+            default=[],
+            help="Payment ID to keep. The payment's application is also kept.",
+        )
+        parser.add_argument(
+            "--preserve-only-completed-one-dollar-payment",
+            action="store_true",
+            help=(
+                "Keep the application linked to the only completed $1.00 payment. "
+                "Stops if zero or multiple matching payments exist."
+            ),
+        )
+        parser.add_argument(
+            "--keep-users",
+            action="store_true",
+            help="Keep linked tenant users even when their selected applications are deleted.",
+        )
+        parser.add_argument(
             "--delete-files",
             action="store_true",
             help="Also delete uploaded document files from storage for deleted ApplicantDocument records.",
@@ -35,15 +63,49 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         confirm = options["confirm"]
         delete_files = options["delete_files"]
+        keep_users = options["keep_users"]
         preserve_emails = {
             email.strip().lower()
             for email in options["preserve_email"]
             if email and email.strip()
         }
+        preserve_names = {
+            name.strip()
+            for name in options["preserve_name"]
+            if name and name.strip()
+        }
+        preserve_payment_ids = set(options["preserve_payment_id"])
+
+        if options["preserve_only_completed_one_dollar_payment"]:
+            one_dollar_payments = Payment.objects.filter(
+                amount=Decimal("1.00"),
+                status="completed",
+            ).select_related("application")
+
+            if one_dollar_payments.count() != 1:
+                matching_ids = ", ".join(str(payment.id) for payment in one_dollar_payments)
+                raise CommandError(
+                    "Expected exactly one completed $1.00 payment to preserve. "
+                    f"Found {one_dollar_payments.count()}. Matching payment IDs: {matching_ids or 'none'}."
+                )
+
+            preserve_payment_ids.add(one_dollar_payments.first().id)
+
+        preserved_payments = Payment.objects.filter(id__in=preserve_payment_ids).select_related("application")
+        missing_payment_ids = preserve_payment_ids - set(preserved_payments.values_list("id", flat=True))
+        if missing_payment_ids:
+            raise CommandError(
+                f"Cannot preserve missing payment IDs: {', '.join(str(payment_id) for payment_id in sorted(missing_payment_ids))}."
+            )
+        preserve_application_ids = set(preserved_payments.values_list("application_id", flat=True))
 
         applications = HousingApplication.objects.select_related("user").all()
         for email in preserve_emails:
             applications = applications.exclude(email__iexact=email)
+        for name in preserve_names:
+            applications = applications.exclude(full_name__iexact=name)
+        if preserve_application_ids:
+            applications = applications.exclude(id__in=preserve_application_ids)
 
         application_ids = list(applications.values_list("id", flat=True))
         linked_user_ids = set(
@@ -69,11 +131,22 @@ class Command(BaseCommand):
         self.stdout.write("Portal cleanup preview")
         self.stdout.write("======================")
         self.stdout.write(f"Preserved emails: {', '.join(sorted(preserve_emails)) or 'none'}")
+        self.stdout.write(f"Preserved names: {', '.join(sorted(preserve_names)) or 'none'}")
+        self.stdout.write(f"Preserved payment IDs: {', '.join(str(payment.id) for payment in preserved_payments) or 'none'}")
+        if preserved_payments:
+            self.stdout.write("Preserved payment applications:")
+            for payment in preserved_payments:
+                self.stdout.write(
+                    f"  Payment {payment.id}: ${payment.amount} {payment.get_status_display()} "
+                    f"for {payment.application.full_name}"
+                )
         self.stdout.write(f"Applications selected: {len(application_ids)}")
         self.stdout.write(f"Incoming documents selected: {documents.count()}")
         self.stdout.write(f"Resident messages selected: {messages.count()}")
         self.stdout.write(f"Payment records selected: {payments.count()}")
-        self.stdout.write(f"Linked tenant users selected: {users.count()}")
+        self.stdout.write(f"Linked tenant users selected: {0 if keep_users else users.count()}")
+        if keep_users:
+            self.stdout.write("Linked tenant users will be kept.")
 
         if not confirm:
             self.stdout.write("")
@@ -98,7 +171,7 @@ class Command(BaseCommand):
             "documents": documents.count(),
             "messages": messages.count(),
             "payments": payments.count(),
-            "users": users.count(),
+            "users": 0 if keep_users else users.count(),
         }
 
         try:
@@ -107,7 +180,8 @@ class Command(BaseCommand):
                 messages.delete()
                 documents.delete()
                 applications.delete()
-                users.delete()
+                if not keep_users:
+                    users.delete()
 
             for document_file in document_files:
                 document_file.delete(save=False)

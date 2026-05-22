@@ -23,14 +23,24 @@
         }
 
         .brand-script {
-            font-family: "Lucida Calligraphy", Georgia, serif;
+            font-family: "Lucida Calligraphy", "Brush Script MT", Georgia, serif;
             color: #d8ab3b;
             font-size: 22px;
+            line-height: 1;
         }
 
         .brand-logo {
             height: 72px;
             margin-right: 14px;
+        }
+
+        .brand-subtitle {
+            color: #c59a32;
+            font-size: .68rem;
+            letter-spacing: 6px;
+            margin-left: 4px;
+            margin-top: .3rem;
+            text-transform: uppercase;
         }
 
         .soft-card {
@@ -78,6 +88,14 @@
             color: white;
             filter: brightness(.96);
         }
+
+        @media (max-width: 768px) {
+            .site-header { margin-bottom: 1.5rem !important; padding-bottom: .55rem !important; padding-top: .55rem !important; }
+            .site-header .container { gap: .45rem !important; }
+            .brand-logo { height: 44px; margin-right: 10px; }
+            .brand-script { font-size: 18px; }
+            .brand-subtitle { font-size: .58rem; letter-spacing: 4px; margin-top: .1rem; }
+        }
     </style>
 </head>
 
@@ -91,8 +109,9 @@
                  class="brand-logo"
                  alt="Bowling Legacy">
 
-            <div class="brand-script">
-                Bowling Legacy
+            <div>
+                <div class="brand-script">Bowling Legacy</div>
+                <div class="brand-subtitle">RentLogic</div>
             </div>
         </a>
 

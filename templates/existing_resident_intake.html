@@ -9,9 +9,11 @@
     <style>
         body { background: linear-gradient(180deg, #faf6ee 0%, #f2ead9 100%); color: #1d1a13; min-height: 100vh; }
         .topbar { background: #070707; border-bottom: 2px solid #c59a32; }
-        .brand-link { color: #f6ead1; font-family: Georgia, serif; font-size: 1.2rem; font-weight: 700; text-decoration: none; }
+        .brand-link { color: #f6ead1; text-decoration: none; }
         .brand-link:hover { color: #f6ead1; }
         .brand-logo { height: 58px; width: auto; margin-right: .75rem; }
+        .brand-script { color: #d8ab3b; font-family: "Lucida Calligraphy", "Brush Script MT", Georgia, serif; font-size: 20px; line-height: 1; }
+        .brand-subtitle { color: #c59a32; font-size: .64rem; letter-spacing: 5px; margin-left: 4px; margin-top: .2rem; text-transform: uppercase; }
         .shell { max-width: 860px; margin: 1.5rem auto; padding: 0 .85rem 2rem; }
         .profile-card { background: rgba(255,255,255,.96); border: 1px solid rgba(188,150,45,.28); border-radius: 20px; box-shadow: 0 10px 28px rgba(0,0,0,.1); overflow: hidden; }
         .profile-head { background: #111; border-bottom: 2px solid #c59a32; color: #f6ead1; padding: 1.25rem; }
@@ -29,7 +31,8 @@
         @media (max-width: 767px) {
             .topbar { padding-bottom: .55rem !important; padding-top: .55rem !important; }
             .brand-logo { height: 44px; }
-            .brand-link { font-size: 1rem; }
+            .brand-script { font-size: 18px; }
+            .brand-subtitle { font-size: .58rem; letter-spacing: 4px; margin-top: .1rem; }
         }
     </style>
 </head>
@@ -38,7 +41,10 @@
     <div class="container">
         <a href="{% url 'property_detail' property.pk %}" class="brand-link d-flex align-items-center">
             <img src="/static/images/bl-logo.png" class="brand-logo" alt="Bowling Legacy">
-            Bowling Legacy
+            <div>
+                <div class="brand-script">Bowling Legacy</div>
+                <div class="brand-subtitle">RentLogic</div>
+            </div>
         </a>
     </div>
 </nav>

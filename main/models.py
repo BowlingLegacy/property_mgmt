@@ -101,6 +101,10 @@ class Property(models.Model):
     created_at = models.DateTimeField(default=timezone.now, editable=False)
 
     owner_email = models.EmailField(blank=True)
+    landlord_email = models.EmailField(
+        blank=True,
+        help_text="Login email for the landlord or property manager assigned to this property.",
+    )
 
     unit_size = models.CharField(max_length=100, blank=True)
     cable_ready = models.BooleanField(default=True)

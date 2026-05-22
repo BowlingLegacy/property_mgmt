@@ -1146,10 +1146,18 @@ def user_can_view_property_blog(user, property_obj):
     if not user.is_authenticated:
         return False
 
-    if staff_required(user) or getattr(user, "role", "") == "admin":
+    if user.is_superuser or getattr(user, "role", "") in ["admin", "assistant"]:
         return True
 
     if property_obj.owner_email and user.email and property_obj.owner_email.lower() == user.email.lower():
+        return True
+
+    if (
+        getattr(user, "role", "") == "landlord"
+        and property_obj.landlord_email
+        and user.email
+        and property_obj.landlord_email.lower() == user.email.lower()
+    ):
         return True
 
     application = getattr(user, "resident_profile", None)
@@ -1160,13 +1168,17 @@ def user_can_manage_property_blog(user, property_obj):
     if not user.is_authenticated:
         return False
 
-    if staff_required(user) or getattr(user, "role", "") == "admin":
+    if user.is_superuser or getattr(user, "role", "") in ["admin", "assistant"]:
+        return True
+
+    if property_obj.owner_email and user.email and property_obj.owner_email.lower() == user.email.lower():
         return True
 
     return bool(
-        property_obj.owner_email
+        getattr(user, "role", "") == "landlord"
+        and property_obj.landlord_email
         and user.email
-        and property_obj.owner_email.lower() == user.email.lower()
+        and property_obj.landlord_email.lower() == user.email.lower()
     )
 
 

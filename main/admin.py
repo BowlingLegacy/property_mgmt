@@ -163,7 +163,7 @@ class PropertyImageInline(admin.TabularInline):
 @admin.register(Property)
 class PropertyAdmin(admin.ModelAdmin):
     inlines = [PropertyImageInline]
-    list_display = ("name", "availability_status", "available_date", "owner_email")
+    list_display = ("name", "availability_status", "available_date", "owner_email", "landlord_email")
 
 
 @admin.register(PropertyOwnerIntake)
