@@ -47,6 +47,7 @@ from .models import (
     PropertyOwnerIntake,
     LandlordIntake,
 )
+from .invite_utils import create_pending_portal_user, send_portal_access_invite_email
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -519,6 +520,74 @@ def superadmin_owners(request):
         return redirect("tenant_dashboard")
 
     return render(request, "superadmin_owners.html", get_superadmin_workspace_context())
+
+
+@login_required
+@user_passes_test(staff_required)
+def superadmin_owner_intakes(request):
+    if not request.user.is_superuser and request.user.role != "admin":
+        return redirect("tenant_dashboard")
+
+    owner_intakes = PropertyOwnerIntake.objects.select_related("user").all()
+    return render(request, "superadmin_owner_intakes.html", {
+        "submitted_owner_intakes": owner_intakes.filter(status="submitted"),
+        "owner_files": owner_intakes.exclude(status="submitted"),
+    })
+
+
+@login_required
+@user_passes_test(staff_required)
+def superadmin_owner_intake_detail(request, intake_id):
+    if not request.user.is_superuser and request.user.role != "admin":
+        return redirect("tenant_dashboard")
+
+    intake = get_object_or_404(PropertyOwnerIntake.objects.select_related("user"), id=intake_id)
+    owner_properties = Property.objects.filter(owner_email__iexact=intake.email).order_by("name")
+    return render(request, "superadmin_owner_intake_detail.html", {
+        "intake": intake,
+        "owner_properties": owner_properties,
+    })
+
+
+@login_required
+@user_passes_test(staff_required)
+def superadmin_send_owner_invite(request, intake_id):
+    if not request.user.is_superuser and request.user.role != "admin":
+        return redirect("tenant_dashboard")
+
+    if request.method != "POST":
+        return redirect("superadmin_owner_intake_detail", intake_id=intake_id)
+
+    intake = get_object_or_404(PropertyOwnerIntake.objects.select_related("user"), id=intake_id)
+    user = intake.user
+
+    if user and user.has_usable_password():
+        intake.status = "registered"
+        intake.save(update_fields=["status"])
+        messages.info(request, "This property owner already has a registered portal login.")
+        return redirect("superadmin_owner_intake_detail", intake_id=intake.id)
+
+    if not user:
+        user = create_pending_portal_user(intake.full_name, intake.email, "property_owner", intake.id)
+        intake.user = user
+
+    user.refresh_invite_code()
+    intake.status = "invited"
+    intake.invite_sent_at = timezone.now()
+    intake.save(update_fields=["user", "status", "invite_sent_at"])
+
+    try:
+        sent = send_portal_access_invite_email(user, intake.full_name, "Property Owner")
+    except Exception as exc:
+        messages.warning(request, f"Owner setup code created, but email failed: {exc}")
+    else:
+        if sent:
+            messages.success(request, "Owner setup invite email sent.")
+        else:
+            messages.warning(request, "Owner setup code created, but this intake has no email to send.")
+
+    messages.info(request, f"Backup owner setup code: {user.invite_code}")
+    return redirect("superadmin_owner_intake_detail", intake_id=intake.id)
 
 
 @login_required

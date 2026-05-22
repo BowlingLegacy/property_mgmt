@@ -787,6 +787,38 @@ class LiveFlowTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn(intake.user.invite_code, mail.outbox[0].body)
 
+    def test_superadmin_owner_intake_inbox_can_open_file_and_send_invite(self):
+        User.objects.create_superuser(
+            username="owner-intake-admin",
+            email="owner-intake-admin@example.com",
+            password="StrongPass123!",
+            role="admin",
+        )
+        intake = PropertyOwnerIntake.objects.create(
+            full_name="Owner Inbox User",
+            company_name="Owner Inbox LLC",
+            email="owner-inbox@example.com",
+            phone="555-0196",
+            dashboard_goals="Need reports by property.",
+            needs_owner_reporting=True,
+        )
+
+        self.client.login(username="owner-intake-admin", password="StrongPass123!")
+
+        inbox_response = self.client.get(reverse("superadmin_owner_intakes"))
+        detail_response = self.client.get(reverse("superadmin_owner_intake_detail", args=[intake.id]))
+        invite_response = self.client.post(reverse("superadmin_send_owner_invite", args=[intake.id]))
+
+        self.assertContains(inbox_response, "Owner Inbox User")
+        self.assertContains(detail_response, "Need reports by property.")
+        self.assertRedirects(invite_response, reverse("superadmin_owner_intake_detail", args=[intake.id]))
+        intake.refresh_from_db()
+        self.assertEqual(intake.status, "invited")
+        self.assertIsNotNone(intake.user)
+        self.assertTrue(intake.user.invite_code)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(intake.user.invite_code, mail.outbox[0].body)
+
     def test_staff_can_create_property_blog_and_approve_comment(self):
         staff_user = User.objects.create_user(
             username="staff-blog",
