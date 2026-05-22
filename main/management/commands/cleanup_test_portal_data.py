@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from main.models import ApplicantDocument, HousingApplication, Payment, ResidentMessage, User
+from main.models import ApplicantDocument, HousingApplication, Payment, Property, ResidentMessage, User
 
 
 class Command(BaseCommand):
@@ -59,6 +59,15 @@ class Command(BaseCommand):
             action="store_true",
             help="Also delete uploaded document files from storage for deleted ApplicantDocument records.",
         )
+        parser.add_argument(
+            "--delete-property-name",
+            action="append",
+            default=[],
+            help=(
+                "Exact Property name to delete. Can be supplied more than once. "
+                "This is separate from application cleanup and should only be used for named test properties."
+            ),
+        )
 
     def handle(self, *args, **options):
         confirm = options["confirm"]
@@ -75,6 +84,11 @@ class Command(BaseCommand):
             if name and name.strip()
         }
         preserve_payment_ids = set(options["preserve_payment_id"])
+        delete_property_names = {
+            property_name.strip()
+            for property_name in options["delete_property_name"]
+            if property_name and property_name.strip()
+        }
 
         if options["preserve_only_completed_one_dollar_payment"]:
             one_dollar_payments = Payment.objects.filter(
@@ -127,6 +141,13 @@ class Command(BaseCommand):
         documents = ApplicantDocument.objects.filter(application_id__in=application_ids)
         messages = ResidentMessage.objects.filter(application_id__in=application_ids)
         payments = Payment.objects.filter(application_id__in=application_ids)
+        properties = Property.objects.filter(name__in=delete_property_names).order_by("name")
+        missing_property_names = delete_property_names - set(properties.values_list("name", flat=True))
+        if missing_property_names:
+            raise CommandError(
+                "Cannot delete missing property names: "
+                f"{', '.join(sorted(missing_property_names))}."
+            )
 
         self.stdout.write("Portal cleanup preview")
         self.stdout.write("======================")
@@ -145,6 +166,9 @@ class Command(BaseCommand):
         self.stdout.write(f"Resident messages selected: {messages.count()}")
         self.stdout.write(f"Payment records selected: {payments.count()}")
         self.stdout.write(f"Linked tenant users selected: {0 if keep_users else users.count()}")
+        self.stdout.write(f"Properties selected by exact name: {properties.count()}")
+        for property_obj in properties:
+            self.stdout.write(f"  Property {property_obj.id}: {property_obj.name}")
         if keep_users:
             self.stdout.write("Linked tenant users will be kept.")
 
@@ -154,7 +178,7 @@ class Command(BaseCommand):
             self.stdout.write("Run again with --confirm to delete these records.")
             return
 
-        if not application_ids:
+        if not application_ids and not properties.exists():
             self.stdout.write(self.style.SUCCESS("No matching portal records found."))
             return
 
@@ -172,6 +196,7 @@ class Command(BaseCommand):
             "messages": messages.count(),
             "payments": payments.count(),
             "users": 0 if keep_users else users.count(),
+            "properties": properties.count(),
         }
 
         try:
@@ -182,6 +207,7 @@ class Command(BaseCommand):
                 applications.delete()
                 if not keep_users:
                     users.delete()
+                properties.delete()
 
             for document_file in document_files:
                 document_file.delete(save=False)
@@ -196,5 +222,6 @@ class Command(BaseCommand):
         self.stdout.write(f"Resident messages deleted: {selected_counts['messages']}")
         self.stdout.write(f"Payment records deleted: {selected_counts['payments']}")
         self.stdout.write(f"Linked tenant users deleted: {selected_counts['users']}")
+        self.stdout.write(f"Properties deleted: {selected_counts['properties']}")
         if delete_files:
             self.stdout.write(f"Uploaded document files deleted: {len(document_files)}")

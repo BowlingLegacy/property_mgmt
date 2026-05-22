@@ -1229,3 +1229,35 @@ class LiveFlowTests(TestCase):
         self.assertTrue(HousingApplication.objects.filter(id=paid_application.id).exists())
         self.assertFalse(HousingApplication.objects.filter(id=test_application.id).exists())
         self.assertTrue(Payment.objects.filter(id=kept_payment.id).exists())
+
+    def test_cleanup_deletes_only_explicitly_named_test_properties(self):
+        abc_property = Property.objects.create(name="ABC CO PROPERTY")
+        newtest_property = Property.objects.create(name="newtest fake property")
+        real_property = Property.objects.create(name="Painted Lady Inn")
+
+        preview = StringIO()
+        call_command(
+            "cleanup_test_portal_data",
+            "--delete-property-name",
+            "ABC CO PROPERTY",
+            "--delete-property-name",
+            "newtest fake property",
+            stdout=preview,
+        )
+
+        self.assertIn("Properties selected by exact name: 2", preview.getvalue())
+        self.assertTrue(Property.objects.filter(id=abc_property.id).exists())
+        self.assertTrue(Property.objects.filter(id=newtest_property.id).exists())
+
+        call_command(
+            "cleanup_test_portal_data",
+            "--confirm",
+            "--delete-property-name",
+            "ABC CO PROPERTY",
+            "--delete-property-name",
+            "newtest fake property",
+        )
+
+        self.assertFalse(Property.objects.filter(id=abc_property.id).exists())
+        self.assertFalse(Property.objects.filter(id=newtest_property.id).exists())
+        self.assertTrue(Property.objects.filter(id=real_property.id).exists())
