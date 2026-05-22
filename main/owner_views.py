@@ -1,20 +1,21 @@
 from decimal import Decimal
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db.models import Sum
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 
-from .models import Property, HousingApplication, Payment, ResidentMessage
+from .forms import OwnerFinancialUploadForm, OwnerLandlordInviteForm, OwnerPropertyForm
+from .invite_utils import create_pending_portal_user, send_portal_access_invite_email
+from .models import FinancialUpload, Property, HousingApplication, Payment, ResidentMessage
 from .permissions import can_access_owner_dashboard, is_super_admin, is_assistant_admin
 
 
 @login_required
 @user_passes_test(can_access_owner_dashboard)
 def property_owner_dashboard(request):
-    if is_super_admin(request.user) or is_assistant_admin(request.user):
-        properties = Property.objects.all().order_by("name")
-    else:
-        properties = Property.objects.filter(owner_email__iexact=request.user.email).order_by("name")
+    properties = owner_properties_for(request.user)
 
     property_cards = []
     portfolio_monthly_rent = Decimal("0.00")
@@ -74,4 +75,80 @@ def property_owner_dashboard(request):
         "portfolio_collected": portfolio_collected,
         "total_open_messages": total_open_messages,
         "recent_messages": recent_messages,
+    })
+
+
+def owner_properties_for(user):
+    if is_super_admin(user) or is_assistant_admin(user):
+        return Property.objects.all().order_by("name")
+
+    return Property.objects.filter(owner_email__iexact=user.email).order_by("name")
+
+
+@login_required
+@user_passes_test(can_access_owner_dashboard)
+def owner_property_create(request):
+    form = OwnerPropertyForm(request.POST or None, request.FILES or None)
+
+    if request.method == "POST" and form.is_valid():
+        property_obj = form.save(commit=False)
+        property_obj.owner_email = request.user.email
+        property_obj.save()
+        messages.success(request, f"{property_obj.name} was added to your owner dashboard.")
+        return redirect("property_owner_dashboard")
+
+    return render(request, "owner_property_form.html", {"form": form})
+
+
+@login_required
+@user_passes_test(can_access_owner_dashboard)
+def owner_landlord_invite(request):
+    properties = owner_properties_for(request.user)
+    form = OwnerLandlordInviteForm(request.POST or None, properties=properties)
+
+    if request.method == "POST" and form.is_valid():
+        intake = form.save()
+        property_obj = form.cleaned_data["property"]
+        property_obj.landlord_email = intake.email
+        property_obj.save(update_fields=["landlord_email"])
+
+        user = create_pending_portal_user(intake.full_name, intake.email, "landlord", intake.id)
+        user.refresh_invite_code()
+        intake.user = user
+        intake.status = "invited"
+        intake.invite_sent_at = timezone.now()
+        intake.save(update_fields=["user", "status", "invite_sent_at"])
+
+        try:
+            send_portal_access_invite_email(user, intake.full_name, "Landlord")
+        except Exception as exc:
+            messages.warning(request, f"Landlord setup code created, but email failed: {exc}")
+        else:
+            messages.success(request, "Landlord setup invite email sent.")
+
+        messages.info(request, f"Backup landlord setup code: {user.invite_code}")
+        return redirect("property_owner_dashboard")
+
+    return render(request, "owner_landlord_invite.html", {
+        "form": form,
+        "properties": properties,
+    })
+
+
+@login_required
+@user_passes_test(can_access_owner_dashboard)
+def owner_financial_upload(request):
+    properties = owner_properties_for(request.user)
+    form = OwnerFinancialUploadForm(request.POST or None, request.FILES or None, properties=properties)
+
+    if request.method == "POST" and form.is_valid():
+        upload = form.save()
+        messages.success(request, "Financial document uploaded for review and import processing.")
+        return redirect("owner_financial_upload")
+
+    uploads = FinancialUpload.objects.filter(property__in=properties).select_related("property").order_by("-uploaded_at")
+    return render(request, "owner_financial_upload.html", {
+        "form": form,
+        "uploads": uploads,
+        "properties": properties,
     })

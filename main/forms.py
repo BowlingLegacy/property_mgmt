@@ -12,6 +12,7 @@ from .models import (
     Payment,
     PropertyOwnerIntake,
     ExistingResidentIntake,
+    LandlordIntake,
 )
 
 
@@ -55,6 +56,71 @@ class FinancialUploadForm(forms.ModelForm):
             "file": forms.ClearableFileInput(attrs={"class": "form-control"}),
             "notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
         }
+
+
+class OwnerPropertyForm(forms.ModelForm):
+    class Meta:
+        model = Property
+        fields = [
+            "name",
+            "address",
+            "description",
+            "photo",
+            "unit_size",
+            "available_date",
+            "deposit_amount",
+            "utilities_cost",
+            "availability_status",
+            "availability_message",
+        ]
+        widgets = {
+            "name": forms.TextInput(attrs={"class": "form-control"}),
+            "address": forms.TextInput(attrs={"class": "form-control"}),
+            "description": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
+            "photo": forms.ClearableFileInput(attrs={"class": "form-control"}),
+            "unit_size": forms.TextInput(attrs={"class": "form-control"}),
+            "available_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "deposit_amount": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+            "utilities_cost": forms.TextInput(attrs={"class": "form-control"}),
+            "availability_status": forms.Select(attrs={"class": "form-select"}),
+            "availability_message": forms.TextInput(attrs={"class": "form-control"}),
+        }
+
+
+class OwnerFinancialUploadForm(FinancialUploadForm):
+    property = forms.ModelChoiceField(queryset=Property.objects.none(), widget=forms.Select(attrs={"class": "form-select"}))
+
+    class Meta(FinancialUploadForm.Meta):
+        fields = ["property", "name", "file", "notes"]
+
+    def __init__(self, *args, properties=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["property"].queryset = properties if properties is not None else Property.objects.none()
+
+
+class OwnerLandlordInviteForm(forms.ModelForm):
+    property = forms.ModelChoiceField(queryset=Property.objects.none(), widget=forms.Select(attrs={"class": "form-select"}))
+
+    class Meta:
+        model = LandlordIntake
+        fields = ["property", "full_name", "email", "phone", "address"]
+        labels = {
+            "property": "Property this landlord will manage",
+            "full_name": "Landlord name",
+            "email": "Landlord email",
+            "phone": "Landlord phone",
+            "address": "Landlord address",
+        }
+        widgets = {
+            "full_name": forms.TextInput(attrs={"class": "form-control"}),
+            "email": forms.EmailInput(attrs={"class": "form-control"}),
+            "phone": forms.TextInput(attrs={"class": "form-control"}),
+            "address": forms.TextInput(attrs={"class": "form-control"}),
+        }
+
+    def __init__(self, *args, properties=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["property"].queryset = properties if properties is not None else Property.objects.none()
 
 
 class PropertyOwnerIntakeForm(forms.ModelForm):

@@ -678,6 +678,54 @@ class LiveFlowTests(TestCase):
         self.assertEqual(dashboard_response.status_code, 200)
         self.assertContains(dashboard_response, "No properties are connected to this owner yet.")
 
+    def test_property_owner_can_add_property_invite_landlord_and_upload_financial_file(self):
+        owner = User.objects.create_user(
+            username="workflow-owner",
+            email="workflow-owner@example.com",
+            password="StrongPass123!",
+            role="property_owner",
+        )
+        self.client.login(username="workflow-owner", password="StrongPass123!")
+
+        property_response = self.client.post(reverse("owner_property_create"), {
+            "name": "Owner Added Property",
+            "address": "100 Owner Way",
+            "description": "Owner created property.",
+            "availability_status": "full",
+            "availability_message": "Profile setup underway",
+        })
+
+        self.assertRedirects(property_response, reverse("property_owner_dashboard"))
+        property_obj = Property.objects.get(name="Owner Added Property")
+        self.assertEqual(property_obj.owner_email, owner.email)
+
+        landlord_response = self.client.post(reverse("owner_landlord_invite"), {
+            "property": property_obj.id,
+            "full_name": "Assigned Landlord",
+            "email": "assigned-landlord@example.com",
+            "phone": "555-0197",
+            "address": "200 Manager Way",
+        })
+
+        self.assertRedirects(landlord_response, reverse("property_owner_dashboard"))
+        property_obj.refresh_from_db()
+        self.assertEqual(property_obj.landlord_email, "assigned-landlord@example.com")
+        intake = LandlordIntake.objects.get(email="assigned-landlord@example.com")
+        self.assertEqual(intake.status, "invited")
+        self.assertTrue(intake.user.invite_code)
+        self.assertEqual(len(mail.outbox), 1)
+
+        financial_file = SimpleUploadedFile("owner.csv", b"date,amount\n2026-05-01,100", content_type="text/csv")
+        upload_response = self.client.post(reverse("owner_financial_upload"), {
+            "property": property_obj.id,
+            "name": "Owner Upload",
+            "file": financial_file,
+            "notes": "QuickBooks export",
+        })
+
+        self.assertRedirects(upload_response, reverse("owner_financial_upload"))
+        self.assertEqual(property_obj.financial_uploads.get(name="Owner Upload").notes, "QuickBooks export")
+
     def test_property_owner_intake_questionnaire_saves_system_needs(self):
         form_response = self.client.get(reverse("property_owner_intake"))
         self.assertEqual(form_response.status_code, 200)

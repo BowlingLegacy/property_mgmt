@@ -116,6 +116,14 @@
     border-radius: 16px;
     padding: 1.25rem;
 }
+.owner-actions {
+    background: rgba(255,255,255,.9);
+    border: 1px solid rgba(188,150,45,.16);
+    border-radius: 16px;
+    box-shadow: 0 6px 16px rgba(65,45,10,.08);
+    margin-bottom: 1rem;
+    padding: 1rem;
+}
 </style>
 
 <div class="owner-shell">
@@ -131,6 +139,20 @@
             <a href="{% url 'property_blog_manager' %}" class="btn-dark-soft">Property Blogs</a>
             <a href="{% url 'landlord_dashboard' %}" class="btn-dark-soft">Landlord Operations</a>
             <a href="{% url 'rent_roll' %}" class="btn-owner">Monthly Rent Roll</a>
+        </div>
+    </div>
+
+    <div class="owner-actions">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+                <h2 class="h4 fw-bold mb-1">Owner Actions</h2>
+                <p class="text-muted mb-0">Add properties, assign a landlord, bring current residents into setup, and upload financial source files.</p>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="{% url 'owner_property_create' %}" class="btn-owner">Add Property</a>
+                <a href="{% url 'owner_landlord_invite' %}" class="btn-dark-soft">Invite Landlord</a>
+                <a href="{% url 'owner_financial_upload' %}" class="btn-dark-soft">Upload Financial Documents</a>
+            </div>
         </div>
     </div>
 
@@ -194,6 +216,8 @@
 
                 <div class="d-flex gap-2 flex-wrap mt-3">
                     <a href="{% url 'property_financials' card.property.name %}" class="btn-owner">Open {{ card.property.name }} Financials</a>
+                    <a href="{% url 'existing_resident_intake' card.property.id %}" class="btn-dark-soft">Current Resident Setup Link</a>
+                    <a href="{% url 'property_detail' card.property.id %}" class="btn-dark-soft">Public Property Page</a>
                     <a href="{% url 'landlord_dashboard' %}" class="btn-dark-soft">Open Landlord Operations</a>
                 </div>
             </div>

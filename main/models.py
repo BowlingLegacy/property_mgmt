@@ -488,6 +488,13 @@ class Payment(models.Model):
 
 
 class FinancialUpload(models.Model):
+    property = models.ForeignKey(
+        "Property",
+        on_delete=models.SET_NULL,
+        related_name="financial_uploads",
+        blank=True,
+        null=True,
+    )
     file = models.FileField(upload_to="financial_uploads/")
     name = models.CharField(max_length=255, default="Financial Upload")
     uploaded_at = models.DateTimeField(auto_now_add=True)
