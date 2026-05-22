@@ -839,6 +839,32 @@ class LiveFlowTests(TestCase):
         self.assertContains(payment_log, "Assigned Resident")
         self.assertNotContains(payment_log, "Other Resident")
 
+    def test_landlord_can_send_setup_invite_for_saved_current_resident_intake(self):
+        landlord = User.objects.create_user(
+            username="resident-intake-landlord",
+            email="resident-intake-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Intake Property", landlord_email=landlord.email)
+        intake = ExistingResidentIntake.objects.create(
+            property=property_obj,
+            first_name="Saved",
+            last_name="Resident",
+            email="saved-resident@example.com",
+            phone="555-0200",
+        )
+
+        self.client.login(username="resident-intake-landlord", password="StrongPass123!")
+
+        response = self.client.post(reverse("landlord_send_existing_resident_invite", args=[intake.id]))
+
+        self.assertRedirects(response, reverse("landlord_attention"))
+        application = HousingApplication.objects.get(email="saved-resident@example.com")
+        self.assertEqual(application.property, property_obj)
+        self.assertIn(application.user.invite_code, mail.outbox[0].body)
+
     def test_existing_resident_intake_closes_after_property_window(self):
         property_obj = Property.objects.create(name="Older Property")
         property_obj.created_at = timezone.now() - timezone.timedelta(days=31)

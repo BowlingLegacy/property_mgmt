@@ -1297,6 +1297,63 @@ def property_existing_resident_intake_open(property_obj):
     return timezone.now() <= property_obj.created_at + timedelta(days=30)
 
 
+def ensure_existing_resident_portal_application(intake):
+    application = (
+        HousingApplication.objects
+        .select_related("user")
+        .filter(property=intake.property, email__iexact=intake.email)
+        .first()
+    )
+
+    if not application:
+        application = HousingApplication.objects.create(
+            property=intake.property,
+            full_name=intake.full_name(),
+            phone=intake.phone,
+            email=intake.email,
+            age=0,
+            profile_photo=intake.profile_photo,
+            income_source="Existing resident intake",
+            monthly_income=Decimal("0.00"),
+            housing_need="Existing resident profile setup.",
+            additional_notes=intake.additional_notes,
+        )
+
+    if not application.user:
+        application.user = create_pending_portal_user(
+            intake.full_name(),
+            intake.email,
+            "tenant",
+            application.id,
+        )
+        application.save(update_fields=["user"])
+
+    return application
+
+
+def send_existing_resident_portal_invite(request, intake):
+    application = ensure_existing_resident_portal_application(intake)
+
+    if application.user.has_usable_password():
+        messages.info(request, "This resident already has a registered portal login.")
+        return application
+
+    application.user.refresh_invite_code()
+
+    try:
+        from .landlord_views import send_resident_invite_email
+        send_resident_invite_email(application)
+    except Exception as exc:
+        messages.warning(
+            request,
+            f"Resident profile was saved and a setup code was created, but email failed: {exc}",
+        )
+    else:
+        messages.success(request, "Resident profile saved and portal setup email sent.")
+
+    return application
+
+
 def existing_resident_intake(request, pk):
     property_obj = get_object_or_404(Property, pk=pk)
 
@@ -1311,47 +1368,7 @@ def existing_resident_intake(request, pk):
         intake.property = property_obj
         intake.save()
 
-        application = (
-            HousingApplication.objects
-            .select_related("user")
-            .filter(property=property_obj, email__iexact=intake.email)
-            .first()
-        )
-
-        if not application:
-            application = HousingApplication.objects.create(
-                property=property_obj,
-                full_name=intake.full_name(),
-                phone=intake.phone,
-                email=intake.email,
-                age=0,
-                profile_photo=intake.profile_photo,
-                income_source="Existing resident intake",
-                monthly_income=Decimal("0.00"),
-                housing_need="Existing resident profile setup.",
-                additional_notes=intake.additional_notes,
-            )
-
-        if not application.user:
-            application.user = create_pending_portal_user(
-                intake.full_name(),
-                intake.email,
-                "tenant",
-                application.id,
-            )
-            application.user.refresh_invite_code()
-            application.save(update_fields=["user"])
-
-        try:
-            from .landlord_views import send_resident_invite_email
-            send_resident_invite_email(application)
-        except Exception as exc:
-            messages.warning(
-                request,
-                f"Resident profile was saved and a setup code was created, but email failed: {exc}",
-            )
-        else:
-            messages.success(request, "Resident profile saved and portal setup email sent.")
+        send_existing_resident_portal_invite(request, intake)
 
         return redirect("existing_resident_intake_success", pk=property_obj.id)
 
@@ -1364,6 +1381,25 @@ def existing_resident_intake(request, pk):
 def existing_resident_intake_success(request, pk):
     property_obj = get_object_or_404(Property, pk=pk)
     return render(request, "existing_resident_intake_success.html", {"property": property_obj})
+
+
+@login_required
+@user_passes_test(staff_required)
+def landlord_send_existing_resident_invite(request, intake_id):
+    if request.method != "POST":
+        return redirect("landlord_attention")
+
+    intake = get_object_or_404(
+        ExistingResidentIntake.objects.select_related("property"),
+        id=intake_id,
+        property__in=staff_managed_properties(request.user),
+    )
+    application = send_existing_resident_portal_invite(request, intake)
+
+    if application.user and not application.user.has_usable_password():
+        messages.info(request, f"Backup resident setup code: {application.user.invite_code}")
+
+    return redirect("landlord_attention")
 
 
 def add_blog_comment(request, post_id):

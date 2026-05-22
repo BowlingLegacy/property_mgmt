@@ -15,7 +15,7 @@
             <h2 class="fw-bold h4">Current Resident Profile Setups</h2>
             <div class="table-responsive">
                 <table class="table align-middle">
-                    <thead><tr><th>Resident</th><th>Property</th><th>Submitted</th><th>Contact</th></tr></thead>
+                    <thead><tr><th>Resident</th><th>Property</th><th>Submitted</th><th>Contact</th><th>Actions</th></tr></thead>
                     <tbody>
                     {% for intake in existing_resident_intakes %}
                         <tr>
@@ -23,9 +23,15 @@
                             <td>{{ intake.property.name }}</td>
                             <td>{{ intake.created_at|date:"M j, g:i A" }}</td>
                             <td>{{ intake.email }}<br><span class="text-muted small">{{ intake.phone }}</span></td>
+                            <td>
+                                <form method="post" action="{% url 'landlord_send_existing_resident_invite' intake.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-primary btn-sm">Send Setup Invite</button>
+                                </form>
+                            </td>
                         </tr>
                     {% empty %}
-                        <tr><td colspan="4" class="text-muted">No current resident profile setups.</td></tr>
+                        <tr><td colspan="5" class="text-muted">No current resident profile setups.</td></tr>
                     {% endfor %}
                     </tbody>
                 </table>
