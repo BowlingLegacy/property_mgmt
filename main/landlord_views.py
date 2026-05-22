@@ -8,7 +8,7 @@ from django.utils.text import slugify
 
 from .forms import LandlordCreateTenantForm
 from .models import HousingApplication, SignedDocument, User
-from .views import staff_required
+from .views import staff_managed_properties, staff_required
 
 
 def send_resident_invite_email(application):
@@ -82,6 +82,10 @@ def create_tenant(request):
         HousingApplication,
         id=application_id,
     )
+
+    if application.property_id not in set(staff_managed_properties(request.user).values_list("id", flat=True)):
+        messages.error(request, "That resident file is not assigned to your property workspace.")
+        return redirect("landlord_dashboard")
 
     if request.method == "POST":
         form = LandlordCreateTenantForm(request.POST)

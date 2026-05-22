@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from .forms import OwnerFinancialUploadForm, OwnerLandlordInviteForm, OwnerPropertyForm
 from .invite_utils import create_pending_portal_user, send_portal_access_invite_email
-from .models import FinancialUpload, Property, HousingApplication, Payment, ResidentMessage
+from .models import FinancialUpload, Property, PropertyImage, HousingApplication, Payment, ResidentMessage
 from .permissions import can_access_owner_dashboard, is_super_admin, is_assistant_admin
 
 
@@ -94,6 +94,12 @@ def owner_property_create(request):
         property_obj = form.save(commit=False)
         property_obj.owner_email = request.user.email
         property_obj.save()
+
+        PropertyImage.objects.bulk_create([
+            PropertyImage(property=property_obj, image=image)
+            for image in form.cleaned_data["gallery_images"]
+        ])
+
         messages.success(request, f"{property_obj.name} was added to your owner dashboard.")
         return redirect("property_owner_dashboard")
 

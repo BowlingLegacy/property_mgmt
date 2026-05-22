@@ -94,6 +94,11 @@ class User(AbstractUser):
 
 
 class Property(models.Model):
+    LEASE_TYPE_CHOICES = [
+        ("month_to_month", "Month to Month"),
+        ("lease", "Lease"),
+    ]
+
     name = models.CharField(max_length=255)
     address = models.CharField(max_length=255, blank=True)
     description = models.TextField(blank=True)
@@ -110,6 +115,8 @@ class Property(models.Model):
     cable_ready = models.BooleanField(default=True)
     available_date = models.DateField(blank=True, null=True)
     deposit_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    rent_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    lease_type = models.CharField(max_length=30, choices=LEASE_TYPE_CHOICES, default="month_to_month", blank=True)
     utilities_cost = models.CharField(max_length=255, blank=True)
 
     AVAILABILITY_CHOICES = [

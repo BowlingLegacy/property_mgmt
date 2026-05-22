@@ -58,7 +58,28 @@ class FinancialUploadForm(forms.ModelForm):
         }
 
 
+class MultipleImageInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+class MultipleImageField(forms.ImageField):
+    def clean(self, data, initial=None):
+        single_image_clean = super().clean
+
+        if isinstance(data, (list, tuple)):
+            return [single_image_clean(image, initial) for image in data]
+
+        return [single_image_clean(data, initial)] if data else []
+
+
 class OwnerPropertyForm(forms.ModelForm):
+    gallery_images = MultipleImageField(
+        required=False,
+        label="Gallery Pics",
+        help_text="Add up to 9 property gallery pictures.",
+        widget=MultipleImageInput(attrs={"class": "form-control", "accept": "image/*"}),
+    )
+
     class Meta:
         model = Property
         fields = [
@@ -66,13 +87,20 @@ class OwnerPropertyForm(forms.ModelForm):
             "address",
             "description",
             "photo",
+            "gallery_images",
             "unit_size",
             "available_date",
             "deposit_amount",
-            "utilities_cost",
+            "rent_amount",
+            "lease_type",
             "availability_status",
             "availability_message",
         ]
+        labels = {
+            "photo": "Cover Photo",
+            "rent_amount": "Rent",
+            "lease_type": "Rental Term",
+        }
         widgets = {
             "name": forms.TextInput(attrs={"class": "form-control"}),
             "address": forms.TextInput(attrs={"class": "form-control"}),
@@ -81,10 +109,19 @@ class OwnerPropertyForm(forms.ModelForm):
             "unit_size": forms.TextInput(attrs={"class": "form-control"}),
             "available_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
             "deposit_amount": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
-            "utilities_cost": forms.TextInput(attrs={"class": "form-control"}),
+            "rent_amount": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+            "lease_type": forms.Select(attrs={"class": "form-select"}),
             "availability_status": forms.Select(attrs={"class": "form-select"}),
             "availability_message": forms.TextInput(attrs={"class": "form-control"}),
         }
+
+    def clean_gallery_images(self):
+        gallery_images = self.cleaned_data.get("gallery_images", [])
+
+        if len(gallery_images) > 9:
+            raise forms.ValidationError("Upload no more than 9 gallery pictures.")
+
+        return gallery_images
 
 
 class OwnerFinancialUploadForm(FinancialUploadForm):

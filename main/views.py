@@ -45,6 +45,7 @@ from .models import (
     ApplicantDocument,
     SignedDocument,
     PropertyOwnerIntake,
+    ExistingResidentIntake,
     LandlordIntake,
 )
 from .invite_utils import create_pending_portal_user, send_portal_access_invite_email
@@ -367,42 +368,67 @@ def request_invite_code(request):
 
     return render(request, "request_invite_code.html", {"form": form})
 
-def get_landlord_workspace_context():
+def staff_managed_properties(user):
+    if user.is_superuser or getattr(user, "role", "") in ["admin", "assistant"]:
+        return Property.objects.all()
+
+    if getattr(user, "role", "") == "property_owner":
+        return Property.objects.filter(owner_email__iexact=user.email)
+
+    if getattr(user, "role", "") == "landlord":
+        return Property.objects.filter(landlord_email__iexact=user.email)
+
+    return Property.objects.none()
+
+
+def staff_managed_applications(user):
+    return HousingApplication.objects.filter(property__in=staff_managed_properties(user))
+
+
+def get_landlord_workspace_context(user):
+    properties = staff_managed_properties(user).order_by("name")
+
     applications = (
         HousingApplication.objects
         .select_related("property", "user")
-        .all()
+        .filter(property__in=properties)
         .order_by("property__name", "space_label", "full_name")
     )
 
-    properties = Property.objects.all().order_by("name")
-    payments = Payment.objects.all().order_by("-created_at")[:25]
+    payments = Payment.objects.filter(application__property__in=properties).order_by("-created_at")[:25]
 
     resident_messages = (
         ResidentMessage.objects
         .select_related("application", "application__property")
-        .all()
+        .filter(application__property__in=properties)
         .order_by("application__property__name", "-created_at")
     )
 
     new_applications = (
         HousingApplication.objects
         .select_related("property", "user")
-        .filter(user__isnull=True)
+        .filter(property__in=properties, user__isnull=True)
         .order_by("-created_at")
     )
 
     new_messages = (
         ResidentMessage.objects
         .select_related("application", "application__property")
-        .filter(status="submitted")
+        .filter(application__property__in=properties, status="submitted")
         .order_by("-created_at")
     )
 
     new_documents = (
         ApplicantDocument.objects
         .select_related("application", "application__property")
-        .filter(status="uploaded", landlord_notified=False)
+        .filter(application__property__in=properties, status="uploaded", landlord_notified=False)
+        .order_by("-created_at")
+    )
+
+    existing_resident_intakes = (
+        ExistingResidentIntake.objects
+        .select_related("property")
+        .filter(property__in=properties)
         .order_by("-created_at")
     )
 
@@ -431,10 +457,13 @@ def get_landlord_workspace_context():
         "new_messages": new_messages,
         "new_documents": new_documents,
         "new_document_count": new_documents.count(),
+        "existing_resident_intakes": existing_resident_intakes,
+        "existing_resident_intake_count": existing_resident_intakes.count(),
         "attention_count": (
             new_applications.count()
             + new_message_count
             + new_documents.count()
+            + existing_resident_intakes.count()
         ),
     }
 
@@ -442,19 +471,19 @@ def get_landlord_workspace_context():
 @login_required
 @user_passes_test(staff_required)
 def landlord_dashboard(request):
-    return render(request, "landlord_dashboard.html", get_landlord_workspace_context())
+    return render(request, "landlord_dashboard.html", get_landlord_workspace_context(request.user))
 
 
 @login_required
 @user_passes_test(staff_required)
 def landlord_attention(request):
-    return render(request, "landlord_attention.html", get_landlord_workspace_context())
+    return render(request, "landlord_attention.html", get_landlord_workspace_context(request.user))
 
 
 @login_required
 @user_passes_test(staff_required)
 def landlord_resident_files(request):
-    return render(request, "landlord_resident_files.html", get_landlord_workspace_context())
+    return render(request, "landlord_resident_files.html", get_landlord_workspace_context(request.user))
 def get_superadmin_workspace_context():
     properties = Property.objects.all().order_by("name")
     users = User.objects.all().order_by("username")
@@ -603,6 +632,7 @@ def landlord_message_detail(request, message_id):
     resident_message = get_object_or_404(
         ResidentMessage.objects.select_related("application", "application__property"),
         id=message_id,
+        application__in=staff_managed_applications(request.user),
     )
 
     if request.method == "POST":
@@ -627,6 +657,7 @@ def mark_document_reviewed(request, document_id):
     document = get_object_or_404(
         ApplicantDocument.objects.select_related("application"),
         id=document_id,
+        application__in=staff_managed_applications(request.user),
     )
 
     document.landlord_notified = True
@@ -908,7 +939,7 @@ Message:
 def payment_log(request):
     completed_payments = (
         Payment.objects
-        .filter(status="completed")
+        .filter(application__in=staff_managed_applications(request.user), status="completed")
         .select_related("application", "application__property")
         .order_by("application__property__name", "-created_at", "application__space_label", "application__full_name")
     )
@@ -956,6 +987,11 @@ def payment_log(request):
 def record_manual_payment(request):
     if request.method == "POST":
         form = ManualPaymentForm(request.POST)
+        form.fields["application"].queryset = (
+            staff_managed_applications(request.user)
+            .select_related("property")
+            .order_by("property__name", "space_label", "full_name")
+        )
 
         if form.is_valid():
             payment = form.save(commit=False)
@@ -981,6 +1017,11 @@ def record_manual_payment(request):
             initial["application"] = application_id
 
         form = ManualPaymentForm(initial=initial)
+        form.fields["application"].queryset = (
+            staff_managed_applications(request.user)
+            .select_related("property")
+            .order_by("property__name", "space_label", "full_name")
+        )
 
     return render(request, "record_manual_payment.html", {"form": form})
 
@@ -991,6 +1032,7 @@ def payment_receipt(request, payment_id):
     payment = get_object_or_404(
         Payment.objects.select_related("application", "application__property", "recorded_by"),
         id=payment_id,
+        application__in=staff_managed_applications(request.user),
     )
 
     return render(request, "payment_receipt.html", {"payment": payment})
@@ -1000,7 +1042,7 @@ def payment_receipt(request, payment_id):
 @user_passes_test(staff_required)
 def rent_roll(request):
     residents = (
-        HousingApplication.objects
+        staff_managed_applications(request.user)
         .select_related("property")
         .order_by("property__name", "space_label", "full_name")
     )
@@ -1268,6 +1310,49 @@ def existing_resident_intake(request, pk):
         intake = form.save(commit=False)
         intake.property = property_obj
         intake.save()
+
+        application = (
+            HousingApplication.objects
+            .select_related("user")
+            .filter(property=property_obj, email__iexact=intake.email)
+            .first()
+        )
+
+        if not application:
+            application = HousingApplication.objects.create(
+                property=property_obj,
+                full_name=intake.full_name(),
+                phone=intake.phone,
+                email=intake.email,
+                age=0,
+                profile_photo=intake.profile_photo,
+                income_source="Existing resident intake",
+                monthly_income=Decimal("0.00"),
+                housing_need="Existing resident profile setup.",
+                additional_notes=intake.additional_notes,
+            )
+
+        if not application.user:
+            application.user = create_pending_portal_user(
+                intake.full_name(),
+                intake.email,
+                "tenant",
+                application.id,
+            )
+            application.user.refresh_invite_code()
+            application.save(update_fields=["user"])
+
+        try:
+            from .landlord_views import send_resident_invite_email
+            send_resident_invite_email(application)
+        except Exception as exc:
+            messages.warning(
+                request,
+                f"Resident profile was saved and a setup code was created, but email failed: {exc}",
+            )
+        else:
+            messages.success(request, "Resident profile saved and portal setup email sent.")
+
         return redirect("existing_resident_intake_success", pk=property_obj.id)
 
     return render(request, "existing_resident_intake.html", {

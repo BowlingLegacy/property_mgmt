@@ -265,7 +265,9 @@ class LiveFlowTests(TestCase):
             role="landlord",
             is_staff=True,
         )
+        property_obj = Property.objects.create(name="Invite Property", landlord_email=staff_user.email)
         application = HousingApplication.objects.create(
+            property=property_obj,
             full_name="Email Applicant",
             phone="555-0100",
             email="email-applicant@example.com",
@@ -399,7 +401,9 @@ class LiveFlowTests(TestCase):
             role="landlord",
             is_staff=True,
         )
+        property_obj = Property.objects.create(name="Manual Transfer Property", landlord_email=staff_user.email)
         application = HousingApplication.objects.create(
+            property=property_obj,
             full_name="Manual Pay Resident",
             phone="555-0103",
             email="manual@example.com",
@@ -447,7 +451,9 @@ class LiveFlowTests(TestCase):
             role="landlord",
             is_staff=True,
         )
+        property_obj = Property.objects.create(name="Cash App Property", landlord_email=staff_user.email)
         application = HousingApplication.objects.create(
+            property=property_obj,
             full_name="Cash App Resident",
             phone="555-0104",
             email="cashapp@example.com",
@@ -487,7 +493,9 @@ class LiveFlowTests(TestCase):
             role="landlord",
             is_staff=True,
         )
+        property_obj = Property.objects.create(name="Attention Property", landlord_email=staff_user.email)
         application = HousingApplication.objects.create(
+            property=property_obj,
             full_name="New Queue Resident",
             phone="555-0105",
             email="queue@example.com",
@@ -691,6 +699,8 @@ class LiveFlowTests(TestCase):
             "name": "Owner Added Property",
             "address": "100 Owner Way",
             "description": "Owner created property.",
+            "rent_amount": "1450.00",
+            "lease_type": "lease",
             "availability_status": "full",
             "availability_message": "Profile setup underway",
         })
@@ -698,6 +708,8 @@ class LiveFlowTests(TestCase):
         self.assertRedirects(property_response, reverse("property_owner_dashboard"))
         property_obj = Property.objects.get(name="Owner Added Property")
         self.assertEqual(property_obj.owner_email, owner.email)
+        self.assertEqual(property_obj.rent_amount, Decimal("1450.00"))
+        self.assertEqual(property_obj.lease_type, "lease")
 
         landlord_response = self.client.post(reverse("owner_landlord_invite"), {
             "property": property_obj.id,
@@ -779,6 +791,53 @@ class LiveFlowTests(TestCase):
         self.assertEqual(intake.full_name(), "Existing R Resident")
         self.assertEqual(intake.move_in_month, "2023-07")
         self.assertTrue(intake.has_valid_odl)
+        application = HousingApplication.objects.get(email="existing@example.com")
+        self.assertEqual(application.property, property_obj)
+        self.assertIsNotNone(application.user)
+        self.assertIn(application.user.invite_code, mail.outbox[0].body)
+
+    def test_landlord_workspace_only_lists_assigned_property_records(self):
+        landlord = User.objects.create_user(
+            username="assigned-landlord",
+            email="assigned@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        assigned_property = Property.objects.create(name="Assigned Property", landlord_email=landlord.email)
+        other_property = Property.objects.create(name="Other Property", landlord_email="other@example.com")
+        assigned_application = HousingApplication.objects.create(
+            property=assigned_property,
+            full_name="Assigned Resident",
+            phone="555-0198",
+            email="assigned-resident@example.com",
+            age=51,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        other_application = HousingApplication.objects.create(
+            property=other_property,
+            full_name="Other Resident",
+            phone="555-0199",
+            email="other-resident@example.com",
+            age=52,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        Payment.objects.create(application=assigned_application, amount=Decimal("100.00"), status="completed")
+        Payment.objects.create(application=other_application, amount=Decimal("200.00"), status="completed")
+
+        self.client.login(username="assigned-landlord", password="StrongPass123!")
+
+        resident_files = self.client.get(reverse("landlord_resident_files"))
+        payment_log = self.client.get(reverse("payment_log"))
+
+        self.assertContains(resident_files, "Assigned Resident")
+        self.assertNotContains(resident_files, "Other Resident")
+        self.assertContains(payment_log, "Assigned Resident")
+        self.assertNotContains(payment_log, "Other Resident")
 
     def test_existing_resident_intake_closes_after_property_window(self):
         property_obj = Property.objects.create(name="Older Property")
@@ -1124,7 +1183,9 @@ class LiveFlowTests(TestCase):
             role="landlord",
             is_staff=True,
         )
+        property_obj = Property.objects.create(name="Document Property", landlord_email=staff_user.email)
         application = HousingApplication.objects.create(
+            property=property_obj,
             full_name="Document Resident",
             phone="555-0106",
             email="document@example.com",
