@@ -921,6 +921,61 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "(555) 011-3344")
         self.assertNotContains(response, "Hidden Resident")
 
+    def test_custom_reports_scope_to_property_owner_and_block_residents(self):
+        owner = User.objects.create_user(
+            username="report-owner",
+            email="owner-report@example.com",
+            password="StrongPass123!",
+            role="property_owner",
+        )
+        resident_user = User.objects.create_user(
+            username="report-resident-user",
+            email="report-resident-user@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        owned_property = Property.objects.create(name="Owner Report Property", owner_email=owner.email)
+        other_property = Property.objects.create(name="Different Owner Property", owner_email="different@example.com")
+        HousingApplication.objects.create(
+            property=owned_property,
+            full_name="Owned Property Resident",
+            phone="5550114455",
+            email="owned-resident@example.com",
+            age=51,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        HousingApplication.objects.create(
+            property=other_property,
+            full_name="Different Owner Resident",
+            phone="5550114466",
+            email="different-owner-resident@example.com",
+            age=52,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+
+        self.client.login(username="report-owner", password="StrongPass123!")
+
+        response = self.client.get(reverse("custom_reports"), {
+            "report_type": "resident_phone_list",
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Owned Property Resident")
+        self.assertNotContains(response, "Different Owner Resident")
+
+        self.client.logout()
+        self.client.login(username="report-resident-user", password="StrongPass123!")
+
+        response = self.client.get(reverse("custom_reports"), {
+            "report_type": "resident_phone_list",
+        })
+
+        self.assertEqual(response.status_code, 302)
+
     def test_custom_financial_report_can_mix_expense_types_and_print(self):
         superuser = User.objects.create_user(
             username="report-admin",
