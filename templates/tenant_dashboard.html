@@ -463,12 +463,21 @@ body {
                         </p>
                     </div>
                     <div class="col-lg-4">
-                        <button class="message-btn"
-                                data-bs-toggle="modal"
-                                data-bs-target="#messageModal"
-                                data-message-subject="Renters Insurance Information">
-                            Ask About Coverage
-                        </button>
+                        {% if application.property and application.property.renters_insurance_url %}
+                            <a href="{{ application.property.renters_insurance_url }}"
+                               target="_blank"
+                               rel="noopener"
+                               class="message-btn d-block text-center text-decoration-none">
+                                {{ application.property.renters_insurance_provider_name|default:"Explore Coverage" }}
+                            </a>
+                        {% else %}
+                            <button class="message-btn"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#messageModal"
+                                    data-message-subject="Renters Insurance Information">
+                                Ask About Coverage
+                            </button>
+                        {% endif %}
                     </div>
                 </div>
             </div>

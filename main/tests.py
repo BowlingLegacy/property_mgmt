@@ -11,6 +11,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .models import AccountingReceipt, ApplicantDocument, BlogComment, BlogPost, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, ResidentMessage, SignedDocument, User
+from .views import apply_completed_payment_to_balance
 
 
 @override_settings(
@@ -46,6 +47,76 @@ class LiveFlowTests(TestCase):
 
         application = HousingApplication.objects.get(email="applicant@example.com")
         self.assertEqual(application.property, property_obj)
+
+    def test_application_inherits_property_fee_and_background_requirements(self):
+        property_obj = Property.objects.create(
+            name="Fee Property",
+            charges_application_fee=True,
+            application_fee_amount=Decimal("35.00"),
+            requires_background_check=True,
+            background_check_fee_amount=Decimal("45.00"),
+        )
+
+        response = self.client.post(
+            f"{reverse('apply')}?property={property_obj.id}",
+            self.application_payload(),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        application = HousingApplication.objects.get(email="applicant@example.com")
+        self.assertEqual(application.application_fee_amount, Decimal("35.00"))
+        self.assertTrue(application.background_check_required)
+        self.assertEqual(application.background_check_fee_amount, Decimal("45.00"))
+        self.assertEqual(application.background_check_status, "pending")
+
+    def test_application_fee_payment_updates_fee_balance(self):
+        application = HousingApplication.objects.create(
+            full_name="Fee Applicant",
+            phone="555-0100",
+            email="fee@example.com",
+            age=42,
+            application_fee_amount=Decimal("35.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Needs housing.",
+        )
+        payment = Payment.objects.create(
+            application=application,
+            payment_type="application_fee",
+            payment_method="cash",
+            amount=Decimal("35.00"),
+            status="completed",
+        )
+
+        apply_completed_payment_to_balance(payment)
+
+        application.refresh_from_db()
+        self.assertEqual(application.application_fee_paid, Decimal("35.00"))
+
+    @patch("main.views.stripe.checkout.Session.create")
+    def test_recent_applicant_can_pay_application_fee_from_success_session(self, mock_session_create):
+        mock_session_create.return_value = type("StripeSession", (), {
+            "id": "cs_test_fee",
+            "url": "https://checkout.stripe.test/session",
+        })()
+        property_obj = Property.objects.create(
+            name="Fee Property",
+            charges_application_fee=True,
+            application_fee_amount=Decimal("35.00"),
+        )
+
+        self.client.post(
+            f"{reverse('apply')}?property={property_obj.id}",
+            self.application_payload(),
+        )
+        application = HousingApplication.objects.get(email="applicant@example.com")
+
+        response = self.client.get(reverse("pay_by_type", args=[application.id, "application_fee"]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "https://checkout.stripe.test/session")
+        payment = Payment.objects.get(application=application, payment_type="application_fee")
+        self.assertEqual(payment.amount, Decimal("35.00"))
 
     def test_printable_application_includes_full_intake_details(self):
         application = HousingApplication.objects.create(

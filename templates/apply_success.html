@@ -61,6 +61,27 @@
 .gold-btn:hover {
     color: white;
 }
+
+.fee-panel {
+    background: #fffaf0;
+    border: 1px solid rgba(197,154,50,.35);
+    border-radius: 16px;
+    margin-top: 1.25rem;
+    padding: 1rem;
+    text-align: left;
+}
+
+.fee-row {
+    align-items: center;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    padding: .75rem 0;
+}
+
+.fee-row + .fee-row {
+    border-top: 1px solid rgba(197,154,50,.25);
+}
 </style>
 
 <div class="success-wrap">
@@ -82,6 +103,38 @@
             <p>
                 We will review your application and contact you about the next step in the onboarding process.
             </p>
+
+            {% if application %}
+                {% if application.application_fee_amount > application.application_fee_paid or application.background_check_fee_amount > application.background_check_fee_paid %}
+                    <div class="fee-panel">
+                        <strong>Fees Due</strong>
+
+                        {% if application.application_fee_amount > application.application_fee_paid %}
+                            <div class="fee-row">
+                                <div>
+                                    Application fee<br>
+                                    <small class="text-muted">Required for this property application.</small>
+                                </div>
+                                <a href="{% url 'pay_by_type' application.id 'application_fee' %}" class="gold-btn">
+                                    Pay ${{ application.application_fee_amount }}
+                                </a>
+                            </div>
+                        {% endif %}
+
+                        {% if application.background_check_fee_amount > application.background_check_fee_paid %}
+                            <div class="fee-row">
+                                <div>
+                                    Background check fee<br>
+                                    <small class="text-muted">Required before final approval if this property uses screening.</small>
+                                </div>
+                                <a href="{% url 'pay_by_type' application.id 'background_check_fee' %}" class="gold-btn">
+                                    Pay ${{ application.background_check_fee_amount }}
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            {% endif %}
 
             <a href="/" class="gold-btn">
                 Return Home

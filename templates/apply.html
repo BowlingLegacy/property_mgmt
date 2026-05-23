@@ -122,6 +122,19 @@
             </p>
         </div>
 
+        {% if property %}
+            {% if property.charges_application_fee or property.requires_background_check %}
+                <div class="alert alert-warning mb-4">
+                    {% if property.charges_application_fee %}
+                        Application fee: ${{ property.application_fee_amount }}.
+                    {% endif %}
+                    {% if property.requires_background_check %}
+                        Background check may be required{% if property.background_check_fee_amount > 0 %} and costs ${{ property.background_check_fee_amount }}{% endif %}.
+                    {% endif %}
+                </div>
+            {% endif %}
+        {% endif %}
+
         <form method="POST" enctype="multipart/form-data">
             {% csrf_token %}
 

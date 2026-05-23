@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
+from decimal import Decimal
 import random
 import string
 
@@ -134,6 +135,15 @@ class Property(models.Model):
         help_text="Use for other move-in cost formulas or instructions.",
     )
     utilities_cost = models.CharField(max_length=255, blank=True)
+    charges_application_fee = models.BooleanField(default=False)
+    application_fee_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"), blank=True)
+    application_fee_notes = models.CharField(max_length=255, blank=True)
+    requires_background_check = models.BooleanField(default=False)
+    background_check_fee_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"), blank=True)
+    background_check_instructions = models.TextField(blank=True)
+    renters_insurance_provider_name = models.CharField(max_length=255, blank=True, default="Progressive Renters Insurance")
+    renters_insurance_url = models.URLField(blank=True, default="https://www.progressive.com/renters/")
+    renters_insurance_notes = models.TextField(blank=True)
 
     AVAILABILITY_CHOICES = [
         ("available", "Available Now"),
@@ -219,6 +229,24 @@ class HousingApplication(models.Model):
 
     utility_monthly = models.DecimalField(max_digits=10, decimal_places=2, default=66.00)
     utility_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    application_fee_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    application_fee_paid = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    background_check_fee_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    background_check_fee_paid = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    background_check_required = models.BooleanField(default=False)
+    background_check_status = models.CharField(
+        max_length=30,
+        choices=[
+            ("not_required", "Not Required"),
+            ("pending", "Pending"),
+            ("ordered", "Ordered"),
+            ("cleared", "Cleared"),
+            ("needs_review", "Needs Review"),
+            ("declined", "Declined"),
+            ("waived", "Waived"),
+        ],
+        default="not_required",
+    )
 
     current_address = models.CharField(max_length=255, blank=True)
     current_address_length = models.CharField(max_length=100, blank=True)
@@ -495,6 +523,8 @@ class Payment(models.Model):
         ("rent", "Rent"),
         ("deposit", "Deposit"),
         ("utility", "Utilities"),
+        ("application_fee", "Application Fee"),
+        ("background_check_fee", "Background Check Fee"),
         ("late_fee", "Late Fee"),
         ("other", "Other"),
     ]

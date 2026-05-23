@@ -95,6 +95,14 @@ def apply_completed_payment_to_balance(payment):
     elif payment.payment_type == "utility":
         application.utility_balance = max(Decimal("0.00"), application.utility_balance - payment.amount)
 
+    elif payment.payment_type == "application_fee":
+        application.application_fee_paid = min(application.application_fee_amount, application.application_fee_paid + payment.amount)
+
+    elif payment.payment_type == "background_check_fee":
+        application.background_check_fee_paid = min(application.background_check_fee_amount, application.background_check_fee_paid + payment.amount)
+        if application.background_check_required and application.background_check_status == "pending":
+            application.background_check_status = "ordered"
+
     elif payment.payment_type == "other" and "combined" in payment.description.lower():
         remaining = payment.amount
 
@@ -178,7 +186,14 @@ def apply(request):
             application = form.save(commit=False)
             if property_obj:
                 application.property = property_obj
+                if property_obj.charges_application_fee:
+                    application.application_fee_amount = property_obj.application_fee_amount
+                if property_obj.requires_background_check:
+                    application.background_check_required = True
+                    application.background_check_fee_amount = property_obj.background_check_fee_amount
+                    application.background_check_status = "pending"
             application.save()
+            request.session["submitted_application_id"] = application.id
             return redirect("apply_success")
     else:
         form = HousingApplicationForm()
@@ -189,7 +204,14 @@ def apply(request):
 
 
 def apply_success(request):
-    return render(request, "apply_success.html")
+    application = None
+    application_id = request.session.get("submitted_application_id")
+    if application_id:
+        application = HousingApplication.objects.filter(id=application_id).first()
+
+    return render(request, "apply_success.html", {
+        "application": application,
+    })
 
 
 def logout_view(request):
@@ -1958,13 +1980,18 @@ def submit_onboarding_document(request, document_id):
     return redirect("tenant_dashboard")
 
 
-@login_required 
 def create_checkout_session(request, application_id, payment_type="rent"):
     application = get_object_or_404(HousingApplication, id=application_id)
 
     if not staff_required(request.user):
         user_application = getattr(request.user, "resident_profile", None)
-        if not user_application or user_application.id != application.id:
+        session_application_id = request.session.get("submitted_application_id")
+        is_session_fee_payment = (
+            payment_type in ["application_fee", "background_check_fee"]
+            and session_application_id == application.id
+        )
+
+        if (not user_application or user_application.id != application.id) and not is_session_fee_payment:
             return JsonResponse({"error": "You are not authorized to pay this account."}, status=403)
 
     stale_before = timezone.now() - timedelta(minutes=30)
@@ -2005,6 +2032,14 @@ def create_checkout_session(request, application_id, payment_type="rent"):
     elif payment_type == "utility":
         amount = application.utility_balance if application.utility_balance > 0 else application.utility_monthly
         description = "Utility Payment"
+
+    elif payment_type == "application_fee":
+        amount = max(application.application_fee_amount - application.application_fee_paid, Decimal("0.00"))
+        description = "Application Fee"
+
+    elif payment_type == "background_check_fee":
+        amount = max(application.background_check_fee_amount - application.background_check_fee_paid, Decimal("0.00"))
+        description = "Background Check Fee"
 
     elif payment_type == "total":
         rent_due = application.balance if application.balance > 0 else Decimal("0.00")

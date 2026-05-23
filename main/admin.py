@@ -171,7 +171,8 @@ class PropertyOnboardingDocumentInline(admin.TabularInline):
 @admin.register(Property)
 class PropertyAdmin(admin.ModelAdmin):
     inlines = [PropertyImageInline, PropertyOnboardingDocumentInline]
-    list_display = ("name", "availability_status", "available_date", "owner_email", "landlord_email")
+    list_display = ("name", "availability_status", "available_date", "owner_email", "landlord_email", "charges_application_fee", "requires_background_check")
+    list_filter = ("availability_status", "charges_application_fee", "requires_background_check")
 
 
 @admin.register(PropertyOwnerIntake)
@@ -429,11 +430,14 @@ class HousingApplicationAdmin(admin.ModelAdmin):
         "balance",
         "utility_balance",
         "deposit_paid",
+        "application_fee_paid",
+        "background_check_status",
     )
 
     list_filter = (
         "property",
         "space_type",
+        "background_check_status",
     )
 
     search_fields = (
@@ -472,6 +476,12 @@ class HousingApplicationAdmin(admin.ModelAdmin):
                 "deposit_paid",
                 "utility_monthly",
                 "utility_balance",
+                "application_fee_amount",
+                "application_fee_paid",
+                "background_check_required",
+                "background_check_fee_amount",
+                "background_check_fee_paid",
+                "background_check_status",
             )
         }),
         ("Address History", {
