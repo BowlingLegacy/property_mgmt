@@ -593,6 +593,12 @@ class PropertyOwnerIntake(models.Model):
     needs_resident_communication = models.BooleanField(default=False)
     needs_screening = models.BooleanField(default=False)
     needs_property_websites = models.BooleanField(default=False)
+    charges_application_fee = models.BooleanField(default=False)
+    performs_background_checks = models.BooleanField(default=False)
+    advertises_available_units = models.BooleanField(default=False)
+    uses_automatic_late_fees = models.BooleanField(default=False)
+    needs_custom_reports = models.BooleanField(default=False)
+    offers_renters_insurance = models.BooleanField(default=False)
 
     onboarding_timeline = models.CharField(max_length=255, blank=True)
     dashboard_goals = models.TextField(blank=True)

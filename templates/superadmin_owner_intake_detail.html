@@ -73,6 +73,12 @@
             <div class="col-md-4">Maintenance: <strong>{{ intake.needs_maintenance|yesno:"Yes,No" }}</strong></div>
             <div class="col-md-4">Resident communication: <strong>{{ intake.needs_resident_communication|yesno:"Yes,No" }}</strong></div>
             <div class="col-md-4">Screening: <strong>{{ intake.needs_screening|yesno:"Yes,No" }}</strong></div>
+            <div class="col-md-4">Application fee: <strong>{{ intake.charges_application_fee|yesno:"Yes,No" }}</strong></div>
+            <div class="col-md-4">Background checks: <strong>{{ intake.performs_background_checks|yesno:"Yes,No" }}</strong></div>
+            <div class="col-md-4">Advertises units: <strong>{{ intake.advertises_available_units|yesno:"Yes,No" }}</strong></div>
+            <div class="col-md-4">Automatic late fees: <strong>{{ intake.uses_automatic_late_fees|yesno:"Yes,No" }}</strong></div>
+            <div class="col-md-4">Custom reports: <strong>{{ intake.needs_custom_reports|yesno:"Yes,No" }}</strong></div>
+            <div class="col-md-4">Renters insurance: <strong>{{ intake.offers_renters_insurance|yesno:"Yes,No" }}</strong></div>
         </div>
 
         <h2 class="h3 fw-bold mt-4">Properties Already Linked To This Owner Email</h2>

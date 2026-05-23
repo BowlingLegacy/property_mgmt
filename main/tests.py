@@ -774,6 +774,12 @@ class LiveFlowTests(TestCase):
             "needs_rent_collection": "on",
             "needs_accounting": "on",
             "needs_data_migration": "on",
+            "charges_application_fee": "on",
+            "performs_background_checks": "on",
+            "advertises_available_units": "on",
+            "uses_automatic_late_fees": "on",
+            "needs_custom_reports": "on",
+            "offers_renters_insurance": "on",
             "dashboard_goals": "Show NOI and rent collection by property.",
         })
 
@@ -784,6 +790,12 @@ class LiveFlowTests(TestCase):
         self.assertEqual(intake.property_types, "multifamily,commercial")
         self.assertTrue(intake.needs_accounting)
         self.assertTrue(intake.needs_data_migration)
+        self.assertTrue(intake.charges_application_fee)
+        self.assertTrue(intake.performs_background_checks)
+        self.assertTrue(intake.advertises_available_units)
+        self.assertTrue(intake.uses_automatic_late_fees)
+        self.assertTrue(intake.needs_custom_reports)
+        self.assertTrue(intake.offers_renters_insurance)
 
     def test_existing_resident_intake_button_opens_for_new_property_and_saves_profile(self):
         property_obj = Property.objects.create(name="Painted Lady Inn")

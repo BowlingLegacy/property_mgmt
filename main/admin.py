@@ -184,6 +184,7 @@ class PropertyOwnerIntakeAdmin(admin.ModelAdmin):
         "total_units",
         "needs_accounting",
         "needs_data_migration",
+        "needs_custom_reports",
         "created_at",
     )
     list_filter = (
@@ -191,6 +192,10 @@ class PropertyOwnerIntakeAdmin(admin.ModelAdmin):
         "needs_data_migration",
         "needs_rent_collection",
         "needs_screening",
+        "performs_background_checks",
+        "charges_application_fee",
+        "uses_automatic_late_fees",
+        "offers_renters_insurance",
         "created_at",
     )
     search_fields = (

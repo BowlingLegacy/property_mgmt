@@ -261,6 +261,12 @@ class PropertyOwnerIntakeForm(forms.ModelForm):
             "needs_resident_communication",
             "needs_screening",
             "needs_property_websites",
+            "charges_application_fee",
+            "performs_background_checks",
+            "advertises_available_units",
+            "uses_automatic_late_fees",
+            "needs_custom_reports",
+            "offers_renters_insurance",
             "onboarding_timeline",
             "dashboard_goals",
             "additional_notes",
@@ -281,6 +287,12 @@ class PropertyOwnerIntakeForm(forms.ModelForm):
             "needs_resident_communication": "Resident messaging and property announcements",
             "needs_screening": "Rental applications, scoring support, and screening workflow",
             "needs_property_websites": "Property pages, availability, and application intake",
+            "charges_application_fee": "Charges application fees",
+            "performs_background_checks": "Uses background checks",
+            "advertises_available_units": "Advertises available units",
+            "uses_automatic_late_fees": "Automatically charges late fees",
+            "needs_custom_reports": "Needs custom reports",
+            "offers_renters_insurance": "Offers or requires renters insurance",
             "onboarding_timeline": "When do you need to start?",
             "dashboard_goals": "What should your dashboard make easy?",
         }
@@ -322,6 +334,12 @@ class PropertyOwnerIntakeForm(forms.ModelForm):
             "needs_resident_communication",
             "needs_screening",
             "needs_property_websites",
+            "charges_application_fee",
+            "performs_background_checks",
+            "advertises_available_units",
+            "uses_automatic_late_fees",
+            "needs_custom_reports",
+            "offers_renters_insurance",
         ]
 
         for field_name in feature_fields:
