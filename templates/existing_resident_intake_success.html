@@ -6,6 +6,9 @@
         <p class="fs-5">
             Your existing resident profile information for {{ property.name }} has been submitted for review.
         </p>
+        <p class="text-muted">
+            If a portal setup email is sent and it does not arrive in your inbox, check your junk or spam folder.
+        </p>
         <a href="{% url 'property_detail' property.pk %}" class="btn btn-dark">Back to Property</a>
     </div>
 </div>

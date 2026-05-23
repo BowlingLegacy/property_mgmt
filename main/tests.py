@@ -10,7 +10,7 @@ from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import ApplicantDocument, BlogComment, BlogPost, ExistingResidentIntake, HousingApplication, LandlordIntake, Payment, Property, PropertyOwnerIntake, ResidentMessage, SignedDocument, User
+from .models import ApplicantDocument, BlogComment, BlogPost, ExistingResidentIntake, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, ResidentMessage, SignedDocument, User
 
 
 @override_settings(
@@ -705,11 +705,29 @@ class LiveFlowTests(TestCase):
             "availability_message": "Profile setup underway",
         })
 
-        self.assertRedirects(property_response, reverse("property_owner_dashboard"))
+        self.assertRedirects(
+            property_response,
+            reverse("owner_property_onboarding_documents", args=[Property.objects.get(name="Owner Added Property").id]),
+        )
         property_obj = Property.objects.get(name="Owner Added Property")
         self.assertEqual(property_obj.owner_email, owner.email)
         self.assertEqual(property_obj.rent_amount, Decimal("1450.00"))
         self.assertEqual(property_obj.lease_type, "lease")
+
+        onboarding_response = self.client.post(
+            reverse("owner_property_onboarding_documents", args=[property_obj.id]),
+            {
+                "application_file": SimpleUploadedFile("rental-application.pdf", b"application", content_type="application/pdf"),
+                "lease_file": SimpleUploadedFile("lease.pdf", b"lease", content_type="application/pdf"),
+                "other_documents": SimpleUploadedFile("house-rules.pdf", b"rules", content_type="application/pdf"),
+            },
+        )
+
+        self.assertRedirects(onboarding_response, reverse("property_owner_dashboard"))
+        self.assertEqual(
+            set(PropertyOnboardingDocument.objects.filter(property=property_obj).values_list("document_type", flat=True)),
+            {"application", "lease", "other"},
+        )
 
         landlord_response = self.client.post(reverse("owner_landlord_invite"), {
             "property": property_obj.id,
@@ -794,6 +812,8 @@ class LiveFlowTests(TestCase):
         application = HousingApplication.objects.get(email="existing@example.com")
         self.assertEqual(application.property, property_obj)
         self.assertIsNotNone(application.user)
+        self.assertEqual(application.deposit_required, Decimal("0.00"))
+        self.assertEqual(application.utility_monthly, Decimal("0.00"))
         self.assertIn(application.user.invite_code, mail.outbox[0].body)
 
     def test_landlord_workspace_only_lists_assigned_property_records(self):

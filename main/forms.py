@@ -9,6 +9,7 @@ from .models import (
     ResidentMessage,
     ApplicantDocument,
     Property,
+    PropertyOnboardingDocument,
     Payment,
     PropertyOwnerIntake,
     ExistingResidentIntake,
@@ -62,6 +63,10 @@ class MultipleImageInput(forms.ClearableFileInput):
     allow_multiple_selected = True
 
 
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
 class MultipleImageField(forms.ImageField):
     def clean(self, data, initial=None):
         single_image_clean = super().clean
@@ -70,6 +75,16 @@ class MultipleImageField(forms.ImageField):
             return [single_image_clean(image, initial) for image in data]
 
         return [single_image_clean(data, initial)] if data else []
+
+
+class MultipleFileField(forms.FileField):
+    def clean(self, data, initial=None):
+        single_file_clean = super().clean
+
+        if isinstance(data, (list, tuple)):
+            return [single_file_clean(file_obj, initial) for file_obj in data]
+
+        return [single_file_clean(data, initial)] if data else []
 
 
 class OwnerPropertyForm(forms.ModelForm):
@@ -93,6 +108,8 @@ class OwnerPropertyForm(forms.ModelForm):
             "deposit_amount",
             "rent_amount",
             "lease_type",
+            "move_in_cost_type",
+            "move_in_cost_notes",
             "availability_status",
             "availability_message",
         ]
@@ -100,6 +117,8 @@ class OwnerPropertyForm(forms.ModelForm):
             "photo": "Cover Photo",
             "rent_amount": "Rent",
             "lease_type": "Rental Term",
+            "move_in_cost_type": "Move-In Cost Requirement",
+            "move_in_cost_notes": "Other Move-In Cost Description",
         }
         widgets = {
             "name": forms.TextInput(attrs={"class": "form-control"}),
@@ -111,6 +130,11 @@ class OwnerPropertyForm(forms.ModelForm):
             "deposit_amount": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
             "rent_amount": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
             "lease_type": forms.Select(attrs={"class": "form-select"}),
+            "move_in_cost_type": forms.Select(attrs={"class": "form-select"}),
+            "move_in_cost_notes": forms.TextInput(attrs={
+                "class": "form-control",
+                "placeholder": "Example: first month + $500 admin fee + deposit",
+            }),
             "availability_status": forms.Select(attrs={"class": "form-select"}),
             "availability_message": forms.TextInput(attrs={"class": "form-control"}),
         }
@@ -133,6 +157,52 @@ class OwnerFinancialUploadForm(FinancialUploadForm):
     def __init__(self, *args, properties=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["property"].queryset = properties if properties is not None else Property.objects.none()
+
+
+class OwnerPropertyOnboardingDocumentsForm(forms.Form):
+    application_file = forms.FileField(
+        required=False,
+        label="Property rental application",
+        widget=forms.ClearableFileInput(attrs={"class": "form-control"}),
+    )
+    lease_file = forms.FileField(
+        required=False,
+        label="Property lease agreement",
+        widget=forms.ClearableFileInput(attrs={"class": "form-control"}),
+    )
+    other_documents = MultipleFileField(
+        required=False,
+        label="Other onboarding documents",
+        widget=MultipleFileInput(attrs={"class": "form-control"}),
+    )
+
+    def save(self, property_obj):
+        application_file = self.cleaned_data.get("application_file")
+        lease_file = self.cleaned_data.get("lease_file")
+
+        if application_file:
+            PropertyOnboardingDocument.objects.create(
+                property=property_obj,
+                document_type="application",
+                title=application_file.name,
+                source_file=application_file,
+            )
+
+        if lease_file:
+            PropertyOnboardingDocument.objects.create(
+                property=property_obj,
+                document_type="lease",
+                title=lease_file.name,
+                source_file=lease_file,
+            )
+
+        for onboarding_file in self.cleaned_data.get("other_documents", []):
+            PropertyOnboardingDocument.objects.create(
+                property=property_obj,
+                document_type="other",
+                title=onboarding_file.name,
+                source_file=onboarding_file,
+            )
 
 
 class OwnerLandlordInviteForm(forms.ModelForm):
@@ -489,8 +559,8 @@ class ResidentProfilePhotoForm(forms.ModelForm):
             "profile_photo": "Profile photo",
         }
         widgets = {
-            "profile_photo": forms.ClearableFileInput(attrs={
-                "class": "form-control",
+            "profile_photo": forms.FileInput(attrs={
+                "class": "visually-hidden",
                 "accept": "image/*",
             }),
         }

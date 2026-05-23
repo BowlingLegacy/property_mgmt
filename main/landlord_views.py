@@ -30,6 +30,7 @@ Portal setup:
 https://bowlinglegacy.com/enter-invite-code/
 
 This code is single-use and expires 30 minutes after it is issued. If it expires, request a new code from the invite-code page.
+If this email is not in your inbox, check your junk or spam folder.
 
 Thank you,
 Bowling Legacy Housing

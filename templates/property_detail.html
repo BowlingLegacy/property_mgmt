@@ -397,9 +397,13 @@
                 <div class="info-row"><span class="info-label">Address</span><span>{{ property.address|default:"N/A" }}</span></div>
                 <div class="info-row"><span class="info-label">Unit Size</span><span>{{ property.unit_size|default:"N/A" }}</span></div>
                 <div class="info-row"><span class="info-label">Available Date</span><span>{{ property.available_date|date:"M d, Y"|default:"N/A" }}</span></div>
+                <div class="info-row"><span class="info-label">Rent</span><span>{% if property.rent_amount %}${{ property.rent_amount }}{% else %}N/A{% endif %}</span></div>
+                <div class="info-row"><span class="info-label">Rental Term</span><span>{{ property.get_lease_type_display|default:"N/A" }}</span></div>
                 <div class="info-row"><span class="info-label">Deposit</span><span>{% if property.deposit_amount %}${{ property.deposit_amount }}{% else %}N/A{% endif %}</span></div>
-                <div class="info-row"><span class="info-label">Included Services</span><span>1 Gig WiFi, cable, and DirecTV included at no charge.</span></div>
-                <div class="info-row"><span class="info-label">Utilities</span><span>Shared power, gas, and trash contribution.</span></div>
+                <div class="info-row"><span class="info-label">Move-In Costs</span><span>{{ property.get_move_in_cost_type_display }}{% if property.move_in_cost_notes %}: {{ property.move_in_cost_notes }}{% endif %}</span></div>
+                {% if property.utilities_cost %}
+                    <div class="info-row"><span class="info-label">Utilities</span><span>{{ property.utilities_cost }}</span></div>
+                {% endif %}
             </div>
         </div>
     </div>

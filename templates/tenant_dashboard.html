@@ -118,6 +118,18 @@ body {
     object-fit: cover;
 }
 
+.profile-photo-form {
+    display: block;
+    cursor: pointer;
+}
+
+.profile-photo-hint {
+    color: #a57c18;
+    font-size: .82rem;
+    font-weight: 700;
+    text-align: center;
+}
+
 .profile-name {
     font-family: Georgia, serif;
     font-size: 1.75rem;
@@ -254,12 +266,16 @@ body {
 
     <div class="row align-items-center hero-row g-4">
         <div class="col-lg-2 text-center">
-            <img src="/static/images/photo03.JPG" class="house-thumb" alt="The Painted Lady Inn">
+            {% if application.property and application.property.photo %}
+                <img src="{{ application.property.photo.url }}" class="house-thumb" alt="{{ application.property.name }}">
+            {% else %}
+                <img src="/static/images/photo03.JPG" class="house-thumb" alt="{{ application.property.name|default:'Resident property' }}">
+            {% endif %}
         </div>
 
         <div class="col-lg-4 painted-lady-wrap">
-            <div class="the-script">The</div>
-            <div class="painted-lady-title">Painted Lady Inn</div>
+            <div class="the-script">{% if application.property %}Your{% else %}The{% endif %}</div>
+            <div class="painted-lady-title">{{ application.property.name|default:"Resident Portal" }}</div>
             <div class="community-line">A Bowling Legacy Community</div>
         </div>
 
@@ -268,7 +284,7 @@ body {
                 Welcome back, {{ application.full_name }}
             </h1>
             <p class="welcome-text mb-0">
-                We're glad to have you as part of The Painted Lady Inn community.
+                We're glad to have you as part of {{ application.property.name|default:"your resident" }} community.
             </p>
         </div>
 
@@ -288,34 +304,37 @@ body {
             <div class="soft-card profile-card p-4">
                 <div class="card-title">Resident Profile</div>
 
-                <div class="profile-photo">
-                    {% if application.profile_photo %}
-                        <img id="profilePhotoPreview" src="{{ application.profile_photo.url }}" alt="{{ application.full_name }}">
-                    {% else %}
-                        <span id="profilePhotoInitial">{{ application.full_name|first|upper }}</span>
-                        <img id="profilePhotoPreview" src="" alt="{{ application.full_name }}" style="display:none;">
-                    {% endif %}
-                </div>
-
                 {% if profile_photo_form %}
                     <form method="post"
                           action="{% url 'update_resident_profile_photo' %}"
                           enctype="multipart/form-data"
+                          id="profilePhotoForm"
                           class="mb-3">
                         {% csrf_token %}
-                        <label class="form-label fw-bold">Profile Photo</label>
+                        <label for="{{ profile_photo_form.profile_photo.id_for_label }}" class="profile-photo profile-photo-form" title="Change profile photo">
+                            {% if application.profile_photo %}
+                                <img id="profilePhotoPreview" src="{{ application.profile_photo.url }}" alt="{{ application.full_name }}">
+                            {% else %}
+                                <span id="profilePhotoInitial">{{ application.full_name|first|upper }}</span>
+                                <img id="profilePhotoPreview" src="" alt="{{ application.full_name }}" style="display:none;">
+                            {% endif %}
+                        </label>
                         {{ profile_photo_form.profile_photo }}
-                        <button type="submit" class="message-btn mt-2">
-                            Save Photo
-                        </button>
+                        <div class="profile-photo-hint">Tap photo to change it</div>
                     </form>
+                {% else %}
+                    <div class="profile-photo">
+                        {% if application.profile_photo %}
+                            <img src="{{ application.profile_photo.url }}" alt="{{ application.full_name }}">
+                        {% else %}
+                            {{ application.full_name|first|upper }}
+                        {% endif %}
+                    </div>
                 {% endif %}
 
                 <div class="text-center">
                     <div class="profile-name">{{ application.full_name }}</div>
-                    <div class="profile-line">
-                        {{ application.space_type }} {{ application.space_label }} • The Painted Lady Inn
-                    </div>
+                    <div class="profile-line">{{ application.space_type }} {{ application.space_label }} | {{ application.property.name|default:"Resident Portal" }}</div>
                 </div>
 
                 <div class="profile-divider"></div>
@@ -375,6 +394,7 @@ body {
                     </div>
                 </div>
 
+                {% if show_utilities %}
                 <div class="col-lg-4">
                     <div class="soft-card account-card p-4">
                         <div class="card-title">Utilities</div>
@@ -404,6 +424,7 @@ body {
                         </div>
                     </div>
                 </div>
+                {% endif %}
 
                 <div class="col-lg-4">
                     <div class="soft-card account-card p-4">
@@ -435,11 +456,6 @@ body {
                     <div id="resident-inbox" class="soft-card h-100">
                         <div class="p-4 border-bottom d-flex justify-content-between align-items-center">
                             <div class="section-title">Inbox</div>
-                            <button class="btn btn-link gold-link"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#documentUploadModal">
-                                Upload Document
-                            </button>
                         </div>
 
                         <div class="table-responsive">
@@ -667,49 +683,6 @@ body {
     </div>
 </div>
 
-<div class="modal fade" id="documentUploadModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title fw-bold">Upload Resident Document</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-
-            <div class="modal-body">
-                <form method="POST"
-                      action="{% url 'upload_resident_document' %}"
-                      enctype="multipart/form-data">
-                    {% csrf_token %}
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Document Type</label>
-                        <select name="document_type" class="form-select">
-                            <option value="id">Identification</option>
-                            <option value="income">Proof of Income / Pay Stub / SSI / SSDI</option>
-                            <option value="bank">Bank Statements / Deposit Verification</option>
-                            <option value="other">Other</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Document Name</label>
-                        <input type="text" name="name" class="form-control" required>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Choose File</label>
-                        <input type="file" name="file" class="form-control" required>
-                    </div>
-
-                    <button type="submit" class="gold-btn">
-                        Upload Document
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
 {% else %}
 
 <div class="alert alert-warning">
@@ -740,6 +713,8 @@ if (profilePhotoInput && profilePhotoPreview) {
         if (profilePhotoInitial) {
             profilePhotoInitial.style.display = "none";
         }
+
+        document.getElementById("profilePhotoForm").submit();
     });
 }
 </script>

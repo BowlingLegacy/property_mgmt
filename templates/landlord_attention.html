@@ -17,19 +17,30 @@
                 <table class="table align-middle">
                     <thead><tr><th>Resident</th><th>Property</th><th>Submitted</th><th>Contact</th><th>Actions</th></tr></thead>
                     <tbody>
-                    {% for intake in existing_resident_intakes %}
+                    {% for row in existing_resident_intakes %}
+                        {% with intake=row.intake %}
                         <tr>
                             <td><strong>{{ intake.full_name }}</strong></td>
                             <td>{{ intake.property.name }}</td>
                             <td>{{ intake.created_at|date:"M j, g:i A" }}</td>
                             <td>{{ intake.email }}<br><span class="text-muted small">{{ intake.phone }}</span></td>
                             <td>
-                                <form method="post" action="{% url 'landlord_send_existing_resident_invite' intake.id %}">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-primary btn-sm">Send Setup Invite</button>
-                                </form>
+                                {% if row.setup_status == "completed" %}
+                                    <span class="btn btn-outline-success btn-sm disabled">Completed</span>
+                                {% elif row.setup_status == "invite_sent" %}
+                                    <form method="post" action="{% url 'landlord_send_existing_resident_invite' intake.id %}">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-outline-primary btn-sm">Resend Invite</button>
+                                    </form>
+                                {% else %}
+                                    <form method="post" action="{% url 'landlord_send_existing_resident_invite' intake.id %}">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-primary btn-sm">Send Setup Invite</button>
+                                    </form>
+                                {% endif %}
                             </td>
                         </tr>
+                        {% endwith %}
                     {% empty %}
                         <tr><td colspan="5" class="text-muted">No current resident profile setups.</td></tr>
                     {% endfor %}

@@ -55,7 +55,7 @@
         <div class="p-4">
             <div class="alert alert-warning">
                 Payments must be received in full by the applicable due date to avoid late fee review.
-                Paying one balance line does not clear other rent, utility, or deposit amounts that remain due.
+                Paying one balance line does not clear other amounts that remain due.
             </div>
 
             <div class="row g-3">
@@ -71,6 +71,7 @@
                     </div>
                 </div>
 
+                {% if show_utilities %}
                 <div class="col-lg-4">
                     <div class="balance-line">
                         <div class="text-muted fw-bold">Utilities Due</div>
@@ -83,6 +84,7 @@
                         {% endif %}
                     </div>
                 </div>
+                {% endif %}
 
                 <div class="col-lg-4">
                     <div class="balance-line">
@@ -104,7 +106,7 @@
                     <div class="balance-amount">${{ total_due }}</div>
                 </div>
                 {% if total_due > 0 %}
-                    <a href="{% url 'pay_by_type' application.id 'total' %}" class="pay-btn">Pay Rent, Utilities, and Deposit Total</a>
+                    <a href="{% url 'pay_by_type' application.id 'total' %}" class="pay-btn">Pay Total Due</a>
                 {% endif %}
             </div>
         </div>

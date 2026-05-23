@@ -54,6 +54,7 @@ urlpatterns = [
     path("landlord-dashboard/current-resident-intakes/<int:intake_id>/send-invite/", views.landlord_send_existing_resident_invite, name="landlord_send_existing_resident_invite"),
     path("owner-dashboard/", owner_views.property_owner_dashboard, name="property_owner_dashboard"),
     path("owner-dashboard/properties/create/", owner_views.owner_property_create, name="owner_property_create"),
+    path("owner-dashboard/properties/<int:property_id>/onboarding-documents/", owner_views.owner_property_onboarding_documents, name="owner_property_onboarding_documents"),
     path("owner-dashboard/landlords/invite/", owner_views.owner_landlord_invite, name="owner_landlord_invite"),
     path("owner-dashboard/financial-upload/", owner_views.owner_financial_upload, name="owner_financial_upload"),
     path("superadmin-dashboard/", views.superadmin_dashboard, name="superadmin_dashboard"),

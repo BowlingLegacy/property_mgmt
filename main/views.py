@@ -425,12 +425,34 @@ def get_landlord_workspace_context(user):
         .order_by("-created_at")
     )
 
-    existing_resident_intakes = (
+    existing_resident_intakes = list(
         ExistingResidentIntake.objects
         .select_related("property")
         .filter(property__in=properties)
         .order_by("-created_at")
     )
+    existing_resident_rows = []
+
+    for intake in existing_resident_intakes:
+        application = (
+            HousingApplication.objects
+            .select_related("user")
+            .filter(property=intake.property, email__iexact=intake.email)
+            .first()
+        )
+        pending_user = application.user if application and application.user else None
+
+        if pending_user and pending_user.has_usable_password():
+            setup_status = "completed"
+        elif pending_user:
+            setup_status = "invite_sent"
+        else:
+            setup_status = "ready"
+
+        existing_resident_rows.append({
+            "intake": intake,
+            "setup_status": setup_status,
+        })
 
     landlord_inbox = OrderedDict()
 
@@ -457,13 +479,13 @@ def get_landlord_workspace_context(user):
         "new_messages": new_messages,
         "new_documents": new_documents,
         "new_document_count": new_documents.count(),
-        "existing_resident_intakes": existing_resident_intakes,
-        "existing_resident_intake_count": existing_resident_intakes.count(),
+        "existing_resident_intakes": existing_resident_rows,
+        "existing_resident_intake_count": len(existing_resident_rows),
         "attention_count": (
             new_applications.count()
             + new_message_count
             + new_documents.count()
-            + existing_resident_intakes.count()
+            + len(existing_resident_rows)
         ),
     }
 
@@ -681,6 +703,7 @@ def tenant_dashboard(request):
     rent_due = Decimal("0.00")
     deposit_due = Decimal("0.00")
     utility_due = Decimal("0.00")
+    show_utilities = False
 
     if application:
         payments = application.payments.all().order_by("-created_at")
@@ -691,6 +714,7 @@ def tenant_dashboard(request):
         rent_due = application.balance if application.balance > 0 else Decimal("0.00")
         deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
         utility_due = application.utility_balance if application.utility_balance > 0 else Decimal("0.00")
+        show_utilities = utility_due > 0 or application.utility_monthly > 0
 
         total_due = rent_due + deposit_due + utility_due
         if application.property:
@@ -712,6 +736,7 @@ def tenant_dashboard(request):
         "rent_due": rent_due,
         "deposit_due": deposit_due,
         "utility_due": utility_due,
+        "show_utilities": show_utilities,
         "stripe_public_key": settings.STRIPE_PUBLIC_KEY,
         "resident_balance_url": resident_portal_url("resident_balance_detail", is_superadmin_inspecting, application),
         "resident_payment_history_url": resident_portal_url("resident_payment_history", is_superadmin_inspecting, application),
@@ -751,12 +776,14 @@ def resident_balance_detail(request):
     rent_due = application.balance if application.balance > 0 else Decimal("0.00")
     deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
     utility_due = application.utility_balance if application.utility_balance > 0 else Decimal("0.00")
+    show_utilities = utility_due > 0 or application.utility_monthly > 0
 
     return render(request, "resident_balance_detail.html", {
         "application": application,
         "rent_due": rent_due,
         "deposit_due": deposit_due,
         "utility_due": utility_due,
+        "show_utilities": show_utilities,
         "total_due": rent_due + deposit_due + utility_due,
         "dashboard_url": resident_portal_url("tenant_dashboard", is_superadmin_inspecting, application),
         "is_superadmin_inspecting": is_superadmin_inspecting,
@@ -807,7 +834,13 @@ def update_resident_profile_photo(request):
     form = ResidentProfilePhotoForm(request.POST, request.FILES, instance=application)
 
     if form.is_valid():
+        old_photo_name = application.profile_photo.name if application.profile_photo else ""
+        new_photo = request.FILES.get("profile_photo")
         form.save()
+
+        if old_photo_name and new_photo and old_photo_name != application.profile_photo.name:
+            application.profile_photo.storage.delete(old_photo_name)
+
         messages.success(request, "Profile photo updated.")
     else:
         messages.error(request, "Please choose a valid image file.")
@@ -1313,6 +1346,11 @@ def ensure_existing_resident_portal_application(intake):
             email=intake.email,
             age=0,
             profile_photo=intake.profile_photo,
+            monthly_rent=intake.property.rent_amount or Decimal("0.00"),
+            balance=Decimal("0.00"),
+            deposit_required=Decimal("0.00"),
+            utility_monthly=Decimal("0.00"),
+            utility_balance=Decimal("0.00"),
             income_source="Existing resident intake",
             monthly_income=Decimal("0.00"),
             housing_need="Existing resident profile setup.",

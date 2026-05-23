@@ -6,7 +6,12 @@ from django.db.models import Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from .forms import OwnerFinancialUploadForm, OwnerLandlordInviteForm, OwnerPropertyForm
+from .forms import (
+    OwnerFinancialUploadForm,
+    OwnerLandlordInviteForm,
+    OwnerPropertyForm,
+    OwnerPropertyOnboardingDocumentsForm,
+)
 from .invite_utils import create_pending_portal_user, send_portal_access_invite_email
 from .models import FinancialUpload, Property, PropertyImage, HousingApplication, Payment, ResidentMessage
 from .permissions import can_access_owner_dashboard, is_super_admin, is_assistant_admin
@@ -101,9 +106,31 @@ def owner_property_create(request):
         ])
 
         messages.success(request, f"{property_obj.name} was added to your owner dashboard.")
-        return redirect("property_owner_dashboard")
+        return redirect("owner_property_onboarding_documents", property_id=property_obj.id)
 
     return render(request, "owner_property_form.html", {"form": form})
+
+
+@login_required
+@user_passes_test(can_access_owner_dashboard)
+def owner_property_onboarding_documents(request, property_id):
+    property_obj = get_object_or_404(owner_properties_for(request.user), id=property_id)
+    form = OwnerPropertyOnboardingDocumentsForm(request.POST or None, request.FILES or None)
+
+    if request.method == "POST" and form.is_valid():
+        form.save(property_obj)
+        messages.success(
+            request,
+            "Property onboarding files were saved for conversion and property setup review.",
+        )
+        return redirect("property_owner_dashboard")
+
+    documents = property_obj.onboarding_documents.all()
+    return render(request, "owner_property_onboarding_documents.html", {
+        "form": form,
+        "property": property_obj,
+        "documents": documents,
+    })
 
 
 @login_required

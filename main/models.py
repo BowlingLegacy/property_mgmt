@@ -98,6 +98,11 @@ class Property(models.Model):
         ("month_to_month", "Month to Month"),
         ("lease", "Lease"),
     ]
+    MOVE_IN_COST_CHOICES = [
+        ("rent_deposit", "Rent + Deposit"),
+        ("first_last_deposit", "First Month + Last Month + Deposit"),
+        ("other", "Other"),
+    ]
 
     name = models.CharField(max_length=255)
     address = models.CharField(max_length=255, blank=True)
@@ -117,6 +122,17 @@ class Property(models.Model):
     deposit_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     rent_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     lease_type = models.CharField(max_length=30, choices=LEASE_TYPE_CHOICES, default="month_to_month", blank=True)
+    move_in_cost_type = models.CharField(
+        max_length=30,
+        choices=MOVE_IN_COST_CHOICES,
+        default="rent_deposit",
+        blank=True,
+    )
+    move_in_cost_notes = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Use for other move-in cost formulas or instructions.",
+    )
     utilities_cost = models.CharField(max_length=255, blank=True)
 
     AVAILABILITY_CHOICES = [
@@ -139,6 +155,35 @@ class PropertyImage(models.Model):
 
     def __str__(self):
         return f"{self.property.name} Image"
+
+
+class PropertyOnboardingDocument(models.Model):
+    DOCUMENT_TYPE_CHOICES = [
+        ("application", "Rental Application"),
+        ("lease", "Lease Agreement"),
+        ("other", "Other Onboarding Document"),
+    ]
+    CONVERSION_STATUS_CHOICES = [
+        ("uploaded", "Uploaded for conversion"),
+        ("mapped", "Fillable mapping ready"),
+    ]
+
+    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name="onboarding_documents")
+    document_type = models.CharField(max_length=30, choices=DOCUMENT_TYPE_CHOICES)
+    title = models.CharField(max_length=255)
+    source_file = models.FileField(upload_to="property_onboarding_documents/")
+    conversion_status = models.CharField(
+        max_length=30,
+        choices=CONVERSION_STATUS_CHOICES,
+        default="uploaded",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["document_type", "-created_at"]
+
+    def __str__(self):
+        return f"{self.property.name} - {self.get_document_type_display()}"
 
 
 class HousingApplication(models.Model):

@@ -5,6 +5,7 @@ from .models import (
     User,
     Property,
     PropertyImage,
+    PropertyOnboardingDocument,
     HousingApplication,
     ApplicantDocument,
     BlogPost,
@@ -160,9 +161,14 @@ class PropertyImageInline(admin.TabularInline):
     extra = 0
 
 
+class PropertyOnboardingDocumentInline(admin.TabularInline):
+    model = PropertyOnboardingDocument
+    extra = 0
+
+
 @admin.register(Property)
 class PropertyAdmin(admin.ModelAdmin):
-    inlines = [PropertyImageInline]
+    inlines = [PropertyImageInline, PropertyOnboardingDocumentInline]
     list_display = ("name", "availability_status", "available_date", "owner_email", "landlord_email")
 
 
