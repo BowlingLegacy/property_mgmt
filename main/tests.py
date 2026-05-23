@@ -10,7 +10,7 @@ from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import ApplicantDocument, BlogComment, BlogPost, ExistingResidentIntake, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, ResidentMessage, SignedDocument, User
+from .models import ApplicantDocument, BlogComment, BlogPost, ExistingResidentIntake, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, ResidentMessage, SignedDocument, User
 
 
 @override_settings(
@@ -876,6 +876,115 @@ class LiveFlowTests(TestCase):
         self.assertNotContains(resident_files, "Other Resident")
         self.assertContains(payment_log, "Assigned Resident")
         self.assertNotContains(payment_log, "Other Resident")
+
+    def test_custom_phone_report_scopes_to_landlord_property(self):
+        landlord = User.objects.create_user(
+            username="report-landlord",
+            email="report-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        assigned_property = Property.objects.create(name="Report Property", landlord_email=landlord.email)
+        other_property = Property.objects.create(name="Other Report Property", landlord_email="other@example.com")
+        HousingApplication.objects.create(
+            property=assigned_property,
+            full_name="Report Resident",
+            phone="5550113344",
+            email="report-resident@example.com",
+            age=51,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        HousingApplication.objects.create(
+            property=other_property,
+            full_name="Hidden Resident",
+            phone="5550113355",
+            email="hidden-resident@example.com",
+            age=52,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+
+        self.client.login(username="report-landlord", password="StrongPass123!")
+
+        response = self.client.get(reverse("custom_reports"), {
+            "report_type": "resident_phone_list",
+            "property_id": assigned_property.id,
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Resident Phone List")
+        self.assertContains(response, "Report Resident")
+        self.assertContains(response, "(555) 011-3344")
+        self.assertNotContains(response, "Hidden Resident")
+
+    def test_custom_financial_report_can_mix_expense_types_and_print(self):
+        superuser = User.objects.create_user(
+            username="report-admin",
+            email="report-admin@example.com",
+            password="StrongPass123!",
+            role="admin",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Expense Report Property")
+        upload = FinancialUpload.objects.create(
+            name="May Accounting Export",
+            file=SimpleUploadedFile("may.csv", b"category,amount\n", content_type="text/csv"),
+        )
+        FinancialEntry.objects.create(
+            upload=upload,
+            property_name=property_obj.name,
+            sheet_name="Expenses",
+            row_number=1,
+            year=2026,
+            month=5,
+            entry_type="operating_expense",
+            category="Repairs",
+            description="Plumbing repair",
+            amount=Decimal("125.00"),
+        )
+        FinancialEntry.objects.create(
+            upload=upload,
+            property_name=property_obj.name,
+            sheet_name="Expenses",
+            row_number=2,
+            year=2026,
+            month=5,
+            entry_type="capital_expense",
+            category="Improvements",
+            description="Floor replacement",
+            amount=Decimal("400.00"),
+        )
+        FinancialEntry.objects.create(
+            upload=upload,
+            property_name=property_obj.name,
+            sheet_name="Income",
+            row_number=3,
+            year=2026,
+            month=5,
+            entry_type="income",
+            category="Rent",
+            description="May rent",
+            amount=Decimal("900.00"),
+        )
+
+        self.client.login(username="report-admin", password="StrongPass123!")
+
+        response = self.client.get(reverse("custom_reports"), {
+            "report_type": "financial_entries",
+            "property_id": property_obj.id,
+            "financial_entry_types": ["operating_expense", "capital_expense"],
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Financial Entries / Expenses")
+        self.assertContains(response, "Plumbing repair")
+        self.assertContains(response, "Floor replacement")
+        self.assertContains(response, "$525.00")
+        self.assertNotContains(response, "May rent")
 
     def test_landlord_can_send_setup_invite_for_saved_current_resident_intake(self):
         landlord = User.objects.create_user(

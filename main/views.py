@@ -26,6 +26,7 @@ from .forms import (
     FinancialUploadForm,
     SignUpForm,
     ManualPaymentForm,
+    CustomReportForm,
     ResidentProfilePhotoForm,
     ReplacementInviteCodeForm,
     PropertyOwnerIntakeForm,
@@ -49,6 +50,7 @@ from .models import (
     LandlordIntake,
 )
 from .invite_utils import create_pending_portal_user, send_portal_access_invite_email
+from .templatetags.formatting import phone_format
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -69,6 +71,14 @@ def money(value):
 
 def staff_required(user):
     return user.is_authenticated and (user.is_staff or user.is_superuser)
+
+
+def reporting_required(user):
+    return user.is_authenticated and (
+        user.is_staff
+        or user.is_superuser
+        or getattr(user, "role", "") in ["property_owner", "landlord", "assistant", "admin"]
+    )
 
 
 def apply_completed_payment_to_balance(payment):
@@ -383,6 +393,10 @@ def staff_managed_properties(user):
 
 def staff_managed_applications(user):
     return HousingApplication.objects.filter(property__in=staff_managed_properties(user))
+
+
+def custom_report_accessible_properties(user):
+    return staff_managed_properties(user).order_by("name")
 
 
 def get_landlord_workspace_context(user):
@@ -1103,6 +1117,149 @@ def rent_roll(request):
         })
 
     return render(request, "rent_roll.html", {"rows": rows})
+
+
+@login_required
+@user_passes_test(reporting_required)
+def custom_reports(request):
+    properties = custom_report_accessible_properties(request.user)
+    form = CustomReportForm(
+        request.GET or None,
+        properties=properties,
+        initial={
+            "report_type": "resident_phone_list",
+            "financial_entry_types": ["operating_expense"],
+        },
+    )
+
+    selected_property = None
+    report_title = ""
+    report_columns = []
+    report_rows = []
+    totals = {}
+    generated = bool(request.GET)
+
+    if form.is_valid() and generated:
+        report_type = form.cleaned_data["report_type"]
+        selected_property_id = form.cleaned_data.get("property_id")
+        start_date = form.cleaned_data.get("start_date")
+        end_date = form.cleaned_data.get("end_date")
+
+        filtered_properties = properties
+        if selected_property_id:
+            selected_property = get_object_or_404(properties, id=selected_property_id)
+            filtered_properties = properties.filter(id=selected_property.id)
+
+        residents = (
+            HousingApplication.objects
+            .select_related("property")
+            .filter(property__in=filtered_properties)
+            .order_by("property__name", "space_label", "full_name")
+        )
+
+        if report_type == "resident_phone_list":
+            report_title = "Resident Phone List"
+            report_columns = ["Property", "Room / Unit", "Resident", "Phone", "Email"]
+            report_rows = [
+                [
+                    resident.property.name if resident.property else "No Property",
+                    resident.space_label or resident.space_type or "",
+                    resident.full_name,
+                    phone_format(resident.phone),
+                    resident.email,
+                ]
+                for resident in residents
+            ]
+
+        elif report_type == "resident_roster":
+            report_title = "Resident Roster"
+            report_columns = ["Property", "Room / Unit", "Resident", "Phone", "Monthly Rent", "Balance", "Deposit Due"]
+            for resident in residents:
+                deposit_due = max(resident.deposit_required - resident.deposit_paid, Decimal("0.00"))
+                report_rows.append([
+                    resident.property.name if resident.property else "No Property",
+                    resident.space_label or resident.space_type or "",
+                    resident.full_name,
+                    phone_format(resident.phone),
+                    resident.monthly_rent,
+                    resident.balance,
+                    deposit_due,
+                ])
+            totals = {
+                "Scheduled Rent": sum((resident.monthly_rent for resident in residents), Decimal("0.00")),
+                "Open Balances": sum((resident.balance for resident in residents), Decimal("0.00")),
+            }
+
+        elif report_type == "payment_summary":
+            report_title = "Payment Summary"
+            report_columns = ["Date", "Property", "Resident", "Type", "Method", "Amount", "Status"]
+            payments = (
+                Payment.objects
+                .select_related("application", "application__property")
+                .filter(application__in=residents)
+                .order_by("-created_at")
+            )
+            if start_date:
+                payments = payments.filter(created_at__date__gte=start_date)
+            if end_date:
+                payments = payments.filter(created_at__date__lte=end_date)
+
+            for payment in payments:
+                report_rows.append([
+                    timezone.localtime(payment.created_at).strftime("%Y-%m-%d"),
+                    payment.application.property.name if payment.application.property else "No Property",
+                    payment.application.full_name,
+                    payment.get_payment_type_display(),
+                    payment.get_payment_method_display(),
+                    payment.amount,
+                    payment.get_status_display(),
+                ])
+            totals = {
+                "Completed Total": payments.filter(status="completed").aggregate(total=Sum("amount"))["total"] or Decimal("0.00"),
+                "All Matching Payments": payments.aggregate(total=Sum("amount"))["total"] or Decimal("0.00"),
+            }
+
+        elif report_type == "financial_entries":
+            selected_entry_types = form.cleaned_data.get("financial_entry_types") or ["operating_expense"]
+            report_title = "Financial Entries / Expenses"
+            report_columns = ["Date", "Property", "Type", "Category", "Description", "Amount", "Source"]
+            property_names = list(filtered_properties.values_list("name", flat=True))
+            entries = (
+                FinancialEntry.objects
+                .filter(property_name__in=property_names, entry_type__in=selected_entry_types)
+                .select_related("upload")
+                .order_by("property_name", "year", "month", "category", "description")
+            )
+            if start_date:
+                entries = entries.filter(entry_date__gte=start_date)
+            if end_date:
+                entries = entries.filter(entry_date__lte=end_date)
+
+            for entry in entries:
+                report_rows.append([
+                    entry.entry_date or f"{entry.year or ''}-{entry.month or ''}",
+                    entry.property_name,
+                    entry.get_entry_type_display(),
+                    entry.category,
+                    entry.description,
+                    entry.amount,
+                    entry.upload.name,
+                ])
+            totals = {
+                "Report Total": entries.aggregate(total=Sum("amount"))["total"] or Decimal("0.00"),
+            }
+
+    return render(request, "custom_reports.html", {
+        "form": form,
+        "generated": generated,
+        "selected_property": selected_property,
+        "report_title": report_title,
+        "report_columns": report_columns,
+        "report_rows": report_rows,
+        "totals": totals,
+        "row_count": len(report_rows),
+        "generated_at": timezone.localtime(),
+    })
 
 
 @login_required

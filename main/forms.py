@@ -432,6 +432,55 @@ class ManualPaymentForm(forms.ModelForm):
         )
 
 
+class CustomReportForm(forms.Form):
+    REPORT_TYPE_CHOICES = [
+        ("resident_phone_list", "Resident Phone List"),
+        ("resident_roster", "Resident Roster"),
+        ("payment_summary", "Payment Summary"),
+        ("financial_entries", "Financial Entries / Expenses"),
+    ]
+
+    FINANCIAL_ENTRY_CHOICES = [
+        ("income", "Income"),
+        ("operating_expense", "Operating Expenses"),
+        ("debt_service", "Debt Service"),
+        ("capital_expense", "Capital Expenses"),
+        ("other", "Other"),
+    ]
+
+    report_type = forms.ChoiceField(
+        choices=REPORT_TYPE_CHOICES,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    property_id = forms.ChoiceField(
+        label="Property",
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    start_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+    )
+    end_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+    )
+    financial_entry_types = forms.MultipleChoiceField(
+        choices=FINANCIAL_ENTRY_CHOICES,
+        required=False,
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "form-check-input"}),
+    )
+
+    def __init__(self, *args, properties=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        property_choices = [("", "All accessible properties")]
+
+        if properties is not None:
+            property_choices.extend((str(property_obj.id), property_obj.name) for property_obj in properties)
+
+        self.fields["property_id"].choices = property_choices
+
+
 class LandlordCreateTenantForm(forms.Form):
     lease_start_date = forms.DateField(
         required=False,
