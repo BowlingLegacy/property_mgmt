@@ -1662,6 +1662,8 @@ def ensure_existing_resident_portal_application(intake):
             email=intake.email,
             age=0,
             profile_photo=intake.profile_photo,
+            space_type="Room",
+            space_label=intake.room_unit_label,
             monthly_rent=intake.property.rent_amount or Decimal("0.00"),
             balance=Decimal("0.00"),
             deposit_required=Decimal("0.00"),
@@ -1672,6 +1674,16 @@ def ensure_existing_resident_portal_application(intake):
             housing_need="Existing resident profile setup.",
             additional_notes=intake.additional_notes,
         )
+    else:
+        update_fields = []
+
+        if intake.room_unit_label and application.space_label != intake.room_unit_label:
+            application.space_type = application.space_type or "Room"
+            application.space_label = intake.room_unit_label
+            update_fields.extend(["space_type", "space_label"])
+
+        if update_fields:
+            application.save(update_fields=update_fields)
 
     if not application.user:
         application.user = create_pending_portal_user(

@@ -291,6 +291,7 @@ class ExistingResidentIntakeAdmin(admin.ModelAdmin):
     list_display = (
         "full_name",
         "property",
+        "room_unit_label",
         "email",
         "phone",
         "has_valid_odl",
@@ -299,7 +300,7 @@ class ExistingResidentIntakeAdmin(admin.ModelAdmin):
         "created_at",
     )
     list_filter = ("property", "has_valid_odl", "created_at")
-    search_fields = ("first_name", "middle_name", "last_name", "email", "phone", "property__name")
+    search_fields = ("first_name", "middle_name", "last_name", "email", "phone", "room_unit_label", "property__name")
     readonly_fields = ("created_at",)
 
 

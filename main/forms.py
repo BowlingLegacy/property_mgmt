@@ -453,6 +453,7 @@ class ExistingResidentIntakeForm(forms.ModelForm):
             "last_name",
             "email",
             "phone",
+            "room_unit_label",
             "profile_photo",
             "has_valid_odl",
             "years_at_residence",
@@ -461,6 +462,7 @@ class ExistingResidentIntakeForm(forms.ModelForm):
         ]
         labels = {
             "middle_name": "Middle name",
+            "room_unit_label": "Current Room / Unit # / Label",
             "profile_photo": "Selfie or profile photo",
             "has_valid_odl": "I have a valid Oregon driver's license",
             "years_at_residence": "Years at this residence",
@@ -473,6 +475,10 @@ class ExistingResidentIntakeForm(forms.ModelForm):
             "last_name": forms.TextInput(attrs={"class": "form-control"}),
             "email": forms.EmailInput(attrs={"class": "form-control"}),
             "phone": forms.TextInput(attrs={"class": "form-control"}),
+            "room_unit_label": forms.TextInput(attrs={
+                "class": "form-control",
+                "placeholder": "Example: Room B, Unit 3, 204",
+            }),
             "profile_photo": forms.ClearableFileInput(attrs={
                 "class": "form-control",
                 "accept": "image/*",

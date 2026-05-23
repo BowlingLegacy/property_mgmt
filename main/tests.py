@@ -816,6 +816,7 @@ class LiveFlowTests(TestCase):
             "last_name": "Resident",
             "email": "existing@example.com",
             "phone": "555-0195",
+            "room_unit_label": "Room B",
             "has_valid_odl": "on",
             "years_at_residence": "3",
             "move_in_month": "2023-07",
@@ -825,10 +826,13 @@ class LiveFlowTests(TestCase):
         intake = ExistingResidentIntake.objects.get(email="existing@example.com")
         self.assertEqual(intake.property, property_obj)
         self.assertEqual(intake.full_name(), "Existing R Resident")
+        self.assertEqual(intake.room_unit_label, "Room B")
         self.assertEqual(intake.move_in_month, "2023-07")
         self.assertTrue(intake.has_valid_odl)
         application = HousingApplication.objects.get(email="existing@example.com")
         self.assertEqual(application.property, property_obj)
+        self.assertEqual(application.space_type, "Room")
+        self.assertEqual(application.space_label, "Room B")
         self.assertIsNotNone(application.user)
         self.assertEqual(application.deposit_required, Decimal("0.00"))
         self.assertEqual(application.utility_monthly, Decimal("0.00"))
@@ -1198,6 +1202,7 @@ class LiveFlowTests(TestCase):
             last_name="Resident",
             email="saved-resident@example.com",
             phone="555-0200",
+            room_unit_label="Unit 4",
         )
 
         self.client.login(username="resident-intake-landlord", password="StrongPass123!")
@@ -1207,6 +1212,7 @@ class LiveFlowTests(TestCase):
         self.assertRedirects(response, reverse("landlord_attention"))
         application = HousingApplication.objects.get(email="saved-resident@example.com")
         self.assertEqual(application.property, property_obj)
+        self.assertEqual(application.space_label, "Unit 4")
         self.assertIn(application.user.invite_code, mail.outbox[0].body)
 
     def test_existing_resident_intake_closes_after_property_window(self):

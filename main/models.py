@@ -728,6 +728,7 @@ class ExistingResidentIntake(models.Model):
     last_name = models.CharField(max_length=100)
     email = models.EmailField()
     phone = models.CharField(max_length=50)
+    room_unit_label = models.CharField(max_length=50, blank=True)
     profile_photo = models.ImageField(upload_to="existing_resident_intake_photos/", blank=True, null=True)
     has_valid_odl = models.BooleanField(default=False)
     years_at_residence = models.PositiveIntegerField(default=0)
