@@ -1258,6 +1258,79 @@ class LiveFlowTests(TestCase):
         self.assertEqual(receipt.financial_entry.category, "Repairs")
         self.assertEqual(receipt.financial_entry.amount, Decimal("225.00"))
 
+    def test_accounting_import_maps_csv_to_property_scoped_ledger_entries(self):
+        landlord = User.objects.create_user(
+            username="accounting-landlord",
+            email="accounting-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Accounting Property", landlord_email=landlord.email)
+        csv_file = SimpleUploadedFile(
+            "expenses.csv",
+            b"Date,Vendor,Amount,Category\n2026-05-01,Power Company,-125.50,Utilities\n2026-05-03,Roof Vendor,-900.00,Capital Roof\n",
+            content_type="text/csv",
+        )
+
+        self.client.login(username="accounting-landlord", password="StrongPass123!")
+        upload_response = self.client.post(reverse("financial_upload"), {
+            "property": property_obj.id,
+            "name": "May Expenses",
+            "file": csv_file,
+            "notes": "Bank export",
+        })
+
+        upload = FinancialUpload.objects.get(name="May Expenses")
+        self.assertRedirects(upload_response, reverse("parse_financial_upload", args=[upload.id]))
+
+        response = self.client.post(reverse("parse_financial_upload", args=[upload.id]), {
+            "date_column": "Date",
+            "description_column": "Vendor",
+            "amount_column": "Amount",
+            "category_column": "Category",
+            "entry_type_column": "",
+            "property_column": "",
+            "default_entry_type": "operating_expense",
+            "default_category": "",
+        })
+
+        self.assertRedirects(response, reverse("parse_financial_upload", args=[upload.id]))
+        entries = FinancialEntry.objects.filter(upload=upload).order_by("row_number")
+        self.assertEqual(entries.count(), 2)
+        self.assertEqual(entries[0].property_name, property_obj.name)
+        self.assertEqual(entries[0].entry_date.isoformat(), "2026-05-01")
+        self.assertEqual(entries[0].amount, Decimal("125.50"))
+        self.assertEqual(entries[0].category, "Utilities")
+        self.assertEqual(entries[1].entry_type, "capital_expense")
+        self.assertTrue(ExpenseCategory.objects.filter(name="Utilities").exists())
+
+    def test_accounting_import_blocks_other_landlord_property(self):
+        landlord = User.objects.create_user(
+            username="blocked-accounting-landlord",
+            email="blocked-accounting-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        other_property = Property.objects.create(name="Other Accounting Property", landlord_email="other@example.com")
+        csv_file = SimpleUploadedFile(
+            "blocked.csv",
+            b"Date,Vendor,Amount\n2026-05-01,Vendor,-10.00\n",
+            content_type="text/csv",
+        )
+
+        self.client.login(username="blocked-accounting-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("financial_upload"), {
+            "property": other_property.id,
+            "name": "Blocked Upload",
+            "file": csv_file,
+            "notes": "",
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(FinancialUpload.objects.filter(name="Blocked Upload").exists())
+
     def test_landlord_can_send_setup_invite_for_saved_current_resident_intake(self):
         landlord = User.objects.create_user(
             username="resident-intake-landlord",

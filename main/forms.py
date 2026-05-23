@@ -43,8 +43,9 @@ class BlogCommentForm(forms.ModelForm):
 class FinancialUploadForm(forms.ModelForm):
     class Meta:
         model = FinancialUpload
-        fields = ["name", "file", "notes"]
+        fields = ["property", "name", "file", "notes"]
         labels = {
+            "property": "Property",
             "name": "Import name",
             "file": "Accounting export or data file",
             "notes": "Source system / import notes",
@@ -55,10 +56,17 @@ class FinancialUploadForm(forms.ModelForm):
             "notes": "Add the source system, property, date range, and anything needed to classify the data correctly.",
         }
         widgets = {
+            "property": forms.Select(attrs={"class": "form-select"}),
             "name": forms.TextInput(attrs={"class": "form-control"}),
             "file": forms.ClearableFileInput(attrs={"class": "form-control"}),
             "notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
         }
+
+    def __init__(self, *args, properties=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if properties is not None:
+            self.fields["property"].queryset = properties
+        self.fields["property"].required = True
 
 
 class AccountingReceiptForm(forms.ModelForm):

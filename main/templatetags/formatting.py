@@ -19,3 +19,11 @@ def phone_format(value):
         return f"+1 ({digits[1:4]}) {digits[4:7]}-{digits[7:]}"
 
     return raw_value
+
+
+@register.filter
+def get_item(mapping, key):
+    if not mapping:
+        return ""
+
+    return mapping.get(key, "")

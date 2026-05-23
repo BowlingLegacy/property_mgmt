@@ -2,8 +2,10 @@ from collections import OrderedDict
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 import csv
+from io import TextIOWrapper
 
 import stripe
+from openpyxl import load_workbook
 
 from django.contrib.auth import authenticate, login
 from django.contrib import messages
@@ -44,6 +46,7 @@ from .models import (
     FinancialUpload,
     FinancialEntry,
     AccountingReceipt,
+    ExpenseCategory,
     ResidentMessage,
     ApplicantDocument,
     SignedDocument,
@@ -69,6 +72,134 @@ def money(value):
         return Decimal(cleaned).quantize(Decimal("0.01"))
     except (InvalidOperation, ValueError, TypeError):
         return Decimal("0.00")
+
+
+FINANCIAL_COLUMN_ALIASES = {
+    "entry_date": ["date", "transaction date", "posted date", "posting date", "paid date", "receipt date"],
+    "description": ["description", "memo", "payee", "vendor", "name", "transaction", "details"],
+    "amount": ["amount", "debit", "credit", "paid", "payment", "total", "net amount"],
+    "category": ["category", "account", "expense category", "income category", "gl account", "class"],
+    "entry_type": ["type", "entry type", "transaction type", "account type"],
+    "property_name": ["property", "property name", "building", "location"],
+}
+
+FINANCIAL_TYPE_KEYWORDS = {
+    "income": ["income", "rent income", "deposit", "revenue", "payment received"],
+    "debt_service": ["mortgage", "loan", "debt", "principal", "interest"],
+    "capital_expense": ["capital", "capex", "improvement", "renovation", "appliance", "roof"],
+    "operating_expense": ["expense", "repair", "maintenance", "utility", "insurance", "tax", "supplies", "cleaning"],
+}
+
+
+def normalized_header(value):
+    return " ".join(str(value or "").strip().lower().replace("_", " ").split())
+
+
+def unique_headers(raw_headers):
+    headers = []
+    used = {}
+    for index, header in enumerate(raw_headers, start=1):
+        base = str(header or f"Column {index}").strip() or f"Column {index}"
+        count = used.get(base, 0) + 1
+        used[base] = count
+        headers.append(base if count == 1 else f"{base} {count}")
+    return headers
+
+
+def guess_financial_columns(headers):
+    normalized = {header: normalized_header(header) for header in headers}
+    guesses = {}
+    for field_name, aliases in FINANCIAL_COLUMN_ALIASES.items():
+        for header, clean_header in normalized.items():
+            if clean_header in aliases or any(alias in clean_header for alias in aliases):
+                guesses[field_name] = header
+                break
+    return guesses
+
+
+def read_financial_upload_rows(upload, limit=None):
+    file_name = upload.file.name.lower()
+    upload.file.open("rb")
+    try:
+        if file_name.endswith(".xlsx"):
+            workbook = load_workbook(upload.file, read_only=True, data_only=True)
+            worksheet = workbook.active
+            raw_rows = list(worksheet.iter_rows(values_only=True))
+            sheet_name = worksheet.title
+        else:
+            wrapper = TextIOWrapper(upload.file, encoding="utf-8-sig", newline="")
+            try:
+                raw_rows = list(csv.reader(wrapper))
+            except UnicodeDecodeError:
+                upload.file.seek(0)
+                wrapper = TextIOWrapper(upload.file, encoding="latin-1", newline="")
+                raw_rows = list(csv.reader(wrapper))
+            sheet_name = "CSV"
+    finally:
+        upload.file.close()
+
+    non_empty_rows = [
+        list(row)
+        for row in raw_rows
+        if any(str(cell or "").strip() for cell in row)
+    ]
+    if not non_empty_rows:
+        return sheet_name, [], []
+
+    headers = unique_headers(non_empty_rows[0])
+    data_rows = non_empty_rows[1:]
+    if limit:
+        data_rows = data_rows[:limit]
+
+    rows = []
+    for row_number, row in enumerate(data_rows, start=2):
+        row_data = {}
+        for index, header in enumerate(headers):
+            row_data[header] = row[index] if index < len(row) else ""
+        rows.append({"row_number": row_number, "data": row_data})
+
+    return sheet_name, headers, rows
+
+
+def parse_import_date(value):
+    if not value:
+        return None
+    if hasattr(value, "date"):
+        return value.date()
+    if isinstance(value, date):
+        return value
+
+    value = str(value).strip()
+    for date_format in ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y", "%m-%d-%Y"):
+        try:
+            return timezone.datetime.strptime(value, date_format).date()
+        except ValueError:
+            continue
+    return None
+
+
+def normalize_entry_type(value, category, description, amount, default_entry_type):
+    clean_value = normalized_header(value)
+    for entry_type, keywords in FINANCIAL_TYPE_KEYWORDS.items():
+        if clean_value == entry_type or clean_value in keywords:
+            return entry_type
+
+    combined = normalized_header(f"{category} {description}")
+    for entry_type, keywords in FINANCIAL_TYPE_KEYWORDS.items():
+        if any(keyword in combined for keyword in keywords):
+            return entry_type
+
+    if amount < 0:
+        return "operating_expense"
+
+    return default_entry_type or "operating_expense"
+
+
+def normalized_import_amount(amount, entry_type):
+    amount = money(amount)
+    if entry_type == "income":
+        return abs(amount)
+    return abs(amount)
 
 
 def staff_required(user):
@@ -1463,18 +1594,25 @@ def t12_report(request):
 
 
 @login_required
-@user_passes_test(staff_required)
+@user_passes_test(reporting_required)
 def financial_upload(request):
+    properties = staff_managed_properties(request.user).order_by("name")
+
     if request.method == "POST":
-        form = FinancialUploadForm(request.POST, request.FILES)
+        form = FinancialUploadForm(request.POST, request.FILES, properties=properties)
 
         if form.is_valid():
             upload = form.save()
             return redirect("parse_financial_upload", upload_id=upload.id)
     else:
-        form = FinancialUploadForm()
+        form = FinancialUploadForm(properties=properties)
 
-    uploads = FinancialUpload.objects.all().order_by("-uploaded_at")
+    uploads = (
+        FinancialUpload.objects
+        .filter(property__in=properties)
+        .select_related("property")
+        .order_by("-uploaded_at")
+    )
     return render(request, "financial_upload.html", {"form": form, "uploads": uploads})
 
 
@@ -1565,13 +1703,109 @@ def approve_accounting_receipt(request, receipt_id):
 
 
 @login_required
-@user_passes_test(staff_required)
+@user_passes_test(reporting_required)
 def parse_financial_upload(request, upload_id):
-    upload = get_object_or_404(FinancialUpload, id=upload_id)
-    upload.parsed_at = timezone.now()
-    upload.save()
+    properties = staff_managed_properties(request.user).order_by("name")
+    upload = get_object_or_404(
+        FinancialUpload.objects.select_related("property"),
+        id=upload_id,
+        property__in=properties,
+    )
 
-    return render(request, "financial_upload_parsed.html", {"upload": upload, "created": 0})
+    try:
+        sheet_name, headers, rows = read_financial_upload_rows(upload)
+    except Exception as exc:
+        messages.error(request, f"RentLogic could not read that file yet: {exc}")
+        return redirect("financial_upload")
+
+    guesses = guess_financial_columns(headers)
+    entry_type_choices = FinancialEntry.ENTRY_TYPE_CHOICES
+    created = 0
+    skipped = 0
+
+    if request.method == "POST":
+        date_column = request.POST.get("date_column", "")
+        description_column = request.POST.get("description_column", "")
+        amount_column = request.POST.get("amount_column", "")
+        category_column = request.POST.get("category_column", "")
+        entry_type_column = request.POST.get("entry_type_column", "")
+        property_column = request.POST.get("property_column", "")
+        default_entry_type = request.POST.get("default_entry_type", "operating_expense")
+        default_category = request.POST.get("default_category", "").strip()
+
+        accessible_properties = {property_obj.name.lower(): property_obj for property_obj in properties}
+        upload.entries.all().delete()
+
+        for row in rows:
+            row_data = row["data"]
+            raw_amount = row_data.get(amount_column)
+            amount = money(raw_amount)
+
+            if amount == Decimal("0.00"):
+                skipped += 1
+                continue
+
+            raw_property_name = str(row_data.get(property_column, "") or "").strip()
+            property_obj = upload.property
+            if raw_property_name:
+                property_obj = accessible_properties.get(raw_property_name.lower())
+                if not property_obj:
+                    skipped += 1
+                    continue
+
+            description = str(row_data.get(description_column, "") or "").strip()
+            category = str(row_data.get(category_column, "") or "").strip() or default_category or "Uncategorized"
+            entry_type = normalize_entry_type(
+                row_data.get(entry_type_column, ""),
+                category,
+                description,
+                amount,
+                default_entry_type,
+            )
+            entry_date = parse_import_date(row_data.get(date_column))
+            clean_amount = normalized_import_amount(amount, entry_type)
+
+            if entry_type != "income" and category:
+                ExpenseCategory.objects.get_or_create(
+                    name=category,
+                    defaults={
+                        "entry_type": entry_type if entry_type in dict(ExpenseCategory.ENTRY_TYPE_CHOICES) else "other",
+                        "created_by": request.user,
+                    },
+                )
+
+            FinancialEntry.objects.create(
+                upload=upload,
+                property_name=property_obj.name if property_obj else "",
+                sheet_name=sheet_name,
+                row_number=row["row_number"],
+                entry_date=entry_date,
+                month=entry_date.month if entry_date else None,
+                year=entry_date.year if entry_date else None,
+                entry_type=entry_type,
+                category=category,
+                description=description,
+                amount=clean_amount,
+            )
+            created += 1
+
+        upload.parsed_at = timezone.now()
+        upload.save(update_fields=["parsed_at"])
+        messages.success(request, f"Imported {created} ledger entries. Skipped {skipped} rows that were blank, zero, or outside your properties.")
+        return redirect("parse_financial_upload", upload_id=upload.id)
+
+    preview_rows = rows[:10]
+
+    return render(request, "financial_upload_parsed.html", {
+        "upload": upload,
+        "headers": headers,
+        "preview_rows": preview_rows,
+        "guesses": guesses,
+        "entry_type_choices": entry_type_choices,
+        "created": created,
+        "skipped": skipped,
+        "existing_entries": upload.entries.count(),
+    })
 
 
 @login_required
