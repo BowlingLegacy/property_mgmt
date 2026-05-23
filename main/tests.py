@@ -877,6 +877,70 @@ class LiveFlowTests(TestCase):
         self.assertContains(payment_log, "Assigned Resident")
         self.assertNotContains(payment_log, "Other Resident")
 
+    def test_landlord_dashboard_lists_current_month_rent_and_utility_exceptions(self):
+        landlord = User.objects.create_user(
+            username="collection-landlord",
+            email="collection@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        assigned_property = Property.objects.create(name="Collection Property", landlord_email=landlord.email)
+        other_property = Property.objects.create(name="Other Collection Property", landlord_email="other@example.com")
+        paid_resident = HousingApplication.objects.create(
+            property=assigned_property,
+            full_name="Paid Resident",
+            phone="555-0301",
+            email="paid-collection@example.com",
+            age=51,
+            space_label="A",
+            monthly_rent=Decimal("500.00"),
+            utility_monthly=Decimal("66.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        missing_utility_resident = HousingApplication.objects.create(
+            property=assigned_property,
+            full_name="Missing Utility Resident",
+            phone="555-0302",
+            email="missing-utility@example.com",
+            age=52,
+            space_label="B",
+            monthly_rent=Decimal("500.00"),
+            utility_monthly=Decimal("66.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        other_resident = HousingApplication.objects.create(
+            property=other_property,
+            full_name="Other Missing Resident",
+            phone="555-0303",
+            email="other-missing@example.com",
+            age=53,
+            space_label="C",
+            monthly_rent=Decimal("500.00"),
+            utility_monthly=Decimal("66.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        Payment.objects.create(application=paid_resident, payment_type="rent", amount=Decimal("500.00"), status="completed")
+        Payment.objects.create(application=paid_resident, payment_type="utility", amount=Decimal("66.00"), status="completed")
+        Payment.objects.create(application=missing_utility_resident, payment_type="rent", amount=Decimal("500.00"), status="completed")
+
+        self.client.login(username="collection-landlord", password="StrongPass123!")
+
+        response = self.client.get(reverse("landlord_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Monthly Collection Watch")
+        self.assertContains(response, "Missing Utility Resident")
+        self.assertContains(response, "Utilities")
+        self.assertNotContains(response, "Paid Resident</td>")
+        self.assertNotContains(response, "Other Missing Resident")
+
     def test_custom_phone_report_scopes_to_landlord_property(self):
         landlord = User.objects.create_user(
             username="report-landlord",

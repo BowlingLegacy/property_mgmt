@@ -103,10 +103,10 @@ body {
 .metric-grid,
 .workspace-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 1rem;
     margin-bottom: 1.5rem;
 }
+.metric-grid { grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); }
 .metric-card {
     background: #fff;
     border: 1px solid rgba(188,150,45,.18);
@@ -153,6 +153,38 @@ body {
     color: #f3d27a;
     font-weight: 900;
     margin-bottom: .65rem;
+}
+.collection-watch {
+    padding: 1.1rem;
+    margin-bottom: 1.5rem;
+}
+.collection-table {
+    margin-bottom: 0;
+}
+.collection-table th {
+    color: #6f5411;
+    background: #f3ead7;
+    border-bottom: none;
+    font-size: .82rem;
+}
+.collection-table td {
+    vertical-align: middle;
+}
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: .28rem .65rem;
+    background: #fff0d6;
+    color: #8a5b00;
+    font-weight: 900;
+    font-size: .78rem;
+}
+.small-action {
+    color: #a57c18;
+    font-weight: 800;
+    text-decoration: underline;
+    text-underline-offset: 3px;
 }
 @media (max-width: 992px) {
     .ops-shell { grid-template-columns: 1fr; }
@@ -206,7 +238,65 @@ body {
                 <div class="metric-card"><div class="metric-label">New Applications</div><div class="metric-value">{{ new_application_count }}</div></div>
                 <div class="metric-card"><div class="metric-label">New Messages</div><div class="metric-value">{{ new_message_count }}</div></div>
                 <div class="metric-card"><div class="metric-label">Resident Files</div><div class="metric-value">{{ applications.count }}</div></div>
+                <div class="metric-card"><div class="metric-label">Unpaid This Month</div><div class="metric-value">{{ collection_watch_count }}</div></div>
             </div>
+
+            <section class="soft-card collection-watch">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                    <div>
+                        <h2 class="mb-1" style="font-family: Georgia, serif; font-size: 1.6rem; font-weight: 800;">Monthly Collection Watch</h2>
+                        <p class="text-muted mb-0">
+                            Residents missing rent or utilities for {{ collection_watch_month|date:"F Y" }}.
+                        </p>
+                    </div>
+                    <a href="{% url 'payment_log' %}" class="small-action">Open Payment Log</a>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table collection-table">
+                        <thead>
+                            <tr>
+                                <th>Property</th>
+                                <th>Resident</th>
+                                <th>Room / Unit</th>
+                                <th>Missing</th>
+                                <th>Rent Paid</th>
+                                <th>Utilities Paid</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in collection_watch_rows %}
+                                <tr>
+                                    <td>{{ row.property }}</td>
+                                    <td>{{ row.application.full_name }}</td>
+                                    <td>{{ row.unit }}</td>
+                                    <td><span class="status-pill">{{ row.missing }}</span></td>
+                                    <td>${{ row.rent_paid }} / ${{ row.rent_expected }}</td>
+                                    <td>
+                                        {% if row.utility_expected > 0 %}
+                                            ${{ row.utility_paid }} / ${{ row.utility_expected }}
+                                        {% else %}
+                                            Not used
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'record_manual_payment' %}?application={{ row.application.id }}" class="small-action">
+                                            Record Payment
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="7" class="text-muted p-3">
+                                        Everyone visible to this dashboard has paid the current month's rent and applicable utilities.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
 
             <div class="workspace-grid">
                 <a href="{% url 'landlord_attention' %}" class="workspace-card">

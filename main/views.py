@@ -12,7 +12,7 @@ from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.mail import send_mail
-from django.db.models import Count, Sum
+from django.db.models import Count, Q, Sum
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
@@ -399,6 +399,72 @@ def custom_report_accessible_properties(user):
     return staff_managed_properties(user).order_by("name")
 
 
+def current_month_bounds():
+    today = timezone.localdate()
+    month_start = today.replace(day=1)
+
+    if month_start.month == 12:
+        next_month = month_start.replace(year=month_start.year + 1, month=1)
+    else:
+        next_month = month_start.replace(month=month_start.month + 1)
+
+    return month_start, next_month
+
+
+def monthly_collection_watch_rows(applications):
+    month_start, next_month = current_month_bounds()
+    rows = []
+
+    for application in applications:
+        monthly_payments = application.payments.filter(status="completed").filter(
+            Q(received_at__date__gte=month_start, received_at__date__lt=next_month)
+            | Q(received_at__isnull=True, created_at__date__gte=month_start, created_at__date__lt=next_month)
+        )
+
+        rent_paid = monthly_payments.filter(payment_type="rent").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        utility_paid = monthly_payments.filter(payment_type="utility").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        combined_paid = monthly_payments.filter(payment_type="other", description__icontains="combined").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+
+        rent_expected = application.monthly_rent or Decimal("0.00")
+        utility_expected = application.utility_monthly or Decimal("0.00")
+
+        if combined_paid > 0:
+            rent_shortfall = max(rent_expected - rent_paid, Decimal("0.00"))
+            combined_to_rent = min(combined_paid, rent_shortfall)
+            rent_paid += combined_to_rent
+            combined_paid -= combined_to_rent
+
+            utility_shortfall = max(utility_expected - utility_paid, Decimal("0.00"))
+            combined_to_utility = min(combined_paid, utility_shortfall)
+            utility_paid += combined_to_utility
+
+        missing_items = []
+        rent_due = max(rent_expected - rent_paid, Decimal("0.00"))
+        utility_due = max(utility_expected - utility_paid, Decimal("0.00"))
+
+        if rent_expected > 0 and rent_due > 0:
+            missing_items.append("Rent")
+
+        if utility_expected > 0 and utility_due > 0:
+            missing_items.append("Utilities")
+
+        if missing_items:
+            rows.append({
+                "application": application,
+                "property": application.property.name if application.property else "No Property",
+                "unit": application.space_label or application.space_type or "",
+                "missing": " + ".join(missing_items),
+                "rent_paid": rent_paid,
+                "rent_expected": rent_expected,
+                "rent_due": rent_due,
+                "utility_paid": utility_paid,
+                "utility_expected": utility_expected,
+                "utility_due": utility_due,
+            })
+
+    return rows
+
+
 def get_landlord_workspace_context(user):
     properties = staff_managed_properties(user).order_by("name")
 
@@ -481,6 +547,8 @@ def get_landlord_workspace_context(user):
         landlord_inbox[property_name].append(resident_message)
 
     new_message_count = new_messages.count()
+    collection_watch_rows = monthly_collection_watch_rows(applications)
+    month_start, _next_month = current_month_bounds()
 
     return {
         "applications": applications,
@@ -495,6 +563,9 @@ def get_landlord_workspace_context(user):
         "new_document_count": new_documents.count(),
         "existing_resident_intakes": existing_resident_rows,
         "existing_resident_intake_count": len(existing_resident_rows),
+        "collection_watch_month": month_start,
+        "collection_watch_rows": collection_watch_rows,
+        "collection_watch_count": len(collection_watch_rows),
         "attention_count": (
             new_applications.count()
             + new_message_count
