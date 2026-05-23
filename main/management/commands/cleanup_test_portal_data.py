@@ -6,6 +6,9 @@ from django.db import transaction
 from main.models import ApplicantDocument, HousingApplication, Payment, Property, ResidentMessage, User
 
 
+DEFAULT_PRESERVE_NAMES = {"Felicia Valdez"}
+
+
 class Command(BaseCommand):
     help = (
         "Preview or delete test portal data: applications, resident messages, "
@@ -83,6 +86,7 @@ class Command(BaseCommand):
             for name in options["preserve_name"]
             if name and name.strip()
         }
+        preserve_names.update(DEFAULT_PRESERVE_NAMES)
         preserve_payment_ids = set(options["preserve_payment_id"])
         delete_property_names = {
             property_name.strip()

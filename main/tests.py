@@ -615,6 +615,10 @@ class LiveFlowTests(TestCase):
 
         self.client.login(username="photo-resident", password="StrongPass123!")
 
+        dashboard_response = self.client.get(reverse("tenant_dashboard"))
+
+        self.assertContains(dashboard_response, "Change Photo")
+
         response = self.client.post(reverse("update_resident_profile_photo"), {
             "profile_photo": image,
         })
@@ -633,7 +637,7 @@ class LiveFlowTests(TestCase):
         )
         application = HousingApplication.objects.create(
             full_name="Inspect Resident",
-            phone="555-0112",
+            phone="5550112233",
             email="inspect@example.com",
             age=53,
             income_source="Employment",
@@ -647,6 +651,8 @@ class LiveFlowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Inspect Resident")
+        self.assertContains(response, "(555) 011-2233")
+        self.assertContains(response, "Renters Insurance")
         self.assertContains(response, "Back to Super Admin Dashboard")
 
     def test_superadmin_owners_page_lists_properties_without_owner_email(self):
@@ -1302,6 +1308,11 @@ class LiveFlowTests(TestCase):
             role="landlord",
             is_staff=True,
         )
+        superuser = User.objects.create_superuser(
+            username="system-owner",
+            email="superowner@example.com",
+            password="StrongPass123!",
+        )
         tenant_user = User.objects.create_user(
             username="test-tenant",
             email="tenant@example.com",
@@ -1366,6 +1377,7 @@ class LiveFlowTests(TestCase):
         self.assertTrue(HousingApplication.objects.filter(id=preserved_application.id).exists())
         self.assertTrue(User.objects.filter(id=preserved_user.id).exists())
         self.assertTrue(User.objects.filter(id=staff_user.id).exists())
+        self.assertTrue(User.objects.filter(id=superuser.id).exists())
         self.assertEqual(ResidentMessage.objects.count(), 0)
         self.assertEqual(ApplicantDocument.objects.count(), 0)
         self.assertEqual(Payment.objects.count(), 0)
@@ -1379,6 +1391,12 @@ class LiveFlowTests(TestCase):
             income_source="Employment",
             monthly_income=Decimal("3000.00"),
             housing_need="Real application.",
+        )
+        felicia_document = SignedDocument.objects.create(
+            application=felicia,
+            document_type="lease",
+            title="Felicia Lease Agreement",
+            locked=True,
         )
         paid_application = HousingApplication.objects.create(
             full_name="Real Payment Resident",
@@ -1417,14 +1435,13 @@ class LiveFlowTests(TestCase):
         call_command(
             "cleanup_test_portal_data",
             "--confirm",
-            "--preserve-name",
-            "Felicia Valdez",
             "--preserve-only-completed-one-dollar-payment",
             "--keep-users",
             stdout=output,
         )
 
         self.assertTrue(HousingApplication.objects.filter(id=felicia.id).exists())
+        self.assertTrue(SignedDocument.objects.filter(id=felicia_document.id).exists())
         self.assertTrue(HousingApplication.objects.filter(id=paid_application.id).exists())
         self.assertFalse(HousingApplication.objects.filter(id=test_application.id).exists())
         self.assertTrue(Payment.objects.filter(id=kept_payment.id).exists())

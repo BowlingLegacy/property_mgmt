@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load formatting %}
 {% block content %}
 
 <style>
@@ -320,7 +321,10 @@ body {
                             {% endif %}
                         </label>
                         {{ profile_photo_form.profile_photo }}
-                        <div class="profile-photo-hint">Tap photo to change it</div>
+                        <label for="{{ profile_photo_form.profile_photo.id_for_label }}" class="message-btn mt-2">
+                            Change Photo
+                        </label>
+                        <div class="profile-photo-hint mt-2">Your dashboard photo updates as soon as you choose a new image.</div>
                     </form>
                 {% else %}
                     <div class="profile-photo">
@@ -340,7 +344,7 @@ body {
                 <div class="profile-divider"></div>
 
                 <div class="profile-line">{{ application.email }}</div>
-                <div class="profile-line">{{ application.phone }}</div>
+                <div class="profile-line">{{ application.phone|phone_format }}</div>
 
                 <div class="profile-divider"></div>
 
@@ -448,6 +452,25 @@ body {
                     </div>
                 </div>
 
+            </div>
+
+            <div class="soft-card p-4 mb-4">
+                <div class="row align-items-center g-3">
+                    <div class="col-lg-8">
+                        <div class="section-title">Renters Insurance</div>
+                        <p class="text-muted mb-0">
+                            Renters insurance can help protect your belongings and may be useful if something unexpected happens in your room or shared space.
+                        </p>
+                    </div>
+                    <div class="col-lg-4">
+                        <button class="message-btn"
+                                data-bs-toggle="modal"
+                                data-bs-target="#messageModal"
+                                data-message-subject="Renters Insurance Information">
+                            Ask About Coverage
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div class="row g-4">
@@ -698,6 +721,15 @@ body {
 const profilePhotoInput = document.querySelector('input[name="profile_photo"]');
 const profilePhotoPreview = document.getElementById("profilePhotoPreview");
 const profilePhotoInitial = document.getElementById("profilePhotoInitial");
+const messageSubjectInput = document.querySelector('#messageModal input[name="subject"]');
+
+document.querySelectorAll("[data-message-subject]").forEach(function (button) {
+    button.addEventListener("click", function () {
+        if (messageSubjectInput) {
+            messageSubjectInput.value = this.dataset.messageSubject;
+        }
+    });
+});
 
 if (profilePhotoInput && profilePhotoPreview) {
     profilePhotoInput.addEventListener("change", function () {
