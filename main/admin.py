@@ -14,6 +14,8 @@ from .models import (
     Payment,
     FinancialUpload,
     FinancialEntry,
+    ExpenseCategory,
+    AccountingReceipt,
     ResidentMessage,
     SignedDocument,
     PropertyOwnerIntake,
@@ -727,3 +729,26 @@ class FinancialEntryAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+
+@admin.register(ExpenseCategory)
+class ExpenseCategoryAdmin(admin.ModelAdmin):
+    list_display = ("name", "entry_type", "is_active", "created_at")
+    list_filter = ("entry_type", "is_active")
+    search_fields = ("name",)
+
+
+@admin.register(AccountingReceipt)
+class AccountingReceiptAdmin(admin.ModelAdmin):
+    list_display = (
+        "property",
+        "vendor",
+        "category",
+        "amount",
+        "status",
+        "uploaded_at",
+        "reviewed_at",
+    )
+    list_filter = ("status", "entry_type", "property", "category")
+    search_fields = ("vendor", "description", "notes", "property__name")
+    readonly_fields = ("uploaded_at", "reviewed_at", "financial_upload", "financial_entry")

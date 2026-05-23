@@ -216,6 +216,7 @@ body {
                 <a href="{% url 'record_manual_payment' %}">Record Payment</a>
                 <a href="{% url 'rent_roll' %}">Rent Roll</a>
                 <a href="{% url 'custom_reports' %}">Custom Reports</a>
+                <a href="{% url 'accounting_receipts' %}">Receipt Upload</a>
                 <a href="{% url 'financial_upload' %}">Expense Imports</a>
 
                 <div class="ops-nav-label">Account</div>
@@ -324,6 +325,11 @@ body {
                 <a href="{% url 'financial_upload' %}" class="workspace-card">
                     <h2>Operating / Capital Expenses</h2>
                     <p class="text-muted mb-0">Upload accounting exports and source documents.</p>
+                </a>
+
+                <a href="{% url 'accounting_receipts' %}" class="workspace-card">
+                    <h2>Receipt Upload</h2>
+                    <p class="text-muted mb-0">Store receipts, add simple expense details, and approve them into the ledger.</p>
                 </a>
 
                 <a href="{% url 'custom_reports' %}" class="workspace-card">

@@ -10,7 +10,7 @@ from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import ApplicantDocument, BlogComment, BlogPost, ExistingResidentIntake, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, ResidentMessage, SignedDocument, User
+from .models import AccountingReceipt, ApplicantDocument, BlogComment, BlogPost, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, ResidentMessage, SignedDocument, User
 
 
 @override_settings(
@@ -1104,6 +1104,84 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "Floor replacement")
         self.assertContains(response, "$525.00")
         self.assertNotContains(response, "May rent")
+
+    def test_accounting_receipt_upload_creates_category_and_review_record(self):
+        landlord = User.objects.create_user(
+            username="receipt-landlord",
+            email="receipt-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Receipt Property", landlord_email=landlord.email)
+        receipt_file = SimpleUploadedFile("receipt.pdf", b"%PDF-1.4 receipt", content_type="application/pdf")
+
+        self.client.login(username="receipt-landlord", password="StrongPass123!")
+
+        response = self.client.post(reverse("accounting_receipts"), {
+            "property": property_obj.id,
+            "receipt_file": receipt_file,
+            "vendor": "Plumbing Vendor",
+            "receipt_date": "2026-05-20",
+            "entry_type": "operating_expense",
+            "new_category": "Plumbing Repairs",
+            "description": "Kitchen sink repair",
+            "amount": "125.50",
+            "payment_method": "check",
+            "notes": "Uploaded from paper receipt.",
+        })
+
+        self.assertRedirects(response, reverse("accounting_receipts"))
+        receipt = AccountingReceipt.objects.get(vendor="Plumbing Vendor")
+        self.assertEqual(receipt.property, property_obj)
+        self.assertEqual(receipt.status, "needs_review")
+        self.assertEqual(receipt.category.name, "Plumbing Repairs")
+        self.assertTrue(receipt.receipt_file.name)
+
+    def test_accounting_receipt_approval_creates_financial_entry_and_scopes_property(self):
+        landlord = User.objects.create_user(
+            username="approve-receipt-landlord",
+            email="approve-receipt-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Approval Property", landlord_email=landlord.email)
+        other_property = Property.objects.create(name="Other Approval Property", landlord_email="other@example.com")
+        category = ExpenseCategory.objects.create(name="Repairs", entry_type="operating_expense")
+        receipt = AccountingReceipt.objects.create(
+            property=property_obj,
+            receipt_file="accounting_receipts/repair.pdf",
+            vendor="Repair Vendor",
+            receipt_date=timezone.datetime(2026, 5, 20).date(),
+            category=category,
+            entry_type="operating_expense",
+            description="Door repair",
+            amount=Decimal("225.00"),
+            payment_method="cash",
+        )
+        other_receipt = AccountingReceipt.objects.create(
+            property=other_property,
+            receipt_file="accounting_receipts/other.pdf",
+            vendor="Other Vendor",
+            category=category,
+            amount=Decimal("99.00"),
+        )
+
+        self.client.login(username="approve-receipt-landlord", password="StrongPass123!")
+
+        blocked_response = self.client.post(reverse("approve_accounting_receipt", args=[other_receipt.id]))
+        self.assertEqual(blocked_response.status_code, 404)
+
+        response = self.client.post(reverse("approve_accounting_receipt", args=[receipt.id]))
+
+        self.assertRedirects(response, reverse("accounting_receipts"))
+        receipt.refresh_from_db()
+        self.assertEqual(receipt.status, "approved")
+        self.assertIsNotNone(receipt.financial_entry)
+        self.assertEqual(receipt.financial_entry.property_name, property_obj.name)
+        self.assertEqual(receipt.financial_entry.category, "Repairs")
+        self.assertEqual(receipt.financial_entry.amount, Decimal("225.00"))
 
     def test_landlord_can_send_setup_invite_for_saved_current_resident_intake(self):
         landlord = User.objects.create_user(

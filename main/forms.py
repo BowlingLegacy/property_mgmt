@@ -11,6 +11,8 @@ from .models import (
     Property,
     PropertyOnboardingDocument,
     Payment,
+    AccountingReceipt,
+    ExpenseCategory,
     PropertyOwnerIntake,
     ExistingResidentIntake,
     LandlordIntake,
@@ -57,6 +59,93 @@ class FinancialUploadForm(forms.ModelForm):
             "file": forms.ClearableFileInput(attrs={"class": "form-control"}),
             "notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
         }
+
+
+class AccountingReceiptForm(forms.ModelForm):
+    new_category = forms.CharField(
+        required=False,
+        label="Add New Category",
+        help_text="Use this when the right category is not in the list yet.",
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": "Example: Plumbing Repairs, Insurance, Power",
+        }),
+    )
+
+    class Meta:
+        model = AccountingReceipt
+        fields = [
+            "property",
+            "receipt_file",
+            "vendor",
+            "receipt_date",
+            "entry_type",
+            "category",
+            "new_category",
+            "description",
+            "amount",
+            "payment_method",
+            "notes",
+        ]
+        labels = {
+            "receipt_file": "Receipt / Invoice File",
+            "receipt_date": "Receipt Date",
+            "entry_type": "Accounting Type",
+            "amount": "Amount",
+        }
+        help_texts = {
+            "receipt_file": "Upload the original receipt, invoice, or PDF. RentLogic stores it as proof.",
+            "amount": "Enter the amount from the receipt. Automatic reading can be added later, but this keeps the books reliable now.",
+        }
+        widgets = {
+            "property": forms.Select(attrs={"class": "form-select"}),
+            "receipt_file": forms.ClearableFileInput(attrs={"class": "form-control", "accept": "image/*,.pdf"}),
+            "vendor": forms.TextInput(attrs={"class": "form-control", "placeholder": "Vendor / Payee"}),
+            "receipt_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "entry_type": forms.Select(attrs={"class": "form-select"}),
+            "category": forms.Select(attrs={"class": "form-select"}),
+            "description": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+            "amount": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+            "payment_method": forms.Select(attrs={"class": "form-select"}),
+            "notes": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+        }
+
+    def __init__(self, *args, properties=None, user=None, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+
+        if properties is not None:
+            self.fields["property"].queryset = properties
+
+        self.fields["category"].queryset = ExpenseCategory.objects.filter(is_active=True).order_by("entry_type", "name")
+        self.fields["category"].required = False
+
+    def save(self, commit=True):
+        receipt = super().save(commit=False)
+        new_category = self.cleaned_data.get("new_category", "").strip()
+
+        if new_category:
+            category = ExpenseCategory.objects.filter(name__iexact=new_category).first()
+
+            if not category:
+                category = ExpenseCategory.objects.create(
+                    name=new_category,
+                    entry_type=receipt.entry_type,
+                    created_by=self.user,
+                )
+
+            receipt.category = category
+
+        if receipt.category and not receipt.entry_type:
+            receipt.entry_type = receipt.category.entry_type
+
+        if self.user and not receipt.uploaded_by:
+            receipt.uploaded_by = self.user
+
+        if commit:
+            receipt.save()
+
+        return receipt
 
 
 class MultipleImageInput(forms.ClearableFileInput):

@@ -79,6 +79,8 @@ urlpatterns = [
     path("t12-report/", views.t12_report, name="t12_report"),
     path("financial-upload/", views.financial_upload, name="financial_upload"),
     path("financial-upload/<int:upload_id>/parse/", views.parse_financial_upload, name="parse_financial_upload"),
+    path("accounting/receipts/", views.accounting_receipts, name="accounting_receipts"),
+    path("accounting/receipts/<int:receipt_id>/approve/", views.approve_accounting_receipt, name="approve_accounting_receipt"),
 
     path("property-financials/<str:property_name>/", views.property_financials, name="property_financials"),
 

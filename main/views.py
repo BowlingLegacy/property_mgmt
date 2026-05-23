@@ -24,6 +24,7 @@ from .forms import (
     BlogCommentForm,
     HousingApplicationForm,
     FinancialUploadForm,
+    AccountingReceiptForm,
     SignUpForm,
     ManualPaymentForm,
     CustomReportForm,
@@ -42,6 +43,7 @@ from .models import (
     Payment,
     FinancialUpload,
     FinancialEntry,
+    AccountingReceipt,
     ResidentMessage,
     ApplicantDocument,
     SignedDocument,
@@ -1452,6 +1454,92 @@ def financial_upload(request):
 
     uploads = FinancialUpload.objects.all().order_by("-uploaded_at")
     return render(request, "financial_upload.html", {"form": form, "uploads": uploads})
+
+
+@login_required
+@user_passes_test(reporting_required)
+def accounting_receipts(request):
+    properties = staff_managed_properties(request.user).order_by("name")
+
+    if request.method == "POST":
+        form = AccountingReceiptForm(
+            request.POST,
+            request.FILES,
+            properties=properties,
+            user=request.user,
+        )
+
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Receipt uploaded and saved for accounting review.")
+            return redirect("accounting_receipts")
+    else:
+        form = AccountingReceiptForm(properties=properties, user=request.user)
+
+    receipts = (
+        AccountingReceipt.objects
+        .select_related("property", "category", "uploaded_by", "financial_entry")
+        .filter(property__in=properties)
+        .order_by("status", "-uploaded_at")
+    )
+
+    return render(request, "accounting_receipts.html", {
+        "form": form,
+        "receipts": receipts,
+    })
+
+
+@login_required
+@user_passes_test(reporting_required)
+def approve_accounting_receipt(request, receipt_id):
+    if request.method != "POST":
+        return redirect("accounting_receipts")
+
+    receipt = get_object_or_404(
+        AccountingReceipt.objects.select_related("property", "category", "financial_entry"),
+        id=receipt_id,
+        property__in=staff_managed_properties(request.user),
+    )
+
+    if not receipt.category:
+        messages.error(request, "Choose or create a category before approving this receipt.")
+        return redirect("accounting_receipts")
+
+    if receipt.amount <= 0:
+        messages.error(request, "Enter a valid amount before approving this receipt.")
+        return redirect("accounting_receipts")
+
+    if not receipt.financial_upload:
+        receipt.financial_upload = FinancialUpload.objects.create(
+            property=receipt.property,
+            file=receipt.receipt_file,
+            name=f"Receipt - {receipt.vendor or receipt.property.name}",
+            notes=receipt.notes,
+            parsed_at=timezone.now(),
+        )
+
+    if not receipt.financial_entry:
+        receipt.financial_entry = FinancialEntry.objects.create(
+            upload=receipt.financial_upload,
+            property_name=receipt.property.name,
+            sheet_name="Receipt Upload",
+            row_number=receipt.id,
+            entry_date=receipt.receipt_date,
+            month=receipt.receipt_date.month if receipt.receipt_date else None,
+            year=receipt.receipt_date.year if receipt.receipt_date else None,
+            entry_type=receipt.entry_type,
+            category=receipt.category.name,
+            description=receipt.description or receipt.vendor,
+            amount=receipt.amount,
+        )
+
+    receipt.status = "approved"
+    receipt.reviewed_by = request.user
+    receipt.reviewed_at = timezone.now()
+    receipt.save()
+
+    messages.success(request, "Receipt approved and added to the financial ledger.")
+    return redirect("accounting_receipts")
 
 
 @login_required

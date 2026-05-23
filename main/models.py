@@ -557,6 +557,102 @@ class FinancialUpload(models.Model):
         return f"{self.name} ({self.uploaded_at.date()})"
 
 
+class ExpenseCategory(models.Model):
+    ENTRY_TYPE_CHOICES = [
+        ("operating_expense", "Operating Expense"),
+        ("debt_service", "Debt Service"),
+        ("capital_expense", "Capital Expense"),
+        ("other", "Other"),
+    ]
+
+    name = models.CharField(max_length=255, unique=True)
+    entry_type = models.CharField(max_length=50, choices=ENTRY_TYPE_CHOICES, default="operating_expense")
+    is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        "User",
+        on_delete=models.SET_NULL,
+        related_name="created_expense_categories",
+        blank=True,
+        null=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["entry_type", "name"]
+        verbose_name_plural = "Expense categories"
+
+    def __str__(self):
+        return self.name
+
+
+class AccountingReceipt(models.Model):
+    STATUS_CHOICES = [
+        ("needs_review", "Needs Review"),
+        ("approved", "Approved"),
+        ("ignored", "Ignored / Duplicate"),
+    ]
+
+    PAYMENT_METHOD_CHOICES = Payment.PAYMENT_METHOD_CHOICES
+
+    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name="accounting_receipts")
+    receipt_file = models.FileField(upload_to="accounting_receipts/")
+    vendor = models.CharField(max_length=255, blank=True)
+    receipt_date = models.DateField(blank=True, null=True)
+    category = models.ForeignKey(
+        ExpenseCategory,
+        on_delete=models.SET_NULL,
+        related_name="receipts",
+        blank=True,
+        null=True,
+    )
+    entry_type = models.CharField(
+        max_length=50,
+        choices=ExpenseCategory.ENTRY_TYPE_CHOICES,
+        default="operating_expense",
+    )
+    description = models.TextField(blank=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    payment_method = models.CharField(max_length=30, choices=PAYMENT_METHOD_CHOICES, default="other")
+    notes = models.TextField(blank=True)
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="needs_review")
+    uploaded_by = models.ForeignKey(
+        "User",
+        on_delete=models.SET_NULL,
+        related_name="uploaded_accounting_receipts",
+        blank=True,
+        null=True,
+    )
+    reviewed_by = models.ForeignKey(
+        "User",
+        on_delete=models.SET_NULL,
+        related_name="reviewed_accounting_receipts",
+        blank=True,
+        null=True,
+    )
+    financial_upload = models.ForeignKey(
+        FinancialUpload,
+        on_delete=models.SET_NULL,
+        related_name="receipt_sources",
+        blank=True,
+        null=True,
+    )
+    financial_entry = models.OneToOneField(
+        "FinancialEntry",
+        on_delete=models.SET_NULL,
+        related_name="source_receipt",
+        blank=True,
+        null=True,
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        ordering = ["-uploaded_at"]
+
+    def __str__(self):
+        return f"{self.property.name} - {self.vendor or 'Receipt'} - ${self.amount}"
+
+
 class PropertyOwnerIntake(models.Model):
     STATUS_CHOICES = [
         ("submitted", "Submitted"),

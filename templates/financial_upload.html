@@ -17,6 +17,7 @@
         <div class="d-flex gap-2">
             <a href="{% url 'rent_roll' %}" class="btn btn-outline-primary btn-sm">Rent Roll</a>
             <a href="{% url 't12_report' %}" class="btn btn-outline-primary btn-sm">T-12</a>
+            <a href="{% url 'accounting_receipts' %}" class="btn btn-outline-primary btn-sm">Receipts</a>
             <a href="/admin/" class="btn btn-outline-secondary btn-sm">Admin</a>
         </div>
     </div>
@@ -47,6 +48,18 @@
                     Upload For Review
                 </button>
             </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+                <h4 class="fw-bold mb-1">Receipt Upload & Review</h4>
+                <p class="text-muted mb-0">Upload receipts one at a time, create categories as you go, then approve clean entries into the ledger.</p>
+            </div>
+            <a href="{% url 'accounting_receipts' %}" class="btn btn-primary">
+                Open Receipts
+            </a>
         </div>
     </div>
 
