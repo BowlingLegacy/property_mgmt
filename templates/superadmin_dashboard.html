@@ -152,6 +152,16 @@
         <p class="text-muted mb-0">Applications, resident files, messages, documents, and payments.</p>
     </a>
 
+    <a href="{% url 'landlord_rent_setup' %}" class="admin-card-link">
+        <h2>Room Rent Setup</h2>
+        <p class="text-muted mb-0">Set rent by room letter and push rent balances to resident dashboards.</p>
+    </a>
+
+    <a href="{% url 'group_resident_message' %}" class="admin-card-link">
+        <h2>Resident Messages</h2>
+        <p class="text-muted mb-0">Send secure group messages to residents by property.</p>
+    </a>
+
     <a href="{% url 'property_owner_dashboard' %}" class="admin-card-link">
         <h2>Owner Dashboard</h2>
         <p class="text-muted mb-0">Portfolio view for owner financial review.</p>
@@ -160,6 +170,21 @@
     <a href="{% url 'payment_log' %}" class="admin-card-link">
         <h2>Money Matters</h2>
         <p class="text-muted mb-0">Payments made through the site, manual receipts, and exports.</p>
+    </a>
+
+    <a href="{% url 'record_manual_payment' %}" class="admin-card-link">
+        <h2>Record Payment</h2>
+        <p class="text-muted mb-0">Enter bank transfer, Cash App, cash, check, ACH, or other payments and print receipts.</p>
+    </a>
+
+    <a href="{% url 'rent_roll' %}" class="admin-card-link">
+        <h2>Rent Roll</h2>
+        <p class="text-muted mb-0">Review resident rent, utilities, deposits, balances, and unit labels.</p>
+    </a>
+
+    <a href="{% url 't12_report' %}" class="admin-card-link">
+        <h2>T-12 Report</h2>
+        <p class="text-muted mb-0">View trailing twelve-month income, expenses, debt service, and NOI.</p>
     </a>
 
     <a href="{% url 'custom_reports' %}" class="admin-card-link">

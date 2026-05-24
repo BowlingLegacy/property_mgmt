@@ -1801,6 +1801,7 @@ class LiveFlowTests(TestCase):
         self.client.login(username="accounting-landlord", password="StrongPass123!")
         upload_response = self.client.post(reverse("financial_upload"), {
             "property": property_obj.id,
+            "ledger_scope": "property",
             "name": "May Expenses",
             "file": csv_file,
             "notes": "Bank export",
@@ -1820,7 +1821,7 @@ class LiveFlowTests(TestCase):
             "default_category": "",
         })
 
-        self.assertRedirects(response, reverse("parse_financial_upload", args=[upload.id]))
+        self.assertRedirects(response, reverse("financial_upload"))
         entries = FinancialEntry.objects.filter(upload=upload).order_by("row_number")
         self.assertEqual(entries.count(), 2)
         self.assertEqual(entries[0].property_name, property_obj.name)
@@ -1829,6 +1830,52 @@ class LiveFlowTests(TestCase):
         self.assertEqual(entries[0].category, "Utilities")
         self.assertEqual(entries[1].entry_type, "capital_expense")
         self.assertTrue(ExpenseCategory.objects.filter(name="Utilities").exists())
+
+    def test_accounting_import_can_split_rent_utilities_and_deposits(self):
+        landlord = User.objects.create_user(
+            username="split-ledger-landlord",
+            email="split-ledger-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Split Ledger Property", landlord_email=landlord.email)
+        csv_file = SimpleUploadedFile(
+            "rent-roll.csv",
+            b"Date,Resident,Rent,Utilities,Deposit\n2026-06-01,Felicia Valdez,500.00,75.00,150.00\n",
+            content_type="text/csv",
+        )
+
+        self.client.login(username="split-ledger-landlord", password="StrongPass123!")
+        self.client.post(reverse("financial_upload"), {
+            "property": property_obj.id,
+            "ledger_scope": "property",
+            "name": "June Rent Roll",
+            "file": csv_file,
+            "notes": "Rent roll export",
+        })
+
+        upload = FinancialUpload.objects.get(name="June Rent Roll")
+        response = self.client.post(reverse("parse_financial_upload", args=[upload.id]), {
+            "date_column": "Date",
+            "description_column": "Resident",
+            "amount_column": "Rent",
+            "utility_amount_column": "Utilities",
+            "deposit_amount_column": "Deposit",
+            "other_income_amount_column": "",
+            "category_column": "",
+            "entry_type_column": "",
+            "property_column": "",
+            "default_entry_type": "income",
+            "default_category": "Rent Income",
+        })
+
+        self.assertRedirects(response, reverse("financial_upload"))
+        entries = FinancialEntry.objects.filter(upload=upload).order_by("category")
+        self.assertEqual(entries.count(), 3)
+        self.assertEqual(sum((entry.amount for entry in entries), Decimal("0.00")), Decimal("725.00"))
+        self.assertTrue(entries.filter(category="Utility Payment", amount=Decimal("75.00")).exists())
+        self.assertTrue(entries.filter(category="Deposit Payment", amount=Decimal("150.00")).exists())
 
     def test_accounting_import_blocks_other_landlord_property(self):
         landlord = User.objects.create_user(

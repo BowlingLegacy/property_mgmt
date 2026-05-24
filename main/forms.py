@@ -43,9 +43,10 @@ class BlogCommentForm(forms.ModelForm):
 class FinancialUploadForm(forms.ModelForm):
     class Meta:
         model = FinancialUpload
-        fields = ["property", "name", "file", "notes"]
+        fields = ["property", "ledger_scope", "name", "file", "notes"]
         labels = {
             "property": "Property",
+            "ledger_scope": "Ledger",
             "name": "Import name",
             "file": "Accounting export or data file",
             "notes": "Source system / import notes",
@@ -57,6 +58,7 @@ class FinancialUploadForm(forms.ModelForm):
         }
         widgets = {
             "property": forms.Select(attrs={"class": "form-select"}),
+            "ledger_scope": forms.Select(attrs={"class": "form-select"}),
             "name": forms.TextInput(attrs={"class": "form-control"}),
             "file": forms.ClearableFileInput(attrs={"class": "form-control"}),
             "notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),

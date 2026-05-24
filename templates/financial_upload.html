@@ -37,7 +37,8 @@
             <p class="text-muted">
                 Use this intake point for CSV, Excel, Google Sheets exports, QuickBooks reports, rent rolls,
                 owner statements, and other accounting-system exports. Imported data should be reviewed before it is
-                treated as final books.
+                treated as final books. Choose Property Ledger for Painted Lady income/expenses, Company Ledger for
+                Bowling Legacy expenses, or Bank Activity for bank downloads that need classification.
             </p>
 
             <form method="post" enctype="multipart/form-data">
@@ -73,6 +74,7 @@
                         <thead>
                             <tr>
                                 <th>Name</th>
+                                <th>Ledger</th>
                                 <th>Uploaded</th>
                                 <th>Reviewed</th>
                                 <th>Entries</th>
@@ -82,6 +84,7 @@
                             {% for upload in uploads %}
                                 <tr>
                                     <td>{{ upload.name }}</td>
+                                    <td>{{ upload.get_ledger_scope_display }}</td>
                                     <td>{{ upload.uploaded_at }}</td>
                                     <td>{{ upload.parsed_at|default:"Not parsed" }}</td>
                                     <td>{{ upload.entries.count }}</td>

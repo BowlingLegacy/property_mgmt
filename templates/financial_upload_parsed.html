@@ -73,6 +73,15 @@
 
         <div class="mapping-grid">
             <div>
+                <label class="form-label fw-bold">Worksheet / Tab</label>
+                <select name="sheet_name" class="form-select" onchange="this.form.method='get'; this.form.submit();">
+                    {% for name in sheet_names %}
+                        <option value="{{ name }}" {% if selected_sheet_name == name %}selected{% endif %}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
                 <label class="form-label fw-bold">Date Column</label>
                 <select name="date_column" class="form-select">
                     <option value="">No date column</option>
@@ -93,11 +102,41 @@
             </div>
 
             <div>
-                <label class="form-label fw-bold">Amount Column</label>
-                <select name="amount_column" class="form-select" required>
-                    <option value="">Choose amount column</option>
+                <label class="form-label fw-bold">Rent / Main Amount Column</label>
+                <select name="amount_column" class="form-select">
+                    <option value="">No main amount column</option>
                     {% for header in headers %}
                         <option value="{{ header }}" {% if guesses.amount == header %}selected{% endif %}>{{ header }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="form-label fw-bold">Utility Payment Column</label>
+                <select name="utility_amount_column" class="form-select">
+                    <option value="">No utilities column</option>
+                    {% for header in headers %}
+                        <option value="{{ header }}">{{ header }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="form-label fw-bold">Deposit Payment Column</label>
+                <select name="deposit_amount_column" class="form-select">
+                    <option value="">No deposit column</option>
+                    {% for header in headers %}
+                        <option value="{{ header }}">{{ header }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="form-label fw-bold">Other Income Column</label>
+                <select name="other_income_amount_column" class="form-select">
+                    <option value="">No other income column</option>
+                    {% for header in headers %}
+                        <option value="{{ header }}">{{ header }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -148,7 +187,7 @@
         </div>
 
         <div class="d-flex justify-content-end mt-4">
-            <button type="submit" class="gold-btn">Import Ledger Entries</button>
+            <button type="submit" class="gold-btn">Save Imported Ledger Entries</button>
         </div>
     </form>
 

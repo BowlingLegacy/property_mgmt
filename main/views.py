@@ -134,13 +134,26 @@ def guess_financial_columns(headers):
     return guesses
 
 
-def read_financial_upload_rows(upload, limit=None):
+def financial_upload_sheet_names(upload):
+    file_name = upload.file.name.lower()
+    if not file_name.endswith(".xlsx"):
+        return ["CSV"]
+
+    upload.file.open("rb")
+    try:
+        workbook = load_workbook(upload.file, read_only=True, data_only=True)
+        return workbook.sheetnames
+    finally:
+        upload.file.close()
+
+
+def read_financial_upload_rows(upload, limit=None, selected_sheet_name=None):
     file_name = upload.file.name.lower()
     upload.file.open("rb")
     try:
         if file_name.endswith(".xlsx"):
             workbook = load_workbook(upload.file, read_only=True, data_only=True)
-            worksheet = workbook.active
+            worksheet = workbook[selected_sheet_name] if selected_sheet_name in workbook.sheetnames else workbook.active
             raw_rows = list(worksheet.iter_rows(values_only=True))
             sheet_name = worksheet.title
         else:
@@ -176,6 +189,35 @@ def read_financial_upload_rows(upload, limit=None):
         rows.append({"row_number": row_number, "data": row_data})
 
     return sheet_name, headers, rows
+
+
+def create_financial_entry_from_import(upload, property_obj, sheet_name, row, entry_date, entry_type, category, description, amount):
+    if amount == Decimal("0.00"):
+        return None
+
+    if entry_type != "income" and category:
+        ExpenseCategory.objects.get_or_create(
+            name=category,
+            defaults={
+                "entry_type": entry_type if entry_type in dict(ExpenseCategory.ENTRY_TYPE_CHOICES) else "other",
+                "created_by": None,
+            },
+        )
+
+    return FinancialEntry.objects.create(
+        upload=upload,
+        ledger_scope=upload.ledger_scope,
+        property_name=property_obj.name if property_obj else "",
+        sheet_name=sheet_name,
+        row_number=row["row_number"],
+        entry_date=entry_date,
+        month=entry_date.month if entry_date else None,
+        year=entry_date.year if entry_date else None,
+        entry_type=entry_type,
+        category=category,
+        description=description,
+        amount=normalized_import_amount(amount, entry_type),
+    )
 
 
 def parse_import_date(value):
@@ -2214,11 +2256,14 @@ def custom_reports(request):
         elif report_type == "financial_entries":
             selected_entry_types = form.cleaned_data.get("financial_entry_types") or ["operating_expense"]
             report_title = "Financial Entries / Expenses"
-            report_columns = ["Date", "Property", "Type", "Category", "Description", "Amount", "Source"]
+            report_columns = ["Date", "Ledger", "Property", "Type", "Category", "Description", "Amount", "Source"]
             property_names = list(filtered_properties.values_list("name", flat=True))
+            entry_scope_filter = Q(property_name__in=property_names)
+            if request.user.is_superuser or getattr(request.user, "role", "") == "admin":
+                entry_scope_filter = entry_scope_filter | Q(ledger_scope__in=["company", "bank"])
             entries = (
                 FinancialEntry.objects
-                .filter(property_name__in=property_names, entry_type__in=selected_entry_types)
+                .filter(entry_scope_filter, entry_type__in=selected_entry_types)
                 .select_related("upload")
                 .order_by("property_name", "year", "month", "category", "description")
             )
@@ -2230,6 +2275,7 @@ def custom_reports(request):
             for entry in entries:
                 report_rows.append([
                     entry.entry_date or f"{entry.year or ''}-{entry.month or ''}",
+                    entry.get_ledger_scope_display(),
                     entry.property_name,
                     entry.get_entry_type_display(),
                     entry.category,
@@ -2478,8 +2524,11 @@ def parse_financial_upload(request, upload_id):
         property__in=properties,
     )
 
+    sheet_names = financial_upload_sheet_names(upload)
+    selected_sheet_name = request.POST.get("sheet_name") or request.GET.get("sheet_name") or (sheet_names[0] if sheet_names else None)
+
     try:
-        sheet_name, headers, rows = read_financial_upload_rows(upload)
+        sheet_name, headers, rows = read_financial_upload_rows(upload, selected_sheet_name=selected_sheet_name)
     except Exception as exc:
         messages.error(request, f"RentLogic could not read that file yet: {exc}")
         return redirect("financial_upload")
@@ -2493,6 +2542,9 @@ def parse_financial_upload(request, upload_id):
         date_column = request.POST.get("date_column", "")
         description_column = request.POST.get("description_column", "")
         amount_column = request.POST.get("amount_column", "")
+        utility_amount_column = request.POST.get("utility_amount_column", "")
+        deposit_amount_column = request.POST.get("deposit_amount_column", "")
+        other_income_amount_column = request.POST.get("other_income_amount_column", "")
         category_column = request.POST.get("category_column", "")
         entry_type_column = request.POST.get("entry_type_column", "")
         property_column = request.POST.get("property_column", "")
@@ -2504,12 +2556,6 @@ def parse_financial_upload(request, upload_id):
 
         for row in rows:
             row_data = row["data"]
-            raw_amount = row_data.get(amount_column)
-            amount = money(raw_amount)
-
-            if amount == Decimal("0.00"):
-                skipped += 1
-                continue
 
             raw_property_name = str(row_data.get(property_column, "") or "").strip()
             property_obj = upload.property
@@ -2521,49 +2567,69 @@ def parse_financial_upload(request, upload_id):
 
             description = str(row_data.get(description_column, "") or "").strip()
             category = str(row_data.get(category_column, "") or "").strip() or default_category or "Uncategorized"
+            primary_amount = money(row_data.get(amount_column)) if amount_column else Decimal("0.00")
             entry_type = normalize_entry_type(
                 row_data.get(entry_type_column, ""),
                 category,
                 description,
-                amount,
+                primary_amount,
                 default_entry_type,
             )
             entry_date = parse_import_date(row_data.get(date_column))
-            clean_amount = normalized_import_amount(amount, entry_type)
 
-            if entry_type != "income" and category:
-                ExpenseCategory.objects.get_or_create(
-                    name=category,
-                    defaults={
-                        "entry_type": entry_type if entry_type in dict(ExpenseCategory.ENTRY_TYPE_CHOICES) else "other",
-                        "created_by": request.user,
-                    },
+            created_for_row = 0
+            amount_columns = [
+                (amount_column, entry_type, category, description),
+                (utility_amount_column, "income", "Utility Payment", f"{description} - Utility payment".strip(" -")),
+                (deposit_amount_column, "income", "Deposit Payment", f"{description} - Deposit payment".strip(" -")),
+                (other_income_amount_column, "income", "Other Income", f"{description} - Other income".strip(" -")),
+            ]
+
+            for column_name, column_entry_type, column_category, column_description in amount_columns:
+                if not column_name:
+                    continue
+
+                amount = money(row_data.get(column_name))
+                if amount == Decimal("0.00"):
+                    continue
+
+                if column_entry_type != "income" and column_category:
+                    ExpenseCategory.objects.get_or_create(
+                        name=column_category,
+                        defaults={
+                            "entry_type": column_entry_type if column_entry_type in dict(ExpenseCategory.ENTRY_TYPE_CHOICES) else "other",
+                            "created_by": request.user,
+                        },
+                    )
+
+                create_financial_entry_from_import(
+                    upload,
+                    property_obj,
+                    sheet_name,
+                    row,
+                    entry_date,
+                    column_entry_type,
+                    column_category,
+                    column_description,
+                    amount,
                 )
+                created += 1
+                created_for_row += 1
 
-            FinancialEntry.objects.create(
-                upload=upload,
-                property_name=property_obj.name if property_obj else "",
-                sheet_name=sheet_name,
-                row_number=row["row_number"],
-                entry_date=entry_date,
-                month=entry_date.month if entry_date else None,
-                year=entry_date.year if entry_date else None,
-                entry_type=entry_type,
-                category=category,
-                description=description,
-                amount=clean_amount,
-            )
-            created += 1
+            if created_for_row == 0:
+                skipped += 1
 
         upload.parsed_at = timezone.now()
         upload.save(update_fields=["parsed_at"])
         messages.success(request, f"Imported {created} ledger entries. Skipped {skipped} rows that were blank, zero, or outside your properties.")
-        return redirect("parse_financial_upload", upload_id=upload.id)
+        return redirect("financial_upload")
 
     preview_rows = rows[:10]
 
     return render(request, "financial_upload_parsed.html", {
         "upload": upload,
+        "sheet_names": sheet_names,
+        "selected_sheet_name": sheet_name,
         "headers": headers,
         "preview_rows": preview_rows,
         "guesses": guesses,
