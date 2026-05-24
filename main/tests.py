@@ -11,7 +11,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .models import AccountingReceipt, ApplicantDocument, BlogComment, BlogPost, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, ResidentMessage, SignedDocument, User
-from .views import apply_completed_payment_to_balance
+from .views import apply_completed_payment_to_balance, ensure_existing_resident_portal_application
 
 
 @override_settings(
@@ -1358,6 +1358,34 @@ class LiveFlowTests(TestCase):
         self.assertEqual(application.property, property_obj)
         self.assertEqual(application.space_label, "Unit 4")
         self.assertIn(application.user.invite_code, mail.outbox[0].body)
+
+    def test_landlord_can_view_current_resident_intake_detail_and_backup_code(self):
+        landlord = User.objects.create_user(
+            username="resident-intake-detail-landlord",
+            email="resident-intake-detail-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Intake Detail Property", landlord_email=landlord.email)
+        intake = ExistingResidentIntake.objects.create(
+            property=property_obj,
+            first_name="Detail",
+            last_name="Resident",
+            email="detail-resident@example.com",
+            phone="555-0201",
+            room_unit_label="Unit 8",
+        )
+        application = ensure_existing_resident_portal_application(intake)
+        application.user.refresh_invite_code()
+
+        self.client.login(username="resident-intake-detail-landlord", password="StrongPass123!")
+        response = self.client.get(reverse("landlord_existing_resident_intake_detail", args=[intake.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Detail Resident")
+        self.assertContains(response, "Unit 8")
+        self.assertContains(response, application.user.invite_code)
 
     def test_existing_resident_intake_closes_after_property_window(self):
         property_obj = Property.objects.create(name="Older Property")

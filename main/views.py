@@ -2007,6 +2007,37 @@ def existing_resident_intake_success(request, pk):
 
 @login_required
 @user_passes_test(staff_required)
+def landlord_existing_resident_intake_detail(request, intake_id):
+    intake = get_object_or_404(
+        ExistingResidentIntake.objects.select_related("property"),
+        id=intake_id,
+        property__in=staff_managed_properties(request.user),
+    )
+    application = (
+        HousingApplication.objects
+        .select_related("user", "property")
+        .filter(property=intake.property, email__iexact=intake.email)
+        .first()
+    )
+    pending_user = application.user if application and application.user else None
+
+    if pending_user and pending_user.has_usable_password():
+        setup_status = "completed"
+    elif pending_user:
+        setup_status = "invite_sent"
+    else:
+        setup_status = "ready"
+
+    return render(request, "landlord_existing_resident_intake_detail.html", {
+        "intake": intake,
+        "application": application,
+        "pending_user": pending_user,
+        "setup_status": setup_status,
+    })
+
+
+@login_required
+@user_passes_test(staff_required)
 def landlord_send_existing_resident_invite(request, intake_id):
     if request.method != "POST":
         return redirect("landlord_attention")

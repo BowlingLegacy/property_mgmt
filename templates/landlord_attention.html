@@ -20,13 +20,17 @@
                     {% for row in existing_resident_intakes %}
                         {% with intake=row.intake %}
                         <tr>
-                            <td><strong>{{ intake.full_name }}</strong></td>
+                            <td>
+                                <strong>{{ intake.full_name }}</strong><br>
+                                <a href="{% url 'landlord_existing_resident_intake_detail' intake.id %}" class="btn btn-outline-secondary btn-sm mt-1">Open</a>
+                            </td>
                             <td>{{ intake.property.name }}</td>
                             <td>{{ intake.created_at|date:"M j, g:i A" }}</td>
                             <td>{{ intake.email }}<br><span class="text-muted small">{{ intake.phone }}</span></td>
                             <td>
                                 {% if row.setup_status == "completed" %}
                                     <span class="btn btn-outline-success btn-sm disabled">Completed</span>
+                                    <a href="{% url 'landlord_existing_resident_intake_detail' intake.id %}" class="btn btn-outline-secondary btn-sm">View</a>
                                 {% elif row.setup_status == "invite_sent" %}
                                     <form method="post" action="{% url 'landlord_send_existing_resident_invite' intake.id %}">
                                         {% csrf_token %}
