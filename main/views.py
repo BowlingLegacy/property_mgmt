@@ -36,6 +36,7 @@ from .forms import (
     LandlordSignUpForm,
     ExistingResidentIntakeForm,
     CurrentResidentRosterUploadForm,
+    GroupResidentMessageForm,
 )
 
 from .models import (
@@ -927,6 +928,48 @@ def landlord_message_detail(request, message_id):
     return render(request, "landlord_message_detail.html", {
         "resident_message": resident_message,
         "application": resident_message.application,
+    })
+
+
+@login_required
+@user_passes_test(reporting_required)
+def group_resident_message(request):
+    properties = staff_managed_properties(request.user).order_by("name")
+    form = GroupResidentMessageForm(request.POST or None, properties=properties)
+    preview_count = staff_managed_applications(request.user).filter(user__isnull=False).count()
+
+    if request.method == "POST" and form.is_valid():
+        selected_property_id = form.cleaned_data["property_id"]
+        target_properties = properties
+
+        if selected_property_id != "all":
+            target_properties = properties.filter(id=selected_property_id)
+
+        recipients = (
+            HousingApplication.objects
+            .select_related("property", "user")
+            .filter(property__in=target_properties, user__isnull=False)
+            .order_by("property__name", "space_label", "full_name")
+        )
+        created_count = 0
+
+        for application in recipients:
+            ResidentMessage.objects.create(
+                application=application,
+                message_type="general",
+                subject=form.cleaned_data["subject"],
+                message=form.cleaned_data["message"],
+                status="reviewed",
+                locked=True,
+            )
+            created_count += 1
+
+        messages.success(request, f"Secure portal message sent to {created_count} resident file(s).")
+        return redirect("group_resident_message")
+
+    return render(request, "group_resident_message.html", {
+        "form": form,
+        "preview_count": preview_count,
     })
 
 

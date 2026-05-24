@@ -674,6 +674,52 @@ class LiveFlowTests(TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertFalse(ResidentMessageReply.objects.filter(message=resident_message).exists())
 
+    def test_landlord_group_message_only_targets_accessible_property_residents(self):
+        landlord = User.objects.create_user(
+            username="group-message-landlord",
+            email="group-message-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        resident_user = User.objects.create_user(username="group-resident", password="StrongPass123!", role="tenant")
+        other_resident_user = User.objects.create_user(username="other-group-resident", password="StrongPass123!", role="tenant")
+        property_obj = Property.objects.create(name="Group Message Property", landlord_email=landlord.email)
+        other_property = Property.objects.create(name="Other Group Message Property", landlord_email="other@example.com")
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Group Resident",
+            phone="555-0108",
+            email="group-resident@example.com",
+            age=46,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+        )
+        other_application = HousingApplication.objects.create(
+            property=other_property,
+            user=other_resident_user,
+            full_name="Other Group Resident",
+            phone="555-0109",
+            email="other-group-resident@example.com",
+            age=46,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+        )
+
+        self.client.login(username="group-message-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("group_resident_message"), {
+            "property_id": "all",
+            "subject": "Building notice",
+            "message": "This is a secure group notice.",
+        })
+
+        self.assertRedirects(response, reverse("group_resident_message"))
+        self.assertTrue(ResidentMessage.objects.filter(application=application, subject="Building notice").exists())
+        self.assertFalse(ResidentMessage.objects.filter(application=other_application, subject="Building notice").exists())
+
     def test_create_tenant_without_application_redirects_to_dashboard(self):
         staff_user = User.objects.create_user(
             username="staff",

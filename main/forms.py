@@ -540,6 +540,34 @@ class CurrentResidentRosterUploadForm(forms.Form):
             self.fields["property"].queryset = properties
 
 
+class GroupResidentMessageForm(forms.Form):
+    property_id = forms.ChoiceField(
+        label="Send To",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    subject = forms.CharField(
+        max_length=255,
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": "Example: Water shutoff notice, rent reminder, building update",
+        }),
+    )
+    message = forms.CharField(
+        widget=forms.Textarea(attrs={
+            "class": "form-control",
+            "rows": 6,
+            "placeholder": "Write the message residents will see in their secure portal...",
+        }),
+    )
+
+    def __init__(self, *args, properties=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        property_choices = [("all", "All accessible properties")]
+        if properties is not None:
+            property_choices.extend((str(property_obj.id), property_obj.name) for property_obj in properties)
+        self.fields["property_id"].choices = property_choices
+
+
 class ManualPaymentForm(forms.ModelForm):
     class Meta:
         model = Payment

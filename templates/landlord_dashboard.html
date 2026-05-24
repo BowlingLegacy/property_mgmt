@@ -306,6 +306,11 @@ body {
                     <p class="text-muted mb-0">New applications, current resident setups, messages, and incoming documents.</p>
                 </a>
 
+                <a href="{% url 'group_resident_message' %}" class="workspace-card">
+                    <h2>Group Message</h2>
+                    <p class="text-muted mb-0">Send one secure portal message to all residents in a property.</p>
+                </a>
+
                 <a href="{% url 'landlord_resident_files' %}" class="workspace-card">
                     <div class="badge-count">{{ applications.count }}</div>
                     <h2>Resident Files</h2>
