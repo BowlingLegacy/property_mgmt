@@ -1234,6 +1234,75 @@ class LiveFlowTests(TestCase):
         self.assertEqual(graph_request.call_args.args[1], "POST")
         self.assertEqual(graph_request.call_args.args[2], "/me/sendMail")
 
+    def test_superadmin_company_mailbox_cleans_marketing_email_body(self):
+        superuser = User.objects.create_user(
+            username="superadmin-mailbox-clean",
+            email="superadmin-mailbox-clean@example.com",
+            password="StrongPass123!",
+            role="admin",
+            is_staff=True,
+        )
+        CompanyMailboxConnection.objects.create(
+            mailbox_email="michael@bowlinglegacy.com",
+            refresh_token="refresh-token",
+            access_token="access-token",
+            token_expires_at=timezone.now() + timezone.timedelta(hours=1),
+            connected_by=superuser,
+        )
+
+        self.client.login(username="superadmin-mailbox-clean", password="StrongPass123!")
+        with patch("main.views.graph_request") as graph_request:
+            graph_request.side_effect = [
+                {
+                    "id": "message-1",
+                    "subject": "Stripe update",
+                    "from": {"emailAddress": {"name": "Stripe", "address": "stripe@example.com"}},
+                    "receivedDateTime": "2026-05-24T10:00:00Z",
+                    "isRead": False,
+                    "bodyPreview": "Unlock more",
+                    "body": {
+                        "contentType": "html",
+                        "content": "<div>Unlock more&nbsp;with Stripe</div>\u200d\u200f [[https://stripe.com?utm_source=test]]<p>Explore products</p>",
+                    },
+                },
+                {},
+            ]
+            response = self.client.get(reverse("company_mailbox_message", args=["message-1"]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Unlock more with Stripe")
+        self.assertContains(response, "Explore products")
+        self.assertNotContains(response, "utm_source")
+        self.assertNotContains(response, "[[https://stripe.com")
+
+    def test_superadmin_company_mailbox_can_delete_message(self):
+        superuser = User.objects.create_user(
+            username="superadmin-mailbox-delete",
+            email="superadmin-mailbox-delete@example.com",
+            password="StrongPass123!",
+            role="admin",
+            is_staff=True,
+        )
+        CompanyMailboxConnection.objects.create(
+            mailbox_email="michael@bowlinglegacy.com",
+            refresh_token="refresh-token",
+            access_token="access-token",
+            token_expires_at=timezone.now() + timezone.timedelta(hours=1),
+            connected_by=superuser,
+        )
+
+        self.client.login(username="superadmin-mailbox-delete", password="StrongPass123!")
+        with patch("main.views.graph_request") as graph_request:
+            graph_request.return_value = {}
+            response = self.client.post(reverse("company_mailbox_message", args=["message-1"]), {
+                "action": "delete",
+            })
+
+        self.assertRedirects(response, reverse("company_mailbox"))
+        graph_request.assert_called_once()
+        self.assertEqual(graph_request.call_args.args[1], "DELETE")
+        self.assertEqual(graph_request.call_args.args[2], "/me/messages/message-1")
+
     def test_property_owner_role_can_open_empty_owner_dashboard(self):
         User.objects.create_user(
             username="portfolio-owner",

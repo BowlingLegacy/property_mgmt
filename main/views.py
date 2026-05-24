@@ -2,9 +2,12 @@ from collections import OrderedDict
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 import csv
+import html
+from html.parser import HTMLParser
 from io import TextIOWrapper
 import base64
 import json
+import re
 import secrets
 from urllib.parse import urlencode
 from urllib.error import HTTPError
@@ -1287,10 +1290,66 @@ def company_mailbox_context():
     }
 
 
+class EmailBodyTextParser(HTMLParser):
+    block_tags = {"br", "div", "p", "li", "tr", "table", "section", "article", "h1", "h2", "h3", "h4"}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag in self.block_tags:
+            self.parts.append("\n")
+
+    def handle_endtag(self, tag):
+        if tag in self.block_tags:
+            self.parts.append("\n")
+
+    def handle_data(self, data):
+        if data:
+            self.parts.append(data)
+
+    def text(self):
+        return "".join(self.parts)
+
+
+def clean_email_body(content, content_type="html"):
+    text = html.unescape(content or "")
+
+    if (content_type or "").lower() == "html":
+        parser = EmailBodyTextParser()
+        parser.feed(text)
+        text = parser.text()
+    else:
+        text = strip_tags(text)
+
+    text = html.unescape(text)
+    text = re.sub(r"[\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff\xad]", "", text)
+    text = text.replace("\xa0", " ")
+    text = re.sub(r"\[\[https?://[^\]]+\]\]", "", text)
+    text = re.sub(r"https?://\S*utm_\S+", "", text)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    text = re.sub(r"\n[ \t]+", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+
+    cleaned_lines = []
+    for line in text.splitlines():
+        clean_line = line.strip()
+        if not clean_line:
+            cleaned_lines.append("")
+            continue
+        if len(clean_line) <= 2 and not clean_line.isalnum():
+            continue
+        cleaned_lines.append(clean_line)
+
+    return "\n".join(cleaned_lines).strip()
+
+
 def parse_graph_message(message):
     sender = message.get("from", {}).get("emailAddress", {})
     body = message.get("body", {})
     body_content = body.get("content", "")
+    body_type = body.get("contentType", "html")
 
     return {
         "id": message.get("id"),
@@ -1299,7 +1358,7 @@ def parse_graph_message(message):
         "sender_email": sender.get("address", ""),
         "received": message.get("receivedDateTime", ""),
         "preview": message.get("bodyPreview", ""),
-        "body_text": strip_tags(body_content).strip(),
+        "body_text": clean_email_body(body_content, body_type),
         "is_read": message.get("isRead"),
         "web_link": message.get("webLink", ""),
     }
@@ -1427,6 +1486,17 @@ def company_mailbox_message(request, message_id):
         return redirect("company_mailbox")
 
     if request.method == "POST":
+        action = request.POST.get("action")
+
+        if action == "delete":
+            try:
+                graph_request(connection, "DELETE", f"/me/messages/{message_id}")
+            except Exception as exc:
+                messages.error(request, f"Email delete failed: {exc}")
+                return redirect("company_mailbox_message", message_id=message_id)
+            messages.success(request, "Email deleted from company mailbox.")
+            return redirect("company_mailbox")
+
         form = CompanyEmailReplyForm(request.POST)
         if form.is_valid():
             try:
