@@ -23,7 +23,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.core.mail import send_mail
+from django.core.mail import EmailMessage, send_mail
 from django.db.models import Count, Q, Sum
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
@@ -2038,13 +2038,14 @@ def upload_resident_document(request):
     if application.property and application.property.owner_email:
         owner_email = application.property.owner_email
 
-    send_mail(
+    notification = EmailMessage(
         subject=f"New Resident Document Uploaded: {name}",
-        message=f"""
+        body=f"""
 A resident uploaded a new document.
 
 Property: {application.property.name if application.property else "No Property"}
 Resident: {application.full_name}
+Resident Email: {application.email}
 Room/Space: {application.space_type} {application.space_label}
 
 Document:
@@ -2052,11 +2053,14 @@ Document:
 
 Type:
 {document_type}
+
+Replying to this email will go to the resident's email address. Use the portal file tools for official document review.
 """,
         from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
-        recipient_list=[owner_email],
-        fail_silently=True,
+        to=[owner_email],
+        reply_to=[application.email] if application.email else None,
     )
+    notification.send(fail_silently=True)
 
     messages.success(request, "Your document has been uploaded and filed.")
     return redirect("tenant_dashboard")
@@ -2081,7 +2085,7 @@ def submit_resident_message(request):
         messages.error(request, "Subject and message are required.")
         return redirect("tenant_dashboard")
 
-    ResidentMessage.objects.create(
+    resident_message = ResidentMessage.objects.create(
         application=application,
         message_type=message_type,
         subject=subject,
@@ -2094,13 +2098,16 @@ def submit_resident_message(request):
     if application.property and application.property.owner_email:
         owner_email = application.property.owner_email
 
-    send_mail(
+    message_url = request.build_absolute_uri(reverse("landlord_message_detail", args=[resident_message.id]))
+
+    notification = EmailMessage(
         subject=f"New Resident Request Filed: {subject}",
-        message=f"""
+        body=f"""
 A new resident request/message has been filed.
 
 Property: {application.property.name if application.property else "No Property"}
 Resident: {application.full_name}
+Resident Email: {application.email}
 Unit/Space: {application.space_type} {application.space_label}
 
 Type: {message_type}
@@ -2110,11 +2117,17 @@ Subject:
 
 Message:
 {message}
+
+Open secure portal thread:
+{message_url}
+
+Replying to this email will go to the resident's email address. To keep the conversation in the portal file, open the secure portal thread above.
 """,
         from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
-        recipient_list=[owner_email],
-        fail_silently=True,
+        to=[owner_email],
+        reply_to=[application.email] if application.email else None,
     )
+    notification.send(fail_silently=True)
 
     messages.success(request, "Your message/request has been submitted and filed.")
     return redirect("tenant_dashboard")

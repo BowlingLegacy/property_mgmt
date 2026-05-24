@@ -2478,6 +2478,75 @@ class LiveFlowTests(TestCase):
         self.assertRedirects(response, reverse("tenant_dashboard"))
         self.assertFalse(ApplicantDocument.objects.filter(name="Lease Upload").exists())
 
+    def test_resident_message_notification_replies_to_resident_email(self):
+        resident_user = User.objects.create_user(
+            username="message-notification-resident",
+            email="message-resident@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        property_obj = Property.objects.create(name="Message Notification Property", owner_email="owner@example.com")
+        HousingApplication.objects.create(
+            user=resident_user,
+            property=property_obj,
+            full_name="Message Resident",
+            phone="555-0137",
+            email="message-resident@example.com",
+            age=43,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+            space_label="B",
+        )
+
+        self.client.login(username="message-notification-resident", password="StrongPass123!")
+        response = self.client.post(reverse("submit_resident_message"), {
+            "message_type": "general",
+            "subject": "Question",
+            "message": "Can you review this?",
+        })
+
+        self.assertRedirects(response, reverse("tenant_dashboard"))
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["owner@example.com"])
+        self.assertEqual(mail.outbox[0].reply_to, ["message-resident@example.com"])
+        self.assertIn("Open secure portal thread:", mail.outbox[0].body)
+        self.assertIn("Replying to this email will go to the resident", mail.outbox[0].body)
+
+    def test_resident_document_notification_replies_to_resident_email(self):
+        resident_user = User.objects.create_user(
+            username="document-notification-resident",
+            email="document-reply@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        property_obj = Property.objects.create(name="Document Notification Property", owner_email="owner@example.com")
+        HousingApplication.objects.create(
+            user=resident_user,
+            property=property_obj,
+            full_name="Document Reply Resident",
+            phone="555-0138",
+            email="document-reply@example.com",
+            age=43,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+            space_label="C",
+        )
+        document = SimpleUploadedFile("id.pdf", b"resident id", content_type="application/pdf")
+
+        self.client.login(username="document-notification-resident", password="StrongPass123!")
+        response = self.client.post(reverse("upload_resident_document"), {
+            "document_type": "id",
+            "name": "Resident ID",
+            "file": document,
+        })
+
+        self.assertRedirects(response, reverse("tenant_dashboard"))
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["owner@example.com"])
+        self.assertEqual(mail.outbox[0].reply_to, ["document-reply@example.com"])
+
     def test_staff_can_mark_uploaded_document_reviewed(self):
         staff_user = User.objects.create_user(
             username="staff",
