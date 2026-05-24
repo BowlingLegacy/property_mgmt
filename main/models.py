@@ -201,6 +201,11 @@ class HousingApplication(models.Model):
         ("paid_in_full", "Paid in full at move-in"),
         ("ninety_day_plan", "Three payments over 90 days"),
     ]
+    COMMUNICATION_PREFERENCE_CHOICES = [
+        ("portal", "Portal Only"),
+        ("sms", "SMS Text"),
+        ("email", "Email"),
+    ]
 
     property = models.ForeignKey(Property, on_delete=models.SET_NULL, null=True, blank=True, related_name="applications")
     user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="resident_profile")
@@ -210,6 +215,15 @@ class HousingApplication(models.Model):
     email = models.EmailField(blank=True)
     age = models.PositiveIntegerField()
     profile_photo = models.ImageField(upload_to="resident_profile_photos/", blank=True, null=True)
+    communication_preference = models.CharField(
+        max_length=20,
+        choices=COMMUNICATION_PREFERENCE_CHOICES,
+        default="portal",
+    )
+    sms_opted_in = models.BooleanField(default=False)
+    sms_opted_in_at = models.DateTimeField(blank=True, null=True)
+    sms_opted_out_at = models.DateTimeField(blank=True, null=True)
+    sms_phone_verified = models.BooleanField(default=False)
 
     space_type = models.CharField(max_length=50, blank=True)
     space_label = models.CharField(max_length=50, blank=True)
@@ -933,3 +947,42 @@ class ResidentMessageReply(models.Model):
 
     def __str__(self):
         return f"Reply to {self.message.subject} - {self.created_at}"
+
+
+class SmsMessageLog(models.Model):
+    STATUS_CHOICES = [
+        ("not_configured", "Provider Not Configured"),
+        ("skipped_no_consent", "Skipped - No Consent"),
+        ("queued", "Queued"),
+        ("sent", "Sent"),
+        ("failed", "Failed"),
+    ]
+
+    application = models.ForeignKey(HousingApplication, on_delete=models.CASCADE, related_name="sms_logs")
+    resident_message = models.ForeignKey(
+        ResidentMessage,
+        on_delete=models.SET_NULL,
+        related_name="sms_logs",
+        blank=True,
+        null=True,
+    )
+    to_phone = models.CharField(max_length=50)
+    body = models.TextField()
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="queued")
+    provider_message_id = models.CharField(max_length=255, blank=True)
+    error_message = models.TextField(blank=True)
+    sent_by = models.ForeignKey(
+        "User",
+        on_delete=models.SET_NULL,
+        related_name="sent_sms_messages",
+        blank=True,
+        null=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.application.full_name} - {self.get_status_display()}"

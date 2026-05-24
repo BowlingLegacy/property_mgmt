@@ -541,8 +541,18 @@ class CurrentResidentRosterUploadForm(forms.Form):
 
 
 class GroupResidentMessageForm(forms.Form):
+    DELIVERY_CHOICES = [
+        ("portal", "Secure portal only"),
+        ("portal_sms", "Secure portal + SMS text"),
+    ]
+
     property_id = forms.ChoiceField(
         label="Send To",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    delivery_method = forms.ChoiceField(
+        choices=DELIVERY_CHOICES,
+        initial="portal",
         widget=forms.Select(attrs={"class": "form-select"}),
     )
     subject = forms.CharField(

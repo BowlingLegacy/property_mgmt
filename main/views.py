@@ -3,6 +3,9 @@ from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 import csv
 from io import TextIOWrapper
+import base64
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 import stripe
 from openpyxl import load_workbook
@@ -51,6 +54,7 @@ from .models import (
     ExpenseCategory,
     ResidentMessage,
     ResidentMessageReply,
+    SmsMessageLog,
     ApplicantDocument,
     SignedDocument,
     PropertyOwnerIntake,
@@ -204,6 +208,70 @@ def normalized_import_amount(amount, entry_type):
     if entry_type == "income":
         return abs(amount)
     return abs(amount)
+
+
+def sms_provider_configured():
+    return bool(settings.TWILIO_ACCOUNT_SID and settings.TWILIO_AUTH_TOKEN and settings.TWILIO_FROM_NUMBER)
+
+
+def resident_can_receive_sms(application):
+    return bool(
+        application.sms_opted_in
+        and not application.sms_opted_out_at
+        and normalize_phone_digits(application.phone)
+    )
+
+
+def sms_body(subject, message):
+    body = f"{subject}\n\n{message}\n\nReply STOP to opt out."
+    return body[:1500]
+
+
+def send_sms_message(application, body, sender, resident_message=None):
+    log = SmsMessageLog.objects.create(
+        application=application,
+        resident_message=resident_message,
+        to_phone=application.phone,
+        body=body,
+        sent_by=sender,
+    )
+
+    if not resident_can_receive_sms(application):
+        log.status = "skipped_no_consent"
+        log.error_message = "Resident has not opted in to SMS, has opted out, or has no phone number."
+        log.save(update_fields=["status", "error_message"])
+        return log
+
+    if not sms_provider_configured():
+        log.status = "not_configured"
+        log.error_message = "Twilio environment variables are not configured."
+        log.save(update_fields=["status", "error_message"])
+        return log
+
+    endpoint = f"https://api.twilio.com/2010-04-01/Accounts/{settings.TWILIO_ACCOUNT_SID}/Messages.json"
+    payload = urlencode({
+        "To": application.phone,
+        "From": settings.TWILIO_FROM_NUMBER,
+        "Body": body,
+    }).encode("utf-8")
+    credentials = f"{settings.TWILIO_ACCOUNT_SID}:{settings.TWILIO_AUTH_TOKEN}".encode("utf-8")
+    request = Request(endpoint, data=payload)
+    request.add_header("Authorization", f"Basic {base64.b64encode(credentials).decode('ascii')}")
+
+    try:
+        response = urlopen(request, timeout=10)
+        response_body = response.read().decode("utf-8")
+    except Exception as exc:
+        log.status = "failed"
+        log.error_message = str(exc)
+        log.save(update_fields=["status", "error_message"])
+        return log
+
+    log.status = "sent"
+    log.provider_message_id = response_body[:255]
+    log.sent_at = timezone.now()
+    log.save(update_fields=["status", "provider_message_id", "sent_at"])
+    return log
 
 
 def staff_required(user):
@@ -952,9 +1020,10 @@ def group_resident_message(request):
             .order_by("property__name", "space_label", "full_name")
         )
         created_count = 0
+        sms_attempt_count = 0
 
         for application in recipients:
-            ResidentMessage.objects.create(
+            resident_message = ResidentMessage.objects.create(
                 application=application,
                 message_type="general",
                 subject=form.cleaned_data["subject"],
@@ -964,13 +1033,45 @@ def group_resident_message(request):
             )
             created_count += 1
 
-        messages.success(request, f"Secure portal message sent to {created_count} resident file(s).")
+            if form.cleaned_data["delivery_method"] == "portal_sms":
+                send_sms_message(
+                    application,
+                    sms_body(form.cleaned_data["subject"], form.cleaned_data["message"]),
+                    request.user,
+                    resident_message=resident_message,
+                )
+                sms_attempt_count += 1
+
+        if sms_attempt_count:
+            messages.success(request, f"Secure portal message sent to {created_count} resident file(s). SMS attempted for {sms_attempt_count} resident file(s).")
+        else:
+            messages.success(request, f"Secure portal message sent to {created_count} resident file(s).")
         return redirect("group_resident_message")
 
     return render(request, "group_resident_message.html", {
         "form": form,
         "preview_count": preview_count,
     })
+
+
+@csrf_exempt
+def twilio_sms_webhook(request):
+    if request.method != "POST":
+        return HttpResponse("", content_type="text/xml")
+
+    from_phone = request.POST.get("From", "")
+    body = request.POST.get("Body", "").strip().lower()
+
+    if body in {"stop", "stopall", "unsubscribe", "cancel", "end", "quit"}:
+        phone_digits = normalize_phone_digits(from_phone)
+        applications = HousingApplication.objects.filter(sms_opted_in=True)
+        for application in applications:
+            if normalize_phone_digits(application.phone) == phone_digits:
+                application.sms_opted_in = False
+                application.sms_opted_out_at = timezone.now()
+                application.save(update_fields=["sms_opted_in", "sms_opted_out_at"])
+
+    return HttpResponse("<Response></Response>", content_type="text/xml")
 
 
 @login_required

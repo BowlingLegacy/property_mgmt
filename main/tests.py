@@ -10,7 +10,7 @@ from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import AccountingReceipt, ApplicantDocument, BlogComment, BlogPost, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, ResidentMessage, ResidentMessageReply, SignedDocument, User
+from .models import AccountingReceipt, ApplicantDocument, BlogComment, BlogPost, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, ResidentMessage, ResidentMessageReply, SignedDocument, SmsMessageLog, User
 from .views import apply_completed_payment_to_balance, ensure_existing_resident_portal_application
 
 
@@ -712,6 +712,7 @@ class LiveFlowTests(TestCase):
         self.client.login(username="group-message-landlord", password="StrongPass123!")
         response = self.client.post(reverse("group_resident_message"), {
             "property_id": "all",
+            "delivery_method": "portal",
             "subject": "Building notice",
             "message": "This is a secure group notice.",
         })
@@ -719,6 +720,65 @@ class LiveFlowTests(TestCase):
         self.assertRedirects(response, reverse("group_resident_message"))
         self.assertTrue(ResidentMessage.objects.filter(application=application, subject="Building notice").exists())
         self.assertFalse(ResidentMessage.objects.filter(application=other_application, subject="Building notice").exists())
+
+    def test_group_message_sms_logs_only_when_selected_and_requires_consent(self):
+        landlord = User.objects.create_user(
+            username="group-sms-landlord",
+            email="group-sms-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        resident_user = User.objects.create_user(username="group-sms-resident", password="StrongPass123!", role="tenant")
+        property_obj = Property.objects.create(name="Group SMS Property", landlord_email=landlord.email)
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Group SMS Resident",
+            phone="555-0110",
+            email="group-sms-resident@example.com",
+            age=46,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            sms_opted_in=False,
+        )
+
+        self.client.login(username="group-sms-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("group_resident_message"), {
+            "property_id": str(property_obj.id),
+            "delivery_method": "portal_sms",
+            "subject": "SMS Notice",
+            "message": "This notice should be logged, not sent.",
+        })
+
+        self.assertRedirects(response, reverse("group_resident_message"))
+        log = SmsMessageLog.objects.get(application=application)
+        self.assertEqual(log.status, "skipped_no_consent")
+
+    def test_twilio_stop_webhook_opts_out_matching_resident_phone(self):
+        resident_user = User.objects.create_user(username="sms-stop-resident", password="StrongPass123!", role="tenant")
+        application = HousingApplication.objects.create(
+            user=resident_user,
+            full_name="SMS Stop Resident",
+            phone="+15550111",
+            email="sms-stop-resident@example.com",
+            age=46,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            sms_opted_in=True,
+        )
+
+        response = self.client.post(reverse("twilio_sms_webhook"), {
+            "From": "+1 (555) 0111",
+            "Body": "STOP",
+        })
+
+        self.assertEqual(response.status_code, 200)
+        application.refresh_from_db()
+        self.assertFalse(application.sms_opted_in)
+        self.assertIsNotNone(application.sms_opted_out_at)
 
     def test_create_tenant_without_application_redirects_to_dashboard(self):
         staff_user = User.objects.create_user(

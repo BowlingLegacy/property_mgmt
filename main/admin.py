@@ -18,6 +18,7 @@ from .models import (
     AccountingReceipt,
     ResidentMessage,
     ResidentMessageReply,
+    SmsMessageLog,
     SignedDocument,
     PropertyOwnerIntake,
     LandlordIntake,
@@ -483,6 +484,11 @@ class HousingApplicationAdmin(admin.ModelAdmin):
                 "phone",
                 "email",
                 "age",
+                "communication_preference",
+                "sms_opted_in",
+                "sms_opted_in_at",
+                "sms_opted_out_at",
+                "sms_phone_verified",
             )
         }),
         ("Rent / Deposit / Utilities", {
@@ -622,6 +628,28 @@ class ResidentMessageAdmin(admin.ModelAdmin):
         if obj.application and obj.application.property:
             return obj.application.property.name
         return "No Property"
+
+
+@admin.register(SmsMessageLog)
+class SmsMessageLogAdmin(admin.ModelAdmin):
+    list_display = ("application", "to_phone", "status", "created_at", "sent_at")
+    list_filter = ("status", "created_at")
+    search_fields = ("application__full_name", "application__phone", "body", "error_message")
+    readonly_fields = (
+        "application",
+        "resident_message",
+        "to_phone",
+        "body",
+        "status",
+        "provider_message_id",
+        "error_message",
+        "sent_by",
+        "created_at",
+        "sent_at",
+    )
+
+    def has_add_permission(self, request):
+        return False
 
 
 @admin.register(BlogPost)
