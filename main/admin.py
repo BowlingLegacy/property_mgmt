@@ -25,6 +25,7 @@ from .models import (
     LandlordIntake,
     ExistingResidentIntake,
     CurrentResidentRosterEntry,
+    CompanyMailboxConnection,
 )
 from django.utils import timezone
 
@@ -719,6 +720,12 @@ class PaymentAdmin(admin.ModelAdmin):
 @admin.register(RentHistory)
 class RentHistoryAdmin(admin.ModelAdmin):
     list_display = ("application", "rent_amount", "effective_date")
+
+
+@admin.register(CompanyMailboxConnection)
+class CompanyMailboxConnectionAdmin(admin.ModelAdmin):
+    list_display = ("mailbox_email", "connected_by", "token_expires_at", "updated_at")
+    readonly_fields = ("connected_at", "updated_at")
 
 
 class FinancialEntryInline(admin.TabularInline):

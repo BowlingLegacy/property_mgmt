@@ -154,6 +154,15 @@ TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "")
 TWILIO_FROM_NUMBER = os.environ.get("TWILIO_FROM_NUMBER", "")
 
 # ---------------------------------------------------------
+# MICROSOFT GRAPH MAILBOX SETTINGS
+# ---------------------------------------------------------
+MICROSOFT_GRAPH_CLIENT_ID = os.environ.get("MICROSOFT_GRAPH_CLIENT_ID", "")
+MICROSOFT_GRAPH_CLIENT_SECRET = os.environ.get("MICROSOFT_GRAPH_CLIENT_SECRET", "")
+MICROSOFT_GRAPH_TENANT_ID = os.environ.get("MICROSOFT_GRAPH_TENANT_ID", "common")
+MICROSOFT_GRAPH_REDIRECT_URI = os.environ.get("MICROSOFT_GRAPH_REDIRECT_URI", "")
+MICROSOFT_GRAPH_MAILBOX_USER = os.environ.get("MICROSOFT_GRAPH_MAILBOX_USER", EMAIL_HOST_USER or "")
+
+# ---------------------------------------------------------
 # LOGGING
 # ---------------------------------------------------------
 import logging

@@ -69,6 +69,27 @@ class FinancialUploadForm(forms.ModelForm):
         self.fields["property"].required = True
 
 
+class CompanyEmailComposeForm(forms.Form):
+    to_email = forms.EmailField(
+        label="To",
+        widget=forms.EmailInput(attrs={"class": "form-control", "placeholder": "recipient@example.com"}),
+    )
+    subject = forms.CharField(
+        max_length=255,
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    body = forms.CharField(
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 8}),
+    )
+
+
+class CompanyEmailReplyForm(forms.Form):
+    body = forms.CharField(
+        label="Reply",
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 7}),
+    )
+
+
 class AccountingReceiptForm(forms.ModelForm):
     new_category = forms.CharField(
         required=False,

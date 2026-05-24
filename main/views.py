@@ -4,7 +4,10 @@ from decimal import Decimal, InvalidOperation
 import csv
 from io import TextIOWrapper
 import base64
+import json
+import secrets
 from urllib.parse import urlencode
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 import stripe
@@ -21,6 +24,7 @@ from django.db.models import Count, Q, Sum
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
+from django.utils.html import strip_tags
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
@@ -40,6 +44,8 @@ from .forms import (
     ExistingResidentIntakeForm,
     CurrentResidentRosterUploadForm,
     GroupResidentMessageForm,
+    CompanyEmailComposeForm,
+    CompanyEmailReplyForm,
 )
 
 from .models import (
@@ -63,6 +69,7 @@ from .models import (
     CurrentResidentRosterEntry,
     PropertyRoomRent,
     LandlordIntake,
+    CompanyMailboxConnection,
 )
 from .invite_utils import create_pending_portal_user, send_portal_access_invite_email
 from .templatetags.formatting import phone_format
@@ -1134,8 +1141,126 @@ def get_superadmin_workspace_context():
         "owner_groups": owner_groups,
         "site_payment_total": site_payment_total,
     }
+    context.update(company_mailbox_context())
 
     return context
+
+
+GRAPH_SCOPE = "offline_access Mail.ReadWrite Mail.Send User.Read"
+GRAPH_API_BASE = "https://graph.microsoft.com/v1.0"
+
+
+def microsoft_graph_configured():
+    return bool(
+        settings.MICROSOFT_GRAPH_CLIENT_ID
+        and settings.MICROSOFT_GRAPH_CLIENT_SECRET
+        and settings.MICROSOFT_GRAPH_REDIRECT_URI
+        and settings.MICROSOFT_GRAPH_MAILBOX_USER
+    )
+
+
+def microsoft_graph_authority_url(path):
+    tenant = settings.MICROSOFT_GRAPH_TENANT_ID or "common"
+    return f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/{path}"
+
+
+def microsoft_token_request(data):
+    request = Request(
+        microsoft_graph_authority_url("token"),
+        data=urlencode(data).encode("utf-8"),
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    with urlopen(request, timeout=20) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def graph_request(connection, method, path, data=None):
+    token = get_company_mailbox_access_token(connection)
+    headers = {"Authorization": f"Bearer {token}"}
+    body = None
+
+    if data is not None:
+        headers["Content-Type"] = "application/json"
+        body = json.dumps(data).encode("utf-8")
+
+    request = Request(
+        f"{GRAPH_API_BASE}{path}",
+        data=body,
+        headers=headers,
+        method=method,
+    )
+
+    try:
+        with urlopen(request, timeout=20) as response:
+            raw = response.read()
+            if not raw:
+                return {}
+            return json.loads(raw.decode("utf-8"))
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Microsoft Graph error {exc.code}: {detail}") from exc
+
+
+def get_company_mailbox_connection():
+    mailbox_email = settings.MICROSOFT_GRAPH_MAILBOX_USER or settings.EMAIL_HOST_USER or ""
+    if not mailbox_email:
+        return None
+
+    connection, _ = CompanyMailboxConnection.objects.get_or_create(mailbox_email=mailbox_email)
+    return connection
+
+
+def get_company_mailbox_access_token(connection):
+    if connection.access_token and connection.token_expires_at and connection.token_expires_at > timezone.now() + timedelta(minutes=5):
+        return connection.access_token
+
+    if not connection.refresh_token:
+        raise RuntimeError("Company mailbox is not connected yet.")
+
+    token_data = microsoft_token_request({
+        "client_id": settings.MICROSOFT_GRAPH_CLIENT_ID,
+        "client_secret": settings.MICROSOFT_GRAPH_CLIENT_SECRET,
+        "grant_type": "refresh_token",
+        "refresh_token": connection.refresh_token,
+        "redirect_uri": settings.MICROSOFT_GRAPH_REDIRECT_URI,
+        "scope": GRAPH_SCOPE,
+    })
+
+    expires_in = int(token_data.get("expires_in") or 3600)
+    connection.access_token = token_data.get("access_token", "")
+    connection.refresh_token = token_data.get("refresh_token") or connection.refresh_token
+    connection.token_expires_at = timezone.now() + timedelta(seconds=expires_in)
+    connection.save(update_fields=["access_token", "refresh_token", "token_expires_at", "updated_at"])
+
+    return connection.access_token
+
+
+def company_mailbox_context():
+    connection = get_company_mailbox_connection()
+    return {
+        "mailbox_connection": connection,
+        "mailbox_configured": microsoft_graph_configured(),
+        "mailbox_email": settings.MICROSOFT_GRAPH_MAILBOX_USER or settings.EMAIL_HOST_USER,
+    }
+
+
+def parse_graph_message(message):
+    sender = message.get("from", {}).get("emailAddress", {})
+    body = message.get("body", {})
+    body_content = body.get("content", "")
+
+    return {
+        "id": message.get("id"),
+        "subject": message.get("subject") or "(No subject)",
+        "sender_name": sender.get("name") or sender.get("address") or "Unknown sender",
+        "sender_email": sender.get("address", ""),
+        "received": message.get("receivedDateTime", ""),
+        "preview": message.get("bodyPreview", ""),
+        "body_text": strip_tags(body_content).strip(),
+        "is_read": message.get("isRead"),
+        "web_link": message.get("webLink", ""),
+    }
 
 
 @login_required
@@ -1150,6 +1275,186 @@ def superadmin_dashboard(request):
         "superadmin_dashboard.html",
         get_superadmin_workspace_context()
     )
+
+
+@login_required
+@user_passes_test(staff_required)
+def company_mailbox_connect(request):
+    if not request.user.is_superuser and request.user.role != "admin":
+        return redirect("tenant_dashboard")
+
+    if not microsoft_graph_configured():
+        messages.error(request, "Microsoft mailbox integration is not configured in Render yet.")
+        return redirect("company_mailbox")
+
+    state = secrets.token_urlsafe(24)
+    request.session["microsoft_graph_oauth_state"] = state
+
+    auth_params = {
+        "client_id": settings.MICROSOFT_GRAPH_CLIENT_ID,
+        "response_type": "code",
+        "redirect_uri": settings.MICROSOFT_GRAPH_REDIRECT_URI,
+        "response_mode": "query",
+        "scope": GRAPH_SCOPE,
+        "state": state,
+        "prompt": "select_account",
+    }
+
+    return redirect(f"{microsoft_graph_authority_url('authorize')}?{urlencode(auth_params)}")
+
+
+@login_required
+@user_passes_test(staff_required)
+def company_mailbox_callback(request):
+    if not request.user.is_superuser and request.user.role != "admin":
+        return redirect("tenant_dashboard")
+
+    if request.GET.get("state") != request.session.pop("microsoft_graph_oauth_state", None):
+        messages.error(request, "Microsoft mailbox connection failed because the security state did not match.")
+        return redirect("company_mailbox")
+
+    code = request.GET.get("code")
+    if not code:
+        messages.error(request, request.GET.get("error_description") or "Microsoft did not return an authorization code.")
+        return redirect("company_mailbox")
+
+    try:
+        token_data = microsoft_token_request({
+            "client_id": settings.MICROSOFT_GRAPH_CLIENT_ID,
+            "client_secret": settings.MICROSOFT_GRAPH_CLIENT_SECRET,
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": settings.MICROSOFT_GRAPH_REDIRECT_URI,
+            "scope": GRAPH_SCOPE,
+        })
+    except Exception as exc:
+        messages.error(request, f"Microsoft mailbox connection failed: {exc}")
+        return redirect("company_mailbox")
+
+    expires_in = int(token_data.get("expires_in") or 3600)
+    connection = get_company_mailbox_connection()
+    connection.access_token = token_data.get("access_token", "")
+    connection.refresh_token = token_data.get("refresh_token", "")
+    connection.token_expires_at = timezone.now() + timedelta(seconds=expires_in)
+    connection.connected_by = request.user
+    connection.save(update_fields=["access_token", "refresh_token", "token_expires_at", "connected_by", "updated_at"])
+
+    messages.success(request, "Company mailbox connected.")
+    return redirect("company_mailbox")
+
+
+@login_required
+@user_passes_test(staff_required)
+def company_mailbox(request):
+    if not request.user.is_superuser and request.user.role != "admin":
+        return redirect("tenant_dashboard")
+
+    context = company_mailbox_context()
+    messages_list = []
+    error_message = ""
+
+    connection = context["mailbox_connection"]
+    if context["mailbox_configured"] and connection and connection.is_connected:
+        query = urlencode({
+            "$top": "25",
+            "$orderby": "receivedDateTime desc",
+            "$select": "id,subject,from,receivedDateTime,isRead,bodyPreview,webLink",
+        })
+        try:
+            response = graph_request(connection, "GET", f"/me/messages?{query}")
+            messages_list = [parse_graph_message(message) for message in response.get("value", [])]
+        except Exception as exc:
+            error_message = str(exc)
+
+    context.update({
+        "messages_list": messages_list,
+        "error_message": error_message,
+    })
+    return render(request, "company_mailbox.html", context)
+
+
+@login_required
+@user_passes_test(staff_required)
+def company_mailbox_message(request, message_id):
+    if not request.user.is_superuser and request.user.role != "admin":
+        return redirect("tenant_dashboard")
+
+    connection = get_company_mailbox_connection()
+    if not connection or not connection.is_connected:
+        messages.error(request, "Connect the company mailbox first.")
+        return redirect("company_mailbox")
+
+    if request.method == "POST":
+        form = CompanyEmailReplyForm(request.POST)
+        if form.is_valid():
+            try:
+                graph_request(connection, "POST", f"/me/messages/{message_id}/reply", {
+                    "comment": form.cleaned_data["body"],
+                })
+            except Exception as exc:
+                messages.error(request, f"Reply failed: {exc}")
+            else:
+                messages.success(request, "Reply sent from company mailbox.")
+                return redirect("company_mailbox_message", message_id=message_id)
+    else:
+        form = CompanyEmailReplyForm()
+
+    query = urlencode({
+        "$select": "id,subject,from,toRecipients,receivedDateTime,isRead,body,bodyPreview,webLink",
+    })
+    try:
+        raw_message = graph_request(connection, "GET", f"/me/messages/{message_id}?{query}")
+        message = parse_graph_message(raw_message)
+        if raw_message.get("isRead") is False:
+            graph_request(connection, "PATCH", f"/me/messages/{message_id}", {"isRead": True})
+    except Exception as exc:
+        messages.error(request, f"Could not load email: {exc}")
+        return redirect("company_mailbox")
+
+    return render(request, "company_mailbox_message.html", {
+        **company_mailbox_context(),
+        "message": message,
+        "form": form,
+    })
+
+
+@login_required
+@user_passes_test(staff_required)
+def company_mailbox_compose(request):
+    if not request.user.is_superuser and request.user.role != "admin":
+        return redirect("tenant_dashboard")
+
+    connection = get_company_mailbox_connection()
+    if not connection or not connection.is_connected:
+        messages.error(request, "Connect the company mailbox first.")
+        return redirect("company_mailbox")
+
+    form = CompanyEmailComposeForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            graph_request(connection, "POST", "/me/sendMail", {
+                "message": {
+                    "subject": form.cleaned_data["subject"],
+                    "body": {
+                        "contentType": "Text",
+                        "content": form.cleaned_data["body"],
+                    },
+                    "toRecipients": [
+                        {"emailAddress": {"address": form.cleaned_data["to_email"]}}
+                    ],
+                },
+                "saveToSentItems": True,
+            })
+        except Exception as exc:
+            messages.error(request, f"Email send failed: {exc}")
+        else:
+            messages.success(request, "Email sent from company mailbox.")
+            return redirect("company_mailbox")
+
+    return render(request, "company_mailbox_compose.html", {
+        **company_mailbox_context(),
+        "form": form,
+    })
 
 
 @login_required

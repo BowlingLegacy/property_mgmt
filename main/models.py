@@ -1005,3 +1005,29 @@ class SmsMessageLog(models.Model):
 
     def __str__(self):
         return f"{self.application.full_name} - {self.get_status_display()}"
+
+
+class CompanyMailboxConnection(models.Model):
+    mailbox_email = models.EmailField(unique=True)
+    access_token = models.TextField(blank=True)
+    refresh_token = models.TextField(blank=True)
+    token_expires_at = models.DateTimeField(blank=True, null=True)
+    connected_by = models.ForeignKey(
+        "User",
+        on_delete=models.SET_NULL,
+        related_name="connected_company_mailboxes",
+        blank=True,
+        null=True,
+    )
+    connected_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["mailbox_email"]
+
+    @property
+    def is_connected(self):
+        return bool(self.refresh_token)
+
+    def __str__(self):
+        return self.mailbox_email

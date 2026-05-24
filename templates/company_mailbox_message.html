@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-dark text-warning d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="text-uppercase small fw-bold">Company Email</div>
+            <h1 class="h3 fw-bold mb-1">{{ message.subject }}</h1>
+            <div class="text-white-50">From {{ message.sender_name }} &lt;{{ message.sender_email }}&gt;</div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'company_mailbox' %}" class="btn btn-outline-light">Inbox</a>
+            {% if message.web_link %}
+                <a href="{{ message.web_link }}" class="btn btn-warning fw-bold" target="_blank" rel="noopener">Open in Outlook</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card-body">
+        <div class="text-muted mb-3">{{ message.received }}</div>
+
+        <div class="border rounded-3 p-3 mb-4" style="white-space: pre-wrap;">{{ message.body_text }}</div>
+
+        <form method="post">
+            {% csrf_token %}
+            <h2 class="h5 fw-bold">Reply From Company Mailbox</h2>
+            {{ form.body }}
+            {% if form.body.errors %}
+                <div class="text-danger small">{{ form.body.errors }}</div>
+            {% endif %}
+            <div class="d-flex justify-content-end mt-3">
+                <button type="submit" class="btn btn-primary fw-bold">Send Reply</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

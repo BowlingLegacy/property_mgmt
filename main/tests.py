@@ -10,7 +10,7 @@ from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import AccountingReceipt, ApplicantDocument, BlogComment, BlogPost, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, PropertyRoomRent, RentHistory, ResidentMessage, ResidentMessageReply, SignedDocument, SmsMessageLog, User
+from .models import AccountingReceipt, ApplicantDocument, BlogComment, BlogPost, CompanyMailboxConnection, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, PropertyRoomRent, RentHistory, ResidentMessage, ResidentMessageReply, SignedDocument, SmsMessageLog, User
 from .views import apply_completed_payment_to_balance, ensure_existing_resident_portal_application
 
 
@@ -19,6 +19,10 @@ from .views import apply_completed_payment_to_balance, ensure_existing_resident_
     STRIPE_SECRET_KEY="sk_test_local",
     STRIPE_PUBLIC_KEY="pk_test_local",
     STRIPE_WEBHOOK_SECRET="whsec_local",
+    MICROSOFT_GRAPH_CLIENT_ID="client-local",
+    MICROSOFT_GRAPH_CLIENT_SECRET="secret-local",
+    MICROSOFT_GRAPH_REDIRECT_URI="https://example.com/superadmin-dashboard/company-mailbox/callback/",
+    MICROSOFT_GRAPH_MAILBOX_USER="michael@bowlinglegacy.com",
     STATICFILES_STORAGE="django.contrib.staticfiles.storage.StaticFilesStorage",
 )
 class LiveFlowTests(TestCase):
@@ -1149,6 +1153,86 @@ class LiveFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Unassigned Owner")
         self.assertContains(response, "Painted Lady Inn")
+
+    def test_superadmin_dashboard_links_company_mailbox(self):
+        User.objects.create_user(
+            username="superadmin-mailbox",
+            email="superadmin-mailbox@example.com",
+            password="StrongPass123!",
+            role="admin",
+            is_staff=True,
+        )
+
+        self.client.login(username="superadmin-mailbox", password="StrongPass123!")
+        response = self.client.get(reverse("superadmin_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Company Inbox")
+        self.assertContains(response, reverse("company_mailbox"))
+
+    def test_superadmin_company_mailbox_lists_graph_messages(self):
+        superuser = User.objects.create_user(
+            username="superadmin-mailbox-list",
+            email="superadmin-mailbox-list@example.com",
+            password="StrongPass123!",
+            role="admin",
+            is_staff=True,
+        )
+        CompanyMailboxConnection.objects.create(
+            mailbox_email="michael@bowlinglegacy.com",
+            refresh_token="refresh-token",
+            access_token="access-token",
+            token_expires_at=timezone.now() + timezone.timedelta(hours=1),
+            connected_by=superuser,
+        )
+
+        self.client.login(username="superadmin-mailbox-list", password="StrongPass123!")
+        with patch("main.views.graph_request") as graph_request:
+            graph_request.return_value = {
+                "value": [{
+                    "id": "message-1",
+                    "subject": "Owner question",
+                    "from": {"emailAddress": {"name": "Owner", "address": "owner@example.com"}},
+                    "receivedDateTime": "2026-05-24T10:00:00Z",
+                    "isRead": False,
+                    "bodyPreview": "Can you help?",
+                }]
+            }
+            response = self.client.get(reverse("company_mailbox"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Owner question")
+        self.assertContains(response, "owner@example.com")
+
+    def test_superadmin_company_mailbox_compose_sends_through_graph(self):
+        superuser = User.objects.create_user(
+            username="superadmin-mailbox-compose",
+            email="superadmin-mailbox-compose@example.com",
+            password="StrongPass123!",
+            role="admin",
+            is_staff=True,
+        )
+        CompanyMailboxConnection.objects.create(
+            mailbox_email="michael@bowlinglegacy.com",
+            refresh_token="refresh-token",
+            access_token="access-token",
+            token_expires_at=timezone.now() + timezone.timedelta(hours=1),
+            connected_by=superuser,
+        )
+
+        self.client.login(username="superadmin-mailbox-compose", password="StrongPass123!")
+        with patch("main.views.graph_request") as graph_request:
+            graph_request.return_value = {}
+            response = self.client.post(reverse("company_mailbox_compose"), {
+                "to_email": "resident@example.com",
+                "subject": "Hello",
+                "body": "Message from dashboard.",
+            })
+
+        self.assertRedirects(response, reverse("company_mailbox"))
+        graph_request.assert_called_once()
+        self.assertEqual(graph_request.call_args.args[1], "POST")
+        self.assertEqual(graph_request.call_args.args[2], "/me/sendMail")
 
     def test_property_owner_role_can_open_empty_owner_dashboard(self):
         User.objects.create_user(

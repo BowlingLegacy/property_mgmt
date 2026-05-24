@@ -140,6 +140,13 @@
         <p class="text-muted mb-0">Open any tenant dashboard without logging out or changing users.</p>
     </a>
 
+    <a href="{% url 'company_mailbox' %}" class="admin-card-link">
+        <h2>Company Inbox</h2>
+        <p class="text-muted mb-0">
+            Read and send company email from {{ mailbox_email|default:"the connected mailbox" }}.
+        </p>
+    </a>
+
     <a href="{% url 'landlord_dashboard' %}" class="admin-card-link">
         <h2>Landlord Operations</h2>
         <p class="text-muted mb-0">Applications, resident files, messages, documents, and payments.</p>
