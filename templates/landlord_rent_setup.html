@@ -21,6 +21,12 @@
 .day-input {
     min-width: 72px;
 }
+.quick-room-card {
+    background: #fff9ec;
+    border: 1px solid rgba(197,154,50,.45);
+    border-radius: 14px;
+    padding: 1rem;
+}
 </style>
 
 <div class="rent-setup-card">
@@ -46,6 +52,41 @@
             <p class="text-muted">
                 Set each room's rent once. Future current-resident profile setups will pull the rent from the room letter automatically.
             </p>
+
+            <div class="quick-room-card mb-4">
+                <h3 class="h5 fw-bold mb-3">Add Room Rent</h3>
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Property</label>
+                        <select class="form-select" name="add_room_property_id">
+                            <option value="">Choose property</option>
+                            {% for property in properties %}
+                                <option value="{{ property.id }}">{{ property.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold">Room Letter</label>
+                        <input type="text" class="form-control" name="add_room_unit_label" placeholder="B">
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold">Rent</label>
+                        <input type="number" class="form-control" step="0.01" min="0" name="add_room_monthly_rent" placeholder="575.00">
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold">Due Day</label>
+                        <input type="number" class="form-control" min="1" max="31" name="add_room_rent_due_day" value="1">
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold">Utilities</label>
+                        <input type="number" class="form-control" step="0.01" min="0" name="add_room_utility_monthly" placeholder="0.00">
+                    </div>
+                </div>
+            </div>
 
             <div class="table-responsive mb-3">
                 <table class="table align-middle">

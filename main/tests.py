@@ -820,6 +820,35 @@ class LiveFlowTests(TestCase):
         self.assertEqual(room_rent.rent_due_day, 3)
         self.assertEqual(room_rent.utility_monthly, Decimal("60.00"))
 
+    def test_landlord_can_add_room_rent_without_roster_entry(self):
+        landlord = User.objects.create_user(
+            username="manual-room-rent-landlord",
+            email="manual-room-rent-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Manual Room Rent Property", landlord_email=landlord.email)
+
+        self.client.login(username="manual-room-rent-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("landlord_rent_setup"), {
+            "room_count": "0",
+            "add_room_property_id": str(property_obj.id),
+            "add_room_unit_label": "B",
+            "add_room_monthly_rent": "525.00",
+            "add_room_rent_due_day": "1",
+            "add_room_utility_monthly": "0.00",
+        })
+
+        self.assertRedirects(response, reverse("landlord_rent_setup"))
+        self.assertTrue(
+            PropertyRoomRent.objects.filter(
+                property=property_obj,
+                room_unit_label="B",
+                monthly_rent=Decimal("525.00"),
+            ).exists()
+        )
+
     def test_room_letter_rent_applies_to_existing_resident_file(self):
         landlord = User.objects.create_user(
             username="apply-room-rent-landlord",

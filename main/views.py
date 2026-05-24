@@ -930,6 +930,34 @@ def landlord_rent_setup(request):
         room_applied_count = 0
         room_applied_resident_ids = set()
 
+        add_room_property_id = request.POST.get("add_room_property_id")
+        add_room_unit_label = (request.POST.get("add_room_unit_label") or "").strip()
+
+        if add_room_property_id and add_room_unit_label:
+            try:
+                property_id = int(add_room_property_id)
+            except (TypeError, ValueError):
+                property_id = None
+
+            if property_id in accessible_property_ids:
+                try:
+                    add_room_rent_due_day = int(request.POST.get("add_room_rent_due_day") or 1)
+                except (TypeError, ValueError):
+                    add_room_rent_due_day = 1
+                add_room_rent_due_day = min(max(add_room_rent_due_day, 1), 31)
+
+                PropertyRoomRent.objects.update_or_create(
+                    property_id=property_id,
+                    room_unit_label=add_room_unit_label,
+                    defaults={
+                        "monthly_rent": money(request.POST.get("add_room_monthly_rent")),
+                        "rent_due_day": add_room_rent_due_day,
+                        "utility_monthly": money(request.POST.get("add_room_utility_monthly")),
+                        "is_active": True,
+                    },
+                )
+                room_setting_count += 1
+
         for index in range(room_count):
             prefix = f"room_{index}_"
 
@@ -1060,6 +1088,7 @@ def landlord_rent_setup(request):
         return redirect("landlord_rent_setup")
 
     return render(request, "landlord_rent_setup.html", {
+        "properties": staff_managed_properties(request.user).order_by("name"),
         "room_rows": room_rows,
         "residents": residents,
     })
