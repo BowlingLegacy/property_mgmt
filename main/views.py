@@ -47,6 +47,7 @@ from .models import (
     Property,
     BlogPost,
     HousingApplication,
+    RentHistory,
     Payment,
     FinancialUpload,
     FinancialEntry,
@@ -829,6 +830,77 @@ def landlord_attention(request):
 @user_passes_test(staff_required)
 def landlord_resident_files(request):
     return render(request, "landlord_resident_files.html", get_landlord_workspace_context(request.user))
+
+
+@login_required
+@user_passes_test(staff_required)
+def landlord_rent_setup(request):
+    residents = (
+        staff_managed_applications(request.user)
+        .select_related("property", "user")
+        .order_by("property__name", "space_label", "full_name")
+    )
+
+    if request.method == "POST":
+        updated_count = 0
+        rent_history_count = 0
+        effective_date = timezone.localdate().replace(day=1)
+
+        for resident in residents:
+            prefix = f"resident_{resident.id}_"
+            monthly_rent = money(request.POST.get(prefix + "monthly_rent"))
+            rent_balance = money(request.POST.get(prefix + "balance"))
+            utility_monthly = money(request.POST.get(prefix + "utility_monthly"))
+            utility_balance = money(request.POST.get(prefix + "utility_balance"))
+
+            try:
+                rent_due_day = int(request.POST.get(prefix + "rent_due_day") or resident.rent_due_day or 1)
+            except (TypeError, ValueError):
+                rent_due_day = resident.rent_due_day or 1
+            rent_due_day = min(max(rent_due_day, 1), 31)
+
+            changed_fields = []
+            if resident.monthly_rent != monthly_rent:
+                resident.monthly_rent = monthly_rent
+                changed_fields.append("monthly_rent")
+                RentHistory.objects.create(
+                    application=resident,
+                    rent_amount=monthly_rent,
+                    effective_date=effective_date,
+                )
+                rent_history_count += 1
+
+            if resident.balance != rent_balance:
+                resident.balance = rent_balance
+                changed_fields.append("balance")
+
+            if resident.rent_due_day != rent_due_day:
+                resident.rent_due_day = rent_due_day
+                changed_fields.append("rent_due_day")
+
+            if resident.utility_monthly != utility_monthly:
+                resident.utility_monthly = utility_monthly
+                changed_fields.append("utility_monthly")
+
+            if resident.utility_balance != utility_balance:
+                resident.utility_balance = utility_balance
+                changed_fields.append("utility_balance")
+
+            if changed_fields:
+                resident.save(update_fields=changed_fields)
+                updated_count += 1
+
+        messages.success(
+            request,
+            f"Rent setup saved for {updated_count} resident file(s). {rent_history_count} rent history record(s) added.",
+        )
+        return redirect("landlord_rent_setup")
+
+    return render(request, "landlord_rent_setup.html", {
+        "residents": residents,
+    })
+
+
 def get_superadmin_workspace_context():
     properties = Property.objects.all().order_by("name")
     users = User.objects.all().order_by("username")

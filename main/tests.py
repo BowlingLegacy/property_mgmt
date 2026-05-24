@@ -10,7 +10,7 @@ from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import AccountingReceipt, ApplicantDocument, BlogComment, BlogPost, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, ResidentMessage, ResidentMessageReply, SignedDocument, SmsMessageLog, User
+from .models import AccountingReceipt, ApplicantDocument, BlogComment, BlogPost, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, RentHistory, ResidentMessage, ResidentMessageReply, SignedDocument, SmsMessageLog, User
 from .views import apply_completed_payment_to_balance, ensure_existing_resident_portal_application
 
 
@@ -743,6 +743,99 @@ class LiveFlowTests(TestCase):
         self.assertRedirects(response, reverse("group_resident_message"))
         self.assertTrue(ResidentMessage.objects.filter(application=application, subject="Building notice").exists())
         self.assertFalse(ResidentMessage.objects.filter(application=other_application, subject="Building notice").exists())
+
+    def test_landlord_can_set_rent_for_resident_without_portal_login(self):
+        landlord = User.objects.create_user(
+            username="rent-setup-landlord",
+            email="rent-setup-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Rent Setup Property", landlord_email=landlord.email)
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Rent Setup Resident",
+            phone="555-0112",
+            email="rent-setup@example.com",
+            age=46,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            monthly_rent=Decimal("0.00"),
+            balance=Decimal("0.00"),
+            utility_monthly=Decimal("0.00"),
+            utility_balance=Decimal("0.00"),
+        )
+
+        self.client.login(username="rent-setup-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("landlord_rent_setup"), {
+            f"resident_{resident.id}_monthly_rent": "575.00",
+            f"resident_{resident.id}_balance": "575.00",
+            f"resident_{resident.id}_rent_due_day": "5",
+            f"resident_{resident.id}_utility_monthly": "66.00",
+            f"resident_{resident.id}_utility_balance": "66.00",
+        })
+
+        self.assertRedirects(response, reverse("landlord_rent_setup"))
+        resident.refresh_from_db()
+        self.assertEqual(resident.monthly_rent, Decimal("575.00"))
+        self.assertEqual(resident.balance, Decimal("575.00"))
+        self.assertEqual(resident.rent_due_day, 5)
+        self.assertEqual(resident.utility_monthly, Decimal("66.00"))
+        self.assertEqual(resident.utility_balance, Decimal("66.00"))
+        self.assertTrue(RentHistory.objects.filter(application=resident, rent_amount=Decimal("575.00")).exists())
+
+    def test_landlord_rent_setup_does_not_update_other_property_resident(self):
+        landlord = User.objects.create_user(
+            username="blocked-rent-setup-landlord",
+            email="blocked-rent-setup-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Allowed Rent Setup Property", landlord_email=landlord.email)
+        other_property = Property.objects.create(name="Other Rent Setup Property", landlord_email="other@example.com")
+        allowed_resident = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Allowed Rent Resident",
+            phone="555-0113",
+            email="allowed-rent@example.com",
+            age=46,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+        )
+        other_resident = HousingApplication.objects.create(
+            property=other_property,
+            full_name="Other Rent Resident",
+            phone="555-0114",
+            email="other-rent@example.com",
+            age=46,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            monthly_rent=Decimal("400.00"),
+            balance=Decimal("400.00"),
+        )
+
+        self.client.login(username="blocked-rent-setup-landlord", password="StrongPass123!")
+        self.client.post(reverse("landlord_rent_setup"), {
+            f"resident_{allowed_resident.id}_monthly_rent": "500.00",
+            f"resident_{allowed_resident.id}_balance": "500.00",
+            f"resident_{allowed_resident.id}_rent_due_day": "1",
+            f"resident_{allowed_resident.id}_utility_monthly": "0.00",
+            f"resident_{allowed_resident.id}_utility_balance": "0.00",
+            f"resident_{other_resident.id}_monthly_rent": "999.00",
+            f"resident_{other_resident.id}_balance": "999.00",
+            f"resident_{other_resident.id}_rent_due_day": "1",
+            f"resident_{other_resident.id}_utility_monthly": "0.00",
+            f"resident_{other_resident.id}_utility_balance": "0.00",
+        })
+
+        other_resident.refresh_from_db()
+        self.assertEqual(other_resident.monthly_rent, Decimal("400.00"))
+        self.assertEqual(other_resident.balance, Decimal("400.00"))
 
     def test_group_message_sms_logs_only_when_selected_and_requires_consent(self):
         landlord = User.objects.create_user(

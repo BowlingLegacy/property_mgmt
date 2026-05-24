@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+.rent-setup-card {
+    background: rgba(255,255,255,.94);
+    border: 1px solid rgba(188,150,45,.2);
+    border-radius: 18px;
+    box-shadow: 0 8px 20px rgba(0,0,0,.06);
+    overflow: hidden;
+}
+.rent-setup-head {
+    background: #111;
+    border-bottom: 2px solid #c59a32;
+    color: #f6ead1;
+    padding: 1.35rem;
+}
+.rent-input {
+    min-width: 105px;
+}
+.day-input {
+    min-width: 72px;
+}
+</style>
+
+<div class="rent-setup-card">
+    <div class="rent-setup-head d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="text-uppercase small fw-bold text-warning">Rent Setup</div>
+            <h1 class="fw-bold mb-1">June Rent Balances</h1>
+            <div>Set each resident's exact rent before they log into the portal.</div>
+        </div>
+        <a href="{% url 'landlord_dashboard' %}" class="btn btn-outline-light">Back to Dashboard</a>
+    </div>
+
+    <div class="p-4">
+        <div class="alert alert-warning">
+            This page updates the rent due shown on resident dashboards. Use each resident's actual agreed rent. It works even if their portal login is not completed yet, as long as a resident file exists.
+        </div>
+
+        <form method="post">
+            {% csrf_token %}
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Resident</th>
+                            <th>Property</th>
+                            <th>Room</th>
+                            <th>Monthly Rent</th>
+                            <th>June Rent Due</th>
+                            <th>Due Day</th>
+                            <th>Monthly Utilities</th>
+                            <th>Utilities Due</th>
+                            <th>Portal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for resident in residents %}
+                            <tr>
+                                <td>
+                                    <strong>{{ resident.full_name }}</strong><br>
+                                    <span class="text-muted small">{{ resident.email }}</span>
+                                </td>
+                                <td>{{ resident.property.name|default:"No Property" }}</td>
+                                <td>{{ resident.space_type }} {{ resident.space_label }}</td>
+                                <td>
+                                    <input type="number" class="form-control rent-input" step="0.01" min="0" name="resident_{{ resident.id }}_monthly_rent" value="{{ resident.monthly_rent }}">
+                                </td>
+                                <td>
+                                    <input type="number" class="form-control rent-input" step="0.01" min="0" name="resident_{{ resident.id }}_balance" value="{{ resident.balance }}">
+                                </td>
+                                <td>
+                                    <input type="number" class="form-control day-input" min="1" max="31" name="resident_{{ resident.id }}_rent_due_day" value="{{ resident.rent_due_day }}">
+                                </td>
+                                <td>
+                                    <input type="number" class="form-control rent-input" step="0.01" min="0" name="resident_{{ resident.id }}_utility_monthly" value="{{ resident.utility_monthly }}">
+                                </td>
+                                <td>
+                                    <input type="number" class="form-control rent-input" step="0.01" min="0" name="resident_{{ resident.id }}_utility_balance" value="{{ resident.utility_balance }}">
+                                </td>
+                                <td>{% if resident.user %}Linked{% else %}No login yet{% endif %}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="9" class="text-muted">No resident files found. A resident must have a resident file before rent can be assigned.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="d-flex justify-content-end mt-3">
+                <button type="submit" class="gold-btn">Save Rent Setup</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

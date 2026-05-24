@@ -7,7 +7,10 @@
             <h1 class="fw-bold mb-1">Resident Files</h1>
             <p class="text-muted mb-0">Resident records, applications, balances, and portal access.</p>
         </div>
-        <a href="{% url 'landlord_dashboard' %}" class="btn btn-outline-dark">Back to Landlord Menu</a>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'landlord_rent_setup' %}" class="btn btn-primary">June Rent Setup</a>
+            <a href="{% url 'landlord_dashboard' %}" class="btn btn-outline-dark">Back to Landlord Menu</a>
+        </div>
     </div>
 
     <div class="card shadow-sm">
