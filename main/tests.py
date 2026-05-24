@@ -1262,7 +1262,7 @@ class LiveFlowTests(TestCase):
                     "bodyPreview": "Unlock more",
                     "body": {
                         "contentType": "html",
-                        "content": "<div>Unlock more&nbsp;with Stripe</div>\u200d\u200f [[https://stripe.com?utm_source=test]]<p>Explore products</p>",
+                        "content": "<!-- #outlook a { padding:0 } @media only screen { .mj-column { width:100% } } --><style>.hide{display:none}</style><div>Unlock more&nbsp;with Stripe</div>\u200d\u200f [[https://stripe.com?utm_source=test]]<p>[ Stripe icon - Radar fraud prevention ]</p><p>Explore products</p><p>Explore products</p>",
                     },
                 },
                 {},
@@ -1274,6 +1274,8 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "Explore products")
         self.assertNotContains(response, "utm_source")
         self.assertNotContains(response, "[[https://stripe.com")
+        self.assertNotContains(response, "#outlook")
+        self.assertNotContains(response, "Stripe icon")
 
     def test_superadmin_company_mailbox_can_delete_message(self):
         superuser = User.objects.create_user(

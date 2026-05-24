@@ -9,6 +9,7 @@ import base64
 import json
 import re
 import secrets
+import unicodedata
 from urllib.parse import urlencode
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -1317,6 +1318,8 @@ def clean_email_body(content, content_type="html"):
     text = html.unescape(content or "")
 
     if (content_type or "").lower() == "html":
+        text = re.sub(r"<!--.*?-->", " ", text, flags=re.DOTALL)
+        text = re.sub(r"<(style|script|head|meta|title)[^>]*>.*?</\1>", " ", text, flags=re.DOTALL | re.IGNORECASE)
         parser = EmailBodyTextParser()
         parser.feed(text)
         text = parser.text()
@@ -1324,7 +1327,12 @@ def clean_email_body(content, content_type="html"):
         text = strip_tags(text)
 
     text = html.unescape(text)
-    text = re.sub(r"[\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff\xad]", "", text)
+    text = "".join(
+        ""
+        if unicodedata.category(character) in {"Cf", "Cc"} and character not in "\n\r\t"
+        else character
+        for character in text
+    )
     text = text.replace("\xa0", " ")
     text = re.sub(r"\[\[https?://[^\]]+\]\]", "", text)
     text = re.sub(r"https?://\S*utm_\S+", "", text)
@@ -1333,6 +1341,7 @@ def clean_email_body(content, content_type="html"):
     text = re.sub(r"\n{3,}", "\n\n", text)
 
     cleaned_lines = []
+    seen_lines = set()
     for line in text.splitlines():
         clean_line = line.strip()
         if not clean_line:
@@ -1340,9 +1349,35 @@ def clean_email_body(content, content_type="html"):
             continue
         if len(clean_line) <= 2 and not clean_line.isalnum():
             continue
+        if "{" in clean_line or "}" in clean_line:
+            continue
+        if clean_line.startswith(("@media", ".", "#")):
+            continue
+        if clean_line.lower().startswith(("padding-", "line-height-", "background-", "mj-", "mso-")):
+            continue
+        if re.fullmatch(r"\[.*?(icon|stripe).*?\]", clean_line, flags=re.IGNORECASE):
+            continue
+        line_key = clean_line.lower()
+        if line_key in seen_lines:
+            continue
+        seen_lines.add(line_key)
         cleaned_lines.append(clean_line)
 
-    return "\n".join(cleaned_lines).strip()
+    normalized_lines = []
+    previous_blank = False
+    for line in cleaned_lines:
+        is_blank = not line.strip()
+        if is_blank and previous_blank:
+            continue
+        normalized_lines.append(line)
+        previous_blank = is_blank
+
+    practical_text = "\n".join(normalized_lines).strip()
+    if len(practical_text) > 5000:
+        practical_text = practical_text[:5000].rsplit("\n", 1)[0].strip()
+        practical_text += "\n\n[Message shortened. Open in Outlook to view the full email.]"
+
+    return practical_text
 
 
 def parse_graph_message(message):
