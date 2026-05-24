@@ -61,6 +61,7 @@ from .models import (
     PropertyOwnerIntake,
     ExistingResidentIntake,
     CurrentResidentRosterEntry,
+    PropertyRoomRent,
     LandlordIntake,
 )
 from .invite_utils import create_pending_portal_user, send_portal_access_invite_email
@@ -832,9 +833,80 @@ def landlord_resident_files(request):
     return render(request, "landlord_resident_files.html", get_landlord_workspace_context(request.user))
 
 
+def room_rent_setup_rows(user):
+    properties = staff_managed_properties(user).order_by("name")
+    room_map = OrderedDict()
+
+    roster_entries = (
+        CurrentResidentRosterEntry.objects
+        .select_related("property")
+        .filter(property__in=properties, is_active=True)
+        .order_by("property__name", "room_unit_label", "last_name", "first_name")
+    )
+    for entry in roster_entries:
+        label = (entry.room_unit_label or "").strip()
+        if not label:
+            continue
+        key = (entry.property_id, label.lower())
+        room_map.setdefault(key, {
+            "property": entry.property,
+            "room_unit_label": label,
+            "residents": [],
+            "setting": None,
+        })
+        room_map[key]["residents"].append(entry.full_name())
+
+    existing_files = (
+        staff_managed_applications(user)
+        .select_related("property")
+        .exclude(space_label="")
+        .order_by("property__name", "space_label", "full_name")
+    )
+    for application in existing_files:
+        if not application.property_id:
+            continue
+        label = (application.space_label or "").strip()
+        if not label:
+            continue
+        key = (application.property_id, label.lower())
+        room_map.setdefault(key, {
+            "property": application.property,
+            "room_unit_label": label,
+            "residents": [],
+            "setting": None,
+        })
+        if application.full_name not in room_map[key]["residents"]:
+            room_map[key]["residents"].append(application.full_name)
+
+    settings = PropertyRoomRent.objects.filter(property__in=properties)
+    for setting in settings:
+        key = (setting.property_id, (setting.room_unit_label or "").strip().lower())
+        room_map.setdefault(key, {
+            "property": setting.property,
+            "room_unit_label": setting.room_unit_label,
+            "residents": [],
+            "setting": None,
+        })
+        room_map[key]["setting"] = setting
+
+    return list(room_map.values())
+
+
+def find_room_rent_setting(property_obj, room_unit_label):
+    if not property_obj or not room_unit_label:
+        return None
+
+    return (
+        PropertyRoomRent.objects
+        .filter(property=property_obj, room_unit_label__iexact=room_unit_label.strip(), is_active=True)
+        .first()
+    )
+
+
 @login_required
 @user_passes_test(staff_required)
 def landlord_rent_setup(request):
+    room_rows = room_rent_setup_rows(request.user)
     residents = (
         staff_managed_applications(request.user)
         .select_related("property", "user")
@@ -845,8 +917,99 @@ def landlord_rent_setup(request):
         updated_count = 0
         rent_history_count = 0
         effective_date = timezone.localdate().replace(day=1)
+        apply_room_rents = request.POST.get("apply_room_rents") == "on"
+        accessible_properties = staff_managed_properties(request.user)
+        accessible_property_ids = set(accessible_properties.values_list("id", flat=True))
+
+        try:
+            room_count = int(request.POST.get("room_count") or 0)
+        except (TypeError, ValueError):
+            room_count = 0
+
+        room_setting_count = 0
+        room_applied_count = 0
+        room_applied_resident_ids = set()
+
+        for index in range(room_count):
+            prefix = f"room_{index}_"
+
+            try:
+                property_id = int(request.POST.get(prefix + "property_id") or 0)
+            except (TypeError, ValueError):
+                continue
+
+            if property_id not in accessible_property_ids:
+                continue
+
+            room_unit_label = (request.POST.get(prefix + "room_unit_label") or "").strip()
+            if not room_unit_label:
+                continue
+
+            monthly_rent = money(request.POST.get(prefix + "monthly_rent"))
+            utility_monthly = money(request.POST.get(prefix + "utility_monthly"))
+
+            try:
+                rent_due_day = int(request.POST.get(prefix + "rent_due_day") or 1)
+            except (TypeError, ValueError):
+                rent_due_day = 1
+            rent_due_day = min(max(rent_due_day, 1), 31)
+
+            room_setting, _ = PropertyRoomRent.objects.update_or_create(
+                property_id=property_id,
+                room_unit_label=room_unit_label,
+                defaults={
+                    "monthly_rent": monthly_rent,
+                    "rent_due_day": rent_due_day,
+                    "utility_monthly": utility_monthly,
+                    "is_active": True,
+                },
+            )
+            room_setting_count += 1
+
+            if apply_room_rents:
+                matching_residents = residents.filter(
+                    property_id=property_id,
+                    space_label__iexact=room_unit_label,
+                )
+
+                for resident in matching_residents:
+                    changed_fields = []
+                    if resident.monthly_rent != room_setting.monthly_rent:
+                        resident.monthly_rent = room_setting.monthly_rent
+                        changed_fields.append("monthly_rent")
+                        RentHistory.objects.create(
+                            application=resident,
+                            rent_amount=room_setting.monthly_rent,
+                            effective_date=effective_date,
+                        )
+                        rent_history_count += 1
+
+                    if resident.balance != room_setting.monthly_rent:
+                        resident.balance = room_setting.monthly_rent
+                        changed_fields.append("balance")
+
+                    if resident.rent_due_day != room_setting.rent_due_day:
+                        resident.rent_due_day = room_setting.rent_due_day
+                        changed_fields.append("rent_due_day")
+
+                    if resident.utility_monthly != room_setting.utility_monthly:
+                        resident.utility_monthly = room_setting.utility_monthly
+                        changed_fields.append("utility_monthly")
+
+                    if resident.utility_balance != room_setting.utility_monthly:
+                        resident.utility_balance = room_setting.utility_monthly
+                        changed_fields.append("utility_balance")
+
+                    if changed_fields:
+                        resident.save(update_fields=changed_fields)
+                        updated_count += 1
+                        room_applied_count += 1
+                        room_applied_resident_ids.add(resident.id)
 
         for resident in residents:
+            if resident.id in room_applied_resident_ids:
+                continue
+
             prefix = f"resident_{resident.id}_"
             monthly_rent = money(request.POST.get(prefix + "monthly_rent"))
             rent_balance = money(request.POST.get(prefix + "balance"))
@@ -892,11 +1055,12 @@ def landlord_rent_setup(request):
 
         messages.success(
             request,
-            f"Rent setup saved for {updated_count} resident file(s). {rent_history_count} rent history record(s) added.",
+            f"Rent setup saved for {updated_count} resident file(s). {room_setting_count} room rent setting(s) saved. {room_applied_count} resident file(s) updated from room rent. {rent_history_count} rent history record(s) added.",
         )
         return redirect("landlord_rent_setup")
 
     return render(request, "landlord_rent_setup.html", {
+        "room_rows": room_rows,
         "residents": residents,
     })
 
@@ -2215,6 +2379,15 @@ def current_roster_match_status(intake):
 
 
 def ensure_existing_resident_portal_application(intake):
+    room_rent_setting = find_room_rent_setting(intake.property, intake.room_unit_label)
+    monthly_rent = (
+        room_rent_setting.monthly_rent
+        if room_rent_setting
+        else intake.property.rent_amount or Decimal("0.00")
+    )
+    rent_due_day = room_rent_setting.rent_due_day if room_rent_setting else 1
+    utility_monthly = room_rent_setting.utility_monthly if room_rent_setting else Decimal("0.00")
+
     application = (
         HousingApplication.objects
         .select_related("user")
@@ -2232,11 +2405,12 @@ def ensure_existing_resident_portal_application(intake):
             profile_photo=intake.profile_photo,
             space_type="Room",
             space_label=intake.room_unit_label,
-            monthly_rent=intake.property.rent_amount or Decimal("0.00"),
-            balance=Decimal("0.00"),
+            monthly_rent=monthly_rent,
+            balance=monthly_rent,
+            rent_due_day=rent_due_day,
             deposit_required=Decimal("0.00"),
-            utility_monthly=Decimal("0.00"),
-            utility_balance=Decimal("0.00"),
+            utility_monthly=utility_monthly,
+            utility_balance=utility_monthly,
             communication_preference="sms" if intake.sms_opted_in else "portal",
             sms_opted_in=intake.sms_opted_in,
             sms_opted_in_at=intake.sms_opted_in_at,

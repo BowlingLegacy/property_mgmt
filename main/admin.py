@@ -5,6 +5,7 @@ from .models import (
     User,
     Property,
     PropertyImage,
+    PropertyRoomRent,
     PropertyOnboardingDocument,
     HousingApplication,
     ApplicantDocument,
@@ -171,11 +172,23 @@ class PropertyOnboardingDocumentInline(admin.TabularInline):
     extra = 0
 
 
+class PropertyRoomRentInline(admin.TabularInline):
+    model = PropertyRoomRent
+    extra = 0
+
+
 @admin.register(Property)
 class PropertyAdmin(admin.ModelAdmin):
-    inlines = [PropertyImageInline, PropertyOnboardingDocumentInline]
+    inlines = [PropertyImageInline, PropertyRoomRentInline, PropertyOnboardingDocumentInline]
     list_display = ("name", "availability_status", "available_date", "owner_email", "landlord_email", "charges_application_fee", "requires_background_check")
     list_filter = ("availability_status", "charges_application_fee", "requires_background_check")
+
+
+@admin.register(PropertyRoomRent)
+class PropertyRoomRentAdmin(admin.ModelAdmin):
+    list_display = ("property", "room_unit_label", "monthly_rent", "rent_due_day", "utility_monthly", "is_active", "updated_at")
+    list_filter = ("property", "is_active")
+    search_fields = ("property__name", "room_unit_label")
 
 
 @admin.register(PropertyOwnerIntake)

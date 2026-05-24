@@ -167,6 +167,23 @@ class PropertyImage(models.Model):
         return f"{self.property.name} Image"
 
 
+class PropertyRoomRent(models.Model):
+    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name="room_rents")
+    room_unit_label = models.CharField(max_length=50)
+    monthly_rent = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    rent_due_day = models.PositiveSmallIntegerField(default=1)
+    utility_monthly = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    is_active = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["property__name", "room_unit_label"]
+        unique_together = ("property", "room_unit_label")
+
+    def __str__(self):
+        return f"{self.property.name} {self.room_unit_label} - ${self.monthly_rent}"
+
+
 class PropertyOnboardingDocument(models.Model):
     DOCUMENT_TYPE_CHOICES = [
         ("application", "Rental Application"),

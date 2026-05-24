@@ -40,6 +40,70 @@
 
         <form method="post">
             {% csrf_token %}
+            <input type="hidden" name="room_count" value="{{ room_rows|length }}">
+
+            <h2 class="h4 fw-bold mb-2">Rent By Room Letter</h2>
+            <p class="text-muted">
+                Set each room's rent once. Future current-resident profile setups will pull the rent from the room letter automatically.
+            </p>
+
+            <div class="table-responsive mb-3">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Property</th>
+                            <th>Room</th>
+                            <th>Resident / Roster Name</th>
+                            <th>Monthly Rent</th>
+                            <th>Due Day</th>
+                            <th>Monthly Utilities</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in room_rows %}
+                            <tr>
+                                <td>
+                                    {{ row.property.name }}
+                                    <input type="hidden" name="room_{{ forloop.counter0 }}_property_id" value="{{ row.property.id }}">
+                                    <input type="hidden" name="room_{{ forloop.counter0 }}_room_unit_label" value="{{ row.room_unit_label }}">
+                                </td>
+                                <td><strong>{{ row.room_unit_label }}</strong></td>
+                                <td>
+                                    {% for resident_name in row.residents %}
+                                        <div>{{ resident_name }}</div>
+                                    {% empty %}
+                                        <span class="text-muted">No resident file yet</span>
+                                    {% endfor %}
+                                </td>
+                                <td>
+                                    <input type="number" class="form-control rent-input" step="0.01" min="0" name="room_{{ forloop.counter0 }}_monthly_rent" value="{% if row.setting %}{{ row.setting.monthly_rent }}{% else %}0.00{% endif %}">
+                                </td>
+                                <td>
+                                    <input type="number" class="form-control day-input" min="1" max="31" name="room_{{ forloop.counter0 }}_rent_due_day" value="{% if row.setting %}{{ row.setting.rent_due_day }}{% else %}1{% endif %}">
+                                </td>
+                                <td>
+                                    <input type="number" class="form-control rent-input" step="0.01" min="0" name="room_{{ forloop.counter0 }}_utility_monthly" value="{% if row.setting %}{{ row.setting.utility_monthly }}{% else %}0.00{% endif %}">
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-muted">No room letters found yet. Upload the current resident roster or create resident files with room labels first.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <label class="form-check mb-4">
+                <input type="checkbox" class="form-check-input" name="apply_room_rents">
+                <span class="form-check-label">Apply room rent settings to existing resident files now</span>
+            </label>
+
+            <h2 class="h4 fw-bold mb-2">Resident File Balances</h2>
+            <p class="text-muted">
+                Use this section for one-off adjustments after room rent defaults are saved.
+            </p>
+
             <div class="table-responsive">
                 <table class="table align-middle">
                     <thead>

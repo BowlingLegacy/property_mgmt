@@ -10,7 +10,7 @@ from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import AccountingReceipt, ApplicantDocument, BlogComment, BlogPost, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, RentHistory, ResidentMessage, ResidentMessageReply, SignedDocument, SmsMessageLog, User
+from .models import AccountingReceipt, ApplicantDocument, BlogComment, BlogPost, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, PropertyRoomRent, RentHistory, ResidentMessage, ResidentMessageReply, SignedDocument, SmsMessageLog, User
 from .views import apply_completed_payment_to_balance, ensure_existing_resident_portal_application
 
 
@@ -785,6 +785,89 @@ class LiveFlowTests(TestCase):
         self.assertEqual(resident.utility_monthly, Decimal("66.00"))
         self.assertEqual(resident.utility_balance, Decimal("66.00"))
         self.assertTrue(RentHistory.objects.filter(application=resident, rent_amount=Decimal("575.00")).exists())
+
+    def test_landlord_can_set_rent_by_room_letter_before_profile_exists(self):
+        landlord = User.objects.create_user(
+            username="room-rent-landlord",
+            email="room-rent-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Room Rent Property", landlord_email=landlord.email)
+        CurrentResidentRosterEntry.objects.create(
+            property=property_obj,
+            first_name="Grady",
+            last_name="Brady",
+            email="grady@example.com",
+            room_unit_label="B",
+            uploaded_by=landlord,
+        )
+
+        self.client.login(username="room-rent-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("landlord_rent_setup"), {
+            "room_count": "1",
+            "room_0_property_id": str(property_obj.id),
+            "room_0_room_unit_label": "B",
+            "room_0_monthly_rent": "525.00",
+            "room_0_rent_due_day": "3",
+            "room_0_utility_monthly": "60.00",
+        })
+
+        self.assertRedirects(response, reverse("landlord_rent_setup"))
+        room_rent = PropertyRoomRent.objects.get(property=property_obj, room_unit_label="B")
+        self.assertEqual(room_rent.monthly_rent, Decimal("525.00"))
+        self.assertEqual(room_rent.rent_due_day, 3)
+        self.assertEqual(room_rent.utility_monthly, Decimal("60.00"))
+
+    def test_room_letter_rent_applies_to_existing_resident_file(self):
+        landlord = User.objects.create_user(
+            username="apply-room-rent-landlord",
+            email="apply-room-rent-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Apply Room Rent Property", landlord_email=landlord.email)
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Room Letter Resident",
+            phone="555-0116",
+            email="room-letter@example.com",
+            age=45,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            space_type="Room",
+            space_label="Q",
+            monthly_rent=Decimal("0.00"),
+            balance=Decimal("0.00"),
+            utility_monthly=Decimal("0.00"),
+            utility_balance=Decimal("0.00"),
+        )
+
+        self.client.login(username="apply-room-rent-landlord", password="StrongPass123!")
+        self.client.post(reverse("landlord_rent_setup"), {
+            "room_count": "1",
+            "room_0_property_id": str(property_obj.id),
+            "room_0_room_unit_label": "Q",
+            "room_0_monthly_rent": "600.00",
+            "room_0_rent_due_day": "1",
+            "room_0_utility_monthly": "75.00",
+            "apply_room_rents": "on",
+            f"resident_{resident.id}_monthly_rent": "0.00",
+            f"resident_{resident.id}_balance": "0.00",
+            f"resident_{resident.id}_rent_due_day": "1",
+            f"resident_{resident.id}_utility_monthly": "0.00",
+            f"resident_{resident.id}_utility_balance": "0.00",
+        })
+
+        resident.refresh_from_db()
+        self.assertEqual(resident.monthly_rent, Decimal("600.00"))
+        self.assertEqual(resident.balance, Decimal("600.00"))
+        self.assertEqual(resident.utility_monthly, Decimal("75.00"))
+        self.assertEqual(resident.utility_balance, Decimal("75.00"))
+        self.assertTrue(RentHistory.objects.filter(application=resident, rent_amount=Decimal("600.00")).exists())
 
     def test_landlord_rent_setup_does_not_update_other_property_resident(self):
         landlord = User.objects.create_user(
@@ -1687,6 +1770,32 @@ class LiveFlowTests(TestCase):
         self.assertEqual(application.property, property_obj)
         self.assertEqual(application.space_label, "Unit 4")
         self.assertIn(application.user.invite_code, mail.outbox[0].body)
+
+    def test_current_resident_setup_uses_room_letter_rent(self):
+        property_obj = Property.objects.create(name="Room Letter Intake Property", rent_amount=Decimal("400.00"))
+        PropertyRoomRent.objects.create(
+            property=property_obj,
+            room_unit_label="B",
+            monthly_rent=Decimal("575.00"),
+            rent_due_day=4,
+            utility_monthly=Decimal("65.00"),
+        )
+        intake = ExistingResidentIntake.objects.create(
+            property=property_obj,
+            first_name="Grady",
+            last_name="Brady",
+            email="grady-room-rent@example.com",
+            phone="555-0400",
+            room_unit_label="B",
+        )
+
+        application = ensure_existing_resident_portal_application(intake)
+
+        self.assertEqual(application.monthly_rent, Decimal("575.00"))
+        self.assertEqual(application.balance, Decimal("575.00"))
+        self.assertEqual(application.rent_due_day, 4)
+        self.assertEqual(application.utility_monthly, Decimal("65.00"))
+        self.assertEqual(application.utility_balance, Decimal("65.00"))
 
     def test_landlord_can_upload_current_resident_roster(self):
         landlord = User.objects.create_user(
