@@ -10,7 +10,7 @@ from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import AccountingReceipt, ApplicantDocument, BlogComment, BlogPost, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, ResidentMessage, SignedDocument, User
+from .models import AccountingReceipt, ApplicantDocument, BlogComment, BlogPost, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, ResidentMessage, ResidentMessageReply, SignedDocument, User
 from .views import apply_completed_payment_to_balance, ensure_existing_resident_portal_application
 
 
@@ -601,6 +601,78 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "New request")
         self.assertContains(response, "Uploaded ID")
         self.assertContains(response, "Mark Reviewed")
+
+    def test_landlord_can_reply_to_scoped_resident_message(self):
+        landlord = User.objects.create_user(
+            username="reply-landlord",
+            email="reply-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Reply Property", landlord_email=landlord.email)
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Reply Resident",
+            phone="555-0106",
+            email="reply-resident@example.com",
+            age=46,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Needs review.",
+        )
+        resident_message = ResidentMessage.objects.create(
+            application=application,
+            message_type="maintenance",
+            subject="Repair request",
+            message="Please fix this.",
+            status="submitted",
+        )
+
+        self.client.login(username="reply-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("landlord_message_detail", args=[resident_message.id]), {
+            "reply_body": "I will check this today.",
+        })
+
+        self.assertRedirects(response, reverse("landlord_message_detail", args=[resident_message.id]))
+        reply = ResidentMessageReply.objects.get(message=resident_message)
+        self.assertEqual(reply.sender, landlord)
+        self.assertEqual(reply.body, "I will check this today.")
+        resident_message.refresh_from_db()
+        self.assertEqual(resident_message.status, "reviewed")
+
+    def test_landlord_cannot_reply_to_other_property_message(self):
+        landlord = User.objects.create_user(
+            username="blocked-reply-landlord",
+            email="blocked-reply-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        other_property = Property.objects.create(name="Other Reply Property", landlord_email="other@example.com")
+        application = HousingApplication.objects.create(
+            property=other_property,
+            full_name="Other Reply Resident",
+            phone="555-0107",
+            email="other-reply-resident@example.com",
+            age=46,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Needs review.",
+        )
+        resident_message = ResidentMessage.objects.create(
+            application=application,
+            subject="Other request",
+            message="Private message.",
+        )
+
+        self.client.login(username="blocked-reply-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("landlord_message_detail", args=[resident_message.id]), {
+            "reply_body": "Should not send.",
+        })
+
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(ResidentMessageReply.objects.filter(message=resident_message).exists())
 
     def test_create_tenant_without_application_redirects_to_dashboard(self):
         staff_user = User.objects.create_user(
@@ -1751,6 +1823,66 @@ class LiveFlowTests(TestCase):
         self.assertContains(balance_response, "Pay Utilities")
         self.assertContains(history_response, "Payment History")
         self.assertContains(requests_response, "Sink request")
+
+    def test_resident_can_reply_only_to_own_message(self):
+        resident_user = User.objects.create_user(
+            username="reply-resident",
+            email="reply-resident@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        other_user = User.objects.create_user(
+            username="other-reply-resident",
+            email="other-reply-resident@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        application = HousingApplication.objects.create(
+            user=resident_user,
+            full_name="Reply Resident",
+            phone="555-0137",
+            email="reply-resident@example.com",
+            age=43,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        other_application = HousingApplication.objects.create(
+            user=other_user,
+            full_name="Other Reply Resident",
+            phone="555-0138",
+            email="other-reply-resident@example.com",
+            age=43,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        resident_message = ResidentMessage.objects.create(
+            application=application,
+            subject="My request",
+            message="My private request.",
+        )
+        other_message = ResidentMessage.objects.create(
+            application=other_application,
+            subject="Other request",
+            message="Other private request.",
+        )
+
+        self.client.login(username="reply-resident", password="StrongPass123!")
+        response = self.client.post(reverse("resident_requests"), {
+            "message_id": resident_message.id,
+            "reply_body": "Here is my reply.",
+        })
+
+        self.assertRedirects(response, reverse("resident_requests"))
+        self.assertTrue(ResidentMessageReply.objects.filter(message=resident_message, body="Here is my reply.").exists())
+
+        blocked_response = self.client.post(reverse("resident_requests"), {
+            "message_id": other_message.id,
+            "reply_body": "Trying to reply.",
+        })
+        self.assertEqual(blocked_response.status_code, 404)
+        self.assertFalse(ResidentMessageReply.objects.filter(message=other_message).exists())
 
     def test_resident_upload_rejects_lease_document_type(self):
         resident_user = User.objects.create_user(

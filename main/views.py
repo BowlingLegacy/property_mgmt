@@ -49,6 +49,7 @@ from .models import (
     AccountingReceipt,
     ExpenseCategory,
     ResidentMessage,
+    ResidentMessageReply,
     ApplicantDocument,
     SignedDocument,
     PropertyOwnerIntake,
@@ -894,12 +895,26 @@ def superadmin_residents(request):
 @user_passes_test(staff_required)
 def landlord_message_detail(request, message_id):
     resident_message = get_object_or_404(
-        ResidentMessage.objects.select_related("application", "application__property"),
+        ResidentMessage.objects.select_related("application", "application__property").prefetch_related("replies", "replies__sender"),
         id=message_id,
         application__in=staff_managed_applications(request.user),
     )
 
     if request.method == "POST":
+        reply_body = request.POST.get("reply_body", "").strip()
+        if reply_body:
+            ResidentMessageReply.objects.create(
+                message=resident_message,
+                sender=request.user,
+                body=reply_body,
+                visible_to_resident=True,
+            )
+            if resident_message.status == "submitted":
+                resident_message.status = "reviewed"
+                resident_message.save(update_fields=["status"])
+            messages.success(request, "Reply sent to resident portal.")
+            return redirect("landlord_message_detail", message_id=resident_message.id)
+
         new_status = request.POST.get("status")
 
         if new_status in ["submitted", "reviewed", "closed"]:
@@ -1055,9 +1070,33 @@ def resident_requests(request):
         messages.error(request, "No resident file connected.")
         return redirect("tenant_dashboard")
 
+    if request.method == "POST":
+        message_id = request.POST.get("message_id")
+        reply_body = request.POST.get("reply_body", "").strip()
+        resident_message = get_object_or_404(
+            ResidentMessage,
+            id=message_id,
+            application=application,
+        )
+
+        if not reply_body:
+            messages.error(request, "Reply cannot be blank.")
+            return redirect("resident_requests")
+
+        ResidentMessageReply.objects.create(
+            message=resident_message,
+            sender=request.user,
+            body=reply_body,
+            visible_to_resident=True,
+        )
+        resident_message.status = "submitted"
+        resident_message.save(update_fields=["status"])
+        messages.success(request, "Reply sent.")
+        return redirect("resident_requests")
+
     return render(request, "resident_requests.html", {
         "application": application,
-        "requests": application.resident_messages.all().order_by("-created_at"),
+        "requests": application.resident_messages.prefetch_related("replies", "replies__sender").all().order_by("-created_at"),
         "dashboard_url": resident_portal_url("tenant_dashboard", is_superadmin_inspecting, application),
     })
 

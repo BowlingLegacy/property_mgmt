@@ -17,6 +17,7 @@ from .models import (
     ExpenseCategory,
     AccountingReceipt,
     ResidentMessage,
+    ResidentMessageReply,
     SignedDocument,
     PropertyOwnerIntake,
     LandlordIntake,
@@ -379,6 +380,16 @@ class SignedDocumentInline(admin.TabularInline):
         return False
 
 
+class ResidentMessageReplyInline(admin.TabularInline):
+    model = ResidentMessageReply
+    extra = 0
+    readonly_fields = ("sender", "body", "visible_to_resident", "created_at")
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
 class PaymentInline(admin.TabularInline):
     model = Payment
     extra = 0
@@ -560,6 +571,7 @@ class HousingApplicationAdmin(admin.ModelAdmin):
 
 @admin.register(ResidentMessage)
 class ResidentMessageAdmin(admin.ModelAdmin):
+    inlines = [ResidentMessageReplyInline]
     list_display = (
         "created_at",
         "application",

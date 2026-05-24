@@ -40,6 +40,37 @@
                     <strong>{{ request_item.get_status_display }}</strong>
                 </div>
                 <div class="mt-3">{{ request_item.message|linebreaks }}</div>
+
+                {% if request_item.replies.all %}
+                    <div class="mt-3">
+                        <strong>Replies</strong>
+                        {% for reply in request_item.replies.all %}
+                            {% if reply.visible_to_resident %}
+                                <div class="border rounded p-3 mt-2 bg-light">
+                                    <div class="d-flex justify-content-between flex-wrap gap-2">
+                                        <strong>
+                                            {% if reply.sender %}
+                                                {{ reply.sender.get_full_name|default:reply.sender.username }}
+                                            {% else %}
+                                                Office
+                                            {% endif %}
+                                        </strong>
+                                        <span class="text-muted small">{{ reply.created_at|date:"M j, Y g:i A" }}</span>
+                                    </div>
+                                    <div class="mt-2">{{ reply.body|linebreaks }}</div>
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                <form method="post" class="mt-3">
+                    {% csrf_token %}
+                    <input type="hidden" name="message_id" value="{{ request_item.id }}">
+                    <label class="form-label fw-bold">Reply</label>
+                    <textarea name="reply_body" class="form-control mb-2" rows="3" placeholder="Write a reply..."></textarea>
+                    <button type="submit" class="btn btn-primary">Send Reply</button>
+                </form>
             </article>
         {% empty %}
             <p class="text-muted mb-0">No requests have been submitted yet.</p>

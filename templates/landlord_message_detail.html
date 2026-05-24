@@ -5,11 +5,11 @@
     <div class="card-body p-4">
 
         <a href="{% url 'landlord_dashboard' %}" class="btn btn-outline-secondary rounded-pill mb-3">
-            ← Back to Landlord Dashboard
+            Back to Landlord Dashboard
         </a>
 
         <h2 class="fw-bold" style="color:#1e3a5f;">Resident Communication</h2>
-        <p class="text-muted mb-4">Locked resident file message / request record</p>
+        <p class="text-muted mb-4">Secure resident file message / request record</p>
 
         <div class="row g-3 mb-4">
             <div class="col-md-6">
@@ -37,6 +37,36 @@
         <div class="p-4 bg-light border rounded mb-4" style="white-space: pre-wrap;">
 {{ resident_message.message }}
         </div>
+
+        <h5 class="fw-bold">Secure Replies</h5>
+        <div class="mb-4">
+            {% for reply in resident_message.replies.all %}
+                <div class="p-3 border rounded mb-2 bg-white">
+                    <div class="d-flex justify-content-between flex-wrap gap-2">
+                        <strong>
+                            {% if reply.sender %}
+                                {{ reply.sender.get_full_name|default:reply.sender.username }}
+                            {% else %}
+                                System
+                            {% endif %}
+                        </strong>
+                        <span class="text-muted small">{{ reply.created_at|date:"M j, Y g:i A" }}</span>
+                    </div>
+                    <div class="mt-2" style="white-space: pre-wrap;">{{ reply.body }}</div>
+                </div>
+            {% empty %}
+                <p class="text-muted">No replies yet.</p>
+            {% endfor %}
+        </div>
+
+        <form method="POST" class="card p-3 bg-light border-0 mb-4" style="border-radius:18px;">
+            {% csrf_token %}
+            <label class="form-label fw-bold">Reply to Resident</label>
+            <textarea name="reply_body" class="form-control mb-3" rows="4" placeholder="Write a secure portal reply..."></textarea>
+            <button type="submit" class="btn btn-primary rounded-pill">
+                Send Reply
+            </button>
+        </form>
 
         <form method="POST" class="card p-3 bg-light border-0" style="border-radius:18px;">
             {% csrf_token %}

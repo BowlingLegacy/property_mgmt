@@ -913,3 +913,23 @@ class ResidentMessage(models.Model):
 
     def __str__(self):
         return f"{self.get_message_type_display()} - {self.application.full_name} - {self.created_at}"
+
+
+class ResidentMessageReply(models.Model):
+    message = models.ForeignKey(ResidentMessage, on_delete=models.CASCADE, related_name="replies")
+    sender = models.ForeignKey(
+        "User",
+        on_delete=models.SET_NULL,
+        related_name="resident_message_replies",
+        blank=True,
+        null=True,
+    )
+    body = models.TextField()
+    visible_to_resident = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self):
+        return f"Reply to {self.message.subject} - {self.created_at}"
