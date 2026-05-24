@@ -48,6 +48,29 @@ class LiveFlowTests(TestCase):
         application = HousingApplication.objects.get(email="applicant@example.com")
         self.assertEqual(application.property, property_obj)
 
+    def test_public_privacy_and_terms_pages_render(self):
+        privacy_response = self.client.get(reverse("privacy_policy"))
+        terms_response = self.client.get(reverse("terms_of_service"))
+
+        self.assertContains(privacy_response, "does not sell, rent, or share mobile phone numbers")
+        self.assertContains(terms_response, "Reply STOP to opt out")
+
+    def test_application_sms_opt_in_records_consent_timestamp(self):
+        property_obj = Property.objects.create(name="SMS Consent Property")
+        payload = self.application_payload()
+        payload["sms_opted_in"] = "on"
+
+        response = self.client.post(
+            f"{reverse('apply')}?property={property_obj.id}",
+            payload,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        application = HousingApplication.objects.get(email="applicant@example.com")
+        self.assertTrue(application.sms_opted_in)
+        self.assertEqual(application.communication_preference, "sms")
+        self.assertIsNotNone(application.sms_opted_in_at)
+
     def test_application_inherits_property_fee_and_background_requirements(self):
         property_obj = Property.objects.create(
             name="Fee Property",
@@ -1074,6 +1097,7 @@ class LiveFlowTests(TestCase):
             "email": "existing@example.com",
             "phone": "555-0195",
             "room_unit_label": "Room B",
+            "sms_opted_in": "on",
             "has_valid_odl": "on",
             "years_at_residence": "3",
             "move_in_month": "2023-07",
@@ -1093,6 +1117,8 @@ class LiveFlowTests(TestCase):
         self.assertIsNotNone(application.user)
         self.assertEqual(application.deposit_required, Decimal("0.00"))
         self.assertEqual(application.utility_monthly, Decimal("0.00"))
+        self.assertTrue(application.sms_opted_in)
+        self.assertIsNotNone(application.sms_opted_in_at)
         self.assertIn(application.user.invite_code, mail.outbox[0].body)
 
     def test_existing_resident_intake_does_not_auto_invite_without_roster_match(self):

@@ -774,6 +774,8 @@ class ExistingResidentIntake(models.Model):
     phone = models.CharField(max_length=50)
     room_unit_label = models.CharField(max_length=50, blank=True)
     profile_photo = models.ImageField(upload_to="existing_resident_intake_photos/", blank=True, null=True)
+    sms_opted_in = models.BooleanField(default=False)
+    sms_opted_in_at = models.DateTimeField(blank=True, null=True)
     has_valid_odl = models.BooleanField(default=False)
     years_at_residence = models.PositiveIntegerField(default=0)
     move_in_month = models.CharField(max_length=7, blank=True)

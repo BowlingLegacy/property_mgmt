@@ -361,6 +361,14 @@ def who_we_serve(request):
     return render(request, "who_we_serve.html")
 
 
+def privacy_policy(request):
+    return render(request, "privacy_policy.html")
+
+
+def terms_of_service(request):
+    return render(request, "terms_of_service.html")
+
+
 def property_owner_intake(request):
     form = PropertyOwnerIntakeForm(request.POST or None)
 
@@ -395,6 +403,9 @@ def apply(request):
                     application.background_check_required = True
                     application.background_check_fee_amount = property_obj.background_check_fee_amount
                     application.background_check_status = "pending"
+            if application.sms_opted_in:
+                application.sms_opted_in_at = timezone.now()
+                application.communication_preference = "sms"
             application.save()
             request.session["submitted_application_id"] = application.id
             return redirect("apply_success")
@@ -2154,6 +2165,9 @@ def ensure_existing_resident_portal_application(intake):
             deposit_required=Decimal("0.00"),
             utility_monthly=Decimal("0.00"),
             utility_balance=Decimal("0.00"),
+            communication_preference="sms" if intake.sms_opted_in else "portal",
+            sms_opted_in=intake.sms_opted_in,
+            sms_opted_in_at=intake.sms_opted_in_at,
             income_source="Existing resident intake",
             monthly_income=Decimal("0.00"),
             housing_need="Existing resident profile setup.",
@@ -2166,6 +2180,12 @@ def ensure_existing_resident_portal_application(intake):
             application.space_type = application.space_type or "Room"
             application.space_label = intake.room_unit_label
             update_fields.extend(["space_type", "space_label"])
+
+        if intake.sms_opted_in and not application.sms_opted_in:
+            application.sms_opted_in = True
+            application.sms_opted_in_at = intake.sms_opted_in_at or timezone.now()
+            application.communication_preference = "sms"
+            update_fields.extend(["sms_opted_in", "sms_opted_in_at", "communication_preference"])
 
         if update_fields:
             application.save(update_fields=update_fields)
@@ -2267,6 +2287,8 @@ def existing_resident_intake(request, pk):
     if request.method == "POST" and form.is_valid():
         intake = form.save(commit=False)
         intake.property = property_obj
+        if intake.sms_opted_in:
+            intake.sms_opted_in_at = timezone.now()
         intake.save()
 
         if find_current_roster_match(intake):

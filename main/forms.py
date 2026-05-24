@@ -487,6 +487,7 @@ class ExistingResidentIntakeForm(forms.ModelForm):
             "phone",
             "room_unit_label",
             "profile_photo",
+            "sms_opted_in",
             "has_valid_odl",
             "years_at_residence",
             "move_in_month",
@@ -496,6 +497,7 @@ class ExistingResidentIntakeForm(forms.ModelForm):
             "middle_name": "Middle name",
             "room_unit_label": "Current Room / Unit # / Label",
             "profile_photo": "Selfie or profile photo",
+            "sms_opted_in": "Yes, I agree to receive text messages from Bowling Legacy",
             "has_valid_odl": "I have a valid Oregon driver's license",
             "years_at_residence": "Years at this residence",
             "move_in_month": "Month you moved in",
@@ -516,6 +518,7 @@ class ExistingResidentIntakeForm(forms.ModelForm):
                 "accept": "image/*",
                 "capture": "user",
             }),
+            "sms_opted_in": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "has_valid_odl": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "years_at_residence": forms.NumberInput(attrs={"class": "form-control", "min": "0"}),
             "move_in_month": forms.TextInput(attrs={"class": "form-control", "type": "month"}),
@@ -841,6 +844,7 @@ class HousingApplicationForm(forms.ModelForm):
             "phone",
             "email",
             "age",
+            "sms_opted_in",
             "current_address",
             "current_address_length",
             "previous_address_1",
@@ -884,6 +888,7 @@ class HousingApplicationForm(forms.ModelForm):
             "phone": forms.TextInput(attrs={"class": "form-control"}),
             "email": forms.EmailInput(attrs={"class": "form-control"}),
             "age": forms.NumberInput(attrs={"class": "form-control"}),
+            "sms_opted_in": forms.CheckboxInput(attrs={"class": "form-check-input"}),
 
             "current_address": forms.TextInput(attrs={"class": "form-control"}),
             "current_address_length": forms.TextInput(attrs={"class": "form-control"}),
@@ -927,6 +932,12 @@ class HousingApplicationForm(forms.ModelForm):
             "additional_notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
             "sobriety_acknowledgment": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "unconditional_regard_acknowledgment": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+        labels = {
+            "sms_opted_in": "Yes, I agree to receive text messages from Bowling Legacy",
+        }
+        help_texts = {
+            "sms_opted_in": "Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help. Consent is not required to rent from Bowling Legacy.",
         }
 
 
