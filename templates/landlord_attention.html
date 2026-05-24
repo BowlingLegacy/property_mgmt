@@ -7,7 +7,10 @@
             <h1 class="fw-bold mb-1">Needs Attention</h1>
             <p class="text-muted mb-0">New applications, resident messages, and uploaded documents.</p>
         </div>
-        <a href="{% url 'landlord_dashboard' %}" class="btn btn-outline-dark">Back to Landlord Menu</a>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'current_resident_roster_upload' %}" class="btn btn-outline-primary">Approved Resident List</a>
+            <a href="{% url 'landlord_dashboard' %}" class="btn btn-outline-dark">Back to Landlord Menu</a>
+        </div>
     </div>
 
     <div class="card shadow-sm mb-4">

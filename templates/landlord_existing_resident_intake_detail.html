@@ -125,6 +125,14 @@
                 <div class="file-panel mb-3">
                     <h2 class="h5 fw-bold">Portal Setup</h2>
 
+                    {% if roster_match_status == "matched" %}
+                        <div class="alert alert-success">This submission matches the approved current resident list.</div>
+                    {% elif roster_match_status == "not_matched" %}
+                        <div class="alert alert-warning">This submission does not match the approved current resident list. Review carefully before sending a code.</div>
+                    {% else %}
+                        <div class="alert alert-warning">No approved current resident list has been uploaded for this property yet.</div>
+                    {% endif %}
+
                     {% if setup_status == "completed" %}
                         <div class="alert alert-success">Completed. This resident has created their portal login.</div>
                     {% elif setup_status == "invite_sent" %}

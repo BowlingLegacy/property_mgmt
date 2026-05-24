@@ -35,6 +35,7 @@ from .forms import (
     PropertyOwnerIntakeForm,
     LandlordSignUpForm,
     ExistingResidentIntakeForm,
+    CurrentResidentRosterUploadForm,
 )
 
 from .models import (
@@ -52,6 +53,7 @@ from .models import (
     SignedDocument,
     PropertyOwnerIntake,
     ExistingResidentIntake,
+    CurrentResidentRosterEntry,
     LandlordIntake,
 )
 from .invite_utils import create_pending_portal_user, send_portal_access_invite_email
@@ -1902,6 +1904,50 @@ def property_existing_resident_intake_open(property_obj):
     return timezone.now() <= property_obj.created_at + timedelta(days=30)
 
 
+def clean_match_value(value):
+    return "".join(character.lower() for character in str(value or "") if character.isalnum())
+
+
+def normalize_phone_digits(value):
+    return "".join(character for character in str(value or "") if character.isdigit())
+
+
+def find_current_roster_match(intake):
+    entries = CurrentResidentRosterEntry.objects.filter(
+        property=intake.property,
+        is_active=True,
+    )
+    intake_email = str(intake.email or "").strip().lower()
+    intake_phone = normalize_phone_digits(intake.phone)
+    intake_unit = clean_match_value(intake.room_unit_label)
+    intake_first = clean_match_value(intake.first_name)
+    intake_last = clean_match_value(intake.last_name)
+
+    for entry in entries:
+        email_matches = bool(intake_email and entry.email and intake_email == entry.email.strip().lower())
+        phone_matches = bool(intake_phone and normalize_phone_digits(entry.phone) == intake_phone)
+        unit_matches = bool(intake_unit and clean_match_value(entry.room_unit_label) == intake_unit)
+        name_matches = (
+            clean_match_value(entry.first_name) == intake_first
+            and clean_match_value(entry.last_name) == intake_last
+        )
+
+        if email_matches or (name_matches and (unit_matches or phone_matches)):
+            return entry
+
+    return None
+
+
+def current_roster_match_status(intake):
+    if find_current_roster_match(intake):
+        return "matched"
+
+    if CurrentResidentRosterEntry.objects.filter(property=intake.property, is_active=True).exists():
+        return "not_matched"
+
+    return "no_roster"
+
+
 def ensure_existing_resident_portal_application(intake):
     application = (
         HousingApplication.objects
@@ -1976,6 +2022,56 @@ def send_existing_resident_portal_invite(request, intake):
     return application
 
 
+def roster_value(row, *keys):
+    for key in keys:
+        value = row.get(key)
+        if value:
+            return str(value).strip()
+    return ""
+
+
+def import_current_resident_roster(property_obj, file_obj, user):
+    decoded_file = TextIOWrapper(file_obj, encoding="utf-8-sig", newline="")
+    reader = csv.DictReader(decoded_file)
+    created = 0
+    skipped = 0
+
+    for row in reader:
+        normalized_row = {normalized_header(key): value for key, value in row.items()}
+        first_name = roster_value(normalized_row, "first name", "firstname", "first")
+        last_name = roster_value(normalized_row, "last name", "lastname", "last")
+        full_name = roster_value(normalized_row, "name", "resident", "resident name", "tenant")
+
+        if (not first_name or not last_name) and full_name:
+            parts = full_name.split()
+            first_name = first_name or (parts[0] if parts else "")
+            last_name = last_name or (" ".join(parts[1:]) if len(parts) > 1 else "")
+
+        email = roster_value(normalized_row, "email", "email address")
+        phone = roster_value(normalized_row, "phone", "phone number", "mobile", "cell")
+        room_unit_label = roster_value(normalized_row, "room unit label", "room", "unit", "room/unit", "room number", "unit number")
+
+        if not first_name or not last_name:
+            skipped += 1
+            continue
+
+        CurrentResidentRosterEntry.objects.update_or_create(
+            property=property_obj,
+            first_name=first_name,
+            last_name=last_name,
+            email=email,
+            room_unit_label=room_unit_label,
+            defaults={
+                "phone": phone,
+                "is_active": True,
+                "uploaded_by": user,
+            },
+        )
+        created += 1
+
+    return created, skipped
+
+
 def existing_resident_intake(request, pk):
     property_obj = get_object_or_404(Property, pk=pk)
 
@@ -1990,7 +2086,13 @@ def existing_resident_intake(request, pk):
         intake.property = property_obj
         intake.save()
 
-        send_existing_resident_portal_invite(request, intake)
+        if find_current_roster_match(intake):
+            send_existing_resident_portal_invite(request, intake)
+        else:
+            messages.warning(
+                request,
+                "Profile saved for landlord review. No automatic invite was sent because this submission did not match the approved current resident list.",
+            )
 
         return redirect("existing_resident_intake_success", pk=property_obj.id)
 
@@ -2033,6 +2135,34 @@ def landlord_existing_resident_intake_detail(request, intake_id):
         "application": application,
         "pending_user": pending_user,
         "setup_status": setup_status,
+        "roster_match_status": current_roster_match_status(intake),
+        "roster_match": find_current_roster_match(intake),
+    })
+
+
+@login_required
+@user_passes_test(staff_required)
+def current_resident_roster_upload(request):
+    properties = staff_managed_properties(request.user).order_by("name")
+    form = CurrentResidentRosterUploadForm(request.POST or None, request.FILES or None, properties=properties)
+
+    if request.method == "POST" and form.is_valid():
+        property_obj = form.cleaned_data["property"]
+        file_obj = form.cleaned_data["file"]
+        created, skipped = import_current_resident_roster(property_obj, file_obj, request.user)
+        messages.success(request, f"Current resident list imported for {property_obj.name}. {created} rows saved, {skipped} rows skipped.")
+        return redirect("current_resident_roster_upload")
+
+    roster_entries = (
+        CurrentResidentRosterEntry.objects
+        .filter(property__in=properties, is_active=True)
+        .select_related("property")
+        .order_by("property__name", "room_unit_label", "last_name")
+    )
+
+    return render(request, "current_resident_roster_upload.html", {
+        "form": form,
+        "roster_entries": roster_entries,
     })
 
 

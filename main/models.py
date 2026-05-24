@@ -776,6 +776,38 @@ class ExistingResidentIntake(models.Model):
         return f"{self.full_name()} - {self.property.name}"
 
 
+class CurrentResidentRosterEntry(models.Model):
+    property = models.ForeignKey(
+        "Property",
+        on_delete=models.CASCADE,
+        related_name="current_resident_roster_entries",
+    )
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+    email = models.EmailField(blank=True)
+    phone = models.CharField(max_length=50, blank=True)
+    room_unit_label = models.CharField(max_length=50, blank=True)
+    is_active = models.BooleanField(default=True)
+    uploaded_by = models.ForeignKey(
+        "User",
+        on_delete=models.SET_NULL,
+        related_name="uploaded_current_resident_roster_entries",
+        blank=True,
+        null=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["property__name", "room_unit_label", "last_name", "first_name"]
+        unique_together = ("property", "first_name", "last_name", "email", "room_unit_label")
+
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}".strip()
+
+    def __str__(self):
+        return f"{self.property.name} - {self.full_name()}"
+
+
 class LandlordIntake(models.Model):
     STATUS_CHOICES = PropertyOwnerIntake.STATUS_CHOICES
 

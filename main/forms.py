@@ -523,6 +523,23 @@ class ExistingResidentIntakeForm(forms.ModelForm):
         }
 
 
+class CurrentResidentRosterUploadForm(forms.Form):
+    property = forms.ModelChoiceField(
+        queryset=Property.objects.none(),
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    file = forms.FileField(
+        label="Current resident list",
+        help_text="CSV columns accepted: first_name, last_name, email, phone, room_unit_label. Name and unit columns from common spreadsheets are also accepted.",
+        widget=forms.ClearableFileInput(attrs={"class": "form-control", "accept": ".csv"}),
+    )
+
+    def __init__(self, *args, properties=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if properties is not None:
+            self.fields["property"].queryset = properties
+
+
 class ManualPaymentForm(forms.ModelForm):
     class Meta:
         model = Payment

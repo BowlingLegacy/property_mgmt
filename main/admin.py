@@ -21,6 +21,7 @@ from .models import (
     PropertyOwnerIntake,
     LandlordIntake,
     ExistingResidentIntake,
+    CurrentResidentRosterEntry,
 )
 from django.utils import timezone
 
@@ -303,6 +304,13 @@ class ExistingResidentIntakeAdmin(admin.ModelAdmin):
     list_filter = ("property", "has_valid_odl", "created_at")
     search_fields = ("first_name", "middle_name", "last_name", "email", "phone", "room_unit_label", "property__name")
     readonly_fields = ("created_at",)
+
+
+@admin.register(CurrentResidentRosterEntry)
+class CurrentResidentRosterEntryAdmin(admin.ModelAdmin):
+    list_display = ("property", "full_name", "room_unit_label", "email", "phone", "is_active", "created_at")
+    list_filter = ("property", "is_active")
+    search_fields = ("first_name", "last_name", "email", "phone", "room_unit_label", "property__name")
 
 
 class ApplicantDocumentInline(admin.TabularInline):

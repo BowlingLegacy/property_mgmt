@@ -10,7 +10,7 @@ from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import AccountingReceipt, ApplicantDocument, BlogComment, BlogPost, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, ResidentMessage, SignedDocument, User
+from .models import AccountingReceipt, ApplicantDocument, BlogComment, BlogPost, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, ResidentMessage, SignedDocument, User
 from .views import apply_completed_payment_to_balance, ensure_existing_resident_portal_application
 
 
@@ -876,6 +876,14 @@ class LiveFlowTests(TestCase):
 
     def test_existing_resident_intake_button_opens_for_new_property_and_saves_profile(self):
         property_obj = Property.objects.create(name="Painted Lady Inn")
+        CurrentResidentRosterEntry.objects.create(
+            property=property_obj,
+            first_name="Existing",
+            last_name="Resident",
+            email="existing@example.com",
+            phone="555-0195",
+            room_unit_label="Room B",
+        )
 
         property_response = self.client.get(reverse("property_detail", args=[property_obj.id]))
         self.assertEqual(property_response.status_code, 200)
@@ -908,6 +916,30 @@ class LiveFlowTests(TestCase):
         self.assertEqual(application.deposit_required, Decimal("0.00"))
         self.assertEqual(application.utility_monthly, Decimal("0.00"))
         self.assertIn(application.user.invite_code, mail.outbox[0].body)
+
+    def test_existing_resident_intake_does_not_auto_invite_without_roster_match(self):
+        property_obj = Property.objects.create(name="Roster Protected Property")
+        CurrentResidentRosterEntry.objects.create(
+            property=property_obj,
+            first_name="Approved",
+            last_name="Resident",
+            email="approved@example.com",
+            room_unit_label="Room A",
+        )
+
+        response = self.client.post(reverse("existing_resident_intake", args=[property_obj.id]), {
+            "first_name": "Unknown",
+            "last_name": "Resident",
+            "email": "unknown@example.com",
+            "phone": "555-0196",
+            "room_unit_label": "Room Z",
+            "years_at_residence": "1",
+        })
+
+        self.assertRedirects(response, reverse("existing_resident_intake_success", args=[property_obj.id]))
+        self.assertTrue(ExistingResidentIntake.objects.filter(email="unknown@example.com").exists())
+        self.assertFalse(HousingApplication.objects.filter(email="unknown@example.com").exists())
+        self.assertEqual(len(mail.outbox), 0)
 
     def test_landlord_workspace_only_lists_assigned_property_records(self):
         landlord = User.objects.create_user(
@@ -1358,6 +1390,32 @@ class LiveFlowTests(TestCase):
         self.assertEqual(application.property, property_obj)
         self.assertEqual(application.space_label, "Unit 4")
         self.assertIn(application.user.invite_code, mail.outbox[0].body)
+
+    def test_landlord_can_upload_current_resident_roster(self):
+        landlord = User.objects.create_user(
+            username="roster-landlord",
+            email="roster-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Roster Property", landlord_email=landlord.email)
+        roster_file = SimpleUploadedFile(
+            "roster.csv",
+            b"first_name,last_name,email,phone,room_unit_label\nRoster,Resident,roster@example.com,555-0300,Unit 12\n",
+            content_type="text/csv",
+        )
+
+        self.client.login(username="roster-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("current_resident_roster_upload"), {
+            "property": property_obj.id,
+            "file": roster_file,
+        })
+
+        self.assertRedirects(response, reverse("current_resident_roster_upload"))
+        roster_entry = CurrentResidentRosterEntry.objects.get(email="roster@example.com")
+        self.assertEqual(roster_entry.property, property_obj)
+        self.assertEqual(roster_entry.room_unit_label, "Unit 12")
 
     def test_landlord_can_view_current_resident_intake_detail_and_backup_code(self):
         landlord = User.objects.create_user(
