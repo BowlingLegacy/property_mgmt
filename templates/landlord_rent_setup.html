@@ -85,6 +85,16 @@
                         <label class="form-label fw-bold">Utilities</label>
                         <input type="number" class="form-control" step="0.01" min="0" name="add_room_utility_monthly" placeholder="0.00">
                     </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold">Deposit Required</label>
+                        <input type="number" class="form-control" step="0.01" min="0" name="add_room_deposit_required" placeholder="450.00">
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold">Deposit Paid</label>
+                        <input type="number" class="form-control" step="0.01" min="0" name="add_room_deposit_paid" placeholder="450.00">
+                    </div>
                 </div>
             </div>
 
@@ -98,6 +108,8 @@
                             <th>Monthly Rent</th>
                             <th>Due Day</th>
                             <th>Monthly Utilities</th>
+                            <th>Deposit Required</th>
+                            <th>Deposit Paid</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -125,10 +137,16 @@
                                 <td>
                                     <input type="number" class="form-control rent-input" step="0.01" min="0" name="room_{{ forloop.counter0 }}_utility_monthly" value="{% if row.setting %}{{ row.setting.utility_monthly }}{% else %}0.00{% endif %}">
                                 </td>
+                                <td>
+                                    <input type="number" class="form-control rent-input" step="0.01" min="0" name="room_{{ forloop.counter0 }}_deposit_required" value="{% if row.setting %}{{ row.setting.deposit_required }}{% else %}0.00{% endif %}">
+                                </td>
+                                <td>
+                                    <input type="number" class="form-control rent-input" step="0.01" min="0" name="room_{{ forloop.counter0 }}_deposit_paid" value="{% if row.setting %}{{ row.setting.deposit_paid }}{% else %}0.00{% endif %}">
+                                </td>
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="6" class="text-muted">No room letters found yet. Upload the current resident roster or create resident files with room labels first.</td>
+                                <td colspan="8" class="text-muted">No room letters found yet. Upload the current resident roster or create resident files with room labels first.</td>
                             </tr>
                         {% endfor %}
                     </tbody>
@@ -157,6 +175,8 @@
                             <th>Due Day</th>
                             <th>Monthly Utilities</th>
                             <th>Utilities Due</th>
+                            <th>Deposit Required</th>
+                            <th>Deposit Paid</th>
                             <th>Portal</th>
                         </tr>
                     </thead>
@@ -184,11 +204,17 @@
                                 <td>
                                     <input type="number" class="form-control rent-input" step="0.01" min="0" name="resident_{{ resident.id }}_utility_balance" value="{{ resident.utility_balance }}">
                                 </td>
+                                <td>
+                                    <input type="number" class="form-control rent-input" step="0.01" min="0" name="resident_{{ resident.id }}_deposit_required" value="{{ resident.deposit_required }}">
+                                </td>
+                                <td>
+                                    <input type="number" class="form-control rent-input" step="0.01" min="0" name="resident_{{ resident.id }}_deposit_paid" value="{{ resident.deposit_paid }}">
+                                </td>
                                 <td>{% if resident.user %}Linked{% else %}No login yet{% endif %}</td>
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="9" class="text-muted">No resident files found. A resident must have a resident file before rent can be assigned.</td>
+                                <td colspan="11" class="text-muted">No resident files found. A resident must have a resident file before rent can be assigned.</td>
                             </tr>
                         {% endfor %}
                     </tbody>

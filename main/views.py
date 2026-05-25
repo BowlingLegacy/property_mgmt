@@ -1006,6 +1006,8 @@ def landlord_rent_setup(request):
                         "monthly_rent": money(request.POST.get("add_room_monthly_rent")),
                         "rent_due_day": add_room_rent_due_day,
                         "utility_monthly": money(request.POST.get("add_room_utility_monthly")),
+                        "deposit_required": money(request.POST.get("add_room_deposit_required")),
+                        "deposit_paid": money(request.POST.get("add_room_deposit_paid")),
                         "is_active": True,
                     },
                 )
@@ -1028,6 +1030,8 @@ def landlord_rent_setup(request):
 
             monthly_rent = money(request.POST.get(prefix + "monthly_rent"))
             utility_monthly = money(request.POST.get(prefix + "utility_monthly"))
+            deposit_required = money(request.POST.get(prefix + "deposit_required"))
+            deposit_paid = money(request.POST.get(prefix + "deposit_paid"))
 
             try:
                 rent_due_day = int(request.POST.get(prefix + "rent_due_day") or 1)
@@ -1042,6 +1046,8 @@ def landlord_rent_setup(request):
                     "monthly_rent": monthly_rent,
                     "rent_due_day": rent_due_day,
                     "utility_monthly": utility_monthly,
+                    "deposit_required": deposit_required,
+                    "deposit_paid": deposit_paid,
                     "is_active": True,
                 },
             )
@@ -1081,6 +1087,14 @@ def landlord_rent_setup(request):
                         resident.utility_balance = room_setting.utility_monthly
                         changed_fields.append("utility_balance")
 
+                    if resident.deposit_required != room_setting.deposit_required:
+                        resident.deposit_required = room_setting.deposit_required
+                        changed_fields.append("deposit_required")
+
+                    if resident.deposit_paid != room_setting.deposit_paid:
+                        resident.deposit_paid = min(room_setting.deposit_paid, room_setting.deposit_required)
+                        changed_fields.append("deposit_paid")
+
                     if changed_fields:
                         resident.save(update_fields=changed_fields)
                         updated_count += 1
@@ -1096,6 +1110,8 @@ def landlord_rent_setup(request):
             rent_balance = money(request.POST.get(prefix + "balance"))
             utility_monthly = money(request.POST.get(prefix + "utility_monthly"))
             utility_balance = money(request.POST.get(prefix + "utility_balance"))
+            deposit_required = money(request.POST.get(prefix + "deposit_required"))
+            deposit_paid = money(request.POST.get(prefix + "deposit_paid"))
 
             try:
                 rent_due_day = int(request.POST.get(prefix + "rent_due_day") or resident.rent_due_day or 1)
@@ -1129,6 +1145,15 @@ def landlord_rent_setup(request):
             if resident.utility_balance != utility_balance:
                 resident.utility_balance = utility_balance
                 changed_fields.append("utility_balance")
+
+            if resident.deposit_required != deposit_required:
+                resident.deposit_required = deposit_required
+                changed_fields.append("deposit_required")
+
+            clean_deposit_paid = min(deposit_paid, deposit_required)
+            if resident.deposit_paid != clean_deposit_paid:
+                resident.deposit_paid = clean_deposit_paid
+                changed_fields.append("deposit_paid")
 
             if changed_fields:
                 resident.save(update_fields=changed_fields)
@@ -2905,6 +2930,8 @@ def ensure_existing_resident_portal_application(intake):
     )
     rent_due_day = room_rent_setting.rent_due_day if room_rent_setting else 1
     utility_monthly = room_rent_setting.utility_monthly if room_rent_setting else Decimal("0.00")
+    deposit_required = room_rent_setting.deposit_required if room_rent_setting else Decimal("0.00")
+    deposit_paid = min(room_rent_setting.deposit_paid, deposit_required) if room_rent_setting else Decimal("0.00")
 
     application = (
         HousingApplication.objects
@@ -2926,7 +2953,8 @@ def ensure_existing_resident_portal_application(intake):
             monthly_rent=monthly_rent,
             balance=monthly_rent,
             rent_due_day=rent_due_day,
-            deposit_required=Decimal("0.00"),
+            deposit_required=deposit_required,
+            deposit_paid=deposit_paid,
             utility_monthly=utility_monthly,
             utility_balance=utility_monthly,
             communication_preference="sms" if intake.sms_opted_in else "portal",
@@ -2967,6 +2995,13 @@ def ensure_existing_resident_portal_application(intake):
 
 
 def send_existing_resident_portal_invite(request, intake):
+    if current_roster_match_status(intake) != "matched":
+        messages.warning(
+            request,
+            "No setup invite was sent and no resident file was created because this profile setup does not match the approved current resident roster.",
+        )
+        return None
+
     application = ensure_existing_resident_portal_application(intake)
 
     if application.user.has_usable_password():
@@ -3148,7 +3183,7 @@ def landlord_send_existing_resident_invite(request, intake_id):
     )
     application = send_existing_resident_portal_invite(request, intake)
 
-    if application.user and not application.user.has_usable_password():
+    if application and application.user and not application.user.has_usable_password():
         messages.info(request, f"Backup resident setup code: {application.user.invite_code}")
 
     return redirect("landlord_attention")

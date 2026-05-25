@@ -824,6 +824,58 @@ class LiveFlowTests(TestCase):
         self.assertEqual(room_rent.rent_due_day, 3)
         self.assertEqual(room_rent.utility_monthly, Decimal("60.00"))
 
+    def test_landlord_can_record_deposit_by_room_letter(self):
+        landlord = User.objects.create_user(
+            username="room-deposit-landlord",
+            email="room-deposit-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Room Deposit Property", landlord_email=landlord.email)
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Deposit Resident",
+            phone="555-0117",
+            email="deposit-resident@example.com",
+            age=45,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            space_type="Room",
+            space_label="D",
+            deposit_required=Decimal("0.00"),
+            deposit_paid=Decimal("0.00"),
+        )
+
+        self.client.login(username="room-deposit-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("landlord_rent_setup"), {
+            "room_count": "1",
+            "room_0_property_id": str(property_obj.id),
+            "room_0_room_unit_label": "D",
+            "room_0_monthly_rent": "500.00",
+            "room_0_rent_due_day": "1",
+            "room_0_utility_monthly": "0.00",
+            "room_0_deposit_required": "450.00",
+            "room_0_deposit_paid": "0.00",
+            "apply_room_rents": "on",
+            f"resident_{resident.id}_monthly_rent": "0.00",
+            f"resident_{resident.id}_balance": "0.00",
+            f"resident_{resident.id}_rent_due_day": "1",
+            f"resident_{resident.id}_utility_monthly": "0.00",
+            f"resident_{resident.id}_utility_balance": "0.00",
+            f"resident_{resident.id}_deposit_required": "0.00",
+            f"resident_{resident.id}_deposit_paid": "0.00",
+        })
+
+        self.assertRedirects(response, reverse("landlord_rent_setup"))
+        room_rent = PropertyRoomRent.objects.get(property=property_obj, room_unit_label="D")
+        self.assertEqual(room_rent.deposit_required, Decimal("450.00"))
+        self.assertEqual(room_rent.deposit_paid, Decimal("0.00"))
+        resident.refresh_from_db()
+        self.assertEqual(resident.deposit_required, Decimal("450.00"))
+        self.assertEqual(resident.deposit_paid, Decimal("0.00"))
+
     def test_landlord_can_add_room_rent_without_roster_entry(self):
         landlord = User.objects.create_user(
             username="manual-room-rent-landlord",
@@ -887,12 +939,16 @@ class LiveFlowTests(TestCase):
             "room_0_monthly_rent": "600.00",
             "room_0_rent_due_day": "1",
             "room_0_utility_monthly": "75.00",
+            "room_0_deposit_required": "450.00",
+            "room_0_deposit_paid": "95.00",
             "apply_room_rents": "on",
             f"resident_{resident.id}_monthly_rent": "0.00",
             f"resident_{resident.id}_balance": "0.00",
             f"resident_{resident.id}_rent_due_day": "1",
             f"resident_{resident.id}_utility_monthly": "0.00",
             f"resident_{resident.id}_utility_balance": "0.00",
+            f"resident_{resident.id}_deposit_required": "0.00",
+            f"resident_{resident.id}_deposit_paid": "0.00",
         })
 
         resident.refresh_from_db()
@@ -900,6 +956,8 @@ class LiveFlowTests(TestCase):
         self.assertEqual(resident.balance, Decimal("600.00"))
         self.assertEqual(resident.utility_monthly, Decimal("75.00"))
         self.assertEqual(resident.utility_balance, Decimal("75.00"))
+        self.assertEqual(resident.deposit_required, Decimal("450.00"))
+        self.assertEqual(resident.deposit_paid, Decimal("95.00"))
         self.assertTrue(RentHistory.objects.filter(application=resident, rent_amount=Decimal("600.00")).exists())
 
     def test_landlord_rent_setup_does_not_update_other_property_resident(self):
@@ -1983,6 +2041,13 @@ class LiveFlowTests(TestCase):
             is_staff=True,
         )
         property_obj = Property.objects.create(name="Intake Property", landlord_email=landlord.email)
+        CurrentResidentRosterEntry.objects.create(
+            property=property_obj,
+            first_name="Saved",
+            last_name="Resident",
+            email="saved-resident@example.com",
+            room_unit_label="Unit 4",
+        )
         intake = ExistingResidentIntake.objects.create(
             property=property_obj,
             first_name="Saved",
@@ -2010,6 +2075,8 @@ class LiveFlowTests(TestCase):
             monthly_rent=Decimal("575.00"),
             rent_due_day=4,
             utility_monthly=Decimal("65.00"),
+            deposit_required=Decimal("450.00"),
+            deposit_paid=Decimal("95.00"),
         )
         intake = ExistingResidentIntake.objects.create(
             property=property_obj,
@@ -2027,6 +2094,40 @@ class LiveFlowTests(TestCase):
         self.assertEqual(application.rent_due_day, 4)
         self.assertEqual(application.utility_monthly, Decimal("65.00"))
         self.assertEqual(application.utility_balance, Decimal("65.00"))
+        self.assertEqual(application.deposit_required, Decimal("450.00"))
+        self.assertEqual(application.deposit_paid, Decimal("95.00"))
+
+    def test_manual_current_resident_invite_requires_roster_match(self):
+        landlord = User.objects.create_user(
+            username="blocked-current-resident-invite",
+            email="blocked-current-resident-invite@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Blocked Intake Property", landlord_email=landlord.email)
+        CurrentResidentRosterEntry.objects.create(
+            property=property_obj,
+            first_name="Approved",
+            last_name="Resident",
+            email="approved@example.com",
+            room_unit_label="A",
+        )
+        intake = ExistingResidentIntake.objects.create(
+            property=property_obj,
+            first_name="Unknown",
+            last_name="Applicant",
+            email="unknown-current@example.com",
+            phone="555-0401",
+            room_unit_label="Z",
+        )
+
+        self.client.login(username="blocked-current-resident-invite", password="StrongPass123!")
+        response = self.client.post(reverse("landlord_send_existing_resident_invite", args=[intake.id]))
+
+        self.assertRedirects(response, reverse("landlord_attention"))
+        self.assertFalse(HousingApplication.objects.filter(email="unknown-current@example.com").exists())
+        self.assertEqual(len(mail.outbox), 0)
 
     def test_landlord_can_upload_current_resident_roster(self):
         landlord = User.objects.create_user(

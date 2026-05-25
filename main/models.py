@@ -173,6 +173,8 @@ class PropertyRoomRent(models.Model):
     monthly_rent = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
     rent_due_day = models.PositiveSmallIntegerField(default=1)
     utility_monthly = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    deposit_required = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    deposit_paid = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
     is_active = models.BooleanField(default=True)
     updated_at = models.DateTimeField(auto_now=True)
 

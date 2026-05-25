@@ -187,7 +187,7 @@ class PropertyAdmin(admin.ModelAdmin):
 
 @admin.register(PropertyRoomRent)
 class PropertyRoomRentAdmin(admin.ModelAdmin):
-    list_display = ("property", "room_unit_label", "monthly_rent", "rent_due_day", "utility_monthly", "is_active", "updated_at")
+    list_display = ("property", "room_unit_label", "monthly_rent", "rent_due_day", "utility_monthly", "deposit_required", "deposit_paid", "is_active", "updated_at")
     list_filter = ("property", "is_active")
     search_fields = ("property__name", "room_unit_label")
 

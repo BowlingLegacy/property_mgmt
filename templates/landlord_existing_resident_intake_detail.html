@@ -149,9 +149,12 @@
                     {% if setup_status != "completed" %}
                         <form method="post" action="{% url 'landlord_send_existing_resident_invite' intake.id %}">
                             {% csrf_token %}
-                            <button type="submit" class="gold-btn">
+                            <button type="submit" class="gold-btn" {% if roster_match_status != "matched" %}disabled{% endif %}>
                                 {% if setup_status == "invite_sent" %}Resend Setup Invite{% else %}Send Setup Invite{% endif %}
                             </button>
+                            {% if roster_match_status != "matched" %}
+                                <p class="text-muted small mt-2 mb-0">Upload or correct the approved current resident roster before sending a setup invite.</p>
+                            {% endif %}
                         </form>
                     {% endif %}
                 </div>
