@@ -189,6 +189,24 @@
                 <p class="mb-0">{{ intake.additional_notes|linebreaksbr }}</p>
             </div>
         {% endif %}
+
+        {% if not application %}
+            <div class="file-panel mt-3 border-danger">
+                <h2 class="h5 fw-bold text-danger">Invalid Setup Attempt</h2>
+                <p class="text-muted">
+                    Delete this only when you have confirmed the person is not a valid current resident setup.
+                    This removes the setup attempt from Needs Attention.
+                </p>
+                <form method="post" action="{% url 'delete_existing_resident_intake' intake.id %}">
+                    {% csrf_token %}
+                    <button type="submit"
+                            class="btn btn-outline-danger"
+                            onclick="return confirm('Delete this current resident setup attempt?');">
+                        Delete Invalid Setup Attempt
+                    </button>
+                </form>
+            </div>
+        {% endif %}
     </div>
 </div>
 

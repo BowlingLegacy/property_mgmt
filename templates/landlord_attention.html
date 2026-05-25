@@ -38,6 +38,14 @@
                                     <a href="{% url 'landlord_existing_resident_intake_detail' intake.id %}" class="btn btn-outline-primary btn-sm">Open / Resend</a>
                                 {% else %}
                                     <a href="{% url 'landlord_existing_resident_intake_detail' intake.id %}" class="btn btn-primary btn-sm">Review / Send</a>
+                                    <form method="post" action="{% url 'delete_existing_resident_intake' intake.id %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <button type="submit"
+                                                class="btn btn-outline-danger btn-sm"
+                                                onclick="return confirm('Delete this invalid setup attempt?');">
+                                            Delete
+                                        </button>
+                                    </form>
                                 {% endif %}
                             </td>
                         </tr>

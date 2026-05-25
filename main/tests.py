@@ -2290,6 +2290,64 @@ class LiveFlowTests(TestCase):
         self.assertEqual(application.space_label, "N")
         self.assertIn(application.user.invite_code, mail.outbox[0].body)
 
+    def test_staff_can_delete_invalid_current_resident_setup_attempt(self):
+        landlord = User.objects.create_user(
+            username="delete-current-resident-intake",
+            email="delete-current-resident-intake@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Delete Intake Property", landlord_email=landlord.email)
+        intake = ExistingResidentIntake.objects.create(
+            property=property_obj,
+            first_name="Invalid",
+            last_name="Attempt",
+            email="invalid-current@example.com",
+            phone="555-0403",
+            room_unit_label="Z",
+        )
+
+        self.client.login(username="delete-current-resident-intake", password="StrongPass123!")
+        response = self.client.post(reverse("delete_existing_resident_intake", args=[intake.id]))
+
+        self.assertRedirects(response, reverse("landlord_attention"))
+        self.assertFalse(ExistingResidentIntake.objects.filter(id=intake.id).exists())
+
+    def test_staff_cannot_delete_current_resident_setup_with_resident_file(self):
+        landlord = User.objects.create_user(
+            username="keep-linked-current-resident-intake",
+            email="keep-linked-current-resident-intake@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Keep Intake Property", landlord_email=landlord.email)
+        intake = ExistingResidentIntake.objects.create(
+            property=property_obj,
+            first_name="Linked",
+            last_name="Resident",
+            email="linked-current@example.com",
+            phone="555-0404",
+            room_unit_label="A",
+        )
+        HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Linked Resident",
+            phone="555-0404",
+            email="linked-current@example.com",
+            age=50,
+            income_source="Existing resident intake",
+            monthly_income=Decimal("0.00"),
+            housing_need="Existing resident.",
+        )
+
+        self.client.login(username="keep-linked-current-resident-intake", password="StrongPass123!")
+        response = self.client.post(reverse("delete_existing_resident_intake", args=[intake.id]))
+
+        self.assertRedirects(response, reverse("landlord_existing_resident_intake_detail", args=[intake.id]))
+        self.assertTrue(ExistingResidentIntake.objects.filter(id=intake.id).exists())
+
     def test_landlord_can_upload_current_resident_roster(self):
         landlord = User.objects.create_user(
             username="roster-landlord",

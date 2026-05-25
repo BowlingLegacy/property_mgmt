@@ -3314,6 +3314,35 @@ def landlord_send_existing_resident_invite(request, intake_id):
     return redirect("landlord_attention")
 
 
+@login_required
+@user_passes_test(staff_required)
+def delete_existing_resident_intake(request, intake_id):
+    if request.method != "POST":
+        return redirect("landlord_attention")
+
+    intake = get_object_or_404(
+        ExistingResidentIntake.objects.select_related("property"),
+        id=intake_id,
+        property__in=staff_managed_properties(request.user),
+    )
+    application_exists = HousingApplication.objects.filter(
+        property=intake.property,
+        email__iexact=intake.email,
+    ).exists()
+
+    if application_exists:
+        messages.error(
+            request,
+            "This setup attempt is already connected to a resident file. Open the resident file before deleting anything.",
+        )
+        return redirect("landlord_existing_resident_intake_detail", intake_id=intake.id)
+
+    resident_name = intake.full_name()
+    intake.delete()
+    messages.success(request, f"Deleted invalid current resident setup attempt for {resident_name}.")
+    return redirect("landlord_attention")
+
+
 def add_blog_comment(request, post_id):
     post = get_object_or_404(BlogPost, id=post_id)
 
