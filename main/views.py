@@ -224,6 +224,46 @@ def create_financial_entry_from_import(upload, property_obj, sheet_name, row, en
     )
 
 
+MONTH_NAME_MAP = {
+    "jan": 1,
+    "january": 1,
+    "feb": 2,
+    "february": 2,
+    "mar": 3,
+    "march": 3,
+    "apr": 4,
+    "april": 4,
+    "may": 5,
+    "jun": 6,
+    "june": 6,
+    "jul": 7,
+    "july": 7,
+    "aug": 8,
+    "august": 8,
+    "sep": 9,
+    "sept": 9,
+    "september": 9,
+    "oct": 10,
+    "october": 10,
+    "nov": 11,
+    "november": 11,
+    "dec": 12,
+    "december": 12,
+}
+
+
+def parse_month_header(value):
+    clean_value = normalized_header(value)
+    if not clean_value:
+        return None
+
+    for token in clean_value.replace("-", " ").replace("/", " ").split():
+        if token in MONTH_NAME_MAP:
+            return MONTH_NAME_MAP[token]
+
+    return MONTH_NAME_MAP.get(clean_value[:3])
+
+
 def parse_import_date(value):
     if not value:
         return None
@@ -2682,6 +2722,7 @@ def parse_financial_upload(request, upload_id):
     skipped = 0
 
     if request.method == "POST":
+        import_mode = request.POST.get("import_mode", "detail")
         date_column = request.POST.get("date_column", "")
         description_column = request.POST.get("description_column", "")
         amount_column = request.POST.get("amount_column", "")
@@ -2693,74 +2734,118 @@ def parse_financial_upload(request, upload_id):
         property_column = request.POST.get("property_column", "")
         default_entry_type = request.POST.get("default_entry_type", "operating_expense")
         default_category = request.POST.get("default_category", "").strip()
+        summary_category_column = request.POST.get("summary_category_column", "")
+        summary_year_raw = request.POST.get("summary_year", "")
+        summary_entry_type = request.POST.get("summary_entry_type", "operating_expense")
+        summary_month_columns = request.POST.getlist("summary_month_columns")
 
         accessible_properties = {property_obj.name.lower(): property_obj for property_obj in properties}
         upload.entries.all().delete()
 
-        for row in rows:
-            row_data = row["data"]
+        if import_mode == "summary_grid":
+            try:
+                summary_year = int(summary_year_raw)
+            except (TypeError, ValueError):
+                summary_year = timezone.localdate().year
 
-            raw_property_name = str(row_data.get(property_column, "") or "").strip()
-            property_obj = upload.property
-            if raw_property_name:
-                property_obj = accessible_properties.get(raw_property_name.lower())
-                if not property_obj:
+            for row in rows:
+                row_data = row["data"]
+                category = str(row_data.get(summary_category_column, "") or "").strip()
+                if not category:
                     skipped += 1
                     continue
 
-            description = str(row_data.get(description_column, "") or "").strip()
-            category = str(row_data.get(category_column, "") or "").strip() or default_category or "Uncategorized"
-            primary_amount = money(row_data.get(amount_column)) if amount_column else Decimal("0.00")
-            entry_type = normalize_entry_type(
-                row_data.get(entry_type_column, ""),
-                category,
-                description,
-                primary_amount,
-                default_entry_type,
-            )
-            entry_date = parse_import_date(row_data.get(date_column))
+                created_for_row = 0
+                for column_name in summary_month_columns:
+                    month_number = parse_month_header(column_name)
+                    if not month_number:
+                        continue
 
-            created_for_row = 0
-            amount_columns = [
-                (amount_column, entry_type, category, description),
-                (utility_amount_column, "income", "Utility Payment", f"{description} - Utility payment".strip(" -")),
-                (deposit_amount_column, "income", "Deposit Payment", f"{description} - Deposit payment".strip(" -")),
-                (other_income_amount_column, "income", "Other Income", f"{description} - Other income".strip(" -")),
-            ]
+                    amount = money(row_data.get(column_name))
+                    if amount == Decimal("0.00"):
+                        continue
 
-            for column_name, column_entry_type, column_category, column_description in amount_columns:
-                if not column_name:
-                    continue
-
-                amount = money(row_data.get(column_name))
-                if amount == Decimal("0.00"):
-                    continue
-
-                if column_entry_type != "income" and column_category:
-                    ExpenseCategory.objects.get_or_create(
-                        name=column_category,
-                        defaults={
-                            "entry_type": column_entry_type if column_entry_type in dict(ExpenseCategory.ENTRY_TYPE_CHOICES) else "other",
-                            "created_by": request.user,
-                        },
+                    create_financial_entry_from_import(
+                        upload,
+                        upload.property,
+                        sheet_name,
+                        row,
+                        date(summary_year, month_number, 1),
+                        summary_entry_type,
+                        category,
+                        f"{category} - {column_name} summary",
+                        amount,
                     )
+                    created += 1
+                    created_for_row += 1
 
-                create_financial_entry_from_import(
-                    upload,
-                    property_obj,
-                    sheet_name,
-                    row,
-                    entry_date,
-                    column_entry_type,
-                    column_category,
-                    column_description,
-                    amount,
+                if created_for_row == 0:
+                    skipped += 1
+        else:
+            for row in rows:
+                row_data = row["data"]
+
+                raw_property_name = str(row_data.get(property_column, "") or "").strip()
+                property_obj = upload.property
+                if raw_property_name:
+                    property_obj = accessible_properties.get(raw_property_name.lower())
+                    if not property_obj:
+                        skipped += 1
+                        continue
+
+                description = str(row_data.get(description_column, "") or "").strip()
+                category = str(row_data.get(category_column, "") or "").strip() or default_category or "Uncategorized"
+                primary_amount = money(row_data.get(amount_column)) if amount_column else Decimal("0.00")
+                entry_type = normalize_entry_type(
+                    row_data.get(entry_type_column, ""),
+                    category,
+                    description,
+                    primary_amount,
+                    default_entry_type,
                 )
-                created += 1
-                created_for_row += 1
+                entry_date = parse_import_date(row_data.get(date_column))
 
-            if created_for_row == 0:
-                skipped += 1
+                created_for_row = 0
+                amount_columns = [
+                    (amount_column, entry_type, category, description),
+                    (utility_amount_column, "income", "Utility Payment", f"{description} - Utility payment".strip(" -")),
+                    (deposit_amount_column, "income", "Deposit Payment", f"{description} - Deposit payment".strip(" -")),
+                    (other_income_amount_column, "income", "Other Income", f"{description} - Other income".strip(" -")),
+                ]
+
+                for column_name, column_entry_type, column_category, column_description in amount_columns:
+                    if not column_name:
+                        continue
+
+                    amount = money(row_data.get(column_name))
+                    if amount == Decimal("0.00"):
+                        continue
+
+                    if column_entry_type != "income" and column_category:
+                        ExpenseCategory.objects.get_or_create(
+                            name=column_category,
+                            defaults={
+                                "entry_type": column_entry_type if column_entry_type in dict(ExpenseCategory.ENTRY_TYPE_CHOICES) else "other",
+                                "created_by": request.user,
+                            },
+                        )
+
+                    create_financial_entry_from_import(
+                        upload,
+                        property_obj,
+                        sheet_name,
+                        row,
+                        entry_date,
+                        column_entry_type,
+                        column_category,
+                        column_description,
+                        amount,
+                    )
+                    created += 1
+                    created_for_row += 1
+
+                if created_for_row == 0:
+                    skipped += 1
 
         upload.parsed_at = timezone.now()
         upload.save(update_fields=["parsed_at"])

@@ -2006,6 +2006,47 @@ class LiveFlowTests(TestCase):
         self.assertTrue(entries.filter(category="Utility Payment", amount=Decimal("75.00")).exists())
         self.assertTrue(entries.filter(category="Deposit Payment", amount=Decimal("150.00")).exists())
 
+    def test_accounting_import_supports_monthly_summary_grid(self):
+        landlord = User.objects.create_user(
+            username="summary-grid-landlord",
+            email="summary-grid-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Summary Grid Property", landlord_email=landlord.email)
+        csv_file = SimpleUploadedFile(
+            "summary.csv",
+            b"Category,January,February,March,Q1 Total\nRepairs,100.00,200.00,300.00,600.00\nUtilities,50.00,60.00,70.00,180.00\n",
+            content_type="text/csv",
+        )
+
+        self.client.login(username="summary-grid-landlord", password="StrongPass123!")
+        self.client.post(reverse("financial_upload"), {
+            "property": property_obj.id,
+            "ledger_scope": "property",
+            "name": "Q1 Summary",
+            "file": csv_file,
+            "notes": "Monthly summary sheet",
+        })
+
+        upload = FinancialUpload.objects.get(name="Q1 Summary")
+        response = self.client.post(reverse("parse_financial_upload", args=[upload.id]), {
+            "import_mode": "summary_grid",
+            "sheet_name": "CSV",
+            "summary_category_column": "Category",
+            "summary_year": "2026",
+            "summary_entry_type": "operating_expense",
+            "summary_month_columns": ["January", "February", "March"],
+        })
+
+        self.assertRedirects(response, reverse("financial_upload"))
+        entries = FinancialEntry.objects.filter(upload=upload).order_by("category", "month")
+        self.assertEqual(entries.count(), 6)
+        self.assertTrue(entries.filter(category="Repairs", month=1, year=2026, amount=Decimal("100.00")).exists())
+        self.assertTrue(entries.filter(category="Utilities", month=3, year=2026, amount=Decimal("70.00")).exists())
+        self.assertFalse(entries.filter(description__icontains="Q1 Total").exists())
+
     def test_accounting_import_blocks_other_landlord_property(self):
         landlord = User.objects.create_user(
             username="blocked-accounting-landlord",
