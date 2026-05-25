@@ -2120,6 +2120,39 @@ class LiveFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(FinancialUpload.objects.filter(name="Blocked Upload").exists())
 
+    def test_cleanup_financial_upload_command_previews_then_deletes_selected_upload(self):
+        property_obj = Property.objects.create(name="Financial Cleanup Property")
+        upload = FinancialUpload.objects.create(
+            property=property_obj,
+            name="Partial Workbook Import",
+            file="financial_uploads/partial.xlsx",
+            parsed_at=timezone.now(),
+        )
+        FinancialEntry.objects.create(
+            upload=upload,
+            property_name=property_obj.name,
+            sheet_name="Wrong Sheet",
+            row_number=1,
+            entry_type="income",
+            category="Rent",
+            description="Partial duplicate",
+            amount=Decimal("100.00"),
+        )
+
+        preview = StringIO()
+        call_command("cleanup_financial_upload", "--upload-id", str(upload.id), stdout=preview)
+
+        self.assertIn("Dry run only", preview.getvalue())
+        self.assertTrue(FinancialUpload.objects.filter(id=upload.id).exists())
+        self.assertEqual(FinancialEntry.objects.filter(upload=upload).count(), 1)
+
+        output = StringIO()
+        call_command("cleanup_financial_upload", "--upload-id", str(upload.id), "--confirm", stdout=output)
+
+        self.assertIn("Uploads deleted: 1", output.getvalue())
+        self.assertFalse(FinancialUpload.objects.filter(id=upload.id).exists())
+        self.assertEqual(FinancialEntry.objects.filter(upload=upload).count(), 0)
+
     def test_landlord_can_send_setup_invite_for_saved_current_resident_intake(self):
         landlord = User.objects.create_user(
             username="resident-intake-landlord",
