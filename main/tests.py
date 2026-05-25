@@ -1129,6 +1129,53 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "viewable but no longer editable")
         self.assertContains(response, "Emergency Person")
 
+    def test_resident_signs_selected_lease_document(self):
+        user = User.objects.create_user(
+            username="resident-selected-lease",
+            email="resident-selected-lease@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        application = HousingApplication.objects.create(
+            user=user,
+            full_name="Selected Lease Resident",
+            phone="555-0119",
+            email="resident-selected-lease@example.com",
+            age=51,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+        )
+        original_lease = SignedDocument.objects.create(
+            application=application,
+            document_type="lease",
+            title="Original Lease",
+        )
+        platform_lease = SignedDocument.objects.create(
+            application=application,
+            document_type="lease",
+            title="Platform Lease Update",
+        )
+
+        self.client.login(username="resident-selected-lease", password="StrongPass123!")
+
+        response = self.client.post(reverse("submit_onboarding_document", args=[platform_lease.id]), {
+            "rent_initials": "SL",
+            "sobriety_initials": "SL",
+            "testing_initials": "SL",
+            "guest_policy_initials": "SL",
+            "cleanliness_initials": "SL",
+            "disclosure_initials": "SL",
+            "resident_signature": "Selected Lease Resident",
+            "signature_agreement": "on",
+        })
+
+        self.assertRedirects(response, reverse("tenant_dashboard"))
+        original_lease.refresh_from_db()
+        platform_lease.refresh_from_db()
+        self.assertFalse(original_lease.locked)
+        self.assertTrue(platform_lease.locked)
+
     def test_resident_can_upload_profile_photo(self):
         user = User.objects.create_user(
             username="photo-resident",
@@ -2137,6 +2184,10 @@ class LiveFlowTests(TestCase):
         self.assertEqual(application.utility_balance, Decimal("65.00"))
         self.assertEqual(application.deposit_required, Decimal("450.00"))
         self.assertEqual(application.deposit_paid, Decimal("95.00"))
+        self.assertEqual(
+            set(application.signed_documents.values_list("document_type", flat=True)),
+            {"lease", "emergency_contact", "painted_lady_acknowledgment"},
+        )
 
     def test_manual_current_resident_invite_requires_roster_match(self):
         landlord = User.objects.create_user(
@@ -2927,3 +2978,36 @@ class LiveFlowTests(TestCase):
         self.assertFalse(Property.objects.filter(id=abc_property.id).exists())
         self.assertFalse(Property.objects.filter(id=newtest_property.id).exists())
         self.assertTrue(Property.objects.filter(id=real_property.id).exists())
+
+    def test_issue_painted_lady_platform_lease_command_preserves_signed_lease(self):
+        property_obj = Property.objects.create(name="The Painted Lady Inn")
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Lease Update Resident",
+            phone="555-0500",
+            email="lease-update@example.com",
+            age=50,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+        )
+        signed_lease = SignedDocument.objects.create(
+            application=application,
+            document_type="lease",
+            title="Original Signed Lease",
+            locked=True,
+        )
+
+        output = StringIO()
+        call_command("issue_painted_lady_platform_lease", "--confirm", stdout=output)
+
+        self.assertTrue(SignedDocument.objects.filter(id=signed_lease.id, locked=True).exists())
+        self.assertTrue(
+            SignedDocument.objects.filter(
+                application=application,
+                document_type="lease",
+                title="Resident Lease Agreement - June 2026 Platform Update",
+                locked=False,
+            ).exists()
+        )
+        self.assertIn("Issued 1 lease update document", output.getvalue())

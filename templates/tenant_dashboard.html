@@ -507,18 +507,12 @@ body {
                                             {% endif %}
                                         </td>
                                         <td>
-                                            {% if signed_document.document_type == "lease" %}
-                                                <a href="{% url 'lease_sign' %}" class="gold-link">
-                                                    {% if signed_document.locked %}View{% else %}Sign{% endif %}
-                                                </a>
-                                            {% else %}
-                                                <a href="{% url 'onboarding_document' signed_document.id %}" class="gold-link">
-                                                    {% if signed_document.locked %}View{% else %}Sign{% endif %}
-                                                </a>
-                                            {% endif %}
+                                            <a href="{% url 'onboarding_document' signed_document.id %}" class="gold-link">
+                                                {% if signed_document.locked %}View{% else %}Sign{% endif %}
+                                            </a>
                                             {% if signed_document.locked %}
                                                 |
-                                                <a href="{% if signed_document.document_type == 'lease' %}{% url 'lease_sign' %}{% else %}{% url 'onboarding_document' signed_document.id %}{% endif %}?print=1"
+                                                <a href="{% url 'onboarding_document' signed_document.id %}?print=1"
                                                    target="_blank"
                                                    class="gold-link">
                                                     Print

@@ -231,7 +231,7 @@
                 </div>
             {% endif %}
 
-            <form method="POST" action="{% url 'submit_lease_signature' %}">
+            <form method="POST" action="{% url 'submit_onboarding_document' signed_document.id %}">
 
                 {% csrf_token %}
                 <fieldset {% if signed_document.locked %}disabled{% endif %}>
@@ -420,6 +420,52 @@
                         <li>Standard nonpayment notices apply</li>
                         <li>Resident may terminate with 30 days written notice</li>
                     </ul>
+
+                </div>
+
+                <div class="lease-section">
+
+                    <h3>11. Resident Portal, Communications, and Payment Records</h3>
+
+                    <p>
+                        Bowling Legacy Housing is moving routine Painted Lady Inn house business onto the resident
+                        portal so rent, utilities, deposit payments, maintenance requests, complaints, resident
+                        documents, and house communications can be tracked in one organized place.
+                    </p>
+
+                    <p>
+                        Residents will use the portal to view balances, payment history, receipts, resident file
+                        documents, maintenance updates, and messages related to house business. Rent, utilities,
+                        deposits, and other approved resident payments will be processed or recorded through the
+                        portal so Bowling Legacy can maintain accurate resident payment ledgers and receipts.
+                    </p>
+
+                    <p>
+                        House updates may be sent by email and, for residents who choose to participate, by group
+                        text message. Text message participation is optional. Residents may opt in or opt out through
+                        the portal or by following the text instructions provided by management. Standard message and
+                        data rates may apply. Choosing not to participate in group text messaging does not remove the
+                        resident's responsibility to review official portal messages, email messages, written notices,
+                        or other communications delivered as required by law.
+                    </p>
+
+                    <p>
+                        A mobile application for easier resident access is in development and is expected to become
+                        available through Google Play and the Apple App Store. Until then, residents can use the
+                        website to create a profile, access the resident dashboard, make or record payments, submit
+                        maintenance requests, and review documents.
+                    </p>
+
+                    <p>
+                        Resident feedback is welcome. Residents are encouraged to share ideas that would make the
+                        portal easier to use or more helpful for daily house communication.
+                    </p>
+
+                    <p>
+                        For the June 2026 platform transition, residents are asked to review this updated lease and
+                        platform acknowledgment by June 1, 2026. Any questions, concerns, or requested corrections
+                        should be sent to management in writing before that date so they can be reviewed.
+                    </p>
 
                 </div>
 

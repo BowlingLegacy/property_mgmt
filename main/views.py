@@ -3076,7 +3076,36 @@ def ensure_existing_resident_portal_application(intake):
         )
         application.save(update_fields=["user"])
 
+    ensure_existing_resident_onboarding_documents(application)
+
     return application
+
+
+def ensure_existing_resident_onboarding_documents(application):
+    document_specs = [
+        ("lease", "Resident Lease Agreement"),
+        ("emergency_contact", "Emergency Contact Sheet"),
+        ("painted_lady_acknowledgment", "Who We Are / Painted Lady Acknowledgment"),
+    ]
+
+    for document_type, title in document_specs:
+        document, _ = SignedDocument.objects.get_or_create(
+            application=application,
+            document_type=document_type,
+            defaults={
+                "title": title,
+                "lease_sent_date": timezone.localdate(),
+                "landlord_name": "Michael Bowling",
+                "landlord_signature": "Michael Bowling",
+            },
+        )
+
+        if not document.locked:
+            document.title = title
+            document.lease_sent_date = document.lease_sent_date or timezone.localdate()
+            document.landlord_name = document.landlord_name or "Michael Bowling"
+            document.landlord_signature = document.landlord_signature or "Michael Bowling"
+            document.save()
 
 
 def send_existing_resident_portal_invite(request, intake):
@@ -3361,7 +3390,7 @@ def onboarding_document(request, document_id):
 
 
 @login_required
-def submit_lease_signature(request):
+def submit_lease_signature(request, document_id=None):
 
     if request.method != "POST":
         return redirect("tenant_dashboard")
@@ -3372,10 +3401,18 @@ def submit_lease_signature(request):
         messages.error(request, "No resident file connected.")
         return redirect("tenant_dashboard")
 
-    signed_document = SignedDocument.objects.filter(
-        application=application,
-        document_type="lease",
-    ).first()
+    if document_id:
+        signed_document = get_object_or_404(
+            SignedDocument,
+            id=document_id,
+            application=application,
+            document_type="lease",
+        )
+    else:
+        signed_document = SignedDocument.objects.filter(
+            application=application,
+            document_type="lease",
+        ).first()
 
     if not signed_document:
         messages.error(request, "Lease document not found.")
@@ -3434,7 +3471,7 @@ def submit_onboarding_document(request, document_id):
         return redirect("tenant_dashboard")
 
     if signed_document.document_type == "lease":
-        return submit_lease_signature(request)
+        return submit_lease_signature(request, document_id=signed_document.id)
 
     signed_document.emergency_contact_name = request.POST.get("emergency_contact_name", "").strip()
     signed_document.emergency_contact_phone = request.POST.get("emergency_contact_phone", "").strip()
