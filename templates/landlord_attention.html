@@ -35,15 +35,9 @@
                                     <span class="btn btn-outline-success btn-sm disabled">Completed</span>
                                     <a href="{% url 'landlord_existing_resident_intake_detail' intake.id %}" class="btn btn-outline-secondary btn-sm">View</a>
                                 {% elif row.setup_status == "invite_sent" %}
-                                    <form method="post" action="{% url 'landlord_send_existing_resident_invite' intake.id %}">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn btn-outline-primary btn-sm">Resend Invite</button>
-                                    </form>
+                                    <a href="{% url 'landlord_existing_resident_intake_detail' intake.id %}" class="btn btn-outline-primary btn-sm">Open / Resend</a>
                                 {% else %}
-                                    <form method="post" action="{% url 'landlord_send_existing_resident_invite' intake.id %}">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn btn-primary btn-sm">Send Setup Invite</button>
-                                    </form>
+                                    <a href="{% url 'landlord_existing_resident_intake_detail' intake.id %}" class="btn btn-primary btn-sm">Review / Send</a>
                                 {% endif %}
                             </td>
                         </tr>

@@ -3108,13 +3108,19 @@ def ensure_existing_resident_onboarding_documents(application):
             document.save()
 
 
-def send_existing_resident_portal_invite(request, intake):
-    if current_roster_match_status(intake) != "matched":
+def send_existing_resident_portal_invite(request, intake, allow_roster_override=False):
+    if current_roster_match_status(intake) != "matched" and not allow_roster_override:
         messages.warning(
             request,
             "No setup invite was sent and no resident file was created because this profile setup does not match the approved current resident roster.",
         )
         return None
+
+    if current_roster_match_status(intake) != "matched" and allow_roster_override:
+        messages.warning(
+            request,
+            "Roster match was manually overridden by staff. Confirm this resident belongs to the property before sharing the setup code.",
+        )
 
     application = ensure_existing_resident_portal_application(intake)
 
@@ -3295,7 +3301,12 @@ def landlord_send_existing_resident_invite(request, intake_id):
         id=intake_id,
         property__in=staff_managed_properties(request.user),
     )
-    application = send_existing_resident_portal_invite(request, intake)
+    allow_roster_override = request.POST.get("allow_roster_override") == "on"
+    application = send_existing_resident_portal_invite(
+        request,
+        intake,
+        allow_roster_override=allow_roster_override,
+    )
 
     if application and application.user and not application.user.has_usable_password():
         messages.info(request, f"Backup resident setup code: {application.user.invite_code}")

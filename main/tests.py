@@ -2254,6 +2254,42 @@ class LiveFlowTests(TestCase):
         self.assertFalse(HousingApplication.objects.filter(email="unknown-current@example.com").exists())
         self.assertEqual(len(mail.outbox), 0)
 
+    def test_staff_can_override_roster_match_for_current_resident_invite(self):
+        landlord = User.objects.create_user(
+            username="override-current-resident-invite",
+            email="override-current-resident-invite@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Override Intake Property", landlord_email=landlord.email)
+        CurrentResidentRosterEntry.objects.create(
+            property=property_obj,
+            first_name="Approved",
+            last_name="Resident",
+            email="approved@example.com",
+            room_unit_label="A",
+        )
+        intake = ExistingResidentIntake.objects.create(
+            property=property_obj,
+            first_name="Hero",
+            last_name="Lowe",
+            email="hero-lowe@example.com",
+            phone="555-0402",
+            room_unit_label="N",
+        )
+
+        self.client.login(username="override-current-resident-invite", password="StrongPass123!")
+        response = self.client.post(reverse("landlord_send_existing_resident_invite", args=[intake.id]), {
+            "allow_roster_override": "on",
+        })
+
+        self.assertRedirects(response, reverse("landlord_attention"))
+        application = HousingApplication.objects.get(email="hero-lowe@example.com")
+        self.assertEqual(application.full_name, "Hero Lowe")
+        self.assertEqual(application.space_label, "N")
+        self.assertIn(application.user.invite_code, mail.outbox[0].body)
+
     def test_landlord_can_upload_current_resident_roster(self):
         landlord = User.objects.create_user(
             username="roster-landlord",
