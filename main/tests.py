@@ -755,6 +755,9 @@ class LiveFlowTests(TestCase):
         self.assertRedirects(response, reverse("group_resident_message"))
         self.assertTrue(ResidentMessage.objects.filter(application=application, subject="Building notice").exists())
         self.assertFalse(ResidentMessage.objects.filter(application=other_application, subject="Building notice").exists())
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["group-resident@example.com"])
+        self.assertIn(reverse("resident_requests"), mail.outbox[0].body)
 
     def test_landlord_can_set_rent_for_resident_without_portal_login(self):
         landlord = User.objects.create_user(
@@ -2533,6 +2536,42 @@ class LiveFlowTests(TestCase):
         self.assertRedirects(response, reverse("property_blog_manager"))
         comment.refresh_from_db()
         self.assertTrue(comment.approved)
+
+    def test_property_blog_post_notifies_property_residents(self):
+        staff_user = User.objects.create_user(
+            username="staff-blog-notify",
+            email="staff-blog-notify@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        resident_user = User.objects.create_user(username="blog-resident", password="StrongPass123!", role="tenant")
+        property_obj = Property.objects.create(name="Blog Notify Property", landlord_email=staff_user.email)
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Blog Resident",
+            phone="555-0222",
+            email="blog-resident@example.com",
+            age=46,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            sms_opted_in=False,
+        )
+
+        self.client.login(username="staff-blog-notify", password="StrongPass123!")
+        response = self.client.post(reverse("property_blog_create"), {
+            "property": property_obj.id,
+            "title": "Water notice",
+            "body": "Water will be off briefly.",
+        })
+
+        self.assertRedirects(response, reverse("property_blog_manager"))
+        self.assertEqual(mail.outbox[0].to, ["blog-resident@example.com"])
+        self.assertIn(reverse("property_detail", args=[property_obj.id]), mail.outbox[0].body)
+        sms_log = SmsMessageLog.objects.get(application=application)
+        self.assertEqual(sms_log.status, "skipped_no_consent")
 
     def test_staff_can_delete_pending_blog_comment(self):
         staff_user = User.objects.create_user(

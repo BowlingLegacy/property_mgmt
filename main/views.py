@@ -125,6 +125,30 @@ def notify_resident_of_portal_reply_sms(request, resident_message):
     )
 
 
+def send_resident_portal_notification_email(request, application, subject, message, target_view_name):
+    if not application.email:
+        return False
+
+    target_url = request.build_absolute_uri(reverse(target_view_name))
+    send_mail(
+        subject,
+        f"""Hello {application.full_name},
+
+{message}
+
+Use this direct link. If you are not already signed in, the site will ask for your login first:
+{target_url}
+
+Thank you,
+Bowling Legacy Housing
+""",
+        getattr(settings, "DEFAULT_FROM_EMAIL", None),
+        [application.email],
+        fail_silently=False,
+    )
+    return True
+
+
 def money(value):
     if value is None:
         return Decimal("0.00")
@@ -1885,6 +1909,13 @@ def group_resident_message(request):
                 locked=True,
             )
             created_count += 1
+            send_resident_portal_notification_email(
+                request,
+                application,
+                f"New secure portal message: {form.cleaned_data['subject']}",
+                "You have a new secure message in your Bowling Legacy resident portal.",
+                "resident_requests",
+            )
 
             if form.cleaned_data["delivery_method"] == "portal_sms":
                 send_sms_message(

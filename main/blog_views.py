@@ -1,9 +1,12 @@
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.mail import send_mail
+from django.conf import settings
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
-from .models import BlogComment, BlogPost, Property
+from .models import BlogComment, BlogPost, HousingApplication, Property
 from .permissions import is_assistant_admin, is_landlord, is_owner, is_super_admin
 
 
@@ -64,6 +67,55 @@ def can_manage_property_blog(user, property_obj):
     return False
 
 
+def notify_property_residents_of_blog_post(request, post):
+    if not post.property:
+        return (0, 0)
+
+    from .views import send_sms_message
+
+    property_url = request.build_absolute_uri(reverse("property_detail", args=[post.property.id]))
+    residents = (
+        HousingApplication.objects
+        .filter(property=post.property, user__isnull=False)
+        .order_by("space_label", "full_name")
+    )
+    email_count = 0
+    sms_count = 0
+
+    for resident in residents:
+        if resident.email:
+            send_mail(
+                f"New {post.property.name} community update: {post.title}",
+                f"""Hello {resident.full_name},
+
+A new community update has been posted for {post.property.name}.
+
+Use this direct link. If you are not already signed in, the site will ask for your login first:
+{property_url}
+
+Thank you,
+Bowling Legacy Housing
+""",
+                getattr(settings, "DEFAULT_FROM_EMAIL", None),
+                [resident.email],
+                fail_silently=False,
+            )
+            email_count += 1
+
+        sms_log = send_sms_message(
+            resident,
+            (
+                f"Bowling Legacy: New {post.property.name} community update posted. "
+                f"Log in to view it: {property_url} Reply STOP to opt out."
+            )[:1500],
+            request.user,
+        )
+        if sms_log.status == "sent":
+            sms_count += 1
+
+    return email_count, sms_count
+
+
 @login_required
 def blog_manager(request):
     properties = manageable_properties(request.user)
@@ -122,7 +174,14 @@ def blog_create(request):
 
         post.author = request.user
         post.save()
-        messages.success(request, "Property blog post created.")
+        if post.property:
+            email_count, sms_count = notify_property_residents_of_blog_post(request, post)
+            messages.success(
+                request,
+                f"Property blog post created. Email notices sent to {email_count} resident(s). SMS sent to {sms_count} opted-in resident(s).",
+            )
+        else:
+            messages.success(request, "Public website blog post created.")
         return redirect("property_blog_manager")
 
     return render(request, "property_blog_form.html", {"form": form})
