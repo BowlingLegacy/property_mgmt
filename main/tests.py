@@ -1,5 +1,5 @@
 from decimal import Decimal
-from io import StringIO
+from io import BytesIO, StringIO
 from unittest.mock import patch
 
 from django.contrib import admin
@@ -2333,6 +2333,12 @@ class LiveFlowTests(TestCase):
             role="landlord",
             is_staff=True,
         )
+        resident_user = User.objects.create_user(
+            username="keep-linked-resident",
+            email="linked-current@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
         property_obj = Property.objects.create(name="Keep Intake Property", landlord_email=landlord.email)
         intake = ExistingResidentIntake.objects.create(
             property=property_obj,
@@ -2344,6 +2350,7 @@ class LiveFlowTests(TestCase):
         )
         HousingApplication.objects.create(
             property=property_obj,
+            user=resident_user,
             full_name="Linked Resident",
             phone="555-0404",
             email="linked-current@example.com",
@@ -2358,6 +2365,50 @@ class LiveFlowTests(TestCase):
 
         self.assertRedirects(response, reverse("landlord_existing_resident_intake_detail", args=[intake.id]))
         self.assertTrue(ExistingResidentIntake.objects.filter(id=intake.id).exists())
+
+    def test_staff_can_delete_bad_email_setup_with_unused_code(self):
+        landlord = User.objects.create_user(
+            username="delete-unused-code-current-resident",
+            email="delete-unused-code-current-resident@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        temp_user = User.objects.create_user(
+            username="bad-email-temp",
+            email="bad-email@example.com",
+            password=None,
+            role="tenant",
+        )
+        temp_user.refresh_invite_code()
+        property_obj = Property.objects.create(name="Bad Email Intake Property", landlord_email=landlord.email)
+        intake = ExistingResidentIntake.objects.create(
+            property=property_obj,
+            first_name="Bad",
+            last_name="Email",
+            email="bad-email@example.com",
+            phone="555-0405",
+            room_unit_label="L",
+        )
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            user=temp_user,
+            full_name="Bad Email",
+            phone="555-0405",
+            email="bad-email@example.com",
+            age=50,
+            income_source="Existing resident intake",
+            monthly_income=Decimal("0.00"),
+            housing_need="Existing resident.",
+        )
+
+        self.client.login(username="delete-unused-code-current-resident", password="StrongPass123!")
+        response = self.client.post(reverse("delete_existing_resident_intake", args=[intake.id]))
+
+        self.assertRedirects(response, reverse("landlord_attention"))
+        self.assertFalse(ExistingResidentIntake.objects.filter(id=intake.id).exists())
+        self.assertFalse(HousingApplication.objects.filter(id=application.id).exists())
+        self.assertFalse(User.objects.filter(id=temp_user.id).exists())
 
     def test_landlord_can_upload_current_resident_roster(self):
         landlord = User.objects.create_user(
@@ -2384,6 +2435,42 @@ class LiveFlowTests(TestCase):
         roster_entry = CurrentResidentRosterEntry.objects.get(email="roster@example.com")
         self.assertEqual(roster_entry.property, property_obj)
         self.assertEqual(roster_entry.room_unit_label, "Unit 12")
+
+    def test_landlord_can_upload_current_resident_roster_excel(self):
+        landlord = User.objects.create_user(
+            username="roster-excel-landlord",
+            email="roster-excel-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Roster Excel Property", landlord_email=landlord.email)
+
+        from openpyxl import Workbook
+        workbook = Workbook()
+        worksheet = workbook.active
+        worksheet.append(["Name", "Email", "Phone", "Room"])
+        worksheet.append(["Joe Malone", "joe@example.com", "555-0410", "L"])
+        buffer = BytesIO()
+        workbook.save(buffer)
+        buffer.seek(0)
+        roster_file = SimpleUploadedFile(
+            "roster.xlsx",
+            buffer.read(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+        self.client.login(username="roster-excel-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("current_resident_roster_upload"), {
+            "property": property_obj.id,
+            "file": roster_file,
+        })
+
+        self.assertRedirects(response, reverse("current_resident_roster_upload"))
+        roster_entry = CurrentResidentRosterEntry.objects.get(email="joe@example.com")
+        self.assertEqual(roster_entry.first_name, "Joe")
+        self.assertEqual(roster_entry.last_name, "Malone")
+        self.assertEqual(roster_entry.room_unit_label, "L")
 
     def test_landlord_can_view_current_resident_intake_detail_and_backup_code(self):
         landlord = User.objects.create_user(

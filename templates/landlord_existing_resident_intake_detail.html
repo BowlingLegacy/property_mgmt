@@ -190,23 +190,21 @@
             </div>
         {% endif %}
 
-        {% if not application %}
-            <div class="file-panel mt-3 border-danger">
-                <h2 class="h5 fw-bold text-danger">Invalid Setup Attempt</h2>
-                <p class="text-muted">
-                    Delete this only when you have confirmed the person is not a valid current resident setup.
-                    This removes the setup attempt from Needs Attention.
-                </p>
-                <form method="post" action="{% url 'delete_existing_resident_intake' intake.id %}">
-                    {% csrf_token %}
-                    <button type="submit"
-                            class="btn btn-outline-danger"
-                            onclick="return confirm('Delete this current resident setup attempt?');">
-                        Delete Invalid Setup Attempt
-                    </button>
-                </form>
-            </div>
-        {% endif %}
+        <div class="file-panel mt-3 border-danger">
+            <h2 class="h5 fw-bold text-danger">Invalid Setup Attempt</h2>
+            <p class="text-muted">
+                Delete this only when you have confirmed this is a duplicate or bad-email setup attempt.
+                If a temporary code/user was created but the resident has not completed login, it will be cancelled and removed.
+            </p>
+            <form method="post" action="{% url 'delete_existing_resident_intake' intake.id %}">
+                {% csrf_token %}
+                <button type="submit"
+                        class="btn btn-outline-danger"
+                        onclick="return confirm('Delete this setup attempt and cancel any unused setup code?');">
+                    Delete / Cancel Setup Attempt
+                </button>
+            </form>
+        </div>
     </div>
 </div>
 

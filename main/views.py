@@ -3244,13 +3244,37 @@ def roster_value(row, *keys):
 
 
 def import_current_resident_roster(property_obj, file_obj, user):
+    filename = (getattr(file_obj, "name", "") or "").lower()
+    if filename.endswith((".xlsx", ".xls")):
+        workbook = load_workbook(file_obj, read_only=True, data_only=True)
+        worksheet = workbook.active
+        rows = worksheet.iter_rows(values_only=True)
+        header_row = next(rows, None)
+        if not header_row:
+            return 0, 0
+
+        headers = [normalized_header(value) for value in header_row]
+        row_iterable = (
+            {
+                headers[index]: value
+                for index, value in enumerate(row)
+                if index < len(headers)
+            }
+            for row in rows
+        )
+        return import_current_resident_roster_rows(property_obj, row_iterable, user)
+
     decoded_file = TextIOWrapper(file_obj, encoding="utf-8-sig", newline="")
     reader = csv.DictReader(decoded_file)
+    row_iterable = ({normalized_header(key): value for key, value in row.items()} for row in reader)
+    return import_current_resident_roster_rows(property_obj, row_iterable, user)
+
+
+def import_current_resident_roster_rows(property_obj, row_iterable, user):
     created = 0
     skipped = 0
 
-    for row in reader:
-        normalized_row = {normalized_header(key): value for key, value in row.items()}
+    for normalized_row in row_iterable:
         first_name = roster_value(normalized_row, "first name", "firstname", "first")
         last_name = roster_value(normalized_row, "last name", "lastname", "last")
         full_name = roster_value(normalized_row, "name", "resident", "resident name", "tenant")
@@ -3416,19 +3440,37 @@ def delete_existing_resident_intake(request, intake_id):
         id=intake_id,
         property__in=staff_managed_properties(request.user),
     )
-    application_exists = HousingApplication.objects.filter(
+    application = HousingApplication.objects.select_related("user").filter(
         property=intake.property,
         email__iexact=intake.email,
-    ).exists()
+    ).first()
 
-    if application_exists:
+    if application and application.user and application.user.has_usable_password():
         messages.error(
             request,
-            "This setup attempt is already connected to a resident file. Open the resident file before deleting anything.",
+            "This setup attempt is connected to a completed resident login. Open the resident file before deleting anything.",
+        )
+        return redirect("landlord_existing_resident_intake_detail", intake_id=intake.id)
+
+    if application and (
+        application.payments.exists()
+        or application.documents.exists()
+        or application.signed_documents.filter(locked=True).exists()
+        or application.resident_messages.exists()
+    ):
+        messages.error(
+            request,
+            "This setup attempt is connected to resident activity. Open the resident file before deleting anything.",
         )
         return redirect("landlord_existing_resident_intake_detail", intake_id=intake.id)
 
     resident_name = intake.full_name()
+    if application:
+        temp_user = application.user
+        application.delete()
+        if temp_user and not temp_user.has_usable_password():
+            temp_user.delete()
+
     intake.delete()
     messages.success(request, f"Deleted invalid current resident setup attempt for {resident_name}.")
     return redirect("landlord_attention")

@@ -556,8 +556,8 @@ class CurrentResidentRosterUploadForm(forms.Form):
     )
     file = forms.FileField(
         label="Current resident list",
-        help_text="CSV columns accepted: first_name, last_name, email, phone, room_unit_label. Name and unit columns from common spreadsheets are also accepted.",
-        widget=forms.ClearableFileInput(attrs={"class": "form-control", "accept": ".csv"}),
+        help_text="CSV or Excel accepted. Columns can include first_name, last_name, email, phone, room_unit_label, name, resident, room, or unit.",
+        widget=forms.ClearableFileInput(attrs={"class": "form-control", "accept": ".csv,.xlsx,.xls"}),
     )
 
     def __init__(self, *args, properties=None, **kwargs):
