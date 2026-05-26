@@ -667,6 +667,10 @@ class LiveFlowTests(TestCase):
         self.assertEqual(reply.body, "I will check this today.")
         resident_message.refresh_from_db()
         self.assertEqual(resident_message.status, "reviewed")
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["reply-resident@example.com"])
+        self.assertIn("new secure reply", mail.outbox[0].body.lower())
+        self.assertIn(reverse("resident_requests"), mail.outbox[0].body)
 
     def test_landlord_cannot_reply_to_other_property_message(self):
         landlord = User.objects.create_user(

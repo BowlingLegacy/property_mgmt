@@ -83,6 +83,34 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 LATE_FEE_AMOUNT = Decimal("25.00")
 
 
+def notify_resident_of_portal_reply(request, resident_message):
+    application = resident_message.application
+
+    if not application.email:
+        return False
+
+    dashboard_url = request.build_absolute_uri(reverse("resident_requests"))
+    send_mail(
+        f"New secure portal reply: {resident_message.subject}",
+        f"""Hello {application.full_name},
+
+You have a new secure reply in your Bowling Legacy resident portal.
+
+Please log in to view and respond:
+{dashboard_url}
+
+For privacy, the reply content is stored inside your portal rather than in this email.
+
+Thank you,
+Bowling Legacy Housing
+""",
+        getattr(settings, "DEFAULT_FROM_EMAIL", None),
+        [application.email],
+        fail_silently=False,
+    )
+    return True
+
+
 def money(value):
     if value is None:
         return Decimal("0.00")
@@ -1774,7 +1802,18 @@ def landlord_message_detail(request, message_id):
             if resident_message.status == "submitted":
                 resident_message.status = "reviewed"
                 resident_message.save(update_fields=["status"])
-            messages.success(request, "Reply sent to resident portal.")
+            try:
+                email_sent = notify_resident_of_portal_reply(request, resident_message)
+            except Exception as exc:
+                messages.warning(
+                    request,
+                    f"Reply saved to resident portal, but email notification failed: {exc}",
+                )
+            else:
+                if email_sent:
+                    messages.success(request, "Reply sent to resident portal and email notification sent.")
+                else:
+                    messages.warning(request, "Reply saved to resident portal. No email is on file for this resident.")
             return redirect("landlord_message_detail", message_id=resident_message.id)
 
         new_status = request.POST.get("status")
