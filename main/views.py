@@ -96,7 +96,7 @@ def notify_resident_of_portal_reply(request, resident_message):
 
 You have a new secure reply in your Bowling Legacy resident portal.
 
-Please log in to view and respond:
+Use this direct link to open My Requests. If you are not already signed in, the site will ask for your login first and then take you to the message area:
 {dashboard_url}
 
 For privacy, the reply content is stored inside your portal rather than in this email.
@@ -109,6 +109,20 @@ Bowling Legacy Housing
         fail_silently=False,
     )
     return True
+
+
+def notify_resident_of_portal_reply_sms(request, resident_message):
+    portal_url = request.build_absolute_uri(reverse("resident_requests"))
+    body = (
+        "Bowling Legacy: You have a new secure portal reply. "
+        f"Log in to view it: {portal_url} Reply STOP to opt out."
+    )
+    return send_sms_message(
+        resident_message.application,
+        body[:1500],
+        request.user,
+        resident_message=resident_message,
+    )
 
 
 def money(value):
@@ -1814,6 +1828,13 @@ def landlord_message_detail(request, message_id):
                     messages.success(request, "Reply sent to resident portal and email notification sent.")
                 else:
                     messages.warning(request, "Reply saved to resident portal. No email is on file for this resident.")
+            sms_log = notify_resident_of_portal_reply_sms(request, resident_message)
+            if sms_log.status == "sent":
+                messages.success(request, "Text notification sent.")
+            elif sms_log.status in ["skipped_no_consent", "not_configured"]:
+                messages.info(request, f"Text notification not sent: {sms_log.get_status_display()}.")
+            else:
+                messages.warning(request, f"Text notification failed: {sms_log.error_message}")
             return redirect("landlord_message_detail", message_id=resident_message.id)
 
         new_status = request.POST.get("status")
