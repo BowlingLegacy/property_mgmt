@@ -3112,7 +3112,7 @@ def ensure_existing_resident_portal_application(intake):
     application = (
         HousingApplication.objects
         .select_related("user")
-        .filter(property=intake.property, email__iexact=intake.email)
+        .filter(id=intake.application_id)
         .first()
     )
 
@@ -3141,6 +3141,8 @@ def ensure_existing_resident_portal_application(intake):
             housing_need="Existing resident profile setup.",
             additional_notes=intake.additional_notes,
         )
+        intake.application = application
+        intake.save(update_fields=["application"])
     else:
         update_fields = []
 
@@ -3357,7 +3359,7 @@ def landlord_existing_resident_intake_detail(request, intake_id):
     application = (
         HousingApplication.objects
         .select_related("user", "property")
-        .filter(property=intake.property, email__iexact=intake.email)
+        .filter(id=intake.application_id)
         .first()
     )
     pending_user = application.user if application and application.user else None
@@ -3440,10 +3442,7 @@ def delete_existing_resident_intake(request, intake_id):
         id=intake_id,
         property__in=staff_managed_properties(request.user),
     )
-    application = HousingApplication.objects.select_related("user").filter(
-        property=intake.property,
-        email__iexact=intake.email,
-    ).first()
+    application = HousingApplication.objects.select_related("user").filter(id=intake.application_id).first()
 
     if application and application.user and application.user.has_usable_password():
         messages.error(

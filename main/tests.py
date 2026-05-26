@@ -2348,7 +2348,7 @@ class LiveFlowTests(TestCase):
             phone="555-0404",
             room_unit_label="A",
         )
-        HousingApplication.objects.create(
+        application = HousingApplication.objects.create(
             property=property_obj,
             user=resident_user,
             full_name="Linked Resident",
@@ -2359,6 +2359,8 @@ class LiveFlowTests(TestCase):
             monthly_income=Decimal("0.00"),
             housing_need="Existing resident.",
         )
+        intake.application = application
+        intake.save(update_fields=["application"])
 
         self.client.login(username="keep-linked-current-resident-intake", password="StrongPass123!")
         response = self.client.post(reverse("delete_existing_resident_intake", args=[intake.id]))
@@ -2401,6 +2403,8 @@ class LiveFlowTests(TestCase):
             monthly_income=Decimal("0.00"),
             housing_need="Existing resident.",
         )
+        intake.application = application
+        intake.save(update_fields=["application"])
 
         self.client.login(username="delete-unused-code-current-resident", password="StrongPass123!")
         response = self.client.post(reverse("delete_existing_resident_intake", args=[intake.id]))
@@ -2409,6 +2413,48 @@ class LiveFlowTests(TestCase):
         self.assertFalse(ExistingResidentIntake.objects.filter(id=intake.id).exists())
         self.assertFalse(HousingApplication.objects.filter(id=application.id).exists())
         self.assertFalse(User.objects.filter(id=temp_user.id).exists())
+
+    def test_duplicate_setup_attempt_actions_stay_on_selected_intake(self):
+        landlord = User.objects.create_user(
+            username="duplicate-current-resident-intake",
+            email="duplicate-current-resident-intake@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Duplicate Intake Property", landlord_email=landlord.email)
+        first_intake = ExistingResidentIntake.objects.create(
+            property=property_obj,
+            first_name="Mike",
+            last_name="Dudy",
+            email="wrong@example.com",
+            phone="555-0406",
+            room_unit_label="L",
+        )
+        second_intake = ExistingResidentIntake.objects.create(
+            property=property_obj,
+            first_name="Michael",
+            last_name="Dudley",
+            email="right@example.com",
+            phone="555-0406",
+            room_unit_label="L",
+        )
+
+        first_application = ensure_existing_resident_portal_application(first_intake)
+        second_application = ensure_existing_resident_portal_application(second_intake)
+
+        self.assertNotEqual(first_application.id, second_application.id)
+        self.assertEqual(first_intake.application_id, first_application.id)
+        self.assertEqual(second_intake.application_id, second_application.id)
+
+        self.client.login(username="duplicate-current-resident-intake", password="StrongPass123!")
+        response = self.client.post(reverse("delete_existing_resident_intake", args=[first_intake.id]))
+
+        self.assertRedirects(response, reverse("landlord_attention"))
+        self.assertFalse(ExistingResidentIntake.objects.filter(id=first_intake.id).exists())
+        self.assertFalse(HousingApplication.objects.filter(id=first_application.id).exists())
+        self.assertTrue(ExistingResidentIntake.objects.filter(id=second_intake.id).exists())
+        self.assertTrue(HousingApplication.objects.filter(id=second_application.id).exists())
 
     def test_landlord_can_upload_current_resident_roster(self):
         landlord = User.objects.create_user(
