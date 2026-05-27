@@ -658,6 +658,63 @@ def rent_roll_room_sort_key(room_label):
     return (1, normalized_label)
 
 
+def rent_roll_base_row(property_obj, room_label, resident_name="No profile yet"):
+    clean_room_label = canonical_room_label(room_label)
+    return {
+        "property": property_obj.name if property_obj else "No Property",
+        "property_id": property_obj.id if property_obj else None,
+        "room": clean_room_label or "-",
+        "room_sort": rent_roll_room_sort_key(clean_room_label),
+        "resident": resident_name or "No profile yet",
+        "monthly_rent": Decimal("0.00"),
+        "rent_paid": Decimal("0.00"),
+        "rent_due_for_month": Decimal("0.00"),
+        "current_rent_balance": Decimal("0.00"),
+        "utility_monthly": Decimal("0.00"),
+        "utility_paid": Decimal("0.00"),
+        "utility_due_for_month": Decimal("0.00"),
+        "current_utility_balance": Decimal("0.00"),
+        "deposit_required": Decimal("0.00"),
+        "deposit_paid": Decimal("0.00"),
+        "deposit_due": Decimal("0.00"),
+        "has_profile": False,
+    }
+
+
+def rent_roll_room_key(property_obj, room_label):
+    return (property_obj.id if property_obj else None, normalized_room_label(room_label))
+
+
+def apply_room_setting_to_rent_roll_row(row, setting):
+    row["monthly_rent"] = setting.monthly_rent
+    row["rent_due_for_month"] = setting.monthly_rent
+    row["utility_monthly"] = setting.utility_monthly
+    row["utility_due_for_month"] = setting.utility_monthly
+    row["deposit_required"] = setting.deposit_required
+    row["deposit_paid"] = setting.deposit_paid
+    row["deposit_due"] = max(setting.deposit_required - setting.deposit_paid, Decimal("0.00"))
+
+
+def apply_resident_to_rent_roll_row(row, resident, selected_month):
+    completed_payments = list(resident.payments.filter(status="completed"))
+    rent_paid = payment_amount_for_month(completed_payments, selected_month.year, selected_month.month, ["rent"])
+    utility_paid = payment_amount_for_month(completed_payments, selected_month.year, selected_month.month, ["utility"])
+
+    row["resident"] = resident.full_name
+    row["monthly_rent"] = resident.monthly_rent
+    row["rent_paid"] = rent_paid
+    row["rent_due_for_month"] = max(resident.monthly_rent - rent_paid, Decimal("0.00"))
+    row["current_rent_balance"] = resident.balance
+    row["utility_monthly"] = resident.utility_monthly
+    row["utility_paid"] = utility_paid
+    row["utility_due_for_month"] = max(resident.utility_monthly - utility_paid, Decimal("0.00"))
+    row["current_utility_balance"] = resident.utility_balance
+    row["deposit_required"] = resident.deposit_required
+    row["deposit_paid"] = resident.deposit_paid
+    row["deposit_due"] = max(resident.deposit_required - resident.deposit_paid, Decimal("0.00"))
+    row["has_profile"] = True
+
+
 def recalculate_application_balances(application):
     completed_payments = application.payments.filter(status="completed")
     rent_paid = completed_payments.filter(payment_type="rent").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
@@ -2904,6 +2961,7 @@ def rent_roll(request):
     selected_month = selected_report_month(request)
     previous_month = add_months(selected_month, -1)
     next_month = add_months(selected_month, 1)
+    properties = staff_managed_properties(request.user)
     residents = (
         staff_managed_applications(request.user)
         .select_related("property")
@@ -2911,36 +2969,43 @@ def rent_roll(request):
         .order_by("property__name", "space_label", "full_name")
     )
 
-    rows = []
+    rows_by_room = OrderedDict()
+
+    room_settings = (
+        PropertyRoomRent.objects
+        .select_related("property")
+        .filter(property__in=properties, is_active=True)
+        .order_by("property__name", "room_unit_label")
+    )
+    for setting in room_settings:
+        key = rent_roll_room_key(setting.property, setting.room_unit_label)
+        row = rows_by_room.setdefault(key, rent_roll_base_row(setting.property, setting.room_unit_label))
+        apply_room_setting_to_rent_roll_row(row, setting)
+
+    roster_entries = (
+        CurrentResidentRosterEntry.objects
+        .select_related("property")
+        .filter(property__in=properties, is_active=True)
+        .exclude(room_unit_label="")
+        .order_by("property__name", "room_unit_label", "last_name", "first_name")
+    )
+    for entry in roster_entries:
+        key = rent_roll_room_key(entry.property, entry.room_unit_label)
+        row = rows_by_room.setdefault(key, rent_roll_base_row(entry.property, entry.room_unit_label))
+        if not row["has_profile"] and row["resident"] == "No profile yet":
+            row["resident"] = entry.full_name()
 
     for resident in residents:
-        completed_payments = list(resident.payments.filter(status="completed"))
+        room_label = canonical_room_label(resident.space_label or "")
+        if room_label:
+            key = rent_roll_room_key(resident.property, room_label)
+            row = rows_by_room.setdefault(key, rent_roll_base_row(resident.property, room_label))
+        else:
+            key = ("profile", resident.id)
+            row = rows_by_room.setdefault(key, rent_roll_base_row(resident.property, ""))
+        apply_resident_to_rent_roll_row(row, resident, selected_month)
 
-        rent_paid = payment_amount_for_month(completed_payments, selected_month.year, selected_month.month, ["rent"])
-        utility_paid = payment_amount_for_month(completed_payments, selected_month.year, selected_month.month, ["utility"])
-        room_label = canonical_room_label(resident.space_label or resident.space_type or "")
-
-        rows.append({
-            "property": resident.property.name if resident.property else "No Property",
-            "room": room_label or "-",
-            "room_sort": rent_roll_room_sort_key(room_label),
-            "resident": resident.full_name,
-            "monthly_rent": resident.monthly_rent,
-            "rent_balance": resident.balance,
-            "rent_paid": rent_paid,
-            "rent_due_for_month": max(resident.monthly_rent - rent_paid, Decimal("0.00")),
-            "current_rent_balance": resident.balance,
-            "utility_monthly": resident.utility_monthly,
-            "utility_balance": resident.utility_balance,
-            "utility_paid": utility_paid,
-            "utility_due_for_month": max(resident.utility_monthly - utility_paid, Decimal("0.00")),
-            "current_utility_balance": resident.utility_balance,
-            "deposit_required": resident.deposit_required,
-            "deposit_paid": resident.deposit_paid,
-            "deposit_due": max(resident.deposit_required - resident.deposit_paid, Decimal("0.00")),
-        })
-
-    rows = sorted(rows, key=lambda row: (row["property"].lower(), row["room_sort"], row["resident"].lower()))
+    rows = sorted(rows_by_room.values(), key=lambda row: (row["property"].lower(), row["room_sort"], row["resident"].lower()))
 
     return render(request, "rent_roll.html", {
         "rows": rows,
@@ -3151,45 +3216,67 @@ def export_rent_roll_csv(request):
         "Deposit Still Due",
     ])
 
+    properties = staff_managed_properties(request.user)
     residents = (
         staff_managed_applications(request.user)
         .select_related("property")
         .filter(user__isnull=False)
     )
-    rows = []
+    rows_by_room = OrderedDict()
+
+    room_settings = (
+        PropertyRoomRent.objects
+        .select_related("property")
+        .filter(property__in=properties, is_active=True)
+        .order_by("property__name", "room_unit_label")
+    )
+    for setting in room_settings:
+        key = rent_roll_room_key(setting.property, setting.room_unit_label)
+        row = rows_by_room.setdefault(key, rent_roll_base_row(setting.property, setting.room_unit_label))
+        apply_room_setting_to_rent_roll_row(row, setting)
+
+    roster_entries = (
+        CurrentResidentRosterEntry.objects
+        .select_related("property")
+        .filter(property__in=properties, is_active=True)
+        .exclude(room_unit_label="")
+        .order_by("property__name", "room_unit_label", "last_name", "first_name")
+    )
+    for entry in roster_entries:
+        key = rent_roll_room_key(entry.property, entry.room_unit_label)
+        row = rows_by_room.setdefault(key, rent_roll_base_row(entry.property, entry.room_unit_label))
+        if not row["has_profile"] and row["resident"] == "No profile yet":
+            row["resident"] = entry.full_name()
 
     for resident in residents:
-        completed_payments = list(resident.payments.filter(status="completed"))
-        rent_paid = payment_amount_for_month(completed_payments, selected_month.year, selected_month.month, ["rent"])
-        utility_paid = payment_amount_for_month(completed_payments, selected_month.year, selected_month.month, ["utility"])
-        room_label = canonical_room_label(resident.space_label or resident.space_type or "")
-        property_name = resident.property.name if resident.property else ""
+        room_label = canonical_room_label(resident.space_label or "")
+        if room_label:
+            key = rent_roll_room_key(resident.property, room_label)
+            row = rows_by_room.setdefault(key, rent_roll_base_row(resident.property, room_label))
+        else:
+            key = ("profile", resident.id)
+            row = rows_by_room.setdefault(key, rent_roll_base_row(resident.property, ""))
+        apply_resident_to_rent_roll_row(row, resident, selected_month)
 
-        rows.append((
-            property_name.lower(),
-            rent_roll_room_sort_key(room_label),
-            resident.full_name.lower(),
-            [
-                selected_month.strftime("%B %Y"),
-                resident.full_name,
-                property_name,
-                room_label,
-                resident.monthly_rent,
-                rent_paid,
-                max(resident.monthly_rent - rent_paid, Decimal("0.00")),
-                resident.balance,
-                resident.utility_monthly,
-                utility_paid,
-                max(resident.utility_monthly - utility_paid, Decimal("0.00")),
-                resident.utility_balance,
-                resident.deposit_required,
-                resident.deposit_paid,
-                max(resident.deposit_required - resident.deposit_paid, Decimal("0.00")),
-            ],
-        ))
-
-    for _property_sort, _room_sort, _resident_sort, row in sorted(rows):
-        writer.writerow(row)
+    rows = sorted(rows_by_room.values(), key=lambda row: (row["property"].lower(), row["room_sort"], row["resident"].lower()))
+    for row in rows:
+        writer.writerow([
+            selected_month.strftime("%B %Y"),
+            row["resident"],
+            row["property"],
+            row["room"],
+            row["monthly_rent"],
+            row["rent_paid"],
+            row["rent_due_for_month"],
+            row["current_rent_balance"],
+            row["utility_monthly"],
+            row["utility_paid"],
+            row["utility_due_for_month"],
+            row["current_utility_balance"],
+            row["deposit_required"],
+            row["deposit_paid"],
+            row["deposit_due"],
+        ])
 
     return response
 

@@ -2921,6 +2921,53 @@ class LiveFlowTests(TestCase):
         self.assertIn("Utilities Paid This Month", content)
         self.assertNotIn("CSV Applicant", content)
 
+    def test_rent_roll_lists_room_roster_before_profile_setup(self):
+        landlord = User.objects.create_user(
+            username="rent-roll-roster-landlord",
+            email="rent-roll-roster@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Roster Rent Roll Property", landlord_email=landlord.email)
+        PropertyRoomRent.objects.create(
+            property=property_obj,
+            room_unit_label="Room J",
+            monthly_rent=Decimal("561.00"),
+            utility_monthly=Decimal("55.00"),
+            deposit_required=Decimal("450.00"),
+            deposit_paid=Decimal("450.00"),
+        )
+        CurrentResidentRosterEntry.objects.create(
+            property=property_obj,
+            first_name="Michael",
+            last_name="Dudley",
+            email="michael-dudley@example.com",
+            room_unit_label="J",
+        )
+        HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Applicant Not On Rent Roll",
+            phone="555-0610",
+            email="applicant-not-rent-roll@example.com",
+            age=40,
+            space_label="K",
+            monthly_rent=Decimal("700.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Applicant only.",
+        )
+
+        self.client.login(username="rent-roll-roster-landlord", password="StrongPass123!")
+        response = self.client.get(f"{reverse('rent_roll')}?month=2026-05")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Michael Dudley")
+        self.assertContains(response, "<td>J</td>", html=True)
+        self.assertContains(response, "<td>$561.00</td>", html=True)
+        self.assertContains(response, "<td>$55.00</td>", html=True)
+        self.assertNotContains(response, "Applicant Not On Rent Roll")
+
     def test_custom_phone_report_scopes_to_landlord_property(self):
         landlord = User.objects.create_user(
             username="report-landlord",
