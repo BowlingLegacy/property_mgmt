@@ -2775,6 +2775,152 @@ class LiveFlowTests(TestCase):
         self.assertNotContains(response, "Paid Resident</td>")
         self.assertNotContains(response, "Other Missing Resident")
 
+    def test_rent_roll_is_resident_only_month_labeled_and_room_sorted(self):
+        landlord = User.objects.create_user(
+            username="rent-roll-landlord",
+            email="rent-roll-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Rent Roll Property", landlord_email=landlord.email)
+        room_b_user = User.objects.create_user(username="room-b-user", password="StrongPass123!", role="tenant")
+        room_a_user = User.objects.create_user(username="room-a-user", password="StrongPass123!", role="tenant")
+        room_c_user = User.objects.create_user(username="room-c-user", password="StrongPass123!", role="tenant")
+        room_b_resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=room_b_user,
+            full_name="Room B Resident",
+            phone="555-0601",
+            email="room-b@example.com",
+            age=41,
+            space_label="Room B",
+            monthly_rent=Decimal("600.00"),
+            balance=Decimal("600.00"),
+            utility_monthly=Decimal("55.00"),
+            utility_balance=Decimal("55.00"),
+            deposit_required=Decimal("450.00"),
+            deposit_paid=Decimal("200.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        HousingApplication.objects.create(
+            property=property_obj,
+            user=room_a_user,
+            full_name="Room A Resident",
+            phone="555-0602",
+            email="room-a@example.com",
+            age=42,
+            space_label="A",
+            monthly_rent=Decimal("650.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        HousingApplication.objects.create(
+            property=property_obj,
+            user=room_c_user,
+            full_name="Room C Resident",
+            phone="555-0603",
+            email="room-c@example.com",
+            age=43,
+            space_label="C",
+            monthly_rent=Decimal("625.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Applicant Should Not Show",
+            phone="555-0604",
+            email="applicant-rent-roll@example.com",
+            age=44,
+            space_label="D",
+            monthly_rent=Decimal("700.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Applicant only.",
+        )
+        Payment.objects.create(
+            application=room_b_resident,
+            payment_type="rent",
+            amount=Decimal("300.00"),
+            status="completed",
+            service_month=date(2026, 6, 1),
+        )
+
+        self.client.login(username="rent-roll-landlord", password="StrongPass123!")
+        response = self.client.get(f"{reverse('rent_roll')}?month=2026-06")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Month viewed: <strong>June 2026</strong>", html=True)
+        self.assertContains(response, "Deposit Held/Paid")
+        self.assertContains(response, "Deposit Still Due")
+        self.assertContains(response, "Rent Paid This Month")
+        self.assertNotContains(response, "Applicant Should Not Show")
+
+        content = response.content.decode()
+        self.assertLess(content.index("<td>A</td>"), content.index("<td>B</td>"))
+        self.assertLess(content.index("<td>B</td>"), content.index("<td>C</td>"))
+        self.assertContains(response, "<td>$300.00</td>", html=True)
+        self.assertContains(response, "<td>$250.00</td>", html=True)
+
+    def test_rent_roll_csv_matches_resident_only_month_view(self):
+        landlord = User.objects.create_user(
+            username="rent-roll-csv-landlord",
+            email="rent-roll-csv-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Rent Roll CSV Property", landlord_email=landlord.email)
+        tenant_user = User.objects.create_user(username="rent-roll-csv-tenant", password="StrongPass123!", role="tenant")
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=tenant_user,
+            full_name="CSV Resident",
+            phone="555-0605",
+            email="csv-resident@example.com",
+            age=45,
+            space_label="Room G",
+            monthly_rent=Decimal("560.00"),
+            balance=Decimal("560.00"),
+            utility_monthly=Decimal("55.00"),
+            utility_balance=Decimal("55.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        HousingApplication.objects.create(
+            property=property_obj,
+            full_name="CSV Applicant",
+            phone="555-0606",
+            email="csv-applicant@example.com",
+            age=46,
+            monthly_rent=Decimal("700.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Applicant only.",
+        )
+        Payment.objects.create(
+            application=resident,
+            payment_type="utility",
+            amount=Decimal("55.00"),
+            status="completed",
+            service_month=date(2026, 6, 1),
+        )
+
+        self.client.login(username="rent-roll-csv-landlord", password="StrongPass123!")
+        response = self.client.get(f"{reverse('export_rent_roll_csv')}?month=2026-06")
+        content = response.content.decode()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("June 2026,CSV Resident,Rent Roll CSV Property,G", content)
+        self.assertIn("Utilities Paid This Month", content)
+        self.assertNotIn("CSV Applicant", content)
+
     def test_custom_phone_report_scopes_to_landlord_property(self):
         landlord = User.objects.create_user(
             username="report-landlord",

@@ -23,7 +23,17 @@
 </nav>
 
 <div class="container-fluid my-5 px-4">
-    <h1 class="fw-bold mb-4">Rent Roll</h1>
+    <h1 class="fw-bold mb-2">Rent Roll</h1>
+    <p class="text-muted mb-3">
+        Month viewed: <strong>{{ selected_month|date:"F Y" }}</strong>
+    </p>
+
+    <div class="d-flex gap-2 flex-wrap mb-4">
+        <a href="{% url 'rent_roll' %}?month={{ previous_month|date:'Y-m' }}" class="btn btn-outline-primary btn-sm">Previous Month</a>
+        <a href="{% url 'rent_roll' %}" class="btn btn-outline-dark btn-sm">Current Month</a>
+        <a href="{% url 'rent_roll' %}?month={{ next_month|date:'Y-m' }}" class="btn btn-outline-primary btn-sm">Next Month</a>
+        <a href="{% url 'export_rent_roll_csv' %}?month={{ selected_month|date:'Y-m' }}" class="btn btn-success btn-sm">Download CSV</a>
+    </div>
 
     <div class="table-responsive">
         <table class="table table-bordered table-striped align-middle bg-white">
@@ -32,14 +42,17 @@
                     <th>Property</th>
                     <th>Room / Unit</th>
                     <th>Resident</th>
-                    <th>Monthly Rent</th>
-                    <th>Rent Paid</th>
-                    <th>Rent Balance</th>
+                    <th>Scheduled Rent</th>
+                    <th>Rent Paid This Month</th>
+                    <th>Rent Due This Month</th>
+                    <th>Current Rent Balance</th>
                     <th>Monthly Utilities</th>
-                    <th>Utilities Paid</th>
-                    <th>Utility Balance</th>
+                    <th>Utilities Paid This Month</th>
+                    <th>Utilities Due This Month</th>
+                    <th>Current Utility Balance</th>
                     <th>Deposit Required</th>
-                    <th>Deposit Paid</th>
+                    <th>Deposit Held/Paid</th>
+                    <th>Deposit Still Due</th>
                 </tr>
             </thead>
 
@@ -51,16 +64,19 @@
                         <td>{{ row.resident }}</td>
                         <td>${{ row.monthly_rent }}</td>
                         <td>${{ row.rent_paid }}</td>
-                        <td>${{ row.rent_balance }}</td>
+                        <td>${{ row.rent_due_for_month }}</td>
+                        <td>${{ row.current_rent_balance }}</td>
                         <td>${{ row.utility_monthly }}</td>
                         <td>${{ row.utility_paid }}</td>
-                        <td>${{ row.utility_balance }}</td>
+                        <td>${{ row.utility_due_for_month }}</td>
+                        <td>${{ row.current_utility_balance }}</td>
                         <td>${{ row.deposit_required }}</td>
                         <td>${{ row.deposit_paid }}</td>
+                        <td>${{ row.deposit_due }}</td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="11" class="text-muted">No residents found.</td>
+                        <td colspan="14" class="text-muted">No residents found.</td>
                     </tr>
                 {% endfor %}
             </tbody>

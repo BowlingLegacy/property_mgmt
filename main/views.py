@@ -636,6 +636,24 @@ def payment_amount_for_month(payments, year, month, payment_types=None):
     return total
 
 
+def selected_report_month(request):
+    raw_month = (request.GET.get("month") or "").strip()
+    if raw_month:
+        try:
+            return timezone.datetime.strptime(raw_month, "%Y-%m").date().replace(day=1)
+        except ValueError:
+            pass
+    return timezone.localdate().replace(day=1)
+
+
+def rent_roll_room_sort_key(room_label):
+    clean_label = canonical_room_label(room_label)
+    normalized_label = normalized_room_label(clean_label)
+    if len(normalized_label) == 1 and normalized_label.isalpha():
+        return (0, normalized_label.upper())
+    return (1, normalized_label)
+
+
 def recalculate_application_balances(application):
     completed_payments = application.payments.filter(status="completed")
     rent_paid = completed_payments.filter(payment_type="rent").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
@@ -2879,9 +2897,13 @@ def payment_receipt(request, payment_id):
 @login_required
 @user_passes_test(staff_required)
 def rent_roll(request):
+    selected_month = selected_report_month(request)
+    previous_month = add_months(selected_month, -1)
+    next_month = add_months(selected_month, 1)
     residents = (
         staff_managed_applications(request.user)
         .select_related("property")
+        .filter(user__isnull=False)
         .order_by("property__name", "space_label", "full_name")
     )
 
@@ -2889,26 +2911,39 @@ def rent_roll(request):
 
     for resident in residents:
         completed_payments = list(resident.payments.filter(status="completed"))
-        current_month = timezone.localdate().replace(day=1)
 
-        rent_paid = payment_amount_for_month(completed_payments, current_month.year, current_month.month, ["rent"])
-        utility_paid = payment_amount_for_month(completed_payments, current_month.year, current_month.month, ["utility"])
+        rent_paid = payment_amount_for_month(completed_payments, selected_month.year, selected_month.month, ["rent"])
+        utility_paid = payment_amount_for_month(completed_payments, selected_month.year, selected_month.month, ["utility"])
+        room_label = canonical_room_label(resident.space_label or resident.space_type or "")
 
         rows.append({
             "property": resident.property.name if resident.property else "No Property",
-            "room": resident.space_label or resident.space_type or "—",
+            "room": room_label or "-",
+            "room_sort": rent_roll_room_sort_key(room_label),
             "resident": resident.full_name,
             "monthly_rent": resident.monthly_rent,
             "rent_balance": resident.balance,
             "rent_paid": rent_paid,
+            "rent_due_for_month": max(resident.monthly_rent - rent_paid, Decimal("0.00")),
+            "current_rent_balance": resident.balance,
             "utility_monthly": resident.utility_monthly,
             "utility_balance": resident.utility_balance,
             "utility_paid": utility_paid,
+            "utility_due_for_month": max(resident.utility_monthly - utility_paid, Decimal("0.00")),
+            "current_utility_balance": resident.utility_balance,
             "deposit_required": resident.deposit_required,
             "deposit_paid": resident.deposit_paid,
+            "deposit_due": max(resident.deposit_required - resident.deposit_paid, Decimal("0.00")),
         })
 
-    return render(request, "rent_roll.html", {"rows": rows})
+    rows = sorted(rows, key=lambda row: (row["property"].lower(), row["room_sort"], row["resident"].lower()))
+
+    return render(request, "rent_roll.html", {
+        "rows": rows,
+        "selected_month": selected_month,
+        "previous_month": previous_month,
+        "next_month": next_month,
+    })
 
 
 @login_required
@@ -3089,25 +3124,68 @@ def export_payment_log_csv(request):
 @login_required
 @user_passes_test(staff_required)
 def export_rent_roll_csv(request):
+    selected_month = selected_report_month(request)
     response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = 'attachment; filename="rent_roll.csv"'
+    response["Content-Disposition"] = f'attachment; filename="rent_roll_{selected_month.strftime("%Y_%m")}.csv"'
 
     writer = csv.writer(response)
-    writer.writerow(["Resident", "Property", "Room", "Monthly Rent", "Balance", "Deposit Required", "Deposit Paid", "Utility Balance"])
+    writer.writerow([
+        "Month",
+        "Resident",
+        "Property",
+        "Room",
+        "Scheduled Rent",
+        "Rent Paid This Month",
+        "Rent Due This Month",
+        "Current Rent Balance",
+        "Monthly Utilities",
+        "Utilities Paid This Month",
+        "Utilities Due This Month",
+        "Current Utility Balance",
+        "Deposit Required",
+        "Deposit Held/Paid",
+        "Deposit Still Due",
+    ])
 
-    residents = HousingApplication.objects.all()
+    residents = (
+        staff_managed_applications(request.user)
+        .select_related("property")
+        .filter(user__isnull=False)
+    )
+    rows = []
 
     for resident in residents:
-        writer.writerow([
-            resident.full_name,
-            resident.property.name if resident.property else "",
-            resident.space_label,
-            resident.monthly_rent,
-            resident.balance,
-            resident.deposit_required,
-            resident.deposit_paid,
-            resident.utility_balance,
-        ])
+        completed_payments = list(resident.payments.filter(status="completed"))
+        rent_paid = payment_amount_for_month(completed_payments, selected_month.year, selected_month.month, ["rent"])
+        utility_paid = payment_amount_for_month(completed_payments, selected_month.year, selected_month.month, ["utility"])
+        room_label = canonical_room_label(resident.space_label or resident.space_type or "")
+        property_name = resident.property.name if resident.property else ""
+
+        rows.append((
+            property_name.lower(),
+            rent_roll_room_sort_key(room_label),
+            resident.full_name.lower(),
+            [
+                selected_month.strftime("%B %Y"),
+                resident.full_name,
+                property_name,
+                room_label,
+                resident.monthly_rent,
+                rent_paid,
+                max(resident.monthly_rent - rent_paid, Decimal("0.00")),
+                resident.balance,
+                resident.utility_monthly,
+                utility_paid,
+                max(resident.utility_monthly - utility_paid, Decimal("0.00")),
+                resident.utility_balance,
+                resident.deposit_required,
+                resident.deposit_paid,
+                max(resident.deposit_required - resident.deposit_paid, Decimal("0.00")),
+            ],
+        ))
+
+    for _property_sort, _room_sort, _resident_sort, row in sorted(rows):
+        writer.writerow(row)
 
     return response
 
