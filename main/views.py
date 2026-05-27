@@ -1314,6 +1314,8 @@ def landlord_rent_setup(request):
 
         add_room_property_id = request.POST.get("add_room_property_id")
         add_room_unit_label = (request.POST.get("add_room_unit_label") or "").strip()
+        save_added_room = request.POST.get("save_added_room") == "1"
+        added_room_saved = False
 
         if add_room_property_id and add_room_unit_label:
             try:
@@ -1353,6 +1355,17 @@ def landlord_rent_setup(request):
                     updated_count += applied_updates
                     rent_history_count += applied_history
                     room_applied_count += applied_rooms
+                added_room_saved = True
+
+        if save_added_room:
+            if added_room_saved:
+                messages.success(
+                    request,
+                    f"Room {canonical_room_label(add_room_unit_label)} rent saved and matching resident files updated.",
+                )
+            else:
+                messages.error(request, "Choose a property and room letter before saving room rent.")
+            return redirect("landlord_rent_setup")
 
         for index in range(room_count):
             if selected_room_update_index is not None and index != selected_room_update_index:
