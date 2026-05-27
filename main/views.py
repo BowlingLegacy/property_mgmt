@@ -1139,6 +1139,9 @@ def is_orphan_existing_resident_setup_file(application):
     if not is_existing_resident_setup_file(application):
         return False
 
+    if application.user and application.user.has_usable_password():
+        return False
+
     try:
         application.existing_resident_intake
     except ExistingResidentIntake.DoesNotExist:
