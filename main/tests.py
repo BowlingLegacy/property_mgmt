@@ -3085,6 +3085,90 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "$525.00")
         self.assertNotContains(response, "May rent")
 
+    def test_t12_report_includes_uploaded_income_and_expenses(self):
+        landlord = User.objects.create_user(
+            username="t12-landlord",
+            email="t12-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="T12 Property", landlord_email=landlord.email)
+        tenant_user = User.objects.create_user(username="t12-tenant", password="StrongPass123!", role="tenant")
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=tenant_user,
+            full_name="T12 Resident",
+            phone="555-0701",
+            email="t12-resident@example.com",
+            age=47,
+            monthly_rent=Decimal("700.00"),
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+        )
+        upload = FinancialUpload.objects.create(
+            property=property_obj,
+            name="T12 Spreadsheet",
+            file=SimpleUploadedFile("t12.csv", b"category,amount\n", content_type="text/csv"),
+        )
+        FinancialEntry.objects.create(
+            upload=upload,
+            property_name=property_obj.name,
+            sheet_name="Summary",
+            row_number=1,
+            year=2026,
+            month=6,
+            entry_type="income",
+            category="Rent",
+            amount=Decimal("1200.00"),
+        )
+        FinancialEntry.objects.create(
+            upload=upload,
+            property_name=property_obj.name,
+            sheet_name="Summary",
+            row_number=2,
+            year=2026,
+            month=6,
+            entry_type="operating_expense",
+            category="Power",
+            amount=Decimal("300.00"),
+        )
+        FinancialEntry.objects.create(
+            upload=upload,
+            property_name=property_obj.name,
+            sheet_name="Summary",
+            row_number=3,
+            year=2026,
+            month=6,
+            entry_type="debt_service",
+            category="Mortgage",
+            amount=Decimal("400.00"),
+        )
+        Payment.objects.create(
+            application=resident,
+            payment_type="rent",
+            amount=Decimal("700.00"),
+            status="completed",
+            service_month=date(2026, 6, 1),
+        )
+
+        self.client.login(username="t12-landlord", password="StrongPass123!")
+        response = self.client.get(f"{reverse('t12_report')}?year=2026")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Spreadsheet Income")
+        self.assertContains(response, "Total Income")
+        self.assertContains(response, "<td>$1200.00</td>", html=True)
+        self.assertContains(response, "<td>$1900.00</td>", html=True)
+        self.assertContains(response, "<td>$1600.00</td>", html=True)
+        self.assertContains(response, "<td>$1200.00</td>", html=True)
+
+        csv_response = self.client.get(f"{reverse('export_t12_csv')}?year=2026")
+        csv_content = csv_response.content.decode()
+
+        self.assertIn("June,700.00,1200.00,1900.00,300.00,400.00", csv_content)
+
     def test_accounting_receipt_upload_creates_category_and_review_record(self):
         landlord = User.objects.create_user(
             username="receipt-landlord",

@@ -164,6 +164,10 @@ def money(value):
         return Decimal("0.00")
 
 
+def csv_money(value):
+    return f"{money(value):.2f}"
+
+
 FINANCIAL_COLUMN_ALIASES = {
     "entry_date": ["date", "transaction date", "posted date", "posting date", "paid date", "receipt date"],
     "description": ["description", "memo", "payee", "vendor", "name", "transaction", "details"],
@@ -3193,22 +3197,48 @@ def export_rent_roll_csv(request):
 @login_required
 @user_passes_test(staff_required)
 def export_t12_csv(request):
+    year = selected_report_year(request)
+    months, totals = t12_report_rows(request.user, year)
     response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = 'attachment; filename="t12_report.csv"'
+    response["Content-Disposition"] = f'attachment; filename="t12_report_{year}.csv"'
 
     writer = csv.writer(response)
-    writer.writerow(["Month", "Income", "Expenses", "Debt Service", "Cash Flow"])
+    writer.writerow([
+        "Month",
+        "Online Income",
+        "Spreadsheet Income",
+        "Total Income",
+        "Operating Expenses",
+        "Debt Service",
+        "Capital Expenses",
+        "NOI",
+        "Cash Flow After Debt",
+    ])
 
-    current_year = timezone.localdate().year
-    completed_payments = list(Payment.objects.filter(status="completed"))
+    for month in months:
+        writer.writerow([
+            month["month_name"],
+            csv_money(month["online_income"]),
+            csv_money(month["spreadsheet_income"]),
+            csv_money(month["total_income"]),
+            csv_money(month["operating_expenses"]),
+            csv_money(month["debt_service"]),
+            csv_money(month["capital_expenses"]),
+            csv_money(month["net_operating_income"]),
+            csv_money(month["cash_flow_after_debt"]),
+        ])
 
-    for month in range(1, 13):
-        income = payment_amount_for_month(completed_payments, current_year, month)
-        expenses = FinancialEntry.objects.filter(year=current_year, month=month, entry_type="operating_expense").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-        debt_service = FinancialEntry.objects.filter(year=current_year, month=month, entry_type="debt_service").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-        cash_flow = income - expenses - debt_service
-
-        writer.writerow([date(current_year, month, 1).strftime("%B"), income, expenses, debt_service, cash_flow])
+    writer.writerow([
+        "Total",
+        csv_money(totals["online_income"]),
+        csv_money(totals["spreadsheet_income"]),
+        csv_money(totals["total_income"]),
+        csv_money(totals["operating_expenses"]),
+        csv_money(totals["debt_service"]),
+        csv_money(totals["capital_expenses"]),
+        csv_money(totals["net_operating_income"]),
+        csv_money(totals["cash_flow_after_debt"]),
+    ])
 
     return response
 
@@ -3216,10 +3246,44 @@ def export_t12_csv(request):
 @login_required
 @user_passes_test(staff_required)
 def t12_report(request):
-    year = timezone.localdate().year
-    financial_entries = FinancialEntry.objects.filter(year=year)
-    completed_payments = list(Payment.objects.filter(status="completed"))
+    year = selected_report_year(request)
+    months, totals = t12_report_rows(request.user, year)
+
+    return render(request, "t12_report.html", {"year": year, "months": months, "totals": totals})
+
+
+def selected_report_year(request):
+    raw_year = (request.GET.get("year") or "").strip()
+    if raw_year:
+        try:
+            year = int(raw_year)
+            if 2000 <= year <= 2100:
+                return year
+        except ValueError:
+            pass
+    return timezone.localdate().year
+
+
+def t12_report_rows(user, year):
+    financial_entries = FinancialEntry.objects.filter(
+        upload__property__in=staff_managed_properties(user),
+        year=year,
+    )
+    completed_payments = list(
+        Payment.objects
+        .filter(application__in=staff_managed_applications(user), status="completed")
+    )
     months = []
+    totals = {
+        "online_income": Decimal("0.00"),
+        "spreadsheet_income": Decimal("0.00"),
+        "total_income": Decimal("0.00"),
+        "operating_expenses": Decimal("0.00"),
+        "debt_service": Decimal("0.00"),
+        "capital_expenses": Decimal("0.00"),
+        "net_operating_income": Decimal("0.00"),
+        "cash_flow_after_debt": Decimal("0.00"),
+    }
 
     for month_number in range(1, 13):
         online_income = payment_amount_for_month(completed_payments, year, month_number)
@@ -3229,10 +3293,10 @@ def t12_report(request):
         capital_expenses = financial_entries.filter(month=month_number, entry_type="capital_expense").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
 
         total_income = online_income + spreadsheet_income
-        noi = total_income - operating_expenses
-        cash_flow = noi - debt_service
+        net_operating_income = total_income - operating_expenses
+        cash_flow_after_debt = net_operating_income - debt_service
 
-        months.append({
+        row = {
             "month_name": date(year, month_number, 1).strftime("%B"),
             "online_income": online_income,
             "spreadsheet_income": spreadsheet_income,
@@ -3240,11 +3304,15 @@ def t12_report(request):
             "operating_expenses": operating_expenses,
             "debt_service": debt_service,
             "capital_expenses": capital_expenses,
-            "noi": noi,
-            "cash_flow_after_debt": cash_flow,
-        })
+            "net_operating_income": net_operating_income,
+            "cash_flow_after_debt": cash_flow_after_debt,
+        }
+        months.append(row)
 
-    return render(request, "t12_report.html", {"year": year, "months": months})
+        for key in totals:
+            totals[key] += row[key]
+
+    return months, totals
 
 
 @login_required

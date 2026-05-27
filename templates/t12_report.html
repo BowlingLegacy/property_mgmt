@@ -26,12 +26,21 @@
     <h1 class="fw-bold mb-2">T-12 Report</h1>
     <p class="text-muted">Year: {{ year }}</p>
 
+    <div class="d-flex gap-2 flex-wrap mb-4">
+        <a href="{% url 't12_report' %}?year={{ year|add:'-1' }}" class="btn btn-outline-primary btn-sm">Previous Year</a>
+        <a href="{% url 't12_report' %}" class="btn btn-outline-dark btn-sm">Current Year</a>
+        <a href="{% url 't12_report' %}?year={{ year|add:'1' }}" class="btn btn-outline-primary btn-sm">Next Year</a>
+        <a href="{% url 'export_t12_csv' %}?year={{ year }}" class="btn btn-success btn-sm">Download CSV</a>
+    </div>
+
     <div class="table-responsive">
         <table class="table table-bordered table-striped align-middle bg-white">
             <thead>
                 <tr>
                     <th>Month</th>
                     <th>Online Income</th>
+                    <th>Spreadsheet Income</th>
+                    <th>Total Income</th>
                     <th>Operating Expenses</th>
                     <th>Debt Service</th>
                     <th>Capital Expenses</th>
@@ -45,6 +54,8 @@
                     <tr>
                         <td>{{ month.month_name }}</td>
                         <td>${{ month.online_income }}</td>
+                        <td>${{ month.spreadsheet_income }}</td>
+                        <td>${{ month.total_income }}</td>
                         <td>${{ month.operating_expenses }}</td>
                         <td>${{ month.debt_service }}</td>
                         <td>${{ month.capital_expenses }}</td>
@@ -56,6 +67,8 @@
                 <tr class="fw-bold">
                     <td>Total</td>
                     <td>${{ totals.online_income }}</td>
+                    <td>${{ totals.spreadsheet_income }}</td>
+                    <td>${{ totals.total_income }}</td>
                     <td>${{ totals.operating_expenses }}</td>
                     <td>${{ totals.debt_service }}</td>
                     <td>${{ totals.capital_expenses }}</td>
