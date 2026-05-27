@@ -277,10 +277,26 @@ def create_financial_entry_from_import(upload, property_obj, sheet_name, row, en
             },
         )
 
+    property_name = property_obj.name if property_obj else ""
+    normalized_amount = normalized_import_amount(amount, entry_type)
+    duplicate = FinancialEntry.objects.filter(
+        ledger_scope=upload.ledger_scope,
+        property_name=property_name,
+        entry_date=entry_date,
+        month=entry_date.month if entry_date else None,
+        year=entry_date.year if entry_date else None,
+        entry_type=entry_type,
+        category=category,
+        description=description,
+        amount=normalized_amount,
+    ).exclude(upload=upload).exists()
+    if duplicate:
+        return None
+
     return FinancialEntry.objects.create(
         upload=upload,
         ledger_scope=upload.ledger_scope,
-        property_name=property_obj.name if property_obj else "",
+        property_name=property_name,
         sheet_name=sheet_name,
         row_number=row["row_number"],
         entry_date=entry_date,
@@ -289,8 +305,25 @@ def create_financial_entry_from_import(upload, property_obj, sheet_name, row, en
         entry_type=entry_type,
         category=category,
         description=description,
-        amount=normalized_import_amount(amount, entry_type),
+        amount=normalized_amount,
     )
+
+
+def duplicate_receipt_financial_entry_exists(receipt):
+    if not receipt.category:
+        return False
+
+    return FinancialEntry.objects.filter(
+        ledger_scope="property",
+        property_name=receipt.property.name,
+        entry_date=receipt.receipt_date,
+        month=receipt.receipt_date.month if receipt.receipt_date else None,
+        year=receipt.receipt_date.year if receipt.receipt_date else None,
+        entry_type=receipt.entry_type,
+        category=receipt.category.name,
+        description=receipt.description or receipt.vendor,
+        amount=receipt.amount,
+    ).exists()
 
 
 MONTH_NAME_MAP = {
@@ -3165,9 +3198,18 @@ def approve_accounting_receipt(request, receipt_id):
             parsed_at=timezone.now(),
         )
 
+    if not receipt.financial_entry and duplicate_receipt_financial_entry_exists(receipt):
+        receipt.status = "ignored"
+        receipt.reviewed_by = request.user
+        receipt.reviewed_at = timezone.now()
+        receipt.save(update_fields=["status", "reviewed_by", "reviewed_at"])
+        messages.warning(request, "Receipt matched an existing ledger entry and was marked as duplicate instead of being counted again.")
+        return redirect("accounting_receipts")
+
     if not receipt.financial_entry:
         receipt.financial_entry = FinancialEntry.objects.create(
             upload=receipt.financial_upload,
+            ledger_scope=receipt.financial_upload.ledger_scope,
             property_name=receipt.property.name,
             sheet_name="Receipt Upload",
             row_number=receipt.id,
@@ -3257,7 +3299,7 @@ def parse_financial_upload(request, upload_id):
                     if amount == Decimal("0.00"):
                         continue
 
-                    create_financial_entry_from_import(
+                    entry = create_financial_entry_from_import(
                         upload,
                         upload.property,
                         sheet_name,
@@ -3268,8 +3310,9 @@ def parse_financial_upload(request, upload_id):
                         f"{category} - {column_name} summary",
                         amount,
                     )
-                    created += 1
-                    created_for_row += 1
+                    if entry:
+                        created += 1
+                        created_for_row += 1
 
                 if created_for_row == 0:
                     skipped += 1
@@ -3322,7 +3365,7 @@ def parse_financial_upload(request, upload_id):
                             },
                         )
 
-                    create_financial_entry_from_import(
+                    entry = create_financial_entry_from_import(
                         upload,
                         property_obj,
                         sheet_name,
@@ -3333,8 +3376,9 @@ def parse_financial_upload(request, upload_id):
                         column_description,
                         amount,
                     )
-                    created += 1
-                    created_for_row += 1
+                    if entry:
+                        created += 1
+                        created_for_row += 1
 
                 if created_for_row == 0:
                     skipped += 1

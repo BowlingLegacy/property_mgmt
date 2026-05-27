@@ -3012,6 +3012,56 @@ class LiveFlowTests(TestCase):
         self.assertEqual(receipt.financial_entry.category, "Repairs")
         self.assertEqual(receipt.financial_entry.amount, Decimal("225.00"))
 
+    def test_duplicate_receipt_approval_does_not_create_second_ledger_entry(self):
+        landlord = User.objects.create_user(
+            username="duplicate-receipt-landlord",
+            email="duplicate-receipt-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Duplicate Receipt Property", landlord_email=landlord.email)
+        category = ExpenseCategory.objects.create(name="Duplicate Repairs", entry_type="operating_expense")
+        first_receipt = AccountingReceipt.objects.create(
+            property=property_obj,
+            receipt_file="accounting_receipts/repair-1.pdf",
+            vendor="Repair Vendor",
+            receipt_date=timezone.datetime(2026, 5, 20).date(),
+            category=category,
+            entry_type="operating_expense",
+            description="Door repair",
+            amount=Decimal("225.00"),
+            payment_method="cash",
+        )
+        duplicate_receipt = AccountingReceipt.objects.create(
+            property=property_obj,
+            receipt_file="accounting_receipts/repair-2.pdf",
+            vendor="Repair Vendor",
+            receipt_date=timezone.datetime(2026, 5, 20).date(),
+            category=category,
+            entry_type="operating_expense",
+            description="Door repair",
+            amount=Decimal("225.00"),
+            payment_method="cash",
+        )
+
+        self.client.login(username="duplicate-receipt-landlord", password="StrongPass123!")
+        self.client.post(reverse("approve_accounting_receipt", args=[first_receipt.id]))
+        response = self.client.post(reverse("approve_accounting_receipt", args=[duplicate_receipt.id]))
+
+        self.assertRedirects(response, reverse("accounting_receipts"))
+        duplicate_receipt.refresh_from_db()
+        self.assertEqual(duplicate_receipt.status, "ignored")
+        self.assertEqual(
+            FinancialEntry.objects.filter(
+                property_name=property_obj.name,
+                category="Duplicate Repairs",
+                description="Door repair",
+                amount=Decimal("225.00"),
+            ).count(),
+            1,
+        )
+
     def test_accounting_import_maps_csv_to_property_scoped_ledger_entries(self):
         landlord = User.objects.create_user(
             username="accounting-landlord",
@@ -3059,6 +3109,53 @@ class LiveFlowTests(TestCase):
         self.assertEqual(entries[0].category, "Utilities")
         self.assertEqual(entries[1].entry_type, "capital_expense")
         self.assertTrue(ExpenseCategory.objects.filter(name="Utilities").exists())
+
+    def test_duplicate_financial_upload_does_not_create_second_ledger_entry(self):
+        landlord = User.objects.create_user(
+            username="duplicate-upload-landlord",
+            email="duplicate-upload-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Duplicate Upload Property", landlord_email=landlord.email)
+
+        self.client.login(username="duplicate-upload-landlord", password="StrongPass123!")
+        for upload_name in ["May Expenses Original", "May Expenses Duplicate"]:
+            csv_file = SimpleUploadedFile(
+                f"{upload_name}.csv",
+                b"Date,Vendor,Amount,Category\n2026-05-01,Power Company,-125.50,Utilities\n",
+                content_type="text/csv",
+            )
+            self.client.post(reverse("financial_upload"), {
+                "property": property_obj.id,
+                "ledger_scope": "property",
+                "name": upload_name,
+                "file": csv_file,
+                "notes": "Bank export",
+            })
+            upload = FinancialUpload.objects.get(name=upload_name)
+            self.client.post(reverse("parse_financial_upload", args=[upload.id]), {
+                "date_column": "Date",
+                "description_column": "Vendor",
+                "amount_column": "Amount",
+                "category_column": "Category",
+                "entry_type_column": "",
+                "property_column": "",
+                "default_entry_type": "operating_expense",
+                "default_category": "",
+            })
+
+        self.assertEqual(
+            FinancialEntry.objects.filter(
+                property_name=property_obj.name,
+                entry_date=timezone.datetime(2026, 5, 1).date(),
+                category="Utilities",
+                description="Power Company",
+                amount=Decimal("125.50"),
+            ).count(),
+            1,
+        )
 
     def test_accounting_import_can_split_rent_utilities_and_deposits(self):
         landlord = User.objects.create_user(
