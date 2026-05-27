@@ -86,6 +86,20 @@
                     <div class="form-text">Leave blank to use the current time.</div>
                 </div>
 
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Applies To Month</label>
+                    {{ form.service_month }}
+                    {{ form.service_month.errors }}
+                    <div class="form-text">{{ form.service_month.help_text }}</div>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Months Covered</label>
+                    {{ form.months_covered }}
+                    {{ form.months_covered.errors }}
+                    <div class="form-text">{{ form.months_covered.help_text }}</div>
+                </div>
+
                 <div class="col-md-12">
                     <label class="form-label fw-bold">Reference / Confirmation</label>
                     {{ form.reference_number }}

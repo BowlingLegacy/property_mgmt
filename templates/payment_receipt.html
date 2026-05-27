@@ -76,6 +76,14 @@
         </div>
 
         <div class="receipt-row">
+            <div class="receipt-label">Applies To</div>
+            <div class="receipt-value">
+                {{ payment.accounting_month_label }}
+                {% if payment.months_covered > 1 %} · {{ payment.months_covered }} months covered{% endif %}
+            </div>
+        </div>
+
+        <div class="receipt-row">
             <div class="receipt-label">Payment Method</div>
             <div class="receipt-value">{{ payment.get_payment_method_display }}</div>
         </div>

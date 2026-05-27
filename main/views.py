@@ -498,6 +498,55 @@ def recalculated_utility_due(application):
     return application.move_in_utility_charge if application.move_in_utility_charge > 0 else application.utility_monthly
 
 
+def first_day_of_month(value):
+    return date(value.year, value.month, 1)
+
+
+def add_months(value, months):
+    month_index = value.month - 1 + months
+    year = value.year + month_index // 12
+    month = month_index % 12 + 1
+    return date(year, month, 1)
+
+
+def payment_service_month(payment):
+    if payment.service_month:
+        return first_day_of_month(payment.service_month)
+
+    if payment.received_at:
+        return first_day_of_month(timezone.localtime(payment.received_at).date())
+
+    return first_day_of_month(timezone.localtime(payment.created_at).date())
+
+
+def payment_month_allocations(payment):
+    month_count = min(max(payment.months_covered or 1, 1), 24)
+    base_amount = (payment.amount / Decimal(month_count)).quantize(Decimal("0.01"))
+    allocated_total = Decimal("0.00")
+    start_month = payment_service_month(payment)
+
+    for index in range(month_count):
+        amount = base_amount
+        if index == month_count - 1:
+            amount = payment.amount - allocated_total
+        allocated_total += amount
+        yield add_months(start_month, index), amount
+
+
+def payment_amount_for_month(payments, year, month, payment_types=None):
+    total = Decimal("0.00")
+    payment_types = set(payment_types or [])
+
+    for payment in payments:
+        if payment_types and payment.payment_type not in payment_types:
+            continue
+        for accounting_month, amount in payment_month_allocations(payment):
+            if accounting_month.year == year and accounting_month.month == month:
+                total += amount
+
+    return total
+
+
 def recalculate_application_balances(application):
     completed_payments = application.payments.filter(status="completed")
     rent_paid = completed_payments.filter(payment_type="rent").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
@@ -852,14 +901,20 @@ def monthly_collection_watch_rows(applications):
     rows = []
 
     for application in applications:
-        monthly_payments = application.payments.filter(status="completed").filter(
-            Q(received_at__date__gte=month_start, received_at__date__lt=next_month)
-            | Q(received_at__isnull=True, created_at__date__gte=month_start, created_at__date__lt=next_month)
-        )
+        monthly_payments = list(application.payments.filter(status="completed"))
 
-        rent_paid = monthly_payments.filter(payment_type="rent").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-        utility_paid = monthly_payments.filter(payment_type="utility").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-        combined_paid = monthly_payments.filter(payment_type="other", description__icontains="combined").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        rent_paid = payment_amount_for_month(monthly_payments, month_start.year, month_start.month, ["rent"])
+        utility_paid = payment_amount_for_month(monthly_payments, month_start.year, month_start.month, ["utility"])
+        combined_paid = sum(
+            (
+                amount
+                for payment in monthly_payments
+                if payment.payment_type == "other" and "combined" in payment.description.lower()
+                for accounting_month, amount in payment_month_allocations(payment)
+                if accounting_month.year == month_start.year and accounting_month.month == month_start.month
+            ),
+            Decimal("0.00"),
+        )
 
         rent_expected = application.monthly_rent or Decimal("0.00")
         utility_expected = application.utility_monthly or Decimal("0.00")
@@ -2583,7 +2638,7 @@ def payment_log(request):
     for payment in completed_payments:
         application = payment.application
         property_name = application.property.name if application.property else "No Property"
-        month_label = timezone.localtime(payment.created_at).strftime("%B %Y")
+        month_label = payment_service_month(payment).strftime("%B %Y")
 
         grouped.setdefault(property_name, OrderedDict())
         grouped[property_name].setdefault(month_label, [])
@@ -2744,10 +2799,11 @@ def rent_roll(request):
     rows = []
 
     for resident in residents:
-        completed_payments = resident.payments.filter(status="completed")
+        completed_payments = list(resident.payments.filter(status="completed"))
+        current_month = timezone.localdate().replace(day=1)
 
-        rent_paid = completed_payments.filter(payment_type="rent").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-        utility_paid = completed_payments.filter(payment_type="utility").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        rent_paid = payment_amount_for_month(completed_payments, current_month.year, current_month.month, ["rent"])
+        utility_paid = payment_amount_for_month(completed_payments, current_month.year, current_month.month, ["utility"])
 
         rows.append({
             "property": resident.property.name if resident.property else "No Property",
@@ -2839,7 +2895,7 @@ def custom_reports(request):
 
         elif report_type == "payment_summary":
             report_title = "Payment Summary"
-            report_columns = ["Date", "Property", "Resident", "Type", "Method", "Amount", "Status"]
+            report_columns = ["Date Received", "Applies To", "Months Covered", "Property", "Resident", "Type", "Method", "Amount", "Status"]
             payments = (
                 Payment.objects
                 .select_related("application", "application__property")
@@ -2854,6 +2910,8 @@ def custom_reports(request):
             for payment in payments:
                 report_rows.append([
                     timezone.localtime(payment.created_at).strftime("%Y-%m-%d"),
+                    payment.accounting_month_label,
+                    payment.months_covered,
                     payment.application.property.name if payment.application.property else "No Property",
                     payment.application.full_name,
                     payment.get_payment_type_display(),
@@ -2920,7 +2978,7 @@ def export_payment_log_csv(request):
     response["Content-Disposition"] = 'attachment; filename="payment_log.csv"'
 
     writer = csv.writer(response)
-    writer.writerow(["Resident", "Property", "Payment Type", "Amount", "Status", "Date"])
+    writer.writerow(["Resident", "Property", "Payment Type", "Amount", "Status", "Date Received", "Applies To", "Months Covered"])
 
     payments = Payment.objects.all().order_by("-created_at")
 
@@ -2932,6 +2990,8 @@ def export_payment_log_csv(request):
             payment.amount,
             payment.status,
             timezone.localtime(payment.created_at).strftime("%Y-%m-%d %H:%M"),
+            payment.accounting_month_label,
+            payment.months_covered,
         ])
 
     return response
@@ -2973,9 +3033,10 @@ def export_t12_csv(request):
     writer.writerow(["Month", "Income", "Expenses", "Debt Service", "Cash Flow"])
 
     current_year = timezone.localdate().year
+    completed_payments = list(Payment.objects.filter(status="completed"))
 
     for month in range(1, 13):
-        income = Payment.objects.filter(status="completed", created_at__year=current_year, created_at__month=month).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        income = payment_amount_for_month(completed_payments, current_year, month)
         expenses = FinancialEntry.objects.filter(year=current_year, month=month, entry_type="operating_expense").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
         debt_service = FinancialEntry.objects.filter(year=current_year, month=month, entry_type="debt_service").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
         cash_flow = income - expenses - debt_service
@@ -2990,10 +3051,11 @@ def export_t12_csv(request):
 def t12_report(request):
     year = timezone.localdate().year
     financial_entries = FinancialEntry.objects.filter(year=year)
+    completed_payments = list(Payment.objects.filter(status="completed"))
     months = []
 
     for month_number in range(1, 13):
-        online_income = Payment.objects.filter(status="completed", created_at__year=year, created_at__month=month_number).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        online_income = payment_amount_for_month(completed_payments, year, month_number)
         spreadsheet_income = financial_entries.filter(month=month_number, entry_type="income").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
         operating_expenses = financial_entries.filter(month=month_number, entry_type="operating_expense").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
         debt_service = financial_entries.filter(month=month_number, entry_type="debt_service").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")

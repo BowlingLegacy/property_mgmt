@@ -591,6 +591,12 @@ class Payment(models.Model):
         related_name="recorded_payments",
     )
     received_at = models.DateTimeField(blank=True, null=True)
+    service_month = models.DateField(
+        blank=True,
+        null=True,
+        help_text="First day of the month this payment applies to for rent roll and T-12 reporting.",
+    )
+    months_covered = models.PositiveSmallIntegerField(default=1)
 
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
@@ -599,6 +605,18 @@ class Payment(models.Model):
     stripe_payment_intent = models.CharField(max_length=255, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def accounting_month(self):
+        if self.service_month:
+            return self.service_month.replace(day=1)
+        if self.received_at:
+            return timezone.localtime(self.received_at).date().replace(day=1)
+        return timezone.localtime(self.created_at).date().replace(day=1)
+
+    @property
+    def accounting_month_label(self):
+        return self.accounting_month.strftime("%B %Y")
 
     def __str__(self):
         return f"{self.application.full_name} - {self.get_payment_type_display()} - ${self.amount} - {self.status}"

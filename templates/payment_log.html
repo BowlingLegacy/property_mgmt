@@ -67,6 +67,7 @@
                                         <th>Description</th>
                                         <th>Reference</th>
                                         <th>Amount Paid</th>
+                                        <th>Applies To</th>
                                         <th>Rent Balance Owed</th>
                                         <th>Utility Balance Owed</th>
                                         <th>Deposit Paid</th>
@@ -95,6 +96,12 @@
                                             <td>{{ payment.description }}</td>
                                             <td>{{ payment.reference_number }}</td>
                                             <td>${{ payment.amount }}</td>
+                                            <td>
+                                                {{ payment.accounting_month_label }}
+                                                {% if payment.months_covered > 1 %}
+                                                    <br><span class="text-muted small">{{ payment.months_covered }} months covered</span>
+                                                {% endif %}
+                                            </td>
                                             <td>${{ payment.application.balance }}</td>
                                             <td>${{ payment.application.utility_balance }}</td>
                                             <td>${{ payment.application.deposit_paid }}</td>

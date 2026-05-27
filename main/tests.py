@@ -12,7 +12,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .models import AccountingReceipt, ApplicantDocument, BlogComment, BlogPost, CompanyMailboxConnection, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, PropertyRoomRent, RentHistory, ResidentMessage, ResidentMessageReply, SignedDocument, SmsMessageLog, User
-from .views import apply_completed_payment_to_balance, ensure_existing_resident_portal_application, prorated_monthly_charge
+from .views import apply_completed_payment_to_balance, ensure_existing_resident_portal_application, payment_amount_for_month, prorated_monthly_charge
 
 
 @override_settings(
@@ -595,6 +595,75 @@ class LiveFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Payment Receipt")
         self.assertContains(response, "BANK-123")
+
+    def test_manual_payment_can_apply_to_future_rent_month(self):
+        staff_user = User.objects.create_user(
+            username="future-rent-staff",
+            email="future-rent-staff@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Future Rent Property", landlord_email=staff_user.email)
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Future Rent Resident",
+            phone="555-0201",
+            email="future-rent@example.com",
+            age=44,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            balance=Decimal("650.00"),
+        )
+
+        self.client.login(username="future-rent-staff", password="StrongPass123!")
+        response = self.client.post(reverse("record_manual_payment"), {
+            "application": application.id,
+            "payment_type": "rent",
+            "payment_method": "cash",
+            "amount": "650.00",
+            "service_month": "2026-06",
+            "months_covered": "1",
+            "reference_number": "CASH-JUNE",
+            "description": "June rent paid in May",
+            "notes": "",
+        })
+
+        payment = Payment.objects.get(application=application)
+        self.assertRedirects(response, reverse("payment_receipt", args=[payment.id]))
+        self.assertEqual(payment.service_month, date(2026, 6, 1))
+        self.assertEqual(payment.months_covered, 1)
+        self.assertEqual(payment_amount_for_month([payment], 2026, 5, ["rent"]), Decimal("0.00"))
+        self.assertEqual(payment_amount_for_month([payment], 2026, 6, ["rent"]), Decimal("650.00"))
+
+        payment_log = self.client.get(reverse("payment_log"))
+        self.assertContains(payment_log, "June 2026")
+        self.assertContains(payment_log, "CASH-JUNE")
+
+    def test_multi_month_payment_is_allocated_across_reporting_months(self):
+        application = HousingApplication.objects.create(
+            full_name="Multi Month Resident",
+            phone="555-0202",
+            email="multi-month@example.com",
+            age=44,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+        )
+        payment = Payment.objects.create(
+            application=application,
+            payment_type="rent",
+            payment_method="check",
+            amount=Decimal("1300.00"),
+            status="completed",
+            service_month=date(2026, 6, 1),
+            months_covered=2,
+        )
+
+        self.assertEqual(payment_amount_for_month([payment], 2026, 6, ["rent"]), Decimal("650.00"))
+        self.assertEqual(payment_amount_for_month([payment], 2026, 7, ["rent"]), Decimal("650.00"))
+        self.assertEqual(payment_amount_for_month([payment], 2026, 8, ["rent"]), Decimal("0.00"))
 
     def test_manual_payment_requires_payment_type_selection(self):
         staff_user = User.objects.create_user(

@@ -630,6 +630,14 @@ class GroupResidentMessageForm(forms.Form):
 
 
 class ManualPaymentForm(forms.ModelForm):
+    service_month = forms.DateField(
+        label="Applies To Month",
+        required=False,
+        input_formats=["%Y-%m", "%Y-%m-%d"],
+        widget=forms.DateInput(attrs={"class": "form-control", "type": "month"}),
+        help_text="Use this when June rent is paid in May, or when a payment is for a future month.",
+    )
+
     class Meta:
         model = Payment
         fields = [
@@ -638,6 +646,8 @@ class ManualPaymentForm(forms.ModelForm):
             "payment_method",
             "amount",
             "received_at",
+            "service_month",
+            "months_covered",
             "reference_number",
             "description",
             "notes",
@@ -648,6 +658,7 @@ class ManualPaymentForm(forms.ModelForm):
             "payment_method": forms.Select(attrs={"class": "form-select"}),
             "amount": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0.01"}),
             "received_at": forms.DateTimeInput(attrs={"class": "form-control", "type": "datetime-local"}),
+            "months_covered": forms.NumberInput(attrs={"class": "form-control", "min": "1", "max": "24"}),
             "reference_number": forms.TextInput(attrs={
                 "class": "form-control",
                 "placeholder": "Bank confirmation, Cash App note, check number, etc.",
@@ -660,11 +671,23 @@ class ManualPaymentForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["payment_type"].choices = [("", "Choose what this payment applies to")] + list(Payment.PAYMENT_TYPE_CHOICES)
         self.fields["payment_type"].required = True
+        self.fields["months_covered"].required = False
+        self.fields["months_covered"].help_text = "Use 1 for a normal monthly payment. Use 2 or more when one payment covers multiple months."
         self.fields["application"].queryset = (
             HousingApplication.objects
             .select_related("property")
             .order_by("property__name", "space_label", "full_name")
         )
+
+    def clean_months_covered(self):
+        months_covered = self.cleaned_data.get("months_covered") or 1
+        return min(max(months_covered, 1), 24)
+
+    def clean_service_month(self):
+        service_month = self.cleaned_data.get("service_month")
+        if service_month:
+            return service_month.replace(day=1)
+        return service_month
 
 
 class ResidentBalanceCorrectionForm(forms.ModelForm):
