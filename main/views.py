@@ -591,6 +591,28 @@ def recalculated_utility_due(application):
     return application.move_in_utility_charge if application.move_in_utility_charge > 0 else application.utility_monthly
 
 
+def expected_rent_for_month(application, month_start):
+    if (
+        application.lease_start_date
+        and application.move_in_rent_charge > 0
+        and application.lease_start_date.year == month_start.year
+        and application.lease_start_date.month == month_start.month
+    ):
+        return application.move_in_rent_charge
+    return application.monthly_rent or Decimal("0.00")
+
+
+def expected_utility_for_month(application, month_start):
+    if (
+        application.lease_start_date
+        and application.move_in_utility_charge > 0
+        and application.lease_start_date.year == month_start.year
+        and application.lease_start_date.month == month_start.month
+    ):
+        return application.move_in_utility_charge
+    return application.utility_monthly or Decimal("0.00")
+
+
 def first_day_of_month(value):
     return date(value.year, value.month, 1)
 
@@ -699,15 +721,17 @@ def apply_resident_to_rent_roll_row(row, resident, selected_month):
     completed_payments = list(resident.payments.filter(status="completed"))
     rent_paid = payment_amount_for_month(completed_payments, selected_month.year, selected_month.month, ["rent"])
     utility_paid = payment_amount_for_month(completed_payments, selected_month.year, selected_month.month, ["utility"])
+    rent_expected = expected_rent_for_month(resident, selected_month)
+    utility_expected = expected_utility_for_month(resident, selected_month)
 
     row["resident"] = resident.full_name
     row["monthly_rent"] = resident.monthly_rent
     row["rent_paid"] = rent_paid
-    row["rent_due_for_month"] = max(resident.monthly_rent - rent_paid, Decimal("0.00"))
+    row["rent_due_for_month"] = max(rent_expected - rent_paid, Decimal("0.00"))
     row["current_rent_balance"] = resident.balance
     row["utility_monthly"] = resident.utility_monthly
     row["utility_paid"] = utility_paid
-    row["utility_due_for_month"] = max(resident.utility_monthly - utility_paid, Decimal("0.00"))
+    row["utility_due_for_month"] = max(utility_expected - utility_paid, Decimal("0.00"))
     row["current_utility_balance"] = resident.utility_balance
     row["deposit_required"] = resident.deposit_required
     row["deposit_paid"] = resident.deposit_paid
@@ -1084,8 +1108,8 @@ def monthly_collection_watch_rows(applications):
             Decimal("0.00"),
         )
 
-        rent_expected = application.monthly_rent or Decimal("0.00")
-        utility_expected = application.utility_monthly or Decimal("0.00")
+        rent_expected = expected_rent_for_month(application, month_start)
+        utility_expected = expected_utility_for_month(application, month_start)
 
         if combined_paid > 0:
             rent_shortfall = max(rent_expected - rent_paid, Decimal("0.00"))

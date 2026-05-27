@@ -3149,6 +3149,79 @@ class LiveFlowTests(TestCase):
 
         self.assertEqual(Payment.objects.filter(application=resident, payment_type="rent").count(), 1)
 
+    def test_move_in_month_uses_prorated_rent_for_reports_and_backfill(self):
+        landlord = User.objects.create_user(
+            username="move-in-prorate-landlord",
+            email="move-in-prorate@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Move In Prorate Property", landlord_email=landlord.email)
+        tenant_user = User.objects.create_user(username="move-in-prorate-user", password="StrongPass123!", role="tenant")
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=tenant_user,
+            full_name="Move In Resident",
+            phone="555-0622",
+            email="move-in@example.com",
+            age=52,
+            space_label="H",
+            monthly_rent=Decimal("650.00"),
+            balance=Decimal("0.00"),
+            lease_start_date=date(2026, 5, 27),
+            move_in_rent_charge=Decimal("104.84"),
+            utility_monthly=Decimal("55.00"),
+            move_in_utility_charge=Decimal("8.87"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        PropertyRoomRent.objects.create(
+            property=property_obj,
+            room_unit_label="H",
+            monthly_rent=Decimal("650.00"),
+            utility_monthly=Decimal("55.00"),
+        )
+        Payment.objects.create(
+            application=resident,
+            payment_type="rent",
+            payment_method="cash",
+            amount=Decimal("104.84"),
+            status="completed",
+            service_month=date(2026, 5, 1),
+        )
+        Payment.objects.create(
+            application=resident,
+            payment_type="utility",
+            payment_method="cash",
+            amount=Decimal("8.87"),
+            status="completed",
+            service_month=date(2026, 5, 1),
+        )
+
+        self.client.login(username="move-in-prorate-landlord", password="StrongPass123!")
+        rent_roll_response = self.client.get(f"{reverse('rent_roll')}?month=2026-05")
+        dashboard_response = self.client.get(reverse("landlord_dashboard"))
+
+        self.assertContains(rent_roll_response, "<td>$0.00</td>", html=True)
+        self.assertFalse(
+            any(row["application"] == resident for row in dashboard_response.context["collection_watch_rows"])
+        )
+
+        out = StringIO()
+        call_command(
+            "backfill_monthly_rent_payments",
+            "--property-name",
+            "Move In Prorate Property",
+            "--month",
+            "2026-05",
+            stdout=out,
+        )
+
+        self.assertIn("rent already paid", out.getvalue())
+        self.assertNotIn("CREATE | Room H | Move In Resident | rent", out.getvalue())
+
     def test_custom_phone_report_scopes_to_landlord_property(self):
         landlord = User.objects.create_user(
             username="report-landlord",

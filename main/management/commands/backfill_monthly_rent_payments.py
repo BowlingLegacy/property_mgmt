@@ -117,9 +117,11 @@ class Command(BaseCommand):
                 continue
 
             application = self.find_or_build_application(property_obj, room_label, roster_entry, setting)
-            self.plan_missing_payment(planned, skipped, application, service_month, "rent", setting.monthly_rent, payment_method)
+            rent_amount = self.expected_rent_for_month(application, service_month, setting.monthly_rent)
+            self.plan_missing_payment(planned, skipped, application, service_month, "rent", rent_amount, payment_method)
             if include_utilities:
-                self.plan_missing_payment(planned, skipped, application, service_month, "utility", setting.utility_monthly, payment_method)
+                utility_amount = self.expected_utility_for_month(application, service_month, setting.utility_monthly)
+                self.plan_missing_payment(planned, skipped, application, service_month, "utility", utility_amount, payment_method)
 
         for room_label, resident_name, reason in skipped:
             self.stdout.write(f"SKIP | Room {room_label} | {resident_name} | {reason}")
@@ -213,3 +215,23 @@ class Command(BaseCommand):
 
         description = f"Historical {service_month.strftime('%B %Y')} {payment_type} payment"
         planned.append((application, payment_type, missing_amount, description))
+
+    def expected_rent_for_month(self, application, service_month, default_amount):
+        if (
+            application.lease_start_date
+            and application.move_in_rent_charge > 0
+            and application.lease_start_date.year == service_month.year
+            and application.lease_start_date.month == service_month.month
+        ):
+            return application.move_in_rent_charge
+        return default_amount
+
+    def expected_utility_for_month(self, application, service_month, default_amount):
+        if (
+            application.lease_start_date
+            and application.move_in_utility_charge > 0
+            and application.lease_start_date.year == service_month.year
+            and application.lease_start_date.month == service_month.month
+        ):
+            return application.move_in_utility_charge
+        return default_amount
