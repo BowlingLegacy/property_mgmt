@@ -596,6 +596,98 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "Payment Receipt")
         self.assertContains(response, "BANK-123")
 
+    def test_manual_payment_requires_payment_type_selection(self):
+        staff_user = User.objects.create_user(
+            username="blank-payment-type-staff",
+            email="blank-payment-type-staff@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Blank Type Property", landlord_email=staff_user.email)
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Blank Type Resident",
+            phone="555-0119",
+            email="blank-type@example.com",
+            age=42,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            balance=Decimal("100.00"),
+        )
+
+        self.client.login(username="blank-payment-type-staff", password="StrongPass123!")
+        response = self.client.post(reverse("record_manual_payment"), {
+            "application": application.id,
+            "payment_type": "",
+            "payment_method": "cash",
+            "amount": "100.00",
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Payment.objects.filter(application=application).exists())
+        self.assertContains(response, "This field is required")
+
+    def test_staff_can_correct_manual_payment_type_and_recalculate_balances(self):
+        staff_user = User.objects.create_user(
+            username="correct-payment-staff",
+            email="correct-payment-staff@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Correct Payment Property", landlord_email=staff_user.email)
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Correct Payment Resident",
+            phone="555-0120",
+            email="correct-payment@example.com",
+            age=42,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            monthly_rent=Decimal("104.84"),
+            balance=Decimal("104.84"),
+            utility_monthly=Decimal("8.87"),
+            utility_balance=Decimal("8.87"),
+            deposit_required=Decimal("450.00"),
+            deposit_paid=Decimal("0.00"),
+            move_in_rent_charge=Decimal("104.84"),
+            move_in_utility_charge=Decimal("8.87"),
+        )
+        payment = Payment.objects.create(
+            application=application,
+            payment_type="rent",
+            payment_method="cash",
+            amount=Decimal("450.00"),
+            status="completed",
+            recorded_by=staff_user,
+        )
+        apply_completed_payment_to_balance(payment)
+        application.refresh_from_db()
+        self.assertEqual(application.balance, Decimal("0.00"))
+        self.assertEqual(application.deposit_paid, Decimal("0.00"))
+
+        self.client.login(username="correct-payment-staff", password="StrongPass123!")
+        response = self.client.post(reverse("edit_manual_payment", args=[payment.id]), {
+            "application": application.id,
+            "payment_type": "deposit",
+            "payment_method": "cash",
+            "amount": "450.00",
+            "description": "Corrected to deposit",
+            "reference_number": "",
+            "notes": "",
+        })
+
+        self.assertRedirects(response, reverse("payment_receipt", args=[payment.id]))
+        payment.refresh_from_db()
+        application.refresh_from_db()
+        self.assertEqual(payment.payment_type, "deposit")
+        self.assertEqual(application.balance, Decimal("104.84"))
+        self.assertEqual(application.utility_balance, Decimal("8.87"))
+        self.assertEqual(application.deposit_paid, Decimal("450.00"))
+
     def test_staff_can_record_manual_cashapp_deposit_payment(self):
         staff_user = User.objects.create_user(
             username="staff",

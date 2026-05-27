@@ -25,9 +25,13 @@
 <div class="payment-shell">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
-            <h1 class="payment-title mb-1">Record Manual Payment</h1>
+            <h1 class="payment-title mb-1">{% if is_edit %}Edit Payment{% else %}Record Manual Payment{% endif %}</h1>
             <p class="text-muted mb-0">
-                Use this for bank transfers, Cash App outside Stripe, cash, checks, money orders, Zelle, ACH, and other offline payments.
+                {% if is_edit %}
+                    Correct the payment type, amount, method, reference, or notes. Saving recalculates the resident balances.
+                {% else %}
+                    Use this for bank transfers, Cash App outside Stripe, cash, checks, money orders, Zelle, ACH, and other offline payments.
+                {% endif %}
             </p>
         </div>
 
@@ -102,11 +106,15 @@
             </div>
 
             <div class="alert alert-warning mt-4">
-                Saving this form records the payment as completed and immediately updates the resident balance.
+                {% if is_edit %}
+                    Saving this correction recalculates rent, utility, and deposit balances for this resident.
+                {% else %}
+                    Saving this form records the payment as completed and immediately updates the resident balance.
+                {% endif %}
             </div>
 
             <button type="submit" class="btn btn-success">
-                Save Payment
+                {% if is_edit %}Save Correction{% else %}Save Payment{% endif %}
             </button>
         </form>
     </div>

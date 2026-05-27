@@ -489,6 +489,26 @@ def apply_completed_payment_to_balance(payment):
     application.save()
 
 
+def recalculated_rent_due(application):
+    return application.move_in_rent_charge if application.move_in_rent_charge > 0 else application.monthly_rent
+
+
+def recalculated_utility_due(application):
+    return application.move_in_utility_charge if application.move_in_utility_charge > 0 else application.utility_monthly
+
+
+def recalculate_application_balances(application):
+    completed_payments = application.payments.filter(status="completed")
+    rent_paid = completed_payments.filter(payment_type="rent").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    utility_paid = completed_payments.filter(payment_type="utility").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    deposit_paid = completed_payments.filter(payment_type="deposit").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+
+    application.balance = max(Decimal("0.00"), recalculated_rent_due(application) - rent_paid)
+    application.utility_balance = max(Decimal("0.00"), recalculated_utility_due(application) - utility_paid)
+    application.deposit_paid = min(application.deposit_required, deposit_paid)
+    application.save(update_fields=["balance", "utility_balance", "deposit_paid"])
+
+
 def prorated_monthly_charge(monthly_amount, start_date):
     monthly_amount = Decimal(monthly_amount or "0.00")
     if not start_date or monthly_amount <= 0:
@@ -2598,6 +2618,44 @@ def record_manual_payment(request):
         )
 
     return render(request, "record_manual_payment.html", {"form": form})
+
+
+@login_required
+@user_passes_test(staff_required)
+def edit_manual_payment(request, payment_id):
+    payment = get_object_or_404(
+        Payment.objects.select_related("application", "application__property"),
+        id=payment_id,
+        application__in=staff_managed_applications(request.user),
+    )
+
+    if request.method == "POST":
+        form = ManualPaymentForm(request.POST, instance=payment)
+        form.fields["application"].queryset = (
+            staff_managed_applications(request.user)
+            .select_related("property")
+            .order_by("property__name", "space_label", "full_name")
+        )
+
+        if form.is_valid():
+            payment = form.save()
+            if payment.status == "completed":
+                recalculate_application_balances(payment.application)
+            messages.success(request, "Payment record corrected and resident balances recalculated.")
+            return redirect("payment_receipt", payment_id=payment.id)
+    else:
+        form = ManualPaymentForm(instance=payment)
+        form.fields["application"].queryset = (
+            staff_managed_applications(request.user)
+            .select_related("property")
+            .order_by("property__name", "space_label", "full_name")
+        )
+
+    return render(request, "record_manual_payment.html", {
+        "form": form,
+        "payment": payment,
+        "is_edit": True,
+    })
 
 
 @login_required

@@ -658,6 +658,8 @@ class ManualPaymentForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["payment_type"].choices = [("", "Choose what this payment applies to")] + list(Payment.PAYMENT_TYPE_CHOICES)
+        self.fields["payment_type"].required = True
         self.fields["application"].queryset = (
             HousingApplication.objects
             .select_related("property")
