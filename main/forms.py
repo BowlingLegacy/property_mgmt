@@ -667,6 +667,43 @@ class ManualPaymentForm(forms.ModelForm):
         )
 
 
+class ResidentBalanceCorrectionForm(forms.ModelForm):
+    class Meta:
+        model = HousingApplication
+        fields = [
+            "monthly_rent",
+            "balance",
+            "utility_monthly",
+            "utility_balance",
+            "deposit_required",
+            "deposit_paid",
+            "rent_due_day",
+        ]
+        labels = {
+            "balance": "Rent Balance Due",
+            "utility_balance": "Utility Balance Due",
+        }
+        widgets = {
+            "monthly_rent": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+            "balance": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+            "utility_monthly": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+            "utility_balance": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+            "deposit_required": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+            "deposit_paid": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+            "rent_due_day": forms.NumberInput(attrs={"class": "form-control", "min": "1", "max": "31"}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        deposit_required = cleaned_data.get("deposit_required")
+        deposit_paid = cleaned_data.get("deposit_paid")
+
+        if deposit_required is not None and deposit_paid is not None and deposit_paid > deposit_required:
+            self.add_error("deposit_paid", "Deposit paid cannot be greater than deposit required.")
+
+        return cleaned_data
+
+
 class CustomReportForm(forms.Form):
     REPORT_TYPE_CHOICES = [
         ("resident_phone_list", "Resident Phone List"),

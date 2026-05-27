@@ -24,6 +24,7 @@
                             <td>{% if application.user %}Linked{% else %}No Login{% endif %}</td>
                             <td class="d-flex gap-2 flex-wrap">
                                 <a href="{% url 'tenant_dashboard' %}?resident={{ application.id }}" class="btn btn-dark btn-sm">Inspect Tenant Dashboard</a>
+                                <a href="{% url 'edit_resident_balances' application.id %}" class="btn btn-outline-primary btn-sm">Edit Balances</a>
                                 <a href="{% url 'application_detail' application.id %}" class="btn btn-outline-secondary btn-sm">Application</a>
                             </td>
                         </tr>

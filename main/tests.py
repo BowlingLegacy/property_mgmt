@@ -2497,6 +2497,81 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "Inspection Resident File")
         self.assertNotContains(response, "Inspection Applicant Only")
 
+    def test_staff_can_edit_resident_balances_directly(self):
+        landlord = User.objects.create_user(
+            username="balance-edit-landlord",
+            email="balance-edit-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        resident_user = User.objects.create_user(
+            username="balance-edit-tenant",
+            email="balance-edit-tenant@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        property_obj = Property.objects.create(name="Balance Edit Property", landlord_email=landlord.email)
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Balance Edit Resident",
+            phone="555-0554",
+            email="balance-edit-tenant@example.com",
+            age=42,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            monthly_rent=Decimal("650.00"),
+            balance=Decimal("650.00"),
+            utility_monthly=Decimal("55.00"),
+            utility_balance=Decimal("55.00"),
+            deposit_required=Decimal("450.00"),
+            deposit_paid=Decimal("95.00"),
+        )
+
+        self.client.login(username="balance-edit-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("edit_resident_balances", args=[resident.id]), {
+            "monthly_rent": "650.00",
+            "balance": "325.00",
+            "utility_monthly": "55.00",
+            "utility_balance": "0.00",
+            "deposit_required": "450.00",
+            "deposit_paid": "450.00",
+            "rent_due_day": "1",
+        })
+
+        self.assertRedirects(response, reverse("landlord_resident_files"))
+        resident.refresh_from_db()
+        self.assertEqual(resident.balance, Decimal("325.00"))
+        self.assertEqual(resident.utility_balance, Decimal("0.00"))
+        self.assertEqual(resident.deposit_paid, Decimal("450.00"))
+
+    def test_staff_cannot_edit_unconverted_applicant_balances(self):
+        landlord = User.objects.create_user(
+            username="balance-edit-applicant-landlord",
+            email="balance-edit-applicant@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Balance Edit Applicant Property", landlord_email=landlord.email)
+        applicant = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Balance Edit Applicant",
+            phone="555-0555",
+            email="balance-edit-applicant@example.com",
+            age=34,
+            income_source="Employment",
+            monthly_income=Decimal("2800.00"),
+            housing_need="Needs housing.",
+        )
+
+        self.client.login(username="balance-edit-applicant-landlord", password="StrongPass123!")
+        response = self.client.get(reverse("edit_resident_balances", args=[applicant.id]))
+
+        self.assertEqual(response.status_code, 404)
+
     def test_landlord_dashboard_lists_current_month_rent_and_utility_exceptions(self):
         landlord = User.objects.create_user(
             username="collection-landlord",

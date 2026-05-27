@@ -41,6 +41,7 @@ from .forms import (
     AccountingReceiptForm,
     SignUpForm,
     ManualPaymentForm,
+    ResidentBalanceCorrectionForm,
     CustomReportForm,
     ResidentProfilePhotoForm,
     ReplacementInviteCodeForm,
@@ -2678,6 +2679,28 @@ def edit_manual_payment(request, payment_id):
         "form": form,
         "payment": payment,
         "is_edit": True,
+    })
+
+
+@login_required
+@user_passes_test(staff_required)
+def edit_resident_balances(request, application_id):
+    application = get_object_or_404(
+        HousingApplication.objects.select_related("property", "user"),
+        id=application_id,
+        id__in=staff_managed_applications(request.user).filter(user__isnull=False).values_list("id", flat=True),
+    )
+
+    form = ResidentBalanceCorrectionForm(request.POST or None, instance=application)
+
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Resident balances updated.")
+        return redirect("landlord_resident_files")
+
+    return render(request, "edit_resident_balances.html", {
+        "application": application,
+        "form": form,
     })
 
 
