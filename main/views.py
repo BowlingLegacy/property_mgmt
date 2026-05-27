@@ -1257,6 +1257,11 @@ def save_room_rent_setting(property_id, room_unit_label, defaults):
     )
 
 
+def adjusted_balance_after_amount_change(old_amount, old_balance, new_amount):
+    credited_amount = max(Decimal(old_amount or "0.00") - Decimal(old_balance or "0.00"), Decimal("0.00"))
+    return max(Decimal(new_amount or "0.00") - credited_amount, Decimal("0.00"))
+
+
 def apply_room_rent_setting_to_residents(room_setting, residents, effective_date, applied_resident_ids):
     updated_count = 0
     rent_history_count = 0
@@ -1272,6 +1277,17 @@ def apply_room_rent_setting_to_residents(room_setting, residents, effective_date
 
     for resident in matching_residents:
         changed_fields = []
+        rent_balance = adjusted_balance_after_amount_change(
+            resident.monthly_rent,
+            resident.balance,
+            room_setting.monthly_rent,
+        )
+        utility_balance = adjusted_balance_after_amount_change(
+            resident.utility_monthly,
+            resident.utility_balance,
+            room_setting.utility_monthly,
+        )
+
         if resident.monthly_rent != room_setting.monthly_rent:
             resident.monthly_rent = room_setting.monthly_rent
             changed_fields.append("monthly_rent")
@@ -1282,8 +1298,8 @@ def apply_room_rent_setting_to_residents(room_setting, residents, effective_date
             )
             rent_history_count += 1
 
-        if resident.balance != room_setting.monthly_rent:
-            resident.balance = room_setting.monthly_rent
+        if resident.balance != rent_balance:
+            resident.balance = rent_balance
             changed_fields.append("balance")
 
         if resident.rent_due_day != room_setting.rent_due_day:
@@ -1294,8 +1310,8 @@ def apply_room_rent_setting_to_residents(room_setting, residents, effective_date
             resident.utility_monthly = room_setting.utility_monthly
             changed_fields.append("utility_monthly")
 
-        if resident.utility_balance != room_setting.utility_monthly:
-            resident.utility_balance = room_setting.utility_monthly
+        if resident.utility_balance != utility_balance:
+            resident.utility_balance = utility_balance
             changed_fields.append("utility_balance")
 
         if resident.deposit_required != room_setting.deposit_required:
