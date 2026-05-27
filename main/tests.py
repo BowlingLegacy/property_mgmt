@@ -2454,6 +2454,49 @@ class LiveFlowTests(TestCase):
         self.assertNotContains(resident_files, "Applicant Only")
         self.assertContains(attention, "Applicant Only")
 
+    def test_superadmin_resident_inspection_hides_unconverted_applications(self):
+        superuser = User.objects.create_user(
+            username="resident-inspection-superadmin",
+            email="resident-inspection-superadmin@example.com",
+            password="StrongPass123!",
+            role="admin",
+            is_staff=True,
+        )
+        resident_user = User.objects.create_user(
+            username="resident-inspection-tenant",
+            email="resident-inspection-tenant@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        property_obj = Property.objects.create(name="Superadmin Resident Inspection Property")
+        HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Inspection Applicant Only",
+            phone="555-0552",
+            email="inspection-applicant@example.com",
+            age=34,
+            income_source="Employment",
+            monthly_income=Decimal("2800.00"),
+            housing_need="Needs housing.",
+        )
+        HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Inspection Resident File",
+            phone="555-0553",
+            email="resident-inspection-tenant@example.com",
+            age=42,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+        )
+
+        self.client.login(username="resident-inspection-superadmin", password="StrongPass123!")
+        response = self.client.get(reverse("superadmin_residents"))
+
+        self.assertContains(response, "Inspection Resident File")
+        self.assertNotContains(response, "Inspection Applicant Only")
+
     def test_landlord_dashboard_lists_current_month_rent_and_utility_exceptions(self):
         landlord = User.objects.create_user(
             username="collection-landlord",

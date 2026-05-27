@@ -1538,7 +1538,12 @@ def landlord_rent_setup(request):
 def get_superadmin_workspace_context():
     properties = Property.objects.all().order_by("name")
     users = User.objects.all().order_by("username")
-    applications = HousingApplication.objects.select_related("property", "user").all().order_by("property__name", "space_label", "full_name")
+    applications = (
+        HousingApplication.objects
+        .select_related("property", "user")
+        .filter(user__isnull=False)
+        .order_by("property__name", "space_label", "full_name")
+    )
     completed_payments = Payment.objects.filter(status="completed")
     site_payment_total = completed_payments.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
 
