@@ -20,6 +20,24 @@
     font-size: 2rem;
     font-weight: 700;
 }
+.property-picker {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+}
+.property-choice {
+    display: block;
+    background: #fff9ec;
+    border: 1px solid rgba(197,154,50,.45);
+    border-radius: 14px;
+    padding: 1rem;
+    color: #15110a;
+    text-decoration: none;
+}
+.property-choice:hover {
+    background: #fff3d8;
+    color: #15110a;
+}
 </style>
 
 <div class="payment-shell">
@@ -29,8 +47,10 @@
             <p class="text-muted mb-0">
                 {% if is_edit %}
                     Correct the payment type, amount, method, reference, or notes. Saving recalculates the resident balances.
+                {% elif show_property_picker %}
+                    Choose a property first so the resident list stays short and accurate.
                 {% else %}
-                    Use this for bank transfers, Cash App outside Stripe, cash, checks, money orders, Zelle, ACH, and other offline payments.
+                    {% if selected_property %}{{ selected_property.name }}.{% endif %} Record cash, checks, bank transfers, Cash App, Zelle, ACH, and other offline payments.
                 {% endif %}
             </p>
         </div>
@@ -45,6 +65,19 @@
             <div class="alert alert-info">{{ message }}</div>
         {% endfor %}
 
+        {% if show_property_picker %}
+            <div class="property-picker">
+                {% for property in properties %}
+                    <a href="{% url 'record_manual_payment_property' property.id %}" class="property-choice">
+                        <div class="text-uppercase small fw-bold text-warning">Property</div>
+                        <h2 class="h5 fw-bold mb-1">{{ property.name }}</h2>
+                        <div class="text-muted small">Record payment</div>
+                    </a>
+                {% empty %}
+                    <div class="text-muted">No properties are assigned to this account.</div>
+                {% endfor %}
+            </div>
+        {% else %}
         <form method="post">
             {% csrf_token %}
 
@@ -62,13 +95,13 @@
                 </div>
 
                 <div class="col-md-6">
-                    <label class="form-label fw-bold">Payment Type</label>
+                    <label class="form-label fw-bold">Applies To</label>
                     {{ form.payment_type }}
                     {{ form.payment_type.errors }}
                 </div>
 
                 <div class="col-md-6">
-                    <label class="form-label fw-bold">Payment Method</label>
+                    <label class="form-label fw-bold">Method</label>
                     {{ form.payment_method }}
                     {{ form.payment_method.errors }}
                 </div>
@@ -80,14 +113,14 @@
                 </div>
 
                 <div class="col-md-6">
-                    <label class="form-label fw-bold">Date / Time Received</label>
+                    <label class="form-label fw-bold">Received</label>
                     {{ form.received_at }}
                     {{ form.received_at.errors }}
                     <div class="form-text">Leave blank to use the current time.</div>
                 </div>
 
                 <div class="col-md-6">
-                    <label class="form-label fw-bold">Applies To Month</label>
+                    <label class="form-label fw-bold">Month</label>
                     {{ form.service_month }}
                     {{ form.service_month.errors }}
                     <div class="form-text">{{ form.service_month.help_text }}</div>
@@ -101,7 +134,7 @@
                 </div>
 
                 <div class="col-md-12">
-                    <label class="form-label fw-bold">Reference / Confirmation</label>
+                    <label class="form-label fw-bold">Reference</label>
                     {{ form.reference_number }}
                     {{ form.reference_number.errors }}
                 </div>
@@ -131,6 +164,7 @@
                 {% if is_edit %}Save Correction{% else %}Save Payment{% endif %}
             </button>
         </form>
+        {% endif %}
     </div>
 </div>
 

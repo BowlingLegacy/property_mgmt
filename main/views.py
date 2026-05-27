@@ -2909,14 +2909,33 @@ def payment_log(request):
 
 @login_required
 @user_passes_test(staff_required)
-def record_manual_payment(request):
+def record_manual_payment(request, property_id=None):
+    accessible_properties = staff_managed_properties(request.user).order_by("name")
+    selected_property = None
+    application_id = request.GET.get("application")
+
+    if application_id:
+        selected_application = get_object_or_404(
+            staff_managed_applications(request.user).select_related("property"),
+            id=application_id,
+        )
+        selected_property = selected_application.property
+    elif property_id:
+        selected_property = get_object_or_404(accessible_properties, id=property_id)
+    elif accessible_properties.count() == 1:
+        selected_property = accessible_properties.first()
+
+    application_queryset = (
+        staff_managed_applications(request.user)
+        .select_related("property")
+        .order_by("space_label", "full_name")
+    )
+    if selected_property:
+        application_queryset = application_queryset.filter(property=selected_property)
+
     if request.method == "POST":
         form = ManualPaymentForm(request.POST)
-        form.fields["application"].queryset = (
-            staff_managed_applications(request.user)
-            .select_related("property")
-            .order_by("property__name", "space_label", "full_name")
-        )
+        form.fields["application"].queryset = application_queryset
 
         if form.is_valid():
             payment = form.save(commit=False)
@@ -2936,19 +2955,19 @@ def record_manual_payment(request):
             return redirect("payment_receipt", payment_id=payment.id)
     else:
         initial = {}
-        application_id = request.GET.get("application")
 
         if application_id:
             initial["application"] = application_id
 
         form = ManualPaymentForm(initial=initial)
-        form.fields["application"].queryset = (
-            staff_managed_applications(request.user)
-            .select_related("property")
-            .order_by("property__name", "space_label", "full_name")
-        )
+        form.fields["application"].queryset = application_queryset
 
-    return render(request, "record_manual_payment.html", {"form": form})
+    return render(request, "record_manual_payment.html", {
+        "form": form,
+        "properties": accessible_properties,
+        "selected_property": selected_property,
+        "show_property_picker": not selected_property and not application_id,
+    })
 
 
 @login_required

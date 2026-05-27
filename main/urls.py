@@ -87,6 +87,7 @@ urlpatterns = [
 
     path("payment-log/", views.payment_log, name="payment_log"),
     path("record-payment/", views.record_manual_payment, name="record_manual_payment"),
+    path("record-payment/property/<int:property_id>/", views.record_manual_payment, name="record_manual_payment_property"),
     path("payment/<int:payment_id>/edit/", views.edit_manual_payment, name="edit_manual_payment"),
     path("payment/<int:payment_id>/receipt/", views.payment_receipt, name="payment_receipt"),
     path("resident-files/<int:application_id>/balances/", views.edit_resident_balances, name="edit_resident_balances"),

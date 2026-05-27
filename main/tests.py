@@ -601,6 +601,87 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "Payment Receipt")
         self.assertContains(response, "BANK-123")
 
+    def test_record_payment_prompts_for_property_when_multiple_properties_exist(self):
+        staff_user = User.objects.create_user(
+            username="payment-picker-staff",
+            email="payment-picker@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        first_property = Property.objects.create(name="First Payment Property", landlord_email=staff_user.email)
+        second_property = Property.objects.create(name="Second Payment Property", landlord_email=staff_user.email)
+        first_user = User.objects.create_user(username="first-payment-resident", password="StrongPass123!", role="tenant")
+        second_user = User.objects.create_user(username="second-payment-resident", password="StrongPass123!", role="tenant")
+        first_resident = HousingApplication.objects.create(
+            property=first_property,
+            user=first_user,
+            full_name="First Payment Resident",
+            phone="555-0130",
+            email="first-payment@example.com",
+            age=44,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+        )
+        second_resident = HousingApplication.objects.create(
+            property=second_property,
+            user=second_user,
+            full_name="Second Payment Resident",
+            phone="555-0131",
+            email="second-payment@example.com",
+            age=45,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+        )
+
+        self.client.login(username="payment-picker-staff", password="StrongPass123!")
+        response = self.client.get(reverse("record_manual_payment"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["show_property_picker"])
+        self.assertContains(response, "First Payment Property")
+        self.assertContains(response, "Second Payment Property")
+
+        property_response = self.client.get(reverse("record_manual_payment_property", args=[second_property.id]))
+        choices = list(property_response.context["form"].fields["application"].queryset)
+
+        self.assertFalse(property_response.context["show_property_picker"])
+        self.assertEqual(property_response.context["selected_property"], second_property)
+        self.assertIn(second_resident, choices)
+        self.assertNotIn(first_resident, choices)
+
+    def test_single_property_record_payment_opens_directly(self):
+        staff_user = User.objects.create_user(
+            username="single-payment-staff",
+            email="single-payment@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Single Payment Property", landlord_email=staff_user.email)
+        resident_user = User.objects.create_user(username="single-payment-resident", password="StrongPass123!", role="tenant")
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Single Payment Resident",
+            phone="555-0132",
+            email="single-payment-resident@example.com",
+            age=46,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+        )
+
+        self.client.login(username="single-payment-staff", password="StrongPass123!")
+        response = self.client.get(reverse("record_manual_payment"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["show_property_picker"])
+        self.assertEqual(response.context["selected_property"], property_obj)
+        self.assertIn(resident, list(response.context["form"].fields["application"].queryset))
+
     def test_manual_payment_can_apply_to_future_rent_month(self):
         staff_user = User.objects.create_user(
             username="future-rent-staff",
