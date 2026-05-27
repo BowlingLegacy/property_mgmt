@@ -7,6 +7,7 @@ from django.contrib import admin
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
+from django.db.models import Sum
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -3243,6 +3244,63 @@ class LiveFlowTests(TestCase):
         self.assertTrue(entries.filter(category="Repairs", month=1, year=2026, amount=Decimal("100.00")).exists())
         self.assertTrue(entries.filter(category="Utilities", month=3, year=2026, amount=Decimal("70.00")).exists())
         self.assertFalse(entries.filter(description__icontains="Q1 Total").exists())
+
+    def test_summary_grid_skips_total_columns_and_utility_parent_rows(self):
+        landlord = User.objects.create_user(
+            username="summary-utility-parent-landlord",
+            email="summary-utility-parent@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Summary Utility Property", landlord_email=landlord.email)
+        csv_file = SimpleUploadedFile(
+            "summary-utilities.csv",
+            (
+                b"Category,May,May Total,June\n"
+                b"Utilities,500.00,500.00,550.00\n"
+                b"Power,200.00,200.00,220.00\n"
+                b"Gas,100.00,100.00,110.00\n"
+                b"Water,150.00,150.00,165.00\n"
+                b"Trash,50.00,50.00,55.00\n"
+                b"Total Expenses,500.00,500.00,550.00\n"
+            ),
+            content_type="text/csv",
+        )
+
+        self.client.login(username="summary-utility-parent-landlord", password="StrongPass123!")
+        self.client.post(reverse("financial_upload"), {
+            "property": property_obj.id,
+            "ledger_scope": "property",
+            "name": "Utility Summary",
+            "file": csv_file,
+            "notes": "Monthly summary sheet",
+        })
+
+        upload = FinancialUpload.objects.get(name="Utility Summary")
+        response = self.client.post(reverse("parse_financial_upload", args=[upload.id]), {
+            "import_mode": "summary_grid",
+            "sheet_name": "CSV",
+            "summary_category_column": "Category",
+            "summary_year": "2026",
+            "summary_entry_type": "operating_expense",
+            "summary_month_columns": ["May", "May Total", "June"],
+        })
+
+        self.assertRedirects(response, reverse("financial_upload"))
+        entries = FinancialEntry.objects.filter(upload=upload)
+        self.assertEqual(entries.count(), 8)
+        self.assertFalse(entries.filter(category="Utilities").exists())
+        self.assertFalse(entries.filter(category="Total Expenses").exists())
+        self.assertFalse(entries.filter(description__icontains="May Total").exists())
+        self.assertEqual(
+            entries.filter(month=5).aggregate(total=Sum("amount"))["total"],
+            Decimal("500.00"),
+        )
+        self.assertEqual(
+            entries.filter(month=6).aggregate(total=Sum("amount"))["total"],
+            Decimal("550.00"),
+        )
 
     def test_accounting_import_blocks_other_landlord_property(self):
         landlord = User.objects.create_user(

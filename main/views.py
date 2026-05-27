@@ -354,9 +354,40 @@ MONTH_NAME_MAP = {
 }
 
 
+SUMMARY_TOTAL_KEYWORDS = {"total", "subtotal", "ytd", "year to date", "quarter", "q1", "q2", "q3", "q4"}
+UTILITY_PARENT_CATEGORIES = {"utility", "utilities"}
+UTILITY_DETAIL_KEYWORDS = {"power", "electric", "electricity", "gas", "water", "sewer", "trash", "garbage", "internet", "utilities"}
+
+
+def is_summary_total_label(value):
+    clean_value = normalized_header(value)
+    return any(keyword in clean_value for keyword in SUMMARY_TOTAL_KEYWORDS)
+
+
+def should_skip_summary_category(category, all_categories):
+    clean_category = normalized_header(category)
+    if not clean_category or is_summary_total_label(clean_category):
+        return True
+
+    if clean_category in UTILITY_PARENT_CATEGORIES:
+        detail_categories = [
+            normalized_header(other_category)
+            for other_category in all_categories
+            if normalized_header(other_category) != clean_category
+        ]
+        has_utility_details = any(
+            any(keyword in detail_category for keyword in UTILITY_DETAIL_KEYWORDS)
+            for detail_category in detail_categories
+        )
+        if has_utility_details:
+            return True
+
+    return False
+
+
 def parse_month_header(value):
     clean_value = normalized_header(value)
-    if not clean_value:
+    if not clean_value or is_summary_total_label(clean_value):
         return None
 
     for token in clean_value.replace("-", " ").replace("/", " ").split():
@@ -3282,10 +3313,15 @@ def parse_financial_upload(request, upload_id):
             except (TypeError, ValueError):
                 summary_year = timezone.localdate().year
 
+            summary_categories = [
+                str(row["data"].get(summary_category_column, "") or "").strip()
+                for row in rows
+            ]
+
             for row in rows:
                 row_data = row["data"]
                 category = str(row_data.get(summary_category_column, "") or "").strip()
-                if not category:
+                if should_skip_summary_category(category, summary_categories):
                     skipped += 1
                     continue
 
