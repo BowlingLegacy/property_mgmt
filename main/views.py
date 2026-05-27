@@ -174,7 +174,7 @@ FINANCIAL_COLUMN_ALIASES = {
 }
 
 FINANCIAL_TYPE_KEYWORDS = {
-    "income": ["income", "rent income", "deposit", "revenue", "payment received"],
+    "income": ["income", "rent", "rent income", "deposit", "revenue", "payment received"],
     "debt_service": ["mortgage", "loan", "debt", "principal", "interest"],
     "capital_expense": ["capital", "capex", "improvement", "renovation", "appliance", "roof"],
     "operating_expense": ["expense", "repair", "maintenance", "utility", "insurance", "tax", "supplies", "cleaning"],
@@ -421,6 +421,9 @@ def normalize_entry_type(value, category, description, amount, default_entry_typ
             return entry_type
 
     combined = normalized_header(f"{category} {description}")
+    if "rent" in combined and not any(expense_word in combined for expense_word in ["equipment rental", "rental equipment", "rent expense"]):
+        return "income"
+
     for entry_type, keywords in FINANCIAL_TYPE_KEYWORDS.items():
         if any(keyword in combined for keyword in keywords):
             return entry_type
@@ -3335,13 +3338,21 @@ def parse_financial_upload(request, upload_id):
                     if amount == Decimal("0.00"):
                         continue
 
+                    summary_row_entry_type = normalize_entry_type(
+                        "",
+                        category,
+                        f"{category} - {column_name} summary",
+                        amount,
+                        summary_entry_type,
+                    )
+
                     entry = create_financial_entry_from_import(
                         upload,
                         upload.property,
                         sheet_name,
                         row,
                         date(summary_year, month_number, 1),
-                        summary_entry_type,
+                        summary_row_entry_type,
                         category,
                         f"{category} - {column_name} summary",
                         amount,

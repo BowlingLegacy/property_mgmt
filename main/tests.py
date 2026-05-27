@@ -3302,6 +3302,45 @@ class LiveFlowTests(TestCase):
             Decimal("550.00"),
         )
 
+    def test_summary_grid_classifies_rent_rows_as_income(self):
+        landlord = User.objects.create_user(
+            username="summary-rent-income-landlord",
+            email="summary-rent-income@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Summary Rent Property", landlord_email=landlord.email)
+        csv_file = SimpleUploadedFile(
+            "summary-rent.csv",
+            b"Category,May,June\nRent,1200.00,1300.00\nPower,100.00,120.00\n",
+            content_type="text/csv",
+        )
+
+        self.client.login(username="summary-rent-income-landlord", password="StrongPass123!")
+        self.client.post(reverse("financial_upload"), {
+            "property": property_obj.id,
+            "ledger_scope": "property",
+            "name": "Rent Summary",
+            "file": csv_file,
+            "notes": "Monthly summary sheet",
+        })
+
+        upload = FinancialUpload.objects.get(name="Rent Summary")
+        response = self.client.post(reverse("parse_financial_upload", args=[upload.id]), {
+            "import_mode": "summary_grid",
+            "sheet_name": "CSV",
+            "summary_category_column": "Category",
+            "summary_year": "2026",
+            "summary_entry_type": "operating_expense",
+            "summary_month_columns": ["May", "June"],
+        })
+
+        self.assertRedirects(response, reverse("financial_upload"))
+        self.assertTrue(entries := FinancialEntry.objects.filter(upload=upload, category="Rent"))
+        self.assertEqual(set(entries.values_list("entry_type", flat=True)), {"income"})
+        self.assertTrue(FinancialEntry.objects.filter(upload=upload, category="Power", entry_type="operating_expense").exists())
+
     def test_accounting_import_blocks_other_landlord_property(self):
         landlord = User.objects.create_user(
             username="blocked-accounting-landlord",
