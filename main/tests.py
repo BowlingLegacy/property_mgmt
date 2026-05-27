@@ -1056,6 +1056,53 @@ class LiveFlowTests(TestCase):
         self.assertEqual(room_rent.rent_due_day, 3)
         self.assertEqual(room_rent.utility_monthly, Decimal("60.00"))
 
+    def test_rent_setup_prompts_for_property_when_multiple_properties_exist(self):
+        landlord = User.objects.create_user(
+            username="multi-rent-setup-landlord",
+            email="multi-rent-setup@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        first_property = Property.objects.create(name="First Rent Setup Property", landlord_email=landlord.email)
+        second_property = Property.objects.create(name="Second Rent Setup Property", landlord_email=landlord.email)
+        PropertyRoomRent.objects.create(property=first_property, room_unit_label="A", monthly_rent=Decimal("500.00"))
+        PropertyRoomRent.objects.create(property=second_property, room_unit_label="B", monthly_rent=Decimal("600.00"))
+
+        self.client.login(username="multi-rent-setup-landlord", password="StrongPass123!")
+        response = self.client.get(reverse("landlord_rent_setup"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["selected_property"])
+        self.assertContains(response, "Choose a property before editing rent")
+        self.assertContains(response, "First Rent Setup Property")
+        self.assertContains(response, "Second Rent Setup Property")
+
+        property_response = self.client.get(reverse("landlord_rent_setup_property", args=[second_property.id]))
+
+        self.assertEqual(property_response.status_code, 200)
+        self.assertEqual(property_response.context["selected_property"], second_property)
+        self.assertContains(property_response, "Second Rent Setup Property monthly rent setup")
+        self.assertContains(property_response, "<strong>B</strong>", html=True)
+        self.assertNotContains(property_response, "<strong>A</strong>", html=True)
+
+    def test_single_property_rent_setup_opens_directly(self):
+        landlord = User.objects.create_user(
+            username="single-rent-setup-landlord",
+            email="single-rent-setup@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Single Rent Setup Property", landlord_email=landlord.email)
+
+        self.client.login(username="single-rent-setup-landlord", password="StrongPass123!")
+        response = self.client.get(reverse("landlord_rent_setup"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["selected_property"], property_obj)
+        self.assertContains(response, "Single Rent Setup Property monthly rent setup")
+
     def test_landlord_can_record_deposit_by_room_letter(self):
         landlord = User.objects.create_user(
             username="room-deposit-landlord",

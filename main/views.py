@@ -1350,8 +1350,10 @@ def transfer_resident_room(request, application_id):
     })
 
 
-def room_rent_setup_rows(user):
+def room_rent_setup_rows(user, property_obj=None):
     properties = staff_managed_properties(user).order_by("name")
+    if property_obj:
+        properties = properties.filter(id=property_obj.id)
     room_map = OrderedDict()
 
     roster_entries = (
@@ -1582,20 +1584,30 @@ def apply_room_rent_setting_to_residents(room_setting, residents, effective_date
 
 @login_required
 @user_passes_test(staff_required)
-def landlord_rent_setup(request):
-    room_rows = room_rent_setup_rows(request.user)
+def landlord_rent_setup(request, property_id=None):
+    accessible_properties = staff_managed_properties(request.user).order_by("name")
+    selected_property = None
+    selected_from_route = bool(property_id)
+
+    if property_id:
+        selected_property = get_object_or_404(accessible_properties, id=property_id)
+    elif accessible_properties.count() == 1:
+        selected_property = accessible_properties.first()
+
+    room_rows = room_rent_setup_rows(request.user, selected_property)
     residents = (
         staff_managed_applications(request.user)
         .select_related("property", "user")
         .order_by("property__name", "space_label", "full_name")
     )
+    if selected_property:
+        residents = residents.filter(property=selected_property)
 
     if request.method == "POST":
         updated_count = 0
         rent_history_count = 0
         effective_date = timezone.localdate().replace(day=1)
         apply_room_rents = request.POST.get("apply_room_rents") == "on"
-        accessible_properties = staff_managed_properties(request.user)
         accessible_property_ids = set(accessible_properties.values_list("id", flat=True))
 
         try:
@@ -1616,6 +1628,8 @@ def landlord_rent_setup(request):
         added_room_keys = set()
 
         add_room_property_id = request.POST.get("add_room_property_id")
+        if selected_property and not add_room_property_id:
+            add_room_property_id = str(selected_property.id)
         add_room_unit_label = (request.POST.get("add_room_unit_label") or "").strip()
         save_added_room = request.POST.get("save_added_room") == "1"
         added_room_saved = False
@@ -1667,7 +1681,9 @@ def landlord_rent_setup(request):
                     f"Room {canonical_room_label(add_room_unit_label)} rent saved and matching resident files updated.",
                 )
             else:
-                messages.error(request, "Choose a property and room letter before saving room rent.")
+                messages.error(request, "Choose a space/unit label before saving rent.")
+            if selected_property and selected_from_route:
+                return redirect("landlord_rent_setup_property", property_id=selected_property.id)
             return redirect("landlord_rent_setup")
 
         for index in range(room_count):
@@ -1791,10 +1807,13 @@ def landlord_rent_setup(request):
             request,
             f"Rent setup saved for {updated_count} resident file(s). {room_setting_count} room rent setting(s) saved. {room_applied_count} resident file(s) updated from room rent. {rent_history_count} rent history record(s) added.",
         )
+        if selected_property and selected_from_route:
+            return redirect("landlord_rent_setup_property", property_id=selected_property.id)
         return redirect("landlord_rent_setup")
 
     return render(request, "landlord_rent_setup.html", {
-        "properties": staff_managed_properties(request.user).order_by("name"),
+        "properties": accessible_properties,
+        "selected_property": selected_property,
         "room_rows": room_rows,
         "residents": residents,
     })
