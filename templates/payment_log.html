@@ -106,6 +106,17 @@
                                                 </a>
                                             </td>
                                         </tr>
+                                        {% if payment.application.move_in_rent_charge or payment.application.move_in_utility_charge %}
+                                            <tr>
+                                                <td colspan="13" class="small text-muted">
+                                                    Move-in charges for this file:
+                                                    rent ${{ payment.application.move_in_rent_charge }},
+                                                    utilities ${{ payment.application.move_in_utility_charge }}.
+                                                    Regular monthly rent is ${{ payment.application.monthly_rent }};
+                                                    regular monthly utilities are ${{ payment.application.utility_monthly }}.
+                                                </td>
+                                            </tr>
+                                        {% endif %}
                                     {% endfor %}
                                 </tbody>
                             </table>

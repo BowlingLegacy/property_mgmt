@@ -1,4 +1,5 @@
 from collections import OrderedDict
+import calendar
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 import csv
@@ -486,6 +487,20 @@ def apply_completed_payment_to_balance(payment):
         application.utility_balance = max(Decimal("0.00"), application.utility_balance - utility_paid)
 
     application.save()
+
+
+def prorated_monthly_charge(monthly_amount, start_date):
+    monthly_amount = Decimal(monthly_amount or "0.00")
+    if not start_date or monthly_amount <= 0:
+        return monthly_amount.quantize(Decimal("0.01"))
+
+    days_in_month = calendar.monthrange(start_date.year, start_date.month)[1]
+    charge_days = days_in_month - start_date.day + 1
+    if charge_days >= days_in_month:
+        return monthly_amount.quantize(Decimal("0.01"))
+
+    prorated = monthly_amount * Decimal(charge_days) / Decimal(days_in_month)
+    return prorated.quantize(Decimal("0.01"))
 
 
 def home(request):

@@ -8,7 +8,7 @@ from django.utils.text import slugify
 
 from .forms import LandlordCreateTenantForm
 from .models import HousingApplication, SignedDocument, User
-from .views import staff_managed_properties, staff_required
+from .views import prorated_monthly_charge, staff_managed_properties, staff_required
 
 
 def send_resident_invite_email(application):
@@ -92,18 +92,32 @@ def create_tenant(request):
         form = LandlordCreateTenantForm(request.POST)
 
         if form.is_valid():
+            monthly_rent = form.cleaned_data.get("monthly_rent") or 0
+            utility_monthly = form.cleaned_data.get("utility_monthly") or 0
+            lease_start_date = form.cleaned_data.get("lease_start_date")
+            move_in_rent_charge = prorated_monthly_charge(monthly_rent, lease_start_date)
+            move_in_utility_charge = prorated_monthly_charge(utility_monthly, lease_start_date)
+
             application.space_type = form.cleaned_data.get("space_type", "")
             application.space_label = form.cleaned_data.get("space_label", "")
-            application.monthly_rent = form.cleaned_data.get("monthly_rent") or 0
-            application.balance = form.cleaned_data.get("balance") or 0
+            application.monthly_rent = monthly_rent
+            application.balance = move_in_rent_charge
             application.rent_due_day = form.cleaned_data.get("rent_due_day") or 1
-            application.lease_start_date = form.cleaned_data.get("lease_start_date")
+            application.lease_start_date = lease_start_date
+            application.move_in_rent_charge = move_in_rent_charge
+            application.move_in_utility_charge = move_in_utility_charge
             application.deposit_required = form.cleaned_data.get("deposit_required") or 0
             application.deposit_paid = form.cleaned_data.get("deposit_paid") or 0
             application.deposit_payment_plan = form.cleaned_data.get("deposit_payment_plan") or "paid_in_full"
-            application.utility_monthly = form.cleaned_data.get("utility_monthly") or 0
-            application.utility_balance = form.cleaned_data.get("utility_balance") or 0
+            application.utility_monthly = utility_monthly
+            application.utility_balance = move_in_utility_charge
             application.additional_notes = form.cleaned_data.get("additional_notes") or ""
+            move_in_note = (
+                f"Move-in charges calculated from lease start date: "
+                f"rent ${move_in_rent_charge}, utilities ${move_in_utility_charge}. "
+                f"Regular monthly rent remains ${monthly_rent}; regular monthly utilities remain ${utility_monthly}."
+            )
+            application.additional_notes = f"{application.additional_notes}\n\n{move_in_note}".strip()
 
             created_user = None
 

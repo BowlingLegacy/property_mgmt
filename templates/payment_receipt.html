@@ -90,6 +90,25 @@
             <div class="receipt-value">${{ payment.amount }}</div>
         </div>
 
+        {% if payment.application.move_in_rent_charge or payment.application.move_in_utility_charge %}
+            <div class="receipt-row">
+                <div class="receipt-label">Move-In Rent Due</div>
+                <div class="receipt-value">${{ payment.application.move_in_rent_charge }}</div>
+            </div>
+
+            <div class="receipt-row">
+                <div class="receipt-label">Move-In Utilities Due</div>
+                <div class="receipt-value">${{ payment.application.move_in_utility_charge }}</div>
+            </div>
+
+            <div class="receipt-row">
+                <div class="receipt-label">Regular Monthly Charges</div>
+                <div class="receipt-value">
+                    Rent ${{ payment.application.monthly_rent }} / Utilities ${{ payment.application.utility_monthly }}
+                </div>
+            </div>
+        {% endif %}
+
         <div class="receipt-row">
             <div class="receipt-label">Status</div>
             <div class="receipt-value">{{ payment.get_status_display }}</div>

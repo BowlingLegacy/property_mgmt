@@ -1,4 +1,5 @@
 from decimal import Decimal
+from datetime import date
 from io import BytesIO, StringIO
 from unittest.mock import patch
 
@@ -11,7 +12,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .models import AccountingReceipt, ApplicantDocument, BlogComment, BlogPost, CompanyMailboxConnection, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, PropertyRoomRent, RentHistory, ResidentMessage, ResidentMessageReply, SignedDocument, SmsMessageLog, User
-from .views import apply_completed_payment_to_balance, ensure_existing_resident_portal_application
+from .views import apply_completed_payment_to_balance, ensure_existing_resident_portal_application, prorated_monthly_charge
 
 
 @override_settings(
@@ -412,6 +413,60 @@ class LiveFlowTests(TestCase):
         self.assertEqual(lease.utility_fee, Decimal("66.00"))
         self.assertEqual(lease.landlord_signature, "Michael Bowling")
         self.assertEqual(lease.deposit_payment_plan, "ninety_day_plan")
+
+    def test_approving_application_prorates_move_in_rent_and_utilities(self):
+        staff_user = User.objects.create_user(
+            username="prorate-staff",
+            email="prorate-staff@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Prorate Property", landlord_email=staff_user.email)
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Prorated Applicant",
+            phone="555-0130",
+            email="prorated-applicant@example.com",
+            age=42,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Needs a room.",
+        )
+
+        self.client.login(username="prorate-staff", password="StrongPass123!")
+
+        response = self.client.post(
+            f"{reverse('landlord_create_tenant')}?application={application.id}",
+            {
+                "monthly_rent": "650.00",
+                "balance": "650.00",
+                "rent_due_day": "1",
+                "lease_start_date": "2026-05-27",
+                "deposit_required": "450.00",
+                "deposit_paid": "450.00",
+                "deposit_payment_plan": "paid_in_full",
+                "utility_monthly": "55.00",
+                "utility_balance": "55.00",
+                "space_type": "Room",
+                "space_label": "H",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        application.refresh_from_db()
+        self.assertEqual(application.monthly_rent, Decimal("650.00"))
+        self.assertEqual(application.utility_monthly, Decimal("55.00"))
+        self.assertEqual(application.move_in_rent_charge, Decimal("104.84"))
+        self.assertEqual(application.balance, Decimal("104.84"))
+        self.assertEqual(application.move_in_utility_charge, Decimal("8.87"))
+        self.assertEqual(application.utility_balance, Decimal("8.87"))
+        self.assertEqual(application.deposit_required, Decimal("450.00"))
+        self.assertEqual(application.deposit_paid, Decimal("450.00"))
+
+    def test_prorated_monthly_charge_uses_remaining_calendar_days(self):
+        self.assertEqual(prorated_monthly_charge(Decimal("650.00"), date(2026, 5, 27)), Decimal("104.84"))
+        self.assertEqual(prorated_monthly_charge(Decimal("55.00"), date(2026, 5, 27)), Decimal("8.87"))
 
     @patch("main.views.stripe.checkout.Session.create")
     def test_resident_can_start_own_rent_payment(self, create_session):

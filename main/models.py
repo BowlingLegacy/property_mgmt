@@ -251,6 +251,8 @@ class HousingApplication(models.Model):
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     rent_due_day = models.IntegerField(default=1)
     lease_start_date = models.DateField(blank=True, null=True)
+    move_in_rent_charge = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    move_in_utility_charge = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
 
     deposit_required = models.DecimalField(max_digits=10, decimal_places=2, default=450.00)
     deposit_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
