@@ -47,6 +47,7 @@ from .forms import (
     LandlordSignUpForm,
     ExistingResidentIntakeForm,
     CurrentResidentRosterUploadForm,
+    ResidentRoomTransferForm,
     GroupResidentMessageForm,
     CompanyEmailComposeForm,
     CompanyEmailReplyForm,
@@ -990,6 +991,79 @@ def landlord_attention(request):
 @user_passes_test(staff_required)
 def landlord_resident_files(request):
     return render(request, "landlord_resident_files.html", get_landlord_workspace_context(request.user))
+
+
+@login_required
+@user_passes_test(staff_required)
+def transfer_resident_room(request, application_id):
+    application = get_object_or_404(
+        HousingApplication.objects.select_related("property"),
+        id=application_id,
+        property__in=staff_managed_properties(request.user),
+    )
+
+    if request.method == "POST":
+        form = ResidentRoomTransferForm(request.POST)
+        if form.is_valid():
+            old_room = f"{application.space_type} {application.space_label}".strip() or "Unassigned"
+            new_space_type = form.cleaned_data["space_type"].strip()
+            new_space_label = form.cleaned_data["space_label"].strip()
+            application.space_type = new_space_type
+            application.space_label = new_space_label
+
+            updated_fields = ["space_type", "space_label"]
+            room_setting = None
+            if form.cleaned_data["apply_room_rent"]:
+                room_setting = find_room_rent_setting(application.property, new_space_label)
+
+            if room_setting:
+                if application.monthly_rent != room_setting.monthly_rent:
+                    RentHistory.objects.create(
+                        application=application,
+                        rent_amount=room_setting.monthly_rent,
+                        effective_date=timezone.localdate(),
+                    )
+                application.monthly_rent = room_setting.monthly_rent
+                application.balance = room_setting.monthly_rent
+                application.rent_due_day = room_setting.rent_due_day
+                application.utility_monthly = room_setting.utility_monthly
+                application.utility_balance = room_setting.utility_monthly
+                application.deposit_required = room_setting.deposit_required
+                application.deposit_paid = min(application.deposit_paid, room_setting.deposit_required)
+                updated_fields.extend([
+                    "monthly_rent",
+                    "balance",
+                    "rent_due_day",
+                    "utility_monthly",
+                    "utility_balance",
+                    "deposit_required",
+                    "deposit_paid",
+                ])
+
+            notes = form.cleaned_data.get("notes", "").strip()
+            if notes:
+                application.additional_notes = (
+                    f"{application.additional_notes}\n\n"
+                    f"{timezone.localdate()}: Room transfer from {old_room} to {new_space_type} {new_space_label}. {notes}"
+                ).strip()
+                updated_fields.append("additional_notes")
+
+            application.save(update_fields=updated_fields)
+            messages.success(request, f"{application.full_name} moved from {old_room} to {new_space_type} {new_space_label}.")
+            return redirect("application_detail", pk=application.id)
+    else:
+        form = ResidentRoomTransferForm(initial={
+            "space_type": application.space_type or "Room",
+            "space_label": application.space_label,
+            "apply_room_rent": True,
+        })
+
+    room_setting = find_room_rent_setting(application.property, application.space_label)
+    return render(request, "transfer_resident_room.html", {
+        "application": application,
+        "form": form,
+        "current_room_setting": room_setting,
+    })
 
 
 def room_rent_setup_rows(user):

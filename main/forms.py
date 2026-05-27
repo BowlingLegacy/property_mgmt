@@ -566,6 +566,31 @@ class CurrentResidentRosterUploadForm(forms.Form):
             self.fields["property"].queryset = properties
 
 
+class ResidentRoomTransferForm(forms.Form):
+    space_type = forms.CharField(
+        label="Space Type",
+        initial="Room",
+        max_length=50,
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    space_label = forms.CharField(
+        label="New Room / Unit",
+        max_length=50,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Example: L"}),
+    )
+    apply_room_rent = forms.BooleanField(
+        label="Apply rent, utilities, and deposit settings from this room if they exist",
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+    )
+    notes = forms.CharField(
+        label="Transfer Notes",
+        required=False,
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+    )
+
+
 class GroupResidentMessageForm(forms.Form):
     DELIVERY_CHOICES = [
         ("portal", "Secure portal only"),
