@@ -1148,7 +1148,7 @@ def room_rent_setup_rows(user):
         if application.full_name not in room_map[key]["residents"]:
             room_map[key]["residents"].append(application.full_name)
 
-    settings = PropertyRoomRent.objects.filter(property__in=properties)
+    settings = PropertyRoomRent.objects.filter(property__in=properties, is_active=True).order_by("property__name", "room_unit_label", "id")
     for setting in settings:
         key = (setting.property_id, normalized_room_label(setting.room_unit_label))
         room_map.setdefault(key, {
@@ -1214,22 +1214,40 @@ def find_room_rent_setting(property_obj, room_unit_label):
     return None
 
 
-def save_room_rent_setting(property_id, room_unit_label, defaults):
+def matching_room_rent_settings(property_id, room_unit_label):
     target_label = normalized_room_label(room_unit_label)
+    return [
+        setting for setting in PropertyRoomRent.objects.filter(property_id=property_id)
+        if normalized_room_label(setting.room_unit_label) == target_label
+    ]
+
+
+def save_room_rent_setting(property_id, room_unit_label, defaults):
     clean_room_unit_label = canonical_room_label(room_unit_label)
-    room_setting = None
+    matching_settings = matching_room_rent_settings(property_id, room_unit_label)
 
-    for setting in PropertyRoomRent.objects.filter(property_id=property_id):
-        if normalized_room_label(setting.room_unit_label) == target_label:
-            room_setting = setting
-            break
-
-    if room_setting:
-        room_setting.room_unit_label = clean_room_unit_label
+    if matching_settings:
+        primary_setting = next(
+            (
+                setting for setting in matching_settings
+                if str(setting.room_unit_label or "").strip().lower() == clean_room_unit_label.lower()
+            ),
+            matching_settings[0],
+        )
+        primary_setting.room_unit_label = clean_room_unit_label
         for field_name, value in defaults.items():
-            setattr(room_setting, field_name, value)
-        room_setting.save(update_fields=["room_unit_label", *list(defaults.keys())])
-        return room_setting
+            setattr(primary_setting, field_name, value)
+        primary_setting.save(update_fields=list(dict.fromkeys(["room_unit_label", *list(defaults.keys())])))
+
+        for room_setting in matching_settings:
+            if room_setting.id == primary_setting.id:
+                continue
+            for field_name, value in defaults.items():
+                setattr(room_setting, field_name, value)
+            room_setting.is_active = False
+            room_setting.save(update_fields=list(dict.fromkeys(["room_unit_label", *list(defaults.keys()), "is_active"])))
+        primary_setting.refresh_from_db()
+        return primary_setting
 
     return PropertyRoomRent.objects.create(
         property_id=property_id,

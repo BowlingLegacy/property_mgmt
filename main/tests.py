@@ -1230,6 +1230,80 @@ class LiveFlowTests(TestCase):
         self.assertEqual(resident.utility_monthly, Decimal("55.00"))
         self.assertEqual(resident.utility_balance, Decimal("55.00"))
 
+    def test_room_rent_save_updates_duplicate_room_records(self):
+        landlord = User.objects.create_user(
+            username="duplicate-room-rent-landlord",
+            email="duplicate-room-rent-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Duplicate Room Rent Property", landlord_email=landlord.email)
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Duplicate Room G Resident",
+            phone="555-0199",
+            email="duplicate-room-g@example.com",
+            age=45,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            space_type="Room",
+            space_label="Room G",
+            monthly_rent=Decimal("0.00"),
+            balance=Decimal("0.00"),
+            utility_monthly=Decimal("0.00"),
+            utility_balance=Decimal("0.00"),
+        )
+        PropertyRoomRent.objects.create(
+            property=property_obj,
+            room_unit_label="G",
+            monthly_rent=Decimal("0.00"),
+            utility_monthly=Decimal("0.00"),
+            deposit_required=Decimal("0.00"),
+        )
+        PropertyRoomRent.objects.create(
+            property=property_obj,
+            room_unit_label="Room G",
+            monthly_rent=Decimal("0.00"),
+            utility_monthly=Decimal("0.00"),
+            deposit_required=Decimal("0.00"),
+        )
+
+        self.client.login(username="duplicate-room-rent-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("landlord_rent_setup"), {
+            "room_count": "1",
+            "room_0_property_id": str(property_obj.id),
+            "room_0_room_unit_label": "G",
+            "room_0_monthly_rent": "0.00",
+            "room_0_rent_due_day": "1",
+            "room_0_utility_monthly": "0.00",
+            "room_0_deposit_required": "0.00",
+            "room_0_deposit_paid": "0.00",
+            "add_room_property_id": str(property_obj.id),
+            "add_room_unit_label": "G",
+            "add_room_monthly_rent": "560.00",
+            "add_room_rent_due_day": "1",
+            "add_room_utility_monthly": "55.00",
+            "add_room_deposit_required": "450.00",
+            "add_room_deposit_paid": "450.00",
+            "apply_room_rents": "on",
+            "save_added_room": "1",
+        })
+
+        self.assertRedirects(response, reverse("landlord_rent_setup"))
+        self.assertEqual(
+            set(PropertyRoomRent.objects.filter(property=property_obj).values_list("monthly_rent", flat=True)),
+            {Decimal("560.00")},
+        )
+        self.assertEqual(
+            set(PropertyRoomRent.objects.filter(property=property_obj, is_active=True).values_list("room_unit_label", flat=True)),
+            {"G"},
+        )
+        resident.refresh_from_db()
+        self.assertEqual(resident.monthly_rent, Decimal("560.00"))
+        self.assertEqual(resident.balance, Decimal("560.00"))
+
     def test_room_letter_rent_applies_to_existing_resident_file(self):
         landlord = User.objects.create_user(
             username="apply-room-rent-landlord",
