@@ -330,6 +330,7 @@ class HousingApplication(models.Model):
     unconditional_regard_acknowledgment = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
+    landlord_reviewed_at = models.DateTimeField(blank=True, null=True)
 
     def deposit_balance(self):
         remaining = self.deposit_required - self.deposit_paid
@@ -834,6 +835,7 @@ class ExistingResidentIntake(models.Model):
     move_in_month = models.CharField(max_length=7, blank=True)
     additional_notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    landlord_reviewed_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         ordering = ["-created_at"]

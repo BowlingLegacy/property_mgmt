@@ -1171,7 +1171,7 @@ def get_landlord_workspace_context(user):
     new_applications = (
         HousingApplication.objects
         .select_related("property", "user")
-        .filter(property__in=properties, user__isnull=True)
+        .filter(property__in=properties, user__isnull=True, landlord_reviewed_at__isnull=True)
         .order_by("-created_at")
     )
 
@@ -1192,7 +1192,7 @@ def get_landlord_workspace_context(user):
     existing_resident_intakes = list(
         ExistingResidentIntake.objects
         .select_related("property")
-        .filter(property__in=properties)
+        .filter(property__in=properties, landlord_reviewed_at__isnull=True)
         .order_by("-created_at")
     )
     existing_resident_rows = []
@@ -2355,6 +2355,10 @@ def landlord_message_detail(request, message_id):
         application__in=staff_managed_applications(request.user),
     )
 
+    if request.method == "GET" and resident_message.status == "submitted":
+        resident_message.status = "reviewed"
+        resident_message.save(update_fields=["status"])
+
     if request.method == "POST":
         reply_body = request.POST.get("reply_body", "").strip()
         if reply_body:
@@ -2499,6 +2503,26 @@ def mark_document_reviewed(request, document_id):
 
     messages.success(request, f"{document.name} marked reviewed.")
     return redirect("landlord_dashboard")
+
+
+@login_required
+@user_passes_test(staff_required)
+def open_applicant_document(request, document_id):
+    document = get_object_or_404(
+        ApplicantDocument.objects.select_related("application"),
+        id=document_id,
+        application__in=staff_managed_applications(request.user),
+    )
+
+    if not document.landlord_notified:
+        document.landlord_notified = True
+        document.save(update_fields=["landlord_notified"])
+
+    if document.file:
+        return redirect(document.file.url)
+
+    messages.warning(request, "This document file is not available.")
+    return redirect("landlord_attention")
 
 
 @login_required
@@ -4196,6 +4220,10 @@ def landlord_existing_resident_intake_detail(request, intake_id):
         id=intake_id,
         property__in=staff_managed_properties(request.user),
     )
+    if not intake.landlord_reviewed_at:
+        intake.landlord_reviewed_at = timezone.now()
+        intake.save(update_fields=["landlord_reviewed_at"])
+
     application = (
         HousingApplication.objects
         .select_related("user", "property")
@@ -4338,6 +4366,14 @@ def add_blog_comment(request, post_id):
 
 def printable_application(request, pk):
     application = get_object_or_404(HousingApplication, pk=pk)
+    if (
+        request.user.is_authenticated
+        and staff_required(request.user)
+        and application.property_id in staff_managed_properties(request.user).values_list("id", flat=True)
+        and not application.landlord_reviewed_at
+    ):
+        application.landlord_reviewed_at = timezone.now()
+        application.save(update_fields=["landlord_reviewed_at"])
     return render(request, "printable_application.html", {"application": application})
 
 

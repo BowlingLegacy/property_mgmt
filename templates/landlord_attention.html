@@ -121,7 +121,7 @@
                             <td><strong>{{ document.name }}</strong><br><span class="text-muted small">{{ document.get_document_type_display }}</span></td>
                             <td>{{ document.created_at|date:"M j, g:i A" }}</td>
                             <td class="d-flex gap-2 flex-wrap">
-                                {% if document.file %}<a href="{{ document.file.url }}" target="_blank" class="btn btn-outline-secondary btn-sm">Open</a>{% endif %}
+                                {% if document.file %}<a href="{% url 'open_applicant_document' document.id %}" target="_blank" class="btn btn-outline-secondary btn-sm">Open</a>{% endif %}
                                 <form method="post" action="{% url 'mark_document_reviewed' document.id %}">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-primary btn-sm">Mark Reviewed</button>

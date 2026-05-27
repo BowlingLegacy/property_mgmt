@@ -2808,6 +2808,88 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "<td>J</td>", html=True)
         self.assertNotContains(response, "<td>Room J</td>", html=True)
 
+    def test_attention_count_drops_when_items_are_opened(self):
+        landlord = User.objects.create_user(
+            username="attention-landlord",
+            email="attention-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Attention Property", landlord_email=landlord.email)
+        resident_user = User.objects.create_user(username="attention-resident", password="StrongPass123!", role="tenant")
+        applicant = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Attention Applicant",
+            phone="555-0320",
+            email="attention-applicant@example.com",
+            age=42,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Needs housing.",
+        )
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Attention Resident",
+            phone="555-0321",
+            email="attention-resident@example.com",
+            age=43,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        intake = ExistingResidentIntake.objects.create(
+            property=property_obj,
+            first_name="Setup",
+            last_name="Resident",
+            email="setup-resident@example.com",
+            phone="555-0322",
+        )
+        resident_message = ResidentMessage.objects.create(
+            application=resident,
+            subject="Attention message",
+            message="Please review.",
+            message_type="general",
+            status="submitted",
+        )
+        document = ApplicantDocument.objects.create(
+            application=resident,
+            document_type="other",
+            file=SimpleUploadedFile("attention.txt", b"hello", content_type="text/plain"),
+            name="Attention Document",
+            status="uploaded",
+            landlord_notified=False,
+        )
+
+        self.client.login(username="attention-landlord", password="StrongPass123!")
+        response = self.client.get(reverse("landlord_dashboard"))
+        self.assertEqual(response.context["attention_count"], 4)
+
+        self.client.get(reverse("application_detail", args=[applicant.id]))
+        applicant.refresh_from_db()
+        self.assertIsNotNone(applicant.landlord_reviewed_at)
+        response = self.client.get(reverse("landlord_dashboard"))
+        self.assertEqual(response.context["attention_count"], 3)
+
+        self.client.get(reverse("landlord_existing_resident_intake_detail", args=[intake.id]))
+        intake.refresh_from_db()
+        self.assertIsNotNone(intake.landlord_reviewed_at)
+        response = self.client.get(reverse("landlord_dashboard"))
+        self.assertEqual(response.context["attention_count"], 2)
+
+        self.client.get(reverse("landlord_message_detail", args=[resident_message.id]))
+        resident_message.refresh_from_db()
+        self.assertEqual(resident_message.status, "reviewed")
+        response = self.client.get(reverse("landlord_dashboard"))
+        self.assertEqual(response.context["attention_count"], 1)
+
+        self.client.get(reverse("open_applicant_document", args=[document.id]))
+        document.refresh_from_db()
+        self.assertTrue(document.landlord_notified)
+        response = self.client.get(reverse("landlord_dashboard"))
+        self.assertEqual(response.context["attention_count"], 0)
+
     def test_rent_roll_is_resident_only_month_labeled_and_room_sorted(self):
         landlord = User.objects.create_user(
             username="rent-roll-landlord",
