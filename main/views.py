@@ -1188,6 +1188,65 @@ def save_room_rent_setting(property_id, room_unit_label, defaults):
     )
 
 
+def apply_room_rent_setting_to_residents(room_setting, residents, effective_date, applied_resident_ids):
+    updated_count = 0
+    rent_history_count = 0
+    room_applied_count = 0
+    target_label = normalized_room_label(room_setting.room_unit_label)
+
+    matching_residents = [
+        resident for resident in residents
+        if resident.id not in applied_resident_ids
+        and resident.property_id == room_setting.property_id
+        and normalized_room_label(resident.space_label) == target_label
+    ]
+
+    for resident in matching_residents:
+        changed_fields = []
+        if resident.monthly_rent != room_setting.monthly_rent:
+            resident.monthly_rent = room_setting.monthly_rent
+            changed_fields.append("monthly_rent")
+            RentHistory.objects.create(
+                application=resident,
+                rent_amount=room_setting.monthly_rent,
+                effective_date=effective_date,
+            )
+            rent_history_count += 1
+
+        if resident.balance != room_setting.monthly_rent:
+            resident.balance = room_setting.monthly_rent
+            changed_fields.append("balance")
+
+        if resident.rent_due_day != room_setting.rent_due_day:
+            resident.rent_due_day = room_setting.rent_due_day
+            changed_fields.append("rent_due_day")
+
+        if resident.utility_monthly != room_setting.utility_monthly:
+            resident.utility_monthly = room_setting.utility_monthly
+            changed_fields.append("utility_monthly")
+
+        if resident.utility_balance != room_setting.utility_monthly:
+            resident.utility_balance = room_setting.utility_monthly
+            changed_fields.append("utility_balance")
+
+        if resident.deposit_required != room_setting.deposit_required:
+            resident.deposit_required = room_setting.deposit_required
+            changed_fields.append("deposit_required")
+
+        clean_deposit_paid = min(room_setting.deposit_paid, room_setting.deposit_required)
+        if resident.deposit_paid != clean_deposit_paid:
+            resident.deposit_paid = clean_deposit_paid
+            changed_fields.append("deposit_paid")
+
+        if changed_fields:
+            resident.save(update_fields=changed_fields)
+            updated_count += 1
+            room_applied_count += 1
+            applied_resident_ids.add(resident.id)
+
+    return updated_count, rent_history_count, room_applied_count
+
+
 @login_required
 @user_passes_test(staff_required)
 def landlord_rent_setup(request):
@@ -1214,6 +1273,7 @@ def landlord_rent_setup(request):
         room_setting_count = 0
         room_applied_count = 0
         room_applied_resident_ids = set()
+        added_room_keys = set()
 
         add_room_property_id = request.POST.get("add_room_property_id")
         add_room_unit_label = (request.POST.get("add_room_unit_label") or "").strip()
@@ -1231,7 +1291,7 @@ def landlord_rent_setup(request):
                     add_room_rent_due_day = 1
                 add_room_rent_due_day = min(max(add_room_rent_due_day, 1), 31)
 
-                save_room_rent_setting(
+                room_setting = save_room_rent_setting(
                     property_id,
                     add_room_unit_label,
                     {
@@ -1243,7 +1303,19 @@ def landlord_rent_setup(request):
                         "is_active": True,
                     },
                 )
+                added_room_keys.add((property_id, normalized_room_label(add_room_unit_label)))
                 room_setting_count += 1
+
+                if apply_room_rents:
+                    applied_updates, applied_history, applied_rooms = apply_room_rent_setting_to_residents(
+                        room_setting,
+                        residents,
+                        effective_date,
+                        room_applied_resident_ids,
+                    )
+                    updated_count += applied_updates
+                    rent_history_count += applied_history
+                    room_applied_count += applied_rooms
 
         for index in range(room_count):
             prefix = f"room_{index}_"
@@ -1258,6 +1330,8 @@ def landlord_rent_setup(request):
 
             room_unit_label = (request.POST.get(prefix + "room_unit_label") or "").strip()
             if not room_unit_label:
+                continue
+            if (property_id, normalized_room_label(room_unit_label)) in added_room_keys:
                 continue
 
             monthly_rent = money(request.POST.get(prefix + "monthly_rent"))
@@ -1286,53 +1360,15 @@ def landlord_rent_setup(request):
             room_setting_count += 1
 
             if apply_room_rents:
-                matching_residents = [
-                    resident for resident in residents
-                    if resident.property_id == property_id
-                    and normalized_room_label(resident.space_label) == normalized_room_label(room_unit_label)
-                ]
-
-                for resident in matching_residents:
-                    changed_fields = []
-                    if resident.monthly_rent != room_setting.monthly_rent:
-                        resident.monthly_rent = room_setting.monthly_rent
-                        changed_fields.append("monthly_rent")
-                        RentHistory.objects.create(
-                            application=resident,
-                            rent_amount=room_setting.monthly_rent,
-                            effective_date=effective_date,
-                        )
-                        rent_history_count += 1
-
-                    if resident.balance != room_setting.monthly_rent:
-                        resident.balance = room_setting.monthly_rent
-                        changed_fields.append("balance")
-
-                    if resident.rent_due_day != room_setting.rent_due_day:
-                        resident.rent_due_day = room_setting.rent_due_day
-                        changed_fields.append("rent_due_day")
-
-                    if resident.utility_monthly != room_setting.utility_monthly:
-                        resident.utility_monthly = room_setting.utility_monthly
-                        changed_fields.append("utility_monthly")
-
-                    if resident.utility_balance != room_setting.utility_monthly:
-                        resident.utility_balance = room_setting.utility_monthly
-                        changed_fields.append("utility_balance")
-
-                    if resident.deposit_required != room_setting.deposit_required:
-                        resident.deposit_required = room_setting.deposit_required
-                        changed_fields.append("deposit_required")
-
-                    if resident.deposit_paid != room_setting.deposit_paid:
-                        resident.deposit_paid = min(room_setting.deposit_paid, room_setting.deposit_required)
-                        changed_fields.append("deposit_paid")
-
-                    if changed_fields:
-                        resident.save(update_fields=changed_fields)
-                        updated_count += 1
-                        room_applied_count += 1
-                        room_applied_resident_ids.add(resident.id)
+                applied_updates, applied_history, applied_rooms = apply_room_rent_setting_to_residents(
+                    room_setting,
+                    residents,
+                    effective_date,
+                    room_applied_resident_ids,
+                )
+                updated_count += applied_updates
+                rent_history_count += applied_history
+                room_applied_count += applied_rooms
 
         for resident in residents:
             if resident.id in room_applied_resident_ids:
