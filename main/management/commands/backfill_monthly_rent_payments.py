@@ -2,7 +2,6 @@ from datetime import datetime
 from decimal import Decimal
 
 from django.core.management.base import BaseCommand, CommandError
-from django.db.models import Sum
 from django.utils import timezone
 
 from main.models import CurrentResidentRosterEntry, HousingApplication, Payment, Property, PropertyRoomRent
@@ -27,6 +26,14 @@ def canonical_room_label(room_unit_label):
     if len(clean_label) == 1:
         return clean_label.upper()
     return clean_label.upper() if clean_label.isalpha() else clean_label
+
+
+def payment_accounting_month(payment):
+    if payment.service_month:
+        return payment.service_month.replace(day=1)
+    if payment.received_at:
+        return timezone.localtime(payment.received_at).date().replace(day=1)
+    return timezone.localtime(payment.created_at).date().replace(day=1)
 
 
 class Command(BaseCommand):
@@ -194,13 +201,11 @@ class Command(BaseCommand):
             skipped.append((canonical_room_label(application.space_label), application.full_name, f"no {payment_type} amount"))
             return
 
-        existing_total = (
-            application.payments
-            .filter(payment_type=payment_type, status="completed", service_month=service_month)
-            .aggregate(total_sum=Sum("amount"))["total_sum"]
-            if application.pk
-            else Decimal("0.00")
-        )
+        existing_total = Decimal("0.00")
+        if application.pk:
+            for payment in application.payments.filter(payment_type=payment_type, status="completed"):
+                if payment_accounting_month(payment) == service_month:
+                    existing_total += payment.amount
         missing_amount = max(amount - existing_total, Decimal("0.00"))
         if missing_amount <= 0:
             skipped.append((canonical_room_label(application.space_label), application.full_name, f"{payment_type} already paid"))

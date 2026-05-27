@@ -1,5 +1,5 @@
 from decimal import Decimal
-from datetime import date
+from datetime import date, datetime
 from io import BytesIO, StringIO
 from unittest.mock import patch
 
@@ -3033,6 +3033,88 @@ class LiveFlowTests(TestCase):
             stdout=StringIO(),
         )
         self.assertEqual(Payment.objects.filter(application=michael, payment_type="rent").count(), 1)
+
+    def test_move_payment_service_month_corrects_early_payment(self):
+        property_obj = Property.objects.create(name="Move Payment Month Property")
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Grady Bradley",
+            phone="555-0620",
+            email="grady@example.com",
+            age=50,
+            space_label="B",
+            monthly_rent=Decimal("506.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        payment = Payment.objects.create(
+            application=resident,
+            payment_type="rent",
+            payment_method="cash",
+            amount=Decimal("506.00"),
+            status="completed",
+            received_at=timezone.make_aware(datetime(2026, 5, 27, 12, 0)),
+        )
+
+        call_command(
+            "move_payment_service_month",
+            "--property-name",
+            "Move Payment Month Property",
+            "--from-month",
+            "2026-05",
+            "--to-month",
+            "2026-06",
+            "--room",
+            "B",
+            "--resident-name",
+            "Grady",
+            "--confirm",
+            stdout=StringIO(),
+        )
+
+        payment.refresh_from_db()
+        self.assertEqual(payment.service_month, date(2026, 6, 1))
+
+    def test_backfill_counts_legacy_received_month_payment_without_duplicate(self):
+        property_obj = Property.objects.create(name="Legacy Received Month Property")
+        PropertyRoomRent.objects.create(
+            property=property_obj,
+            room_unit_label="B",
+            monthly_rent=Decimal("506.00"),
+        )
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Legacy Paid Resident",
+            phone="555-0621",
+            email="legacy@example.com",
+            age=51,
+            space_label="B",
+            monthly_rent=Decimal("506.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        Payment.objects.create(
+            application=resident,
+            payment_type="rent",
+            payment_method="cash",
+            amount=Decimal("506.00"),
+            status="completed",
+            received_at=timezone.make_aware(datetime(2026, 5, 15, 12, 0)),
+        )
+
+        call_command(
+            "backfill_monthly_rent_payments",
+            "--property-name",
+            "Legacy Received Month Property",
+            "--month",
+            "2026-05",
+            "--confirm",
+            stdout=StringIO(),
+        )
+
+        self.assertEqual(Payment.objects.filter(application=resident, payment_type="rent").count(), 1)
 
     def test_custom_phone_report_scopes_to_landlord_property(self):
         landlord = User.objects.create_user(
