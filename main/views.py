@@ -1285,6 +1285,13 @@ def landlord_rent_setup(request):
         except (TypeError, ValueError):
             room_count = 0
 
+        selected_room_update_index = request.POST.get("room_update_index")
+        if selected_room_update_index not in [None, ""]:
+            try:
+                selected_room_update_index = int(selected_room_update_index)
+            except (TypeError, ValueError):
+                selected_room_update_index = None
+
         room_setting_count = 0
         room_applied_count = 0
         room_applied_resident_ids = set()
@@ -1333,6 +1340,9 @@ def landlord_rent_setup(request):
                     room_applied_count += applied_rooms
 
         for index in range(room_count):
+            if selected_room_update_index is not None and index != selected_room_update_index:
+                continue
+
             prefix = f"room_{index}_"
 
             try:
