@@ -1960,8 +1960,15 @@ class LiveFlowTests(TestCase):
         )
         assigned_property = Property.objects.create(name="Assigned Property", landlord_email=landlord.email)
         other_property = Property.objects.create(name="Other Property", landlord_email="other@example.com")
+        assigned_resident_user = User.objects.create_user(
+            username="assigned-resident-user",
+            email="assigned-resident@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
         assigned_application = HousingApplication.objects.create(
             property=assigned_property,
+            user=assigned_resident_user,
             full_name="Assigned Resident",
             phone="555-0198",
             email="assigned-resident@example.com",
@@ -1993,6 +2000,51 @@ class LiveFlowTests(TestCase):
         self.assertContains(payment_log, "Assigned Resident")
         self.assertNotContains(payment_log, "Other Resident")
 
+    def test_resident_files_hide_unconverted_applications(self):
+        landlord = User.objects.create_user(
+            username="resident-files-filter-landlord",
+            email="resident-files-filter@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        resident_user = User.objects.create_user(
+            username="converted-resident-user",
+            email="converted@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        property_obj = Property.objects.create(name="Resident Files Filter Property", landlord_email=landlord.email)
+        HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Applicant Only",
+            phone="555-0550",
+            email="applicant-only@example.com",
+            age=34,
+            income_source="Employment",
+            monthly_income=Decimal("2800.00"),
+            housing_need="Needs housing.",
+        )
+        HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Converted Resident",
+            phone="555-0551",
+            email="converted@example.com",
+            age=42,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+        )
+
+        self.client.login(username="resident-files-filter-landlord", password="StrongPass123!")
+        resident_files = self.client.get(reverse("landlord_resident_files"))
+        attention = self.client.get(reverse("landlord_attention"))
+
+        self.assertContains(resident_files, "Converted Resident")
+        self.assertNotContains(resident_files, "Applicant Only")
+        self.assertContains(attention, "Applicant Only")
+
     def test_landlord_dashboard_lists_current_month_rent_and_utility_exceptions(self):
         landlord = User.objects.create_user(
             username="collection-landlord",
@@ -2003,8 +2055,12 @@ class LiveFlowTests(TestCase):
         )
         assigned_property = Property.objects.create(name="Collection Property", landlord_email=landlord.email)
         other_property = Property.objects.create(name="Other Collection Property", landlord_email="other@example.com")
+        paid_user = User.objects.create_user(username="paid-collection-user", password="StrongPass123!", role="tenant")
+        missing_utility_user = User.objects.create_user(username="missing-utility-user", password="StrongPass123!", role="tenant")
+        other_user = User.objects.create_user(username="other-missing-user", password="StrongPass123!", role="tenant")
         paid_resident = HousingApplication.objects.create(
             property=assigned_property,
+            user=paid_user,
             full_name="Paid Resident",
             phone="555-0301",
             email="paid-collection@example.com",
@@ -2018,6 +2074,7 @@ class LiveFlowTests(TestCase):
         )
         missing_utility_resident = HousingApplication.objects.create(
             property=assigned_property,
+            user=missing_utility_user,
             full_name="Missing Utility Resident",
             phone="555-0302",
             email="missing-utility@example.com",
@@ -2031,6 +2088,7 @@ class LiveFlowTests(TestCase):
         )
         other_resident = HousingApplication.objects.create(
             property=other_property,
+            user=other_user,
             full_name="Other Missing Resident",
             phone="555-0303",
             email="other-missing@example.com",
@@ -2846,6 +2904,39 @@ class LiveFlowTests(TestCase):
         self.assertEqual(roster_entry.first_name, "Joe")
         self.assertEqual(roster_entry.last_name, "Malone")
         self.assertEqual(roster_entry.room_unit_label, "L")
+
+    def test_current_resident_roster_upload_replaces_active_property_list(self):
+        landlord = User.objects.create_user(
+            username="replace-roster-landlord",
+            email="replace-roster-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Replace Roster Property", landlord_email=landlord.email)
+        CurrentResidentRosterEntry.objects.create(
+            property=property_obj,
+            first_name="Mispelled",
+            last_name="Resident",
+            email="old@example.com",
+            room_unit_label="G",
+            uploaded_by=landlord,
+        )
+        roster_file = SimpleUploadedFile(
+            "corrected.csv",
+            b"first_name,last_name,email,phone,room_unit_label\nCorrected,Resident,new@example.com,555-0301,G\n",
+            content_type="text/csv",
+        )
+
+        self.client.login(username="replace-roster-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("current_resident_roster_upload"), {
+            "property": property_obj.id,
+            "file": roster_file,
+        })
+
+        self.assertRedirects(response, reverse("current_resident_roster_upload"))
+        self.assertFalse(CurrentResidentRosterEntry.objects.get(email="old@example.com").is_active)
+        self.assertTrue(CurrentResidentRosterEntry.objects.get(email="new@example.com").is_active)
 
     def test_landlord_can_view_current_resident_intake_detail_and_backup_code(self):
         landlord = User.objects.create_user(

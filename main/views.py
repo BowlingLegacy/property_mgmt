@@ -868,10 +868,10 @@ def monthly_collection_watch_rows(applications):
 def get_landlord_workspace_context(user):
     properties = staff_managed_properties(user).order_by("name")
 
-    applications = (
+    resident_files = (
         HousingApplication.objects
         .select_related("property", "user")
-        .filter(property__in=properties)
+        .filter(property__in=properties, user__isnull=False)
         .order_by("property__name", "space_label", "full_name")
     )
 
@@ -947,11 +947,11 @@ def get_landlord_workspace_context(user):
         landlord_inbox[property_name].append(resident_message)
 
     new_message_count = new_messages.count()
-    collection_watch_rows = monthly_collection_watch_rows(applications)
+    collection_watch_rows = monthly_collection_watch_rows(resident_files)
     month_start, _next_month = current_month_bounds()
 
     return {
-        "applications": applications,
+        "applications": resident_files,
         "properties": properties,
         "payments": payments,
         "landlord_inbox": landlord_inbox,
@@ -3507,6 +3507,7 @@ def import_current_resident_roster(property_obj, file_obj, user):
 def import_current_resident_roster_rows(property_obj, row_iterable, user):
     created = 0
     skipped = 0
+    active_entry_ids = []
 
     for normalized_row in row_iterable:
         first_name = roster_value(normalized_row, "first name", "firstname", "first")
@@ -3526,7 +3527,7 @@ def import_current_resident_roster_rows(property_obj, row_iterable, user):
             skipped += 1
             continue
 
-        CurrentResidentRosterEntry.objects.update_or_create(
+        roster_entry, _created = CurrentResidentRosterEntry.objects.update_or_create(
             property=property_obj,
             first_name=first_name,
             last_name=last_name,
@@ -3538,7 +3539,11 @@ def import_current_resident_roster_rows(property_obj, row_iterable, user):
                 "uploaded_by": user,
             },
         )
+        active_entry_ids.append(roster_entry.id)
         created += 1
+
+    if active_entry_ids:
+        CurrentResidentRosterEntry.objects.filter(property=property_obj).exclude(id__in=active_entry_ids).update(is_active=False)
 
     return created, skipped
 
