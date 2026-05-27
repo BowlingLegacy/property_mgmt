@@ -3236,12 +3236,13 @@ def find_current_roster_match(intake):
         email_matches = bool(intake_email and entry.email and intake_email == entry.email.strip().lower())
         phone_matches = bool(intake_phone and normalize_phone_digits(entry.phone) == intake_phone)
         unit_matches = bool(intake_unit and clean_match_value(entry.room_unit_label) == intake_unit)
+        name_only_roster_entry = not entry.email and not entry.phone and not entry.room_unit_label
         name_matches = (
             clean_match_value(entry.first_name) == intake_first
             and clean_match_value(entry.last_name) == intake_last
         )
 
-        if email_matches or (name_matches and (unit_matches or phone_matches)):
+        if email_matches or (name_matches and (unit_matches or phone_matches or name_only_roster_entry)):
             return entry
 
     return None
@@ -3405,6 +3406,56 @@ def roster_value(row, *keys):
     return ""
 
 
+ROSTER_HEADER_ALIASES = {
+    "first name",
+    "firstname",
+    "first",
+    "last name",
+    "lastname",
+    "last",
+    "name",
+    "resident",
+    "resident name",
+    "tenant",
+    "email",
+    "email address",
+    "phone",
+    "phone number",
+    "mobile",
+    "cell",
+    "room unit label",
+    "room",
+    "unit",
+    "room/unit",
+    "room number",
+    "unit number",
+}
+
+
+def has_roster_headers(headers):
+    return any(header in ROSTER_HEADER_ALIASES for header in headers)
+
+
+def import_headerless_roster_rows(property_obj, rows, user):
+    row_iterable = []
+    for row in rows:
+        values = [str(value or "").strip() for value in row if str(value or "").strip()]
+        if not values:
+            continue
+
+        if len(values) == 1:
+            row_iterable.append({"name": values[0]})
+        else:
+            first_value = values[0]
+            second_value = values[1]
+            if len(first_value) <= 10 and len(second_value.split()) >= 2:
+                row_iterable.append({"room": first_value, "name": second_value})
+            else:
+                row_iterable.append({"name": first_value, "room": second_value})
+
+    return import_current_resident_roster_rows(property_obj, row_iterable, user)
+
+
 def import_current_resident_roster(property_obj, file_obj, user):
     filename = (getattr(file_obj, "name", "") or "").lower()
     if filename.endswith((".xlsx", ".xls")):
@@ -3416,6 +3467,9 @@ def import_current_resident_roster(property_obj, file_obj, user):
             return 0, 0
 
         headers = [normalized_header(value) for value in header_row]
+        if not has_roster_headers(headers):
+            return import_headerless_roster_rows(property_obj, [header_row, *rows], user)
+
         row_iterable = (
             {
                 headers[index]: value
@@ -3427,8 +3481,23 @@ def import_current_resident_roster(property_obj, file_obj, user):
         return import_current_resident_roster_rows(property_obj, row_iterable, user)
 
     decoded_file = TextIOWrapper(file_obj, encoding="utf-8-sig", newline="")
-    reader = csv.DictReader(decoded_file)
-    row_iterable = ({normalized_header(key): value for key, value in row.items()} for row in reader)
+    reader = csv.reader(decoded_file)
+    rows = list(reader)
+    if not rows:
+        return 0, 0
+
+    headers = [normalized_header(value) for value in rows[0]]
+    if not has_roster_headers(headers):
+        return import_headerless_roster_rows(property_obj, rows, user)
+
+    row_iterable = (
+        {
+            headers[index]: value
+            for index, value in enumerate(row)
+            if index < len(headers)
+        }
+        for row in rows[1:]
+    )
     return import_current_resident_roster_rows(property_obj, row_iterable, user)
 
 

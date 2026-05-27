@@ -1844,6 +1844,50 @@ class LiveFlowTests(TestCase):
         self.assertFalse(HousingApplication.objects.filter(email="unknown@example.com").exists())
         self.assertEqual(len(mail.outbox), 0)
 
+    def test_headerless_resident_roster_allows_exact_name_setup_invite(self):
+        landlord = User.objects.create_user(
+            username="headerless-roster-landlord",
+            email="headerless-roster-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Headerless Roster Property", landlord_email=landlord.email)
+        roster_file = SimpleUploadedFile(
+            "resident-list.csv",
+            b"Grady Brady\nHero Lowe\nAaron Brown\n",
+            content_type="text/csv",
+        )
+
+        self.client.login(username="headerless-roster-landlord", password="StrongPass123!")
+        upload_response = self.client.post(reverse("current_resident_roster_upload"), {
+            "property": property_obj.id,
+            "file": roster_file,
+        })
+
+        self.assertRedirects(upload_response, reverse("current_resident_roster_upload"))
+        self.assertTrue(
+            CurrentResidentRosterEntry.objects.filter(
+                property=property_obj,
+                first_name="Hero",
+                last_name="Lowe",
+            ).exists()
+        )
+
+        setup_response = self.client.post(reverse("existing_resident_intake", args=[property_obj.id]), {
+            "first_name": "HERO",
+            "last_name": "LOWE",
+            "email": "hero@example.com",
+            "phone": "555-0197",
+            "room_unit_label": "Room N",
+            "years_at_residence": "1",
+        })
+
+        self.assertRedirects(setup_response, reverse("existing_resident_intake_success", args=[property_obj.id]))
+        application = HousingApplication.objects.get(email="hero@example.com")
+        self.assertEqual(application.full_name, "HERO LOWE")
+        self.assertIn(application.user.invite_code, mail.outbox[0].body)
+
     def test_landlord_workspace_only_lists_assigned_property_records(self):
         landlord = User.objects.create_user(
             username="assigned-landlord",
