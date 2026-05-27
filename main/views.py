@@ -1080,7 +1080,7 @@ def room_rent_setup_rows(user):
         label = (entry.room_unit_label or "").strip()
         if not label:
             continue
-        key = (entry.property_id, label.lower())
+        key = (entry.property_id, normalized_room_label(label))
         room_map.setdefault(key, {
             "property": entry.property,
             "room_unit_label": label,
@@ -1101,7 +1101,7 @@ def room_rent_setup_rows(user):
         label = (application.space_label or "").strip()
         if not label:
             continue
-        key = (application.property_id, label.lower())
+        key = (application.property_id, normalized_room_label(label))
         room_map.setdefault(key, {
             "property": application.property,
             "room_unit_label": label,
@@ -1113,26 +1113,57 @@ def room_rent_setup_rows(user):
 
     settings = PropertyRoomRent.objects.filter(property__in=properties)
     for setting in settings:
-        key = (setting.property_id, (setting.room_unit_label or "").strip().lower())
+        key = (setting.property_id, normalized_room_label(setting.room_unit_label))
         room_map.setdefault(key, {
             "property": setting.property,
             "room_unit_label": setting.room_unit_label,
             "residents": [],
             "setting": None,
         })
+        room_map[key]["room_unit_label"] = setting.room_unit_label
         room_map[key]["setting"] = setting
 
     return list(room_map.values())
+
+
+def normalized_room_label(room_unit_label):
+    label = clean_match_value(room_unit_label)
+    for prefix in ["room", "unit", "space", "apt", "apartment"]:
+        if label.startswith(prefix) and len(label) > len(prefix):
+            return label[len(prefix):]
+    return label
 
 
 def find_room_rent_setting(property_obj, room_unit_label):
     if not property_obj or not room_unit_label:
         return None
 
-    return (
-        PropertyRoomRent.objects
-        .filter(property=property_obj, room_unit_label__iexact=room_unit_label.strip(), is_active=True)
-        .first()
+    target_label = normalized_room_label(room_unit_label)
+    for setting in PropertyRoomRent.objects.filter(property=property_obj, is_active=True):
+        if normalized_room_label(setting.room_unit_label) == target_label:
+            return setting
+    return None
+
+
+def save_room_rent_setting(property_id, room_unit_label, defaults):
+    target_label = normalized_room_label(room_unit_label)
+    room_setting = None
+
+    for setting in PropertyRoomRent.objects.filter(property_id=property_id):
+        if normalized_room_label(setting.room_unit_label) == target_label:
+            room_setting = setting
+            break
+
+    if room_setting:
+        for field_name, value in defaults.items():
+            setattr(room_setting, field_name, value)
+        room_setting.save(update_fields=list(defaults.keys()))
+        return room_setting
+
+    return PropertyRoomRent.objects.create(
+        property_id=property_id,
+        room_unit_label=room_unit_label,
+        **defaults,
     )
 
 
@@ -1179,10 +1210,10 @@ def landlord_rent_setup(request):
                     add_room_rent_due_day = 1
                 add_room_rent_due_day = min(max(add_room_rent_due_day, 1), 31)
 
-                PropertyRoomRent.objects.update_or_create(
-                    property_id=property_id,
-                    room_unit_label=add_room_unit_label,
-                    defaults={
+                save_room_rent_setting(
+                    property_id,
+                    add_room_unit_label,
+                    {
                         "monthly_rent": money(request.POST.get("add_room_monthly_rent")),
                         "rent_due_day": add_room_rent_due_day,
                         "utility_monthly": money(request.POST.get("add_room_utility_monthly")),
@@ -1219,10 +1250,10 @@ def landlord_rent_setup(request):
                 rent_due_day = 1
             rent_due_day = min(max(rent_due_day, 1), 31)
 
-            room_setting, _ = PropertyRoomRent.objects.update_or_create(
-                property_id=property_id,
-                room_unit_label=room_unit_label,
-                defaults={
+            room_setting = save_room_rent_setting(
+                property_id,
+                room_unit_label,
+                {
                     "monthly_rent": monthly_rent,
                     "rent_due_day": rent_due_day,
                     "utility_monthly": utility_monthly,
@@ -1234,10 +1265,11 @@ def landlord_rent_setup(request):
             room_setting_count += 1
 
             if apply_room_rents:
-                matching_residents = residents.filter(
-                    property_id=property_id,
-                    space_label__iexact=room_unit_label,
-                )
+                matching_residents = [
+                    resident for resident in residents
+                    if resident.property_id == property_id
+                    and normalized_room_label(resident.space_label) == normalized_room_label(room_unit_label)
+                ]
 
                 for resident in matching_residents:
                     changed_fields = []
@@ -1286,6 +1318,9 @@ def landlord_rent_setup(request):
                 continue
 
             prefix = f"resident_{resident.id}_"
+            if prefix + "monthly_rent" not in request.POST:
+                continue
+
             monthly_rent = money(request.POST.get(prefix + "monthly_rent"))
             rent_balance = money(request.POST.get(prefix + "balance"))
             utility_monthly = money(request.POST.get(prefix + "utility_monthly"))

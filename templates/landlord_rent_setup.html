@@ -33,15 +33,15 @@
     <div class="rent-setup-head d-flex justify-content-between align-items-start flex-wrap gap-3">
         <div>
             <div class="text-uppercase small fw-bold text-warning">Rent Setup</div>
-            <h1 class="fw-bold mb-1">June Rent Balances</h1>
-            <div>Set each resident's exact rent before they log into the portal.</div>
+            <h1 class="fw-bold mb-1">Rent By Room</h1>
+            <div>Set each room once. Matching resident files update from the room letter.</div>
         </div>
         <a href="{% url 'landlord_dashboard' %}" class="btn btn-outline-light">Back to Dashboard</a>
     </div>
 
     <div class="p-4">
         <div class="alert alert-warning">
-            This page updates the rent due shown on resident dashboards. Use each resident's actual agreed rent. It works even if their portal login is not completed yet, as long as a resident file exists.
+            Use this page for room rent defaults. Room labels like <strong>B</strong> and <strong>Room B</strong> are treated as the same room.
         </div>
 
         <form method="post">
@@ -154,72 +154,9 @@
             </div>
 
             <label class="form-check mb-4">
-                <input type="checkbox" class="form-check-input" name="apply_room_rents">
-                <span class="form-check-label">Apply room rent settings to existing resident files now</span>
+                <input type="checkbox" class="form-check-input" name="apply_room_rents" checked>
+                <span class="form-check-label fw-bold">Apply these room settings to matching resident files now</span>
             </label>
-
-            <h2 class="h4 fw-bold mb-2">Resident File Balances</h2>
-            <p class="text-muted">
-                Use this section for one-off adjustments after room rent defaults are saved.
-            </p>
-
-            <div class="table-responsive">
-                <table class="table align-middle">
-                    <thead>
-                        <tr>
-                            <th>Resident</th>
-                            <th>Property</th>
-                            <th>Room</th>
-                            <th>Monthly Rent</th>
-                            <th>June Rent Due</th>
-                            <th>Due Day</th>
-                            <th>Monthly Utilities</th>
-                            <th>Utilities Due</th>
-                            <th>Deposit Required</th>
-                            <th>Deposit Paid</th>
-                            <th>Portal</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for resident in residents %}
-                            <tr>
-                                <td>
-                                    <strong>{{ resident.full_name }}</strong><br>
-                                    <span class="text-muted small">{{ resident.email }}</span>
-                                </td>
-                                <td>{{ resident.property.name|default:"No Property" }}</td>
-                                <td>{{ resident.space_type }} {{ resident.space_label }}</td>
-                                <td>
-                                    <input type="number" class="form-control rent-input" step="0.01" min="0" name="resident_{{ resident.id }}_monthly_rent" value="{{ resident.monthly_rent }}">
-                                </td>
-                                <td>
-                                    <input type="number" class="form-control rent-input" step="0.01" min="0" name="resident_{{ resident.id }}_balance" value="{{ resident.balance }}">
-                                </td>
-                                <td>
-                                    <input type="number" class="form-control day-input" min="1" max="31" name="resident_{{ resident.id }}_rent_due_day" value="{{ resident.rent_due_day }}">
-                                </td>
-                                <td>
-                                    <input type="number" class="form-control rent-input" step="0.01" min="0" name="resident_{{ resident.id }}_utility_monthly" value="{{ resident.utility_monthly }}">
-                                </td>
-                                <td>
-                                    <input type="number" class="form-control rent-input" step="0.01" min="0" name="resident_{{ resident.id }}_utility_balance" value="{{ resident.utility_balance }}">
-                                </td>
-                                <td>
-                                    <input type="number" class="form-control rent-input" step="0.01" min="0" name="resident_{{ resident.id }}_deposit_required" value="{{ resident.deposit_required }}">
-                                </td>
-                                <td>
-                                    <input type="number" class="form-control rent-input" step="0.01" min="0" name="resident_{{ resident.id }}_deposit_paid" value="{{ resident.deposit_paid }}">
-                                </td>
-                                <td>{% if resident.user %}Linked{% else %}No login yet{% endif %}</td>
-                            </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="11" class="text-muted">No resident files found. A resident must have a resident file before rent can be assigned.</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
 
             <div class="d-flex justify-content-end mt-3">
                 <button type="submit" class="gold-btn">Save Rent Setup</button>

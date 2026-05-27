@@ -1022,6 +1022,70 @@ class LiveFlowTests(TestCase):
         self.assertEqual(resident.deposit_paid, Decimal("95.00"))
         self.assertTrue(RentHistory.objects.filter(application=resident, rent_amount=Decimal("600.00")).exists())
 
+    def test_room_rent_setup_matches_room_prefix_aliases(self):
+        landlord = User.objects.create_user(
+            username="room-alias-rent-landlord",
+            email="room-alias-rent-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Room Alias Rent Property", landlord_email=landlord.email)
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Room Alias Resident",
+            phone="555-0188",
+            email="room-alias@example.com",
+            age=45,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            space_type="Room",
+            space_label="Room B",
+            monthly_rent=Decimal("0.00"),
+            balance=Decimal("0.00"),
+            utility_monthly=Decimal("0.00"),
+            utility_balance=Decimal("0.00"),
+        )
+        CurrentResidentRosterEntry.objects.create(
+            property=property_obj,
+            first_name="Room",
+            last_name="Alias Resident",
+            email="room-alias@example.com",
+            room_unit_label="B",
+            uploaded_by=landlord,
+        )
+
+        self.client.login(username="room-alias-rent-landlord", password="StrongPass123!")
+        response = self.client.get(reverse("landlord_rent_setup"))
+
+        rows = [
+            row for row in response.context["room_rows"]
+            if row["property"] == property_obj and row["room_unit_label"] == "B"
+        ]
+        self.assertEqual(len(rows), 1)
+        self.assertIn("Room Alias Resident", rows[0]["residents"])
+
+        self.client.post(reverse("landlord_rent_setup"), {
+            "room_count": "1",
+            "room_0_property_id": str(property_obj.id),
+            "room_0_room_unit_label": "B",
+            "room_0_monthly_rent": "506.00",
+            "room_0_rent_due_day": "1",
+            "room_0_utility_monthly": "55.00",
+            "room_0_deposit_required": "450.00",
+            "room_0_deposit_paid": "450.00",
+            "apply_room_rents": "on",
+        })
+
+        resident.refresh_from_db()
+        self.assertEqual(resident.monthly_rent, Decimal("506.00"))
+        self.assertEqual(resident.balance, Decimal("506.00"))
+        self.assertEqual(resident.utility_monthly, Decimal("55.00"))
+        self.assertEqual(resident.utility_balance, Decimal("55.00"))
+        self.assertEqual(resident.deposit_required, Decimal("450.00"))
+        self.assertEqual(resident.deposit_paid, Decimal("450.00"))
+
     def test_landlord_rent_setup_does_not_update_other_property_resident(self):
         landlord = User.objects.create_user(
             username="blocked-rent-setup-landlord",
