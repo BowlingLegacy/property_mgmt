@@ -216,6 +216,10 @@ class LiveFlowTests(TestCase):
 
         self.assertRedirects(response, reverse("signup"))
 
+        setup_page = self.client.get(reverse("signup"))
+        self.assertContains(setup_page, "Show password while I check it")
+        self.assertContains(setup_page, "show-passwords")
+
         response = self.client.post(reverse("signup"), {
             "username": "resident",
             "email": "applicant@example.com",
