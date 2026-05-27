@@ -73,7 +73,7 @@ def notify_property_residents_of_blog_post(request, post):
 
     from .views import send_sms_message
 
-    property_url = request.build_absolute_uri(reverse("property_detail", args=[post.property.id]))
+    property_url = request.build_absolute_uri(f"{reverse('tenant_dashboard')}#property-updates")
     residents = (
         HousingApplication.objects
         .filter(property=post.property, user__isnull=False)

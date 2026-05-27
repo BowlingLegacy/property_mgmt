@@ -2987,18 +2987,12 @@ def property_financials(request, property_name):
 def property_detail(request, pk):
     property_obj = get_object_or_404(Property, pk=pk)
     gallery_images = property_obj.images.all()
-    can_view_property_blog = user_can_view_property_blog(request.user, property_obj)
     can_manage_property_blog = user_can_manage_property_blog(request.user, property_obj)
-    posts = BlogPost.objects.none()
-
-    if can_view_property_blog:
-        posts = property_obj.blog_posts.prefetch_related("comments").select_related("author").order_by("-created_at")
 
     return render(request, "property_detail.html", {
         "property": property_obj,
         "gallery_images": gallery_images,
-        "posts": posts,
-        "can_view_property_blog": can_view_property_blog,
+        "can_view_property_blog": False,
         "can_manage_property_blog": can_manage_property_blog,
         "existing_resident_intake_open": property_existing_resident_intake_open(property_obj),
     })

@@ -2702,7 +2702,7 @@ class LiveFlowTests(TestCase):
 
         self.assertRedirects(response, reverse("property_blog_manager"))
         self.assertEqual(mail.outbox[0].to, ["blog-resident@example.com"])
-        self.assertIn(reverse("property_detail", args=[property_obj.id]), mail.outbox[0].body)
+        self.assertIn(reverse("tenant_dashboard"), mail.outbox[0].body)
         sms_log = SmsMessageLog.objects.get(application=application)
         self.assertEqual(sms_log.status, "skipped_no_consent")
 
@@ -2810,9 +2810,11 @@ class LiveFlowTests(TestCase):
 
         self.client.login(username="property-resident", password="StrongPass123!")
         resident_response = self.client.get(reverse("property_detail", args=[property_obj.id]))
+        dashboard_response = self.client.get(reverse("tenant_dashboard"))
 
         self.assertEqual(resident_response.status_code, 200)
-        self.assertContains(resident_response, "Residents only notice")
+        self.assertNotContains(resident_response, "Residents only notice")
+        self.assertContains(dashboard_response, "Residents only notice")
 
     def test_resident_property_blog_does_not_show_manager_link_or_other_property_updates(self):
         resident_property = Property.objects.create(name="Resident Property")
