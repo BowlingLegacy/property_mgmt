@@ -1086,6 +1086,55 @@ class LiveFlowTests(TestCase):
         self.assertEqual(resident.deposit_required, Decimal("450.00"))
         self.assertEqual(resident.deposit_paid, Decimal("450.00"))
 
+    def test_rent_setup_hides_orphan_existing_resident_setup_files(self):
+        landlord = User.objects.create_user(
+            username="orphan-setup-landlord",
+            email="orphan-setup-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Orphan Setup Property", landlord_email=landlord.email)
+        HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Deleted Setup Person",
+            phone="555-0191",
+            email="deleted-setup@example.com",
+            age=0,
+            income_source="Existing resident intake",
+            monthly_income=Decimal("0.00"),
+            housing_need="Existing resident profile setup.",
+            space_type="Room",
+            space_label="Z",
+            monthly_rent=Decimal("900.00"),
+            balance=Decimal("900.00"),
+        )
+        regular_application = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Real Application Person",
+            phone="555-0192",
+            email="real-application@example.com",
+            age=44,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Application approved.",
+            space_type="Room",
+            space_label="Y",
+            monthly_rent=Decimal("700.00"),
+            balance=Decimal("700.00"),
+        )
+
+        self.client.login(username="orphan-setup-landlord", password="StrongPass123!")
+        response = self.client.get(reverse("landlord_rent_setup"))
+
+        resident_names = [
+            resident_name
+            for row in response.context["room_rows"]
+            for resident_name in row["residents"]
+        ]
+        self.assertNotIn("Deleted Setup Person", resident_names)
+        self.assertIn(regular_application.full_name, resident_names)
+
     def test_landlord_rent_setup_does_not_update_other_property_resident(self):
         landlord = User.objects.create_user(
             username="blocked-rent-setup-landlord",

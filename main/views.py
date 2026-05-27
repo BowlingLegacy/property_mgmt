@@ -1091,11 +1091,13 @@ def room_rent_setup_rows(user):
 
     existing_files = (
         staff_managed_applications(user)
-        .select_related("property")
+        .select_related("property", "existing_resident_intake")
         .exclude(space_label="")
         .order_by("property__name", "space_label", "full_name")
     )
     for application in existing_files:
+        if is_orphan_existing_resident_setup_file(application):
+            continue
         if not application.property_id:
             continue
         label = (application.space_label or "").strip()
@@ -1124,6 +1126,25 @@ def room_rent_setup_rows(user):
         room_map[key]["setting"] = setting
 
     return list(room_map.values())
+
+
+def is_existing_resident_setup_file(application):
+    return (
+        application.income_source == "Existing resident intake"
+        or application.housing_need == "Existing resident profile setup."
+    )
+
+
+def is_orphan_existing_resident_setup_file(application):
+    if not is_existing_resident_setup_file(application):
+        return False
+
+    try:
+        application.existing_resident_intake
+    except ExistingResidentIntake.DoesNotExist:
+        return True
+
+    return False
 
 
 def normalized_room_label(room_unit_label):
