@@ -1232,7 +1232,7 @@ class LiveFlowTests(TestCase):
 
         rows = [
             row for row in response.context["room_rows"]
-            if row["property"] == property_obj and row["room_unit_label"] == "Room G"
+            if row["property"] == property_obj and row["room_unit_label"] == "G"
         ]
         self.assertEqual(len(rows), 1)
         self.assertIn("David G. Kellum", rows[0]["residents"])
@@ -1251,6 +1251,70 @@ class LiveFlowTests(TestCase):
 
         self.assertRedirects(save_response, reverse("landlord_rent_setup"))
         resident.refresh_from_db()
+        self.assertEqual(resident.monthly_rent, Decimal("560.00"))
+        self.assertEqual(resident.balance, Decimal("560.00"))
+        self.assertEqual(resident.utility_monthly, Decimal("55.00"))
+        self.assertEqual(resident.utility_balance, Decimal("55.00"))
+
+    def test_rent_setup_keeps_pending_setup_file_and_cleans_room_prefix(self):
+        landlord = User.objects.create_user(
+            username="pending-setup-landlord",
+            email="pending-setup-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        pending_user = User.objects.create_user(
+            username="pending-room-g",
+            email="pending-room-g@example.com",
+            password=None,
+            role="tenant",
+        )
+        property_obj = Property.objects.create(name="Pending Setup Property", landlord_email=landlord.email)
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=pending_user,
+            full_name="Room G Resident",
+            phone="555-0194",
+            email="pending-room-g@example.com",
+            age=0,
+            income_source="Existing resident intake",
+            monthly_income=Decimal("0.00"),
+            housing_need="Existing resident profile setup.",
+            space_type="Room",
+            space_label="Room G",
+            monthly_rent=Decimal("0.00"),
+            balance=Decimal("0.00"),
+            utility_monthly=Decimal("0.00"),
+            utility_balance=Decimal("0.00"),
+        )
+
+        self.client.login(username="pending-setup-landlord", password="StrongPass123!")
+        response = self.client.get(reverse("landlord_rent_setup"))
+
+        rows = [
+            row for row in response.context["room_rows"]
+            if row["property"] == property_obj and row["room_unit_label"] == "G"
+        ]
+        self.assertEqual(len(rows), 1)
+        self.assertIn("Room G Resident", rows[0]["residents"])
+
+        save_response = self.client.post(reverse("landlord_rent_setup"), {
+            "room_count": "1",
+            "room_0_property_id": str(property_obj.id),
+            "room_0_room_unit_label": "G",
+            "room_0_monthly_rent": "560.00",
+            "room_0_rent_due_day": "1",
+            "room_0_utility_monthly": "55.00",
+            "room_0_deposit_required": "450.00",
+            "room_0_deposit_paid": "450.00",
+            "apply_room_rents": "on",
+        })
+
+        self.assertRedirects(save_response, reverse("landlord_rent_setup"))
+        resident.refresh_from_db()
+        room_setting = PropertyRoomRent.objects.get(property=property_obj)
+        self.assertEqual(room_setting.room_unit_label, "G")
         self.assertEqual(resident.monthly_rent, Decimal("560.00"))
         self.assertEqual(resident.balance, Decimal("560.00"))
         self.assertEqual(resident.utility_monthly, Decimal("55.00"))

@@ -1083,7 +1083,7 @@ def room_rent_setup_rows(user):
         key = (entry.property_id, normalized_room_label(label))
         room_map.setdefault(key, {
             "property": entry.property,
-            "room_unit_label": label,
+            "room_unit_label": canonical_room_label(label),
             "residents": [],
             "setting": None,
         })
@@ -1106,7 +1106,7 @@ def room_rent_setup_rows(user):
         key = (application.property_id, normalized_room_label(label))
         room_map.setdefault(key, {
             "property": application.property,
-            "room_unit_label": label,
+            "room_unit_label": canonical_room_label(label),
             "residents": [],
             "setting": None,
         })
@@ -1118,11 +1118,11 @@ def room_rent_setup_rows(user):
         key = (setting.property_id, normalized_room_label(setting.room_unit_label))
         room_map.setdefault(key, {
             "property": setting.property,
-            "room_unit_label": setting.room_unit_label,
+            "room_unit_label": canonical_room_label(setting.room_unit_label),
             "residents": [],
             "setting": None,
         })
-        room_map[key]["room_unit_label"] = setting.room_unit_label
+        room_map[key]["room_unit_label"] = canonical_room_label(setting.room_unit_label)
         room_map[key]["setting"] = setting
 
     return list(room_map.values())
@@ -1139,7 +1139,7 @@ def is_orphan_existing_resident_setup_file(application):
     if not is_existing_resident_setup_file(application):
         return False
 
-    if application.user and application.user.has_usable_password():
+    if application.user:
         return False
 
     try:
@@ -1158,6 +1158,16 @@ def normalized_room_label(room_unit_label):
     return label
 
 
+def canonical_room_label(room_unit_label):
+    label = str(room_unit_label or "").strip()
+    clean_label = normalized_room_label(label)
+    if not clean_label:
+        return label
+    if len(clean_label) == 1:
+        return clean_label.upper()
+    return clean_label.upper() if clean_label.isalpha() else clean_label
+
+
 def find_room_rent_setting(property_obj, room_unit_label):
     if not property_obj or not room_unit_label:
         return None
@@ -1171,6 +1181,7 @@ def find_room_rent_setting(property_obj, room_unit_label):
 
 def save_room_rent_setting(property_id, room_unit_label, defaults):
     target_label = normalized_room_label(room_unit_label)
+    clean_room_unit_label = canonical_room_label(room_unit_label)
     room_setting = None
 
     for setting in PropertyRoomRent.objects.filter(property_id=property_id):
@@ -1179,14 +1190,15 @@ def save_room_rent_setting(property_id, room_unit_label, defaults):
             break
 
     if room_setting:
+        room_setting.room_unit_label = clean_room_unit_label
         for field_name, value in defaults.items():
             setattr(room_setting, field_name, value)
-        room_setting.save(update_fields=list(defaults.keys()))
+        room_setting.save(update_fields=["room_unit_label", *list(defaults.keys())])
         return room_setting
 
     return PropertyRoomRent.objects.create(
         property_id=property_id,
-        room_unit_label=room_unit_label,
+        room_unit_label=clean_room_unit_label,
         **defaults,
     )
 
