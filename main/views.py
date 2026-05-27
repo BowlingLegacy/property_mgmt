@@ -1108,10 +1108,11 @@ def monthly_collection_watch_rows(applications):
             missing_items.append("Utilities")
 
         if missing_items:
+            unit_label = canonical_room_label(application.space_label)
             rows.append({
                 "application": application,
                 "property": application.property.name if application.property else "No Property",
-                "unit": application.space_label or application.space_type or "",
+                "unit": unit_label,
                 "missing": " + ".join(missing_items),
                 "rent_paid": rent_paid,
                 "rent_expected": rent_expected,

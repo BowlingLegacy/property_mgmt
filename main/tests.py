@@ -2775,6 +2775,39 @@ class LiveFlowTests(TestCase):
         self.assertNotContains(response, "Paid Resident</td>")
         self.assertNotContains(response, "Other Missing Resident")
 
+    def test_landlord_collection_watch_cleans_room_prefix(self):
+        landlord = User.objects.create_user(
+            username="collection-room-landlord",
+            email="collection-room@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Collection Room Property", landlord_email=landlord.email)
+        resident_user = User.objects.create_user(username="collection-room-user", password="StrongPass123!", role="tenant")
+        HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Room Prefix Resident",
+            phone="555-0310",
+            email="collection-room-resident@example.com",
+            age=51,
+            space_type="Room",
+            space_label="Room J",
+            monthly_rent=Decimal("500.00"),
+            utility_monthly=Decimal("55.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+
+        self.client.login(username="collection-room-landlord", password="StrongPass123!")
+        response = self.client.get(reverse("landlord_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "<td>J</td>", html=True)
+        self.assertNotContains(response, "<td>Room J</td>", html=True)
+
     def test_rent_roll_is_resident_only_month_labeled_and_room_sorted(self):
         landlord = User.objects.create_user(
             username="rent-roll-landlord",
