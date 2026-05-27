@@ -2968,6 +2968,72 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "<td>$55.00</td>", html=True)
         self.assertNotContains(response, "Applicant Not On Rent Roll")
 
+    def test_backfill_monthly_rent_payments_creates_missing_roster_payments(self):
+        property_obj = Property.objects.create(name="Backfill Rent Property")
+        PropertyRoomRent.objects.create(
+            property=property_obj,
+            room_unit_label="Room J",
+            monthly_rent=Decimal("561.00"),
+            utility_monthly=Decimal("55.00"),
+        )
+        PropertyRoomRent.objects.create(
+            property=property_obj,
+            room_unit_label="Room N",
+            monthly_rent=Decimal("1100.00"),
+            utility_monthly=Decimal("55.00"),
+        )
+        CurrentResidentRosterEntry.objects.create(
+            property=property_obj,
+            first_name="Michael",
+            last_name="Dudley",
+            email="michael@example.com",
+            room_unit_label="J",
+        )
+        CurrentResidentRosterEntry.objects.create(
+            property=property_obj,
+            first_name="Hero",
+            last_name="Lowe",
+            email="hero@example.com",
+            room_unit_label="N",
+        )
+        out = StringIO()
+
+        call_command(
+            "backfill_monthly_rent_payments",
+            "--property-name",
+            "Backfill Rent Property",
+            "--month",
+            "2026-05",
+            "--exclude-room",
+            "N",
+            "--confirm",
+            stdout=out,
+        )
+
+        michael = HousingApplication.objects.get(full_name="Michael Dudley")
+        self.assertEqual(michael.space_label, "J")
+        self.assertTrue(Payment.objects.filter(
+            application=michael,
+            payment_type="rent",
+            amount=Decimal("561.00"),
+            service_month=date(2026, 5, 1),
+            status="completed",
+        ).exists())
+        self.assertFalse(HousingApplication.objects.filter(full_name="Hero Lowe").exists())
+
+        call_command(
+            "backfill_monthly_rent_payments",
+            "--property-name",
+            "Backfill Rent Property",
+            "--month",
+            "2026-05",
+            "--exclude-room",
+            "N",
+            "--confirm",
+            stdout=StringIO(),
+        )
+        self.assertEqual(Payment.objects.filter(application=michael, payment_type="rent").count(), 1)
+
     def test_custom_phone_report_scopes_to_landlord_property(self):
         landlord = User.objects.create_user(
             username="report-landlord",
