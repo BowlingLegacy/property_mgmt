@@ -3341,6 +3341,47 @@ class LiveFlowTests(TestCase):
         self.assertEqual(set(entries.values_list("entry_type", flat=True)), {"income"})
         self.assertTrue(FinancialEntry.objects.filter(upload=upload, category="Power", entry_type="operating_expense").exists())
 
+    def test_summary_grid_skips_noi_and_cash_flow_calculated_rows(self):
+        landlord = User.objects.create_user(
+            username="summary-noi-landlord",
+            email="summary-noi@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Summary NOI Property", landlord_email=landlord.email)
+        csv_file = SimpleUploadedFile(
+            "summary-noi.csv",
+            b"Category,May,June\nRent,1200.00,1300.00\nRepairs,100.00,120.00\nNOI,1100.00,1180.00\nCash Flow,900.00,980.00\n",
+            content_type="text/csv",
+        )
+
+        self.client.login(username="summary-noi-landlord", password="StrongPass123!")
+        self.client.post(reverse("financial_upload"), {
+            "property": property_obj.id,
+            "ledger_scope": "property",
+            "name": "NOI Summary",
+            "file": csv_file,
+            "notes": "Monthly summary sheet",
+        })
+
+        upload = FinancialUpload.objects.get(name="NOI Summary")
+        response = self.client.post(reverse("parse_financial_upload", args=[upload.id]), {
+            "import_mode": "summary_grid",
+            "sheet_name": "CSV",
+            "summary_category_column": "Category",
+            "summary_year": "2026",
+            "summary_entry_type": "operating_expense",
+            "summary_month_columns": ["May", "June"],
+        })
+
+        self.assertRedirects(response, reverse("financial_upload"))
+        entries = FinancialEntry.objects.filter(upload=upload)
+        self.assertFalse(entries.filter(category__iexact="NOI").exists())
+        self.assertFalse(entries.filter(category__iexact="Cash Flow").exists())
+        self.assertTrue(entries.filter(category="Rent", entry_type="income").exists())
+        self.assertTrue(entries.filter(category="Repairs", entry_type="operating_expense").exists())
+
     def test_accounting_import_blocks_other_landlord_property(self):
         landlord = User.objects.create_user(
             username="blocked-accounting-landlord",

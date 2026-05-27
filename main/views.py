@@ -354,7 +354,26 @@ MONTH_NAME_MAP = {
 }
 
 
-SUMMARY_TOTAL_KEYWORDS = {"total", "subtotal", "ytd", "year to date", "quarter", "q1", "q2", "q3", "q4"}
+SUMMARY_TOTAL_KEYWORDS = {
+    "total",
+    "subtotal",
+    "ytd",
+    "year to date",
+    "quarter",
+    "q1",
+    "q2",
+    "q3",
+    "q4",
+}
+SUMMARY_CALCULATED_ROW_KEYWORDS = {
+    "noi",
+    "net operating income",
+    "net income",
+    "cash flow",
+    "cashflow",
+    "profit",
+    "loss",
+}
 UTILITY_PARENT_CATEGORIES = {"utility", "utilities"}
 UTILITY_DETAIL_KEYWORDS = {"power", "electric", "electricity", "gas", "water", "sewer", "trash", "garbage", "internet", "utilities"}
 
@@ -367,6 +386,9 @@ def is_summary_total_label(value):
 def should_skip_summary_category(category, all_categories):
     clean_category = normalized_header(category)
     if not clean_category or is_summary_total_label(clean_category):
+        return True
+
+    if any(keyword in clean_category for keyword in SUMMARY_CALCULATED_ROW_KEYWORDS):
         return True
 
     if clean_category in UTILITY_PARENT_CATEGORIES:
