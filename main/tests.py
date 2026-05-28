@@ -3781,6 +3781,59 @@ class LiveFlowTests(TestCase):
 
         self.assertIn("June,700.00,1200.00,1900.00,300.00,400.00", csv_content)
 
+    def test_t12_report_includes_entry_date_rows_and_property_name_scope(self):
+        landlord = User.objects.create_user(
+            username="t12-entry-date-landlord",
+            email="t12-entry-date@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="T12 Entry Date Property", landlord_email=landlord.email)
+        other_property = Property.objects.create(name="Other T12 Property", landlord_email="other@example.com")
+        upload = FinancialUpload.objects.create(
+            property=None,
+            name="Legacy Parsed Summary",
+            file=SimpleUploadedFile("legacy-summary.csv", b"Category,May\n", content_type="text/csv"),
+            parsed_at=timezone.now(),
+        )
+        other_upload = FinancialUpload.objects.create(
+            property=other_property,
+            name="Other Parsed Summary",
+            file=SimpleUploadedFile("other-summary.csv", b"Category,May\n", content_type="text/csv"),
+            parsed_at=timezone.now(),
+        )
+        FinancialEntry.objects.create(
+            upload=upload,
+            property_name=property_obj.name,
+            sheet_name="Summary",
+            row_number=2,
+            entry_date=date(2026, 5, 1),
+            entry_type="operating_expense",
+            category="Power",
+            description="Power - May summary",
+            amount=Decimal("250.00"),
+        )
+        FinancialEntry.objects.create(
+            upload=other_upload,
+            property_name=other_property.name,
+            sheet_name="Summary",
+            row_number=2,
+            entry_date=date(2026, 5, 1),
+            entry_type="operating_expense",
+            category="Other Power",
+            description="Other property should not appear",
+            amount=Decimal("999.00"),
+        )
+
+        self.client.login(username="t12-entry-date-landlord", password="StrongPass123!")
+        response = self.client.get(f"{reverse('t12_report')}?year=2026")
+
+        self.assertEqual(response.status_code, 200)
+        may_row = response.context["months"][4]
+        self.assertEqual(may_row["operating_expenses"], Decimal("250.00"))
+        self.assertNotContains(response, "999.00")
+
     def test_accounting_receipt_upload_creates_category_and_review_record(self):
         landlord = User.objects.create_user(
             username="receipt-landlord",

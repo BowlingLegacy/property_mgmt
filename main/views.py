@@ -3492,9 +3492,12 @@ def selected_report_year(request):
 
 
 def t12_report_rows(user, year):
+    accessible_properties = staff_managed_properties(user)
+    accessible_property_names = list(accessible_properties.values_list("name", flat=True))
     financial_entries = FinancialEntry.objects.filter(
-        upload__property__in=staff_managed_properties(user),
-        year=year,
+        Q(upload__property__in=accessible_properties) | Q(property_name__in=accessible_property_names),
+    ).filter(
+        Q(year=year) | Q(entry_date__year=year),
     )
     completed_payments = list(
         Payment.objects
@@ -3514,10 +3517,11 @@ def t12_report_rows(user, year):
 
     for month_number in range(1, 13):
         online_income = payment_amount_for_month(completed_payments, year, month_number)
-        spreadsheet_income = financial_entries.filter(month=month_number, entry_type="income").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-        operating_expenses = financial_entries.filter(month=month_number, entry_type="operating_expense").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-        debt_service = financial_entries.filter(month=month_number, entry_type="debt_service").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-        capital_expenses = financial_entries.filter(month=month_number, entry_type="capital_expense").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        month_filter = Q(month=month_number) | Q(entry_date__month=month_number)
+        spreadsheet_income = financial_entries.filter(month_filter, entry_type="income").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        operating_expenses = financial_entries.filter(month_filter, entry_type="operating_expense").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        debt_service = financial_entries.filter(month_filter, entry_type="debt_service").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        capital_expenses = financial_entries.filter(month_filter, entry_type="capital_expense").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
 
         total_income = online_income + spreadsheet_income
         net_operating_income = total_income - operating_expenses
