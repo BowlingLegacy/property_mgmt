@@ -1168,12 +1168,13 @@ def get_landlord_workspace_context(user):
         .order_by("application__property__name", "-created_at")
     )
 
-    new_applications = (
+    new_applications_queryset = (
         HousingApplication.objects
         .select_related("property", "user")
         .filter(property__in=properties, user__isnull=True, landlord_reviewed_at__isnull=True)
         .order_by("-created_at")
     )
+    new_applications = dedupe_attention_applications(new_applications_queryset)
 
     new_messages = (
         ResidentMessage.objects
@@ -1196,8 +1197,19 @@ def get_landlord_workspace_context(user):
         .order_by("-created_at")
     )
     existing_resident_rows = []
+    existing_resident_seen = {}
 
     for intake in existing_resident_intakes:
+        intake_key = attention_identity_key(
+            intake.property_id,
+            intake.email,
+            intake.full_name(),
+            intake.room_unit_label,
+        )
+        if intake_key in existing_resident_seen:
+            existing_resident_seen[intake_key]["duplicate_count"] += 1
+            continue
+
         application = (
             HousingApplication.objects
             .select_related("user")
@@ -1213,10 +1225,13 @@ def get_landlord_workspace_context(user):
         else:
             setup_status = "ready"
 
-        existing_resident_rows.append({
+        row = {
             "intake": intake,
             "setup_status": setup_status,
-        })
+            "duplicate_count": 1,
+        }
+        existing_resident_seen[intake_key] = row
+        existing_resident_rows.append(row)
 
     landlord_inbox = OrderedDict()
 
@@ -1241,7 +1256,7 @@ def get_landlord_workspace_context(user):
         "landlord_inbox": landlord_inbox,
         "new_message_count": new_message_count,
         "new_applications": new_applications,
-        "new_application_count": new_applications.count(),
+        "new_application_count": len(new_applications),
         "new_messages": new_messages,
         "new_documents": new_documents,
         "new_document_count": new_documents.count(),
@@ -1251,7 +1266,7 @@ def get_landlord_workspace_context(user):
         "collection_watch_rows": collection_watch_rows,
         "collection_watch_count": len(collection_watch_rows),
         "attention_count": (
-            new_applications.count()
+            len(new_applications)
             + new_message_count
             + new_documents.count()
             + len(existing_resident_rows)
@@ -1463,6 +1478,42 @@ def find_room_rent_setting(property_obj, room_unit_label):
         if normalized_room_label(setting.room_unit_label) == target_label:
             return setting
     return None
+
+
+def attention_identity_key(property_id, email, full_name, room_unit_label=""):
+    email_key = clean_match_value(email)
+    if email_key:
+        return ("email", property_id, email_key)
+
+    return (
+        "name-room",
+        property_id,
+        clean_match_value(full_name),
+        normalized_room_label(room_unit_label),
+    )
+
+
+def dedupe_attention_applications(applications):
+    deduped = []
+    seen = {}
+
+    for application in applications:
+        key = attention_identity_key(
+            application.property_id,
+            application.email,
+            application.full_name,
+            application.space_label,
+        )
+
+        if key in seen:
+            seen[key].attention_duplicate_count += 1
+            continue
+
+        application.attention_duplicate_count = 1
+        seen[key] = application
+        deduped.append(application)
+
+    return deduped
 
 
 def matching_room_rent_settings(property_id, room_unit_label):
@@ -2873,6 +2924,8 @@ def payment_log(request):
 
     for payment in completed_payments:
         application = payment.application
+        payment.display_unit_label = canonical_room_label(application.space_label or application.space_type)
+        payment.display_paid_at = payment.received_at or payment.created_at
         property_name = application.property.name if application.property else "No Property"
         month_label = payment_service_month(payment).strftime("%B %Y")
 
@@ -2889,7 +2942,7 @@ def payment_log(request):
             payments_sorted = sorted(
                 payments,
                 key=lambda p: (
-                    (p.application.space_label or p.application.space_type or "").lower(),
+                    normalized_room_label(p.display_unit_label),
                     p.application.full_name.lower(),
                 )
             )

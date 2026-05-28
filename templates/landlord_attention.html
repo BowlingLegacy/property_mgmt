@@ -25,6 +25,9 @@
                         <tr>
                             <td>
                                 <strong>{{ intake.full_name }}</strong><br>
+                                {% if row.duplicate_count > 1 %}
+                                    <span class="badge text-bg-warning mb-1">{{ row.duplicate_count }} duplicate setup attempts</span><br>
+                                {% endif %}
                                 <a href="{% url 'landlord_existing_resident_intake_detail' intake.id %}" class="btn btn-outline-secondary btn-sm mt-1">Open</a>
                             </td>
                             <td>{{ intake.property.name }}</td>
@@ -68,7 +71,13 @@
                     <tbody>
                     {% for application in new_applications %}
                         <tr>
-                            <td><strong>{{ application.full_name }}</strong><br><span class="text-muted small">{{ application.email }}</span></td>
+                            <td>
+                                <strong>{{ application.full_name }}</strong><br>
+                                {% if application.attention_duplicate_count > 1 %}
+                                    <span class="badge text-bg-warning mb-1">{{ application.attention_duplicate_count }} duplicate applications</span><br>
+                                {% endif %}
+                                <span class="text-muted small">{{ application.email }}</span>
+                            </td>
                             <td>{{ application.property.name|default:"No Property" }}</td>
                             <td>{{ application.created_at|date:"M j, g:i A" }}</td>
                             <td class="d-flex gap-2 flex-wrap">

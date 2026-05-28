@@ -66,6 +66,11 @@ class Command(BaseCommand):
             help="Also backfill monthly utility payments from room settings.",
         )
         parser.add_argument(
+            "--payment-type",
+            choices=["rent", "utility", "both"],
+            help="Limit the backfill to rent, utilities, or both. Defaults to rent unless --include-utilities is used.",
+        )
+        parser.add_argument(
             "--confirm",
             action="store_true",
             help="Actually create missing payment records. Without this flag, this command is a dry run.",
@@ -81,7 +86,13 @@ class Command(BaseCommand):
         exclude_rooms = {normalized_room_label(room) for room in options["exclude_room"]}
         exclude_names = {clean_match_value(name) for name in options["exclude_name"]}
         include_utilities = options["include_utilities"]
+        payment_type_option = options["payment_type"]
         payment_method = options["payment_method"]
+
+        if payment_type_option:
+            selected_payment_types = [payment_type_option] if payment_type_option != "both" else ["rent", "utility"]
+        else:
+            selected_payment_types = ["rent", "utility"] if include_utilities else ["rent"]
 
         room_settings = (
             PropertyRoomRent.objects
@@ -96,7 +107,7 @@ class Command(BaseCommand):
         self.stdout.write(f"Property: {property_obj.name}")
         self.stdout.write(f"Month: {service_month.strftime('%B %Y')}")
         self.stdout.write(f"Payment method: {payment_method}")
-        self.stdout.write(f"Include utilities: {'yes' if include_utilities else 'no'}")
+        self.stdout.write(f"Payment types: {', '.join(selected_payment_types)}")
         if exclude_rooms:
             self.stdout.write(f"Excluded rooms: {', '.join(sorted(exclude_rooms))}")
         if exclude_names:
@@ -117,9 +128,12 @@ class Command(BaseCommand):
                 continue
 
             application = self.find_or_build_application(property_obj, room_label, roster_entry, setting)
-            rent_amount = self.expected_rent_for_month(application, service_month, setting.monthly_rent)
-            self.plan_missing_payment(planned, skipped, application, service_month, "rent", rent_amount, payment_method)
-            if include_utilities:
+
+            if "rent" in selected_payment_types:
+                rent_amount = self.expected_rent_for_month(application, service_month, setting.monthly_rent)
+                self.plan_missing_payment(planned, skipped, application, service_month, "rent", rent_amount, payment_method)
+
+            if "utility" in selected_payment_types:
                 utility_amount = self.expected_utility_for_month(application, service_month, setting.utility_monthly)
                 self.plan_missing_payment(planned, skipped, application, service_month, "utility", utility_amount, payment_method)
 

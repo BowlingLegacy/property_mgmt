@@ -726,6 +726,12 @@ class LiveFlowTests(TestCase):
         payment_log = self.client.get(reverse("payment_log"))
         self.assertContains(payment_log, "June 2026")
         self.assertContains(payment_log, "CASH-JUNE")
+        self.assertContains(payment_log, "Unit")
+        self.assertContains(payment_log, "Date/Time")
+        self.assertContains(payment_log, "Rent Balance")
+        self.assertNotContains(payment_log, "Room / Unit")
+        self.assertNotContains(payment_log, "Date / Time Paid")
+        self.assertNotContains(payment_log, "Rent Balance Owed")
 
     def test_multi_month_payment_is_allocated_across_reporting_months(self):
         application = HousingApplication.objects.create(
@@ -930,6 +936,63 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "New request")
         self.assertContains(response, "Uploaded ID")
         self.assertContains(response, "Mark Reviewed")
+
+    def test_landlord_attention_collapses_duplicate_profile_setups_and_applications(self):
+        staff_user = User.objects.create_user(
+            username="dedupe-staff",
+            email="dedupe-staff@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Dedupe Property", landlord_email=staff_user.email)
+
+        HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Duplicate Applicant",
+            phone="555-0301",
+            email="duplicate-applicant@example.com",
+            age=41,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="First application.",
+        )
+        HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Duplicate Applicant",
+            phone="555-0301",
+            email="duplicate-applicant@example.com",
+            age=41,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Second application.",
+        )
+
+        ExistingResidentIntake.objects.create(
+            property=property_obj,
+            first_name="Mike",
+            last_name="Dudley",
+            email="mike@example.com",
+            phone="555-0302",
+            room_unit_label="J",
+        )
+        ExistingResidentIntake.objects.create(
+            property=property_obj,
+            first_name="Mike",
+            last_name="Dudley",
+            email="mike@example.com",
+            phone="555-0302",
+            room_unit_label="Room J",
+        )
+
+        self.client.login(username="dedupe-staff", password="StrongPass123!")
+        response = self.client.get(reverse("landlord_attention"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["new_applications"]), 1)
+        self.assertEqual(len(response.context["existing_resident_intakes"]), 1)
+        self.assertContains(response, "2 duplicate applications")
+        self.assertContains(response, "2 duplicate setup attempts")
 
     def test_landlord_can_reply_to_scoped_resident_message(self):
         landlord = User.objects.create_user(
@@ -3276,6 +3339,44 @@ class LiveFlowTests(TestCase):
             stdout=StringIO(),
         )
         self.assertEqual(Payment.objects.filter(application=michael, payment_type="rent").count(), 1)
+
+    def test_backfill_monthly_payments_can_create_utilities_only(self):
+        property_obj = Property.objects.create(name="Backfill Utility Property")
+        PropertyRoomRent.objects.create(
+            property=property_obj,
+            room_unit_label="J",
+            monthly_rent=Decimal("561.00"),
+            utility_monthly=Decimal("55.00"),
+        )
+        CurrentResidentRosterEntry.objects.create(
+            property=property_obj,
+            first_name="Michael",
+            last_name="Dudley",
+            email="michael@example.com",
+            room_unit_label="J",
+        )
+
+        call_command(
+            "backfill_monthly_rent_payments",
+            "--property-name",
+            "Backfill Utility Property",
+            "--month",
+            "2026-05",
+            "--payment-type",
+            "utility",
+            "--confirm",
+            stdout=StringIO(),
+        )
+
+        michael = HousingApplication.objects.get(full_name="Michael Dudley")
+        self.assertFalse(Payment.objects.filter(application=michael, payment_type="rent").exists())
+        self.assertTrue(Payment.objects.filter(
+            application=michael,
+            payment_type="utility",
+            amount=Decimal("55.00"),
+            service_month=date(2026, 5, 1),
+            status="completed",
+        ).exists())
 
     def test_move_payment_service_month_corrects_early_payment(self):
         property_obj = Property.objects.create(name="Move Payment Month Property")
