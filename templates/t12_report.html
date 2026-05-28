@@ -24,14 +24,38 @@
 
 <div class="container-fluid my-5 px-4">
     <h1 class="fw-bold mb-2">T-12 Report</h1>
-    <p class="text-muted">Year: {{ year }}</p>
+    <p class="text-muted">
+        Year: {{ year }}
+        {% if selected_property %}
+            | Property: {{ selected_property.name }}
+        {% else %}
+            | Portfolio view
+        {% endif %}
+    </p>
 
     <div class="d-flex gap-2 flex-wrap mb-4">
-        <a href="{% url 't12_report' %}?year={{ year|add:'-1' }}" class="btn btn-outline-primary btn-sm">Previous Year</a>
-        <a href="{% url 't12_report' %}" class="btn btn-outline-dark btn-sm">Current Year</a>
-        <a href="{% url 't12_report' %}?year={{ year|add:'1' }}" class="btn btn-outline-primary btn-sm">Next Year</a>
-        <a href="{% url 'export_t12_csv' %}?year={{ year }}" class="btn btn-success btn-sm">Download CSV</a>
+        <a href="{% url 't12_report' %}?year={{ year|add:'-1' }}{% if selected_property %}&property_id={{ selected_property.id }}{% endif %}" class="btn btn-outline-primary btn-sm">Previous Year</a>
+        <a href="{% url 't12_report' %}{% if selected_property %}?property_id={{ selected_property.id }}{% endif %}" class="btn btn-outline-dark btn-sm">Current Year</a>
+        <a href="{% url 't12_report' %}?year={{ year|add:'1' }}{% if selected_property %}&property_id={{ selected_property.id }}{% endif %}" class="btn btn-outline-primary btn-sm">Next Year</a>
+        <a href="{% url 'export_t12_csv' %}?year={{ year }}{% if selected_property %}&property_id={{ selected_property.id }}{% endif %}" class="btn btn-success btn-sm">Download CSV</a>
     </div>
+
+    {% if properties.count > 1 %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <div class="fw-bold mb-2">Property</div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="{% url 't12_report' %}?year={{ year }}" class="btn {% if not selected_property %}btn-dark{% else %}btn-outline-dark{% endif %} btn-sm">Portfolio</a>
+                    {% for property in properties %}
+                        <a href="{% url 't12_report' %}?year={{ year }}&property_id={{ property.id }}"
+                           class="btn {% if selected_property.id == property.id %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">
+                            {{ property.name }}
+                        </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    {% endif %}
 
     <div class="table-responsive">
         <table class="table table-bordered table-striped align-middle bg-white">

@@ -3764,6 +3764,13 @@ class LiveFlowTests(TestCase):
             status="completed",
             service_month=date(2026, 6, 1),
         )
+        Payment.objects.create(
+            application=resident,
+            payment_type="deposit",
+            amount=Decimal("450.00"),
+            status="completed",
+            service_month=date(2026, 6, 1),
+        )
 
         self.client.login(username="t12-landlord", password="StrongPass123!")
         response = self.client.get(f"{reverse('t12_report')}?year=2026")
@@ -3775,11 +3782,64 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "<td>$1900.00</td>", html=True)
         self.assertContains(response, "<td>$1600.00</td>", html=True)
         self.assertContains(response, "<td>$1200.00</td>", html=True)
+        self.assertNotContains(response, "<td>$2350.00</td>", html=True)
 
         csv_response = self.client.get(f"{reverse('export_t12_csv')}?year=2026")
         csv_content = csv_response.content.decode()
 
         self.assertIn("June,700.00,1200.00,1900.00,300.00,400.00", csv_content)
+
+    def test_t12_report_can_be_filtered_to_one_property(self):
+        owner = User.objects.create_user(
+            username="t12-filter-owner",
+            email="t12-filter@example.com",
+            password="StrongPass123!",
+            role="property_owner",
+            is_staff=True,
+        )
+        first_property = Property.objects.create(name="T12 First Property", owner_email=owner.email)
+        second_property = Property.objects.create(name="T12 Second Property", owner_email=owner.email)
+        first_upload = FinancialUpload.objects.create(
+            property=first_property,
+            name="First T12",
+            file=SimpleUploadedFile("first.csv", b"Category,May\n", content_type="text/csv"),
+        )
+        second_upload = FinancialUpload.objects.create(
+            property=second_property,
+            name="Second T12",
+            file=SimpleUploadedFile("second.csv", b"Category,May\n", content_type="text/csv"),
+        )
+        FinancialEntry.objects.create(
+            upload=first_upload,
+            property_name=first_property.name,
+            sheet_name="Summary",
+            row_number=1,
+            year=2026,
+            month=5,
+            entry_type="operating_expense",
+            category="Power",
+            amount=Decimal("100.00"),
+        )
+        FinancialEntry.objects.create(
+            upload=second_upload,
+            property_name=second_property.name,
+            sheet_name="Summary",
+            row_number=1,
+            year=2026,
+            month=5,
+            entry_type="operating_expense",
+            category="Power",
+            amount=Decimal("900.00"),
+        )
+
+        self.client.login(username="t12-filter-owner", password="StrongPass123!")
+        response = self.client.get(f"{reverse('t12_report')}?year=2026&property_id={first_property.id}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["selected_property"], first_property)
+        self.assertEqual(response.context["months"][4]["operating_expenses"], Decimal("100.00"))
+        self.assertContains(response, "T12 First Property")
+        self.assertNotContains(response, "<td>$900.00</td>", html=True)
 
     def test_t12_report_includes_entry_date_rows_and_property_name_scope(self):
         landlord = User.objects.create_user(

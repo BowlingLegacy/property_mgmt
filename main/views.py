@@ -84,6 +84,7 @@ from .templatetags.formatting import phone_format
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
 LATE_FEE_AMOUNT = Decimal("25.00")
+T12_INCOME_PAYMENT_TYPES = ["rent", "utility", "late_fee", "application_fee", "background_check_fee", "other"]
 
 
 def notify_resident_of_portal_reply(request, resident_message):
@@ -3422,12 +3423,14 @@ def export_rent_roll_csv(request):
 
 
 @login_required
-@user_passes_test(staff_required)
+@user_passes_test(reporting_required)
 def export_t12_csv(request):
     year = selected_report_year(request)
-    months, totals = t12_report_rows(request.user, year)
+    report_properties, selected_property = selected_report_properties(request)
+    months, totals = t12_report_rows(request.user, year, report_properties)
+    property_suffix = f'_{selected_property.name.replace(" ", "_")}' if selected_property else ""
     response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = f'attachment; filename="t12_report_{year}.csv"'
+    response["Content-Disposition"] = f'attachment; filename="t12_report{property_suffix}_{year}.csv"'
 
     writer = csv.writer(response)
     writer.writerow([
@@ -3471,12 +3474,19 @@ def export_t12_csv(request):
 
 
 @login_required
-@user_passes_test(staff_required)
+@user_passes_test(reporting_required)
 def t12_report(request):
     year = selected_report_year(request)
-    months, totals = t12_report_rows(request.user, year)
+    report_properties, selected_property = selected_report_properties(request)
+    months, totals = t12_report_rows(request.user, year, report_properties)
 
-    return render(request, "t12_report.html", {"year": year, "months": months, "totals": totals})
+    return render(request, "t12_report.html", {
+        "year": year,
+        "months": months,
+        "totals": totals,
+        "properties": staff_managed_properties(request.user).order_by("name"),
+        "selected_property": selected_property,
+    })
 
 
 def selected_report_year(request):
@@ -3491,8 +3501,24 @@ def selected_report_year(request):
     return timezone.localdate().year
 
 
-def t12_report_rows(user, year):
-    accessible_properties = staff_managed_properties(user)
+def selected_report_properties(request):
+    accessible_properties = staff_managed_properties(request.user).order_by("name")
+    selected_property = None
+    property_id = (request.GET.get("property_id") or "").strip()
+
+    if property_id:
+        selected_property = get_object_or_404(accessible_properties, id=property_id)
+        return accessible_properties.filter(id=selected_property.id), selected_property
+
+    if accessible_properties.count() == 1:
+        selected_property = accessible_properties.first()
+        return accessible_properties.filter(id=selected_property.id), selected_property
+
+    return accessible_properties, selected_property
+
+
+def t12_report_rows(user, year, report_properties=None):
+    accessible_properties = report_properties or staff_managed_properties(user)
     accessible_property_names = list(accessible_properties.values_list("name", flat=True))
     financial_entries = FinancialEntry.objects.filter(
         Q(upload__property__in=accessible_properties) | Q(property_name__in=accessible_property_names),
@@ -3502,6 +3528,7 @@ def t12_report_rows(user, year):
     completed_payments = list(
         Payment.objects
         .filter(application__in=staff_managed_applications(user), status="completed")
+        .filter(application__property__in=accessible_properties)
     )
     months = []
     totals = {
@@ -3516,9 +3543,15 @@ def t12_report_rows(user, year):
     }
 
     for month_number in range(1, 13):
-        online_income = payment_amount_for_month(completed_payments, year, month_number)
+        online_income = payment_amount_for_month(completed_payments, year, month_number, T12_INCOME_PAYMENT_TYPES)
         month_filter = Q(month=month_number) | Q(entry_date__month=month_number)
-        spreadsheet_income = financial_entries.filter(month_filter, entry_type="income").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        spreadsheet_income = (
+            financial_entries
+            .filter(month_filter, entry_type="income")
+            .exclude(category__icontains="deposit")
+            .aggregate(total=Sum("amount"))["total"]
+            or Decimal("0.00")
+        )
         operating_expenses = financial_entries.filter(month_filter, entry_type="operating_expense").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
         debt_service = financial_entries.filter(month_filter, entry_type="debt_service").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
         capital_expenses = financial_entries.filter(month_filter, entry_type="capital_expense").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")

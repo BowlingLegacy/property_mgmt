@@ -207,8 +207,8 @@
                     <div class="col-lg-4">
                         <div class="fin-section">
                             <div class="fin-title">Performance</div>
-                            <a class="metric-btn" href="{% url 'property_financials' card.property.name %}"><span class="metric-label">NOI</span><span class="metric-value">Open</span></a>
-                            <a class="metric-btn" href="{% url 'property_financials' card.property.name %}"><span class="metric-label">Cash Flow After Debt</span><span class="metric-value">Open</span></a>
+                            <a class="metric-btn" href="{% url 't12_report' %}?property_id={{ card.property.id }}"><span class="metric-label">NOI</span><span class="metric-value">Open</span></a>
+                            <a class="metric-btn" href="{% url 't12_report' %}?property_id={{ card.property.id }}"><span class="metric-label">Cash Flow After Debt</span><span class="metric-value">Open</span></a>
                             <a class="metric-btn" href="{% url 'property_financials' card.property.name %}"><span class="metric-label">Occupancy / Collection %</span><span class="metric-value">Open</span></a>
                         </div>
                     </div>
