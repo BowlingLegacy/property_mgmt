@@ -740,6 +740,74 @@ def apply_resident_to_rent_roll_row(row, resident, selected_month):
     row["has_profile"] = True
 
 
+def selected_property_scope(request):
+    properties = staff_managed_properties(request.user).order_by("name")
+    selected_property = None
+    property_id = (request.GET.get("property_id") or "").strip()
+
+    if property_id:
+        selected_property = get_object_or_404(properties, id=property_id)
+        return properties.filter(id=selected_property.id), selected_property, False
+
+    if properties.count() == 1:
+        selected_property = properties.first()
+        return properties.filter(id=selected_property.id), selected_property, False
+
+    return properties, selected_property, True
+
+
+def rent_roll_rows_for_properties(user, selected_month, properties):
+    residents = (
+        staff_managed_applications(user)
+        .select_related("property")
+        .filter(property__in=properties, user__isnull=False)
+        .order_by("property__name", "space_label", "full_name")
+    )
+
+    rows_by_room = OrderedDict()
+
+    room_settings = (
+        PropertyRoomRent.objects
+        .select_related("property")
+        .filter(property__in=properties, is_active=True)
+        .order_by("property__name", "room_unit_label")
+    )
+    for setting in room_settings:
+        key = rent_roll_room_key(setting.property, setting.room_unit_label)
+        row = rows_by_room.setdefault(key, rent_roll_base_row(setting.property, setting.room_unit_label))
+        apply_room_setting_to_rent_roll_row(row, setting)
+
+    roster_entries = (
+        CurrentResidentRosterEntry.objects
+        .select_related("property")
+        .filter(property__in=properties, is_active=True)
+        .exclude(room_unit_label="")
+        .order_by("property__name", "room_unit_label", "last_name", "first_name")
+    )
+    for entry in roster_entries:
+        key = rent_roll_room_key(entry.property, entry.room_unit_label)
+        row = rows_by_room.setdefault(key, rent_roll_base_row(entry.property, entry.room_unit_label))
+        if not row["has_profile"] and row["resident"] == "No profile yet":
+            row["resident"] = entry.full_name()
+
+    for resident in residents:
+        room_label = canonical_room_label(resident.space_label or "")
+        if room_label:
+            key = rent_roll_room_key(resident.property, room_label)
+            row = rows_by_room.setdefault(key, rent_roll_base_row(resident.property, room_label))
+        else:
+            key = ("profile", resident.id)
+            row = rows_by_room.setdefault(key, rent_roll_base_row(resident.property, ""))
+        apply_resident_to_rent_roll_row(row, resident, selected_month)
+
+    rows = sorted(rows_by_room.values(), key=lambda row: (row["property"].lower(), row["room_sort"], row["resident"].lower()))
+    for row in rows:
+        row["rent_balance"] = max(row["rent_due_for_month"], row["current_rent_balance"])
+        row["utility_balance"] = max(row["utility_due_for_month"], row["current_utility_balance"])
+        row["deposit_balance"] = row["deposit_due"]
+    return rows
+
+
 def recalculate_application_balances(application):
     completed_payments = application.payments.filter(status="completed")
     rent_paid = completed_payments.filter(payment_type="rent").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
@@ -3102,54 +3170,14 @@ def rent_roll(request):
     selected_month = selected_report_month(request)
     previous_month = add_months(selected_month, -1)
     next_month = add_months(selected_month, 1)
-    properties = staff_managed_properties(request.user)
-    residents = (
-        staff_managed_applications(request.user)
-        .select_related("property")
-        .filter(user__isnull=False)
-        .order_by("property__name", "space_label", "full_name")
-    )
-
-    rows_by_room = OrderedDict()
-
-    room_settings = (
-        PropertyRoomRent.objects
-        .select_related("property")
-        .filter(property__in=properties, is_active=True)
-        .order_by("property__name", "room_unit_label")
-    )
-    for setting in room_settings:
-        key = rent_roll_room_key(setting.property, setting.room_unit_label)
-        row = rows_by_room.setdefault(key, rent_roll_base_row(setting.property, setting.room_unit_label))
-        apply_room_setting_to_rent_roll_row(row, setting)
-
-    roster_entries = (
-        CurrentResidentRosterEntry.objects
-        .select_related("property")
-        .filter(property__in=properties, is_active=True)
-        .exclude(room_unit_label="")
-        .order_by("property__name", "room_unit_label", "last_name", "first_name")
-    )
-    for entry in roster_entries:
-        key = rent_roll_room_key(entry.property, entry.room_unit_label)
-        row = rows_by_room.setdefault(key, rent_roll_base_row(entry.property, entry.room_unit_label))
-        if not row["has_profile"] and row["resident"] == "No profile yet":
-            row["resident"] = entry.full_name()
-
-    for resident in residents:
-        room_label = canonical_room_label(resident.space_label or "")
-        if room_label:
-            key = rent_roll_room_key(resident.property, room_label)
-            row = rows_by_room.setdefault(key, rent_roll_base_row(resident.property, room_label))
-        else:
-            key = ("profile", resident.id)
-            row = rows_by_room.setdefault(key, rent_roll_base_row(resident.property, ""))
-        apply_resident_to_rent_roll_row(row, resident, selected_month)
-
-    rows = sorted(rows_by_room.values(), key=lambda row: (row["property"].lower(), row["room_sort"], row["resident"].lower()))
+    properties, selected_property, show_property_picker = selected_property_scope(request)
+    rows = [] if show_property_picker else rent_roll_rows_for_properties(request.user, selected_month, properties)
 
     return render(request, "rent_roll.html", {
         "rows": rows,
+        "properties": properties,
+        "selected_property": selected_property,
+        "show_property_picker": show_property_picker,
         "selected_month": selected_month,
         "previous_month": previous_month,
         "next_month": next_month,
@@ -3335,88 +3363,42 @@ def export_payment_log_csv(request):
 @user_passes_test(staff_required)
 def export_rent_roll_csv(request):
     selected_month = selected_report_month(request)
+    properties, selected_property, _show_property_picker = selected_property_scope(request)
     response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = f'attachment; filename="rent_roll_{selected_month.strftime("%Y_%m")}.csv"'
+    property_suffix = f'_{selected_property.name.replace(" ", "_")}' if selected_property else ""
+    response["Content-Disposition"] = f'attachment; filename="rent_roll{property_suffix}_{selected_month.strftime("%Y_%m")}.csv"'
 
     writer = csv.writer(response)
     writer.writerow([
         "Month",
         "Resident",
-        "Property",
-        "Room",
-        "Scheduled Rent",
-        "Rent Paid This Month",
-        "Rent Due This Month",
-        "Current Rent Balance",
-        "Monthly Utilities",
-        "Utilities Paid This Month",
-        "Utilities Due This Month",
-        "Current Utility Balance",
-        "Deposit Required",
-        "Deposit Held/Paid",
-        "Deposit Still Due",
+        "Unit",
+        "Rent",
+        "Rent Paid",
+        "Rent Balance",
+        "Utilities",
+        "Utilities Paid",
+        "Utilities Balance",
+        "Deposit",
+        "Deposit Paid",
+        "Deposit Balance",
     ])
 
-    properties = staff_managed_properties(request.user)
-    residents = (
-        staff_managed_applications(request.user)
-        .select_related("property")
-        .filter(user__isnull=False)
-    )
-    rows_by_room = OrderedDict()
-
-    room_settings = (
-        PropertyRoomRent.objects
-        .select_related("property")
-        .filter(property__in=properties, is_active=True)
-        .order_by("property__name", "room_unit_label")
-    )
-    for setting in room_settings:
-        key = rent_roll_room_key(setting.property, setting.room_unit_label)
-        row = rows_by_room.setdefault(key, rent_roll_base_row(setting.property, setting.room_unit_label))
-        apply_room_setting_to_rent_roll_row(row, setting)
-
-    roster_entries = (
-        CurrentResidentRosterEntry.objects
-        .select_related("property")
-        .filter(property__in=properties, is_active=True)
-        .exclude(room_unit_label="")
-        .order_by("property__name", "room_unit_label", "last_name", "first_name")
-    )
-    for entry in roster_entries:
-        key = rent_roll_room_key(entry.property, entry.room_unit_label)
-        row = rows_by_room.setdefault(key, rent_roll_base_row(entry.property, entry.room_unit_label))
-        if not row["has_profile"] and row["resident"] == "No profile yet":
-            row["resident"] = entry.full_name()
-
-    for resident in residents:
-        room_label = canonical_room_label(resident.space_label or "")
-        if room_label:
-            key = rent_roll_room_key(resident.property, room_label)
-            row = rows_by_room.setdefault(key, rent_roll_base_row(resident.property, room_label))
-        else:
-            key = ("profile", resident.id)
-            row = rows_by_room.setdefault(key, rent_roll_base_row(resident.property, ""))
-        apply_resident_to_rent_roll_row(row, resident, selected_month)
-
-    rows = sorted(rows_by_room.values(), key=lambda row: (row["property"].lower(), row["room_sort"], row["resident"].lower()))
+    rows = rent_roll_rows_for_properties(request.user, selected_month, properties)
     for row in rows:
         writer.writerow([
             selected_month.strftime("%B %Y"),
             row["resident"],
-            row["property"],
             row["room"],
             row["monthly_rent"],
             row["rent_paid"],
-            row["rent_due_for_month"],
-            row["current_rent_balance"],
+            row["rent_balance"],
             row["utility_monthly"],
             row["utility_paid"],
-            row["utility_due_for_month"],
-            row["current_utility_balance"],
+            row["utility_balance"],
             row["deposit_required"],
             row["deposit_paid"],
-            row["deposit_due"],
+            row["deposit_balance"],
         ])
 
     return response

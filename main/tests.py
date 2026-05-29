@@ -3161,17 +3161,76 @@ class LiveFlowTests(TestCase):
         response = self.client.get(f"{reverse('rent_roll')}?month=2026-06")
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Month viewed: <strong>June 2026</strong>", html=True)
-        self.assertContains(response, "Deposit Held/Paid")
-        self.assertContains(response, "Deposit Still Due")
-        self.assertContains(response, "Rent Paid This Month")
+        self.assertContains(response, "June 2026")
+        self.assertContains(response, "Rent Roll Property")
+        self.assertContains(response, "Deposit Paid")
+        self.assertContains(response, "Deposit Balance")
+        self.assertContains(response, "Rent Paid")
+        self.assertNotContains(response, "<th>Property</th>", html=True)
+        self.assertNotContains(response, "Rent Paid This Month")
         self.assertNotContains(response, "Applicant Should Not Show")
 
         content = response.content.decode()
-        self.assertLess(content.index("<td>A</td>"), content.index("<td>B</td>"))
-        self.assertLess(content.index("<td>B</td>"), content.index("<td>C</td>"))
-        self.assertContains(response, "<td>$300.00</td>", html=True)
-        self.assertContains(response, "<td>$250.00</td>", html=True)
+        self.assertLess(content.index('class="unit-col">A</td>'), content.index('class="unit-col">B</td>'))
+        self.assertLess(content.index('class="unit-col">B</td>'), content.index('class="unit-col">C</td>'))
+        self.assertContains(response, "$300.00")
+        self.assertContains(response, "$250.00")
+
+    def test_rent_roll_prompts_for_property_when_multiple_properties_exist(self):
+        superuser = User.objects.create_user(
+            username="rent-roll-super",
+            email="rent-roll-super@example.com",
+            password="StrongPass123!",
+            role="admin",
+            is_staff=True,
+            is_superuser=True,
+        )
+        first_property = Property.objects.create(name="First Rent Roll Property")
+        second_property = Property.objects.create(name="Second Rent Roll Property")
+        first_user = User.objects.create_user(username="first-rent-roll-user", password="StrongPass123!", role="tenant")
+        second_user = User.objects.create_user(username="second-rent-roll-user", password="StrongPass123!", role="tenant")
+        first_resident = HousingApplication.objects.create(
+            property=first_property,
+            user=first_user,
+            full_name="First Rent Roll Resident",
+            phone="555-0610",
+            email="first-roll@example.com",
+            age=45,
+            space_label="A",
+            monthly_rent=Decimal("500.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        second_resident = HousingApplication.objects.create(
+            property=second_property,
+            user=second_user,
+            full_name="Second Rent Roll Resident",
+            phone="555-0611",
+            email="second-roll@example.com",
+            age=46,
+            space_label="B",
+            monthly_rent=Decimal("600.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+
+        self.client.login(username="rent-roll-super", password="StrongPass123!")
+        picker_response = self.client.get(reverse("rent_roll"))
+
+        self.assertEqual(picker_response.status_code, 200)
+        self.assertTrue(picker_response.context["show_property_picker"])
+        self.assertContains(picker_response, "Choose A Property")
+        self.assertContains(picker_response, "First Rent Roll Property")
+        self.assertContains(picker_response, "Second Rent Roll Property")
+
+        property_response = self.client.get(f"{reverse('rent_roll')}?property_id={second_property.id}")
+
+        self.assertFalse(property_response.context["show_property_picker"])
+        self.assertEqual(property_response.context["selected_property"], second_property)
+        self.assertContains(property_response, second_resident.full_name)
+        self.assertNotContains(property_response, first_resident.full_name)
 
     def test_rent_roll_csv_matches_resident_only_month_view(self):
         landlord = User.objects.create_user(
@@ -3223,8 +3282,10 @@ class LiveFlowTests(TestCase):
         content = response.content.decode()
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("June 2026,CSV Resident,Rent Roll CSV Property,G", content)
-        self.assertIn("Utilities Paid This Month", content)
+        self.assertIn("June 2026,CSV Resident,G", content)
+        self.assertIn("Utilities Paid", content)
+        self.assertNotIn("Property", content.splitlines()[0])
+        self.assertNotIn("Utilities Paid This Month", content)
         self.assertNotIn("CSV Applicant", content)
 
     def test_rent_roll_lists_room_roster_before_profile_setup(self):
@@ -3269,9 +3330,9 @@ class LiveFlowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Michael Dudley")
-        self.assertContains(response, "<td>J</td>", html=True)
-        self.assertContains(response, "<td>$561.00</td>", html=True)
-        self.assertContains(response, "<td>$55.00</td>", html=True)
+        self.assertContains(response, '<td class="unit-col">J</td>', html=True)
+        self.assertContains(response, "$561.00")
+        self.assertContains(response, "$55.00")
         self.assertNotContains(response, "Applicant Not On Rent Roll")
 
     def test_backfill_monthly_rent_payments_creates_missing_roster_payments(self):
@@ -3515,7 +3576,9 @@ class LiveFlowTests(TestCase):
         rent_roll_response = self.client.get(f"{reverse('rent_roll')}?month=2026-05")
         dashboard_response = self.client.get(reverse("landlord_dashboard"))
 
-        self.assertContains(rent_roll_response, "<td>$0.00</td>", html=True)
+        resident_row = next(row for row in rent_roll_response.context["rows"] if row["resident"] == "Move In Resident")
+        self.assertEqual(resident_row["rent_balance"], Decimal("0.00"))
+        self.assertEqual(resident_row["utility_balance"], Decimal("0.00"))
         self.assertFalse(
             any(row["application"] == resident for row in dashboard_response.context["collection_watch_rows"])
         )
