@@ -489,6 +489,16 @@ def parse_month_header(value):
     return MONTH_NAME_MAP.get(clean_value[:3])
 
 
+def summary_month_header_options(headers):
+    return [
+        {
+            "name": header,
+            "is_month": parse_month_header(header) is not None,
+        }
+        for header in headers
+    ]
+
+
 def parse_import_date(value):
     if not value:
         return None
@@ -3932,6 +3942,7 @@ def parse_financial_upload(request, upload_id):
         "preview_rows": preview_rows,
         "guesses": guesses,
         "entry_type_choices": entry_type_choices,
+        "summary_month_headers": summary_month_header_options(headers),
         "created": created,
         "skipped": skipped,
         "existing_entries": upload.entries.count(),

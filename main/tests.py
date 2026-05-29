@@ -4550,6 +4550,40 @@ class LiveFlowTests(TestCase):
         self.assertEqual(may_row["net_operating_income"], Decimal("1800.00"))
         self.assertEqual(may_row["cash_flow_after_debt"], Decimal("1300.00"))
 
+    def test_summary_import_mapper_preselects_month_columns(self):
+        landlord = User.objects.create_user(
+            username="summary-month-picker-landlord",
+            email="summary-month-picker@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Summary Month Picker Property", landlord_email=landlord.email)
+        csv_file = SimpleUploadedFile(
+            "summary-picker.csv",
+            b"OVERHEAD TITLE,JANUARY,FEBRUARY,MARCH,Q1 2026,APRIL,MAY\nRent,2000.00,2100.00,2200.00,6300.00,2300.00,2400.00\n",
+            content_type="text/csv",
+        )
+
+        self.client.login(username="summary-month-picker-landlord", password="StrongPass123!")
+        self.client.post(reverse("financial_upload"), {
+            "property": property_obj.id,
+            "ledger_scope": "property",
+            "name": "Summary Picker",
+            "file": csv_file,
+            "notes": "Monthly summary sheet",
+        })
+
+        upload = FinancialUpload.objects.get(name="Summary Picker")
+        response = self.client.get(reverse("parse_financial_upload", args=[upload.id]))
+
+        self.assertEqual(response.status_code, 200)
+        month_options = response.context["summary_month_headers"]
+        selected = {option["name"]: option["is_month"] for option in month_options}
+        self.assertTrue(selected["JANUARY"])
+        self.assertTrue(selected["MAY"])
+        self.assertFalse(selected["Q1 2026"])
+
     def test_accounting_import_blocks_other_landlord_property(self):
         landlord = User.objects.create_user(
             username="blocked-accounting-landlord",

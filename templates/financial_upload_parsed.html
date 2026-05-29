@@ -240,10 +240,10 @@
             <div>
                 <label class="form-label fw-bold">Summary Month Columns</label>
                 <div class="border rounded-3 bg-white p-2" style="max-height: 190px; overflow:auto;">
-                    {% for header in headers %}
+                    {% for header in summary_month_headers %}
                         <label class="form-check d-block">
-                            <input type="checkbox" class="form-check-input" name="summary_month_columns" value="{{ header }}">
-                            <span class="form-check-label">{{ header }}</span>
+                            <input type="checkbox" class="form-check-input" name="summary_month_columns" value="{{ header.name }}" {% if header.is_month %}checked{% endif %}>
+                            <span class="form-check-label">{{ header.name }}</span>
                         </label>
                     {% endfor %}
                 </div>
