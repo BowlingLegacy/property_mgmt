@@ -4584,6 +4584,69 @@ class LiveFlowTests(TestCase):
         self.assertTrue(selected["MAY"])
         self.assertFalse(selected["Q1 2026"])
 
+    def test_import_summary_grid_command_creates_t12_entries(self):
+        landlord = User.objects.create_user(
+            username="summary-command-landlord",
+            email="summary-command@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Summary Command Property", landlord_email=landlord.email)
+        csv_file = SimpleUploadedFile(
+            "summary-command.csv",
+            (
+                b"OVERHEAD TITLE,JANUARY,FEBRUARY,MARCH,Q1 2026,APRIL,MAY\n"
+                b"Rent,2000.00,2100.00,2200.00,6300.00,2300.00,2400.00\n"
+                b"TOTAL OPERATING EXPENSES,700.00,710.00,720.00,2130.00,730.00,740.00\n"
+                b"Debt Service,500.00,500.00,500.00,1500.00,500.00,500.00\n"
+                b"NOI,1300.00,1390.00,1480.00,4170.00,1570.00,1660.00\n"
+            ),
+            content_type="text/csv",
+        )
+        upload = FinancialUpload.objects.create(
+            property=property_obj,
+            ledger_scope="property",
+            name="Command Summary",
+            file=csv_file,
+        )
+
+        preview = StringIO()
+        call_command(
+            "import_summary_grid",
+            "--property-name",
+            property_obj.name,
+            "--year",
+            "2026",
+            "--upload-id",
+            str(upload.id),
+            stdout=preview,
+        )
+        self.assertEqual(FinancialEntry.objects.filter(upload=upload).count(), 0)
+        self.assertIn("Entries selected: 15", preview.getvalue())
+
+        output = StringIO()
+        call_command(
+            "import_summary_grid",
+            "--property-name",
+            property_obj.name,
+            "--year",
+            "2026",
+            "--upload-id",
+            str(upload.id),
+            "--confirm",
+            stdout=output,
+        )
+
+        self.assertEqual(FinancialEntry.objects.filter(upload=upload).count(), 15)
+        months, _totals = t12_report_rows(landlord, 2026)
+        may_row = months[4]
+        self.assertEqual(may_row["spreadsheet_income"], Decimal("2400.00"))
+        self.assertEqual(may_row["operating_expenses"], Decimal("740.00"))
+        self.assertEqual(may_row["debt_service"], Decimal("500.00"))
+        self.assertEqual(may_row["net_operating_income"], Decimal("1660.00"))
+        self.assertEqual(may_row["cash_flow_after_debt"], Decimal("1160.00"))
+
     def test_accounting_import_blocks_other_landlord_property(self):
         landlord = User.objects.create_user(
             username="blocked-accounting-landlord",
