@@ -381,6 +381,23 @@ SUMMARY_CALCULATED_ROW_KEYWORDS = {
 }
 UTILITY_PARENT_CATEGORIES = {"utility", "utilities"}
 UTILITY_DETAIL_KEYWORDS = {"power", "electric", "electricity", "gas", "water", "sewer", "trash", "garbage", "internet", "utilities"}
+SUMMARY_OPERATING_EXPENSE_LABELS = {
+    "expense",
+    "expenses",
+    "operating expense",
+    "operating expenses",
+    "total expense",
+    "total expenses",
+    "total operating expense",
+    "total operating expenses",
+}
+SUMMARY_DEBT_SERVICE_LABELS = {
+    "debt service",
+    "total debt service",
+    "mortgage",
+    "mortgage payment",
+    "loan payment",
+}
 
 
 def is_summary_total_label(value):
@@ -388,13 +405,58 @@ def is_summary_total_label(value):
     return any(keyword in clean_value for keyword in SUMMARY_TOTAL_KEYWORDS)
 
 
+def summary_category_entry_type(category, default_entry_type):
+    clean_category = normalized_header(category)
+    if not clean_category:
+        return None
+
+    if clean_category in SUMMARY_OPERATING_EXPENSE_LABELS:
+        return "operating_expense"
+
+    if clean_category in SUMMARY_DEBT_SERVICE_LABELS or "debt service" in clean_category:
+        return "debt_service"
+
+    if any(keyword in clean_category for keyword in SUMMARY_CALCULATED_ROW_KEYWORDS):
+        return None
+
+    return normalize_entry_type("", category, f"{category} summary", Decimal("1.00"), default_entry_type)
+
+
+def summary_has_detail_rows(category, all_categories):
+    clean_category = normalized_header(category)
+    if clean_category not in SUMMARY_OPERATING_EXPENSE_LABELS:
+        return False
+
+    for other_category in all_categories:
+        clean_other = normalized_header(other_category)
+        if (
+            clean_other
+            and clean_other != clean_category
+            and clean_other not in SUMMARY_OPERATING_EXPENSE_LABELS
+            and clean_other not in SUMMARY_DEBT_SERVICE_LABELS
+            and not any(keyword in clean_other for keyword in SUMMARY_CALCULATED_ROW_KEYWORDS)
+            and "rent" not in clean_other
+        ):
+            return True
+
+    return False
+
+
 def should_skip_summary_category(category, all_categories):
     clean_category = normalized_header(category)
-    if not clean_category or is_summary_total_label(clean_category):
+    if not clean_category:
         return True
 
     if any(keyword in clean_category for keyword in SUMMARY_CALCULATED_ROW_KEYWORDS):
         return True
+
+    if is_summary_total_label(clean_category):
+        entry_type = summary_category_entry_type(clean_category, "operating_expense")
+        if not entry_type:
+            return True
+        if summary_has_detail_rows(clean_category, all_categories):
+            return True
+        return False
 
     if clean_category in UTILITY_PARENT_CATEGORIES:
         detail_categories = [
@@ -3764,13 +3826,9 @@ def parse_financial_upload(request, upload_id):
                     if amount == Decimal("0.00"):
                         continue
 
-                    summary_row_entry_type = normalize_entry_type(
-                        "",
-                        category,
-                        f"{category} - {column_name} summary",
-                        amount,
-                        summary_entry_type,
-                    )
+                    summary_row_entry_type = summary_category_entry_type(category, summary_entry_type)
+                    if not summary_row_entry_type:
+                        continue
 
                     entry = create_financial_entry_from_import(
                         upload,

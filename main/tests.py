@@ -4486,6 +4486,63 @@ class LiveFlowTests(TestCase):
         self.assertTrue(entries.filter(category="Rent", entry_type="income").exists())
         self.assertTrue(entries.filter(category="Repairs", entry_type="operating_expense").exists())
 
+    def test_summary_grid_imports_total_operating_expenses_when_no_detail_rows(self):
+        landlord = User.objects.create_user(
+            username="summary-total-expense-landlord",
+            email="summary-total-expense@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Summary Total Expense Property", landlord_email=landlord.email)
+        csv_file = SimpleUploadedFile(
+            "summary-total-expense.csv",
+            (
+                b"Category,January,February,March,April,May\n"
+                b"Rent,2000.00,2100.00,2200.00,2300.00,2400.00\n"
+                b"Total Operating Expenses,700.00,710.00,720.00,730.00,740.00\n"
+                b"Debt Service,500.00,500.00,500.00,500.00,500.00\n"
+                b"NOI,1300.00,1390.00,1480.00,1570.00,1660.00\n"
+                b"Cash Flow,800.00,890.00,980.00,1070.00,1160.00\n"
+            ),
+            content_type="text/csv",
+        )
+
+        self.client.login(username="summary-total-expense-landlord", password="StrongPass123!")
+        self.client.post(reverse("financial_upload"), {
+            "property": property_obj.id,
+            "ledger_scope": "property",
+            "name": "Summary Total Expense",
+            "file": csv_file,
+            "notes": "Monthly summary sheet",
+        })
+
+        upload = FinancialUpload.objects.get(name="Summary Total Expense")
+        response = self.client.post(reverse("parse_financial_upload", args=[upload.id]), {
+            "import_mode": "summary_grid",
+            "sheet_name": "CSV",
+            "summary_category_column": "Category",
+            "summary_year": "2026",
+            "summary_entry_type": "operating_expense",
+            "summary_month_columns": ["January", "February", "March", "April", "May"],
+        })
+
+        self.assertRedirects(response, reverse("financial_upload"))
+        entries = FinancialEntry.objects.filter(upload=upload)
+        self.assertEqual(entries.count(), 15)
+        self.assertTrue(entries.filter(category="Total Operating Expenses", month=5, entry_type="operating_expense", amount=Decimal("740.00")).exists())
+        self.assertTrue(entries.filter(category="Debt Service", month=5, entry_type="debt_service", amount=Decimal("500.00")).exists())
+        self.assertFalse(entries.filter(category="NOI").exists())
+        self.assertFalse(entries.filter(category="Cash Flow").exists())
+
+        months, totals = t12_report_rows(landlord, 2026)
+        may_row = months[4]
+        self.assertEqual(may_row["spreadsheet_income"], Decimal("2400.00"))
+        self.assertEqual(may_row["operating_expenses"], Decimal("740.00"))
+        self.assertEqual(may_row["debt_service"], Decimal("500.00"))
+        self.assertEqual(may_row["net_operating_income"], Decimal("1660.00"))
+        self.assertEqual(may_row["cash_flow_after_debt"], Decimal("1160.00"))
+
     def test_accounting_import_blocks_other_landlord_property(self):
         landlord = User.objects.create_user(
             username="blocked-accounting-landlord",
