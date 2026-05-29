@@ -13,7 +13,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .models import AccountingReceipt, ApplicantDocument, BlogComment, BlogPost, CompanyMailboxConnection, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, PropertyRoomRent, RentHistory, ResidentMessage, ResidentMessageReply, SignedDocument, SmsMessageLog, User
-from .views import apply_completed_payment_to_balance, ensure_existing_resident_portal_application, payment_amount_for_month, prorated_monthly_charge
+from .views import apply_completed_payment_to_balance, ensure_existing_resident_portal_application, payment_amount_for_month, prorated_monthly_charge, t12_report_rows
 
 
 @override_settings(
@@ -3842,15 +3842,97 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "Spreadsheet Income")
         self.assertContains(response, "Total Income")
         self.assertContains(response, "<td>$1200.00</td>", html=True)
-        self.assertContains(response, "<td>$1900.00</td>", html=True)
-        self.assertContains(response, "<td>$1600.00</td>", html=True)
+        self.assertNotContains(response, "<td>$1900.00</td>", html=True)
+        self.assertContains(response, "<td>$1200.00</td>", html=True)
+        self.assertContains(response, "<td>$900.00</td>", html=True)
+        self.assertContains(response, "<td>$500.00</td>", html=True)
         self.assertContains(response, "<td>$1200.00</td>", html=True)
         self.assertNotContains(response, "<td>$2350.00</td>", html=True)
 
         csv_response = self.client.get(f"{reverse('export_t12_csv')}?year=2026")
         csv_content = csv_response.content.decode()
 
-        self.assertIn("June,700.00,1200.00,1900.00,300.00,400.00", csv_content)
+        self.assertIn("June,Spreadsheet,0.00,1200.00,1200.00,300.00,400.00", csv_content)
+
+    def test_t12_prefers_summary_income_over_portal_income_for_same_month(self):
+        landlord = User.objects.create_user(
+            username="t12-no-double-landlord",
+            email="t12-no-double@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="T12 No Double Property", landlord_email=landlord.email)
+        tenant_user = User.objects.create_user(username="t12-no-double-tenant", password="StrongPass123!", role="tenant")
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=tenant_user,
+            full_name="No Double Resident",
+            phone="555-0704",
+            email="no-double@example.com",
+            age=47,
+            monthly_rent=Decimal("700.00"),
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+        )
+        upload = FinancialUpload.objects.create(
+            property=property_obj,
+            name="No Double Summary",
+            file=SimpleUploadedFile("no-double.csv", b"category,amount\n", content_type="text/csv"),
+        )
+        FinancialEntry.objects.create(
+            upload=upload,
+            property_name=property_obj.name,
+            sheet_name="Summary",
+            row_number=1,
+            year=2026,
+            month=5,
+            entry_type="income",
+            category="Rent",
+            amount=Decimal("2000.00"),
+        )
+        FinancialEntry.objects.create(
+            upload=upload,
+            property_name=property_obj.name,
+            sheet_name="Summary",
+            row_number=2,
+            year=2026,
+            month=5,
+            entry_type="operating_expense",
+            category="Repairs",
+            amount=Decimal("300.00"),
+        )
+        FinancialEntry.objects.create(
+            upload=upload,
+            property_name=property_obj.name,
+            sheet_name="Summary",
+            row_number=3,
+            year=2026,
+            month=5,
+            entry_type="debt_service",
+            category="Debt Service",
+            amount=Decimal("500.00"),
+        )
+        Payment.objects.create(
+            application=resident,
+            payment_type="rent",
+            amount=Decimal("700.00"),
+            status="completed",
+            service_month=date(2026, 5, 1),
+        )
+
+        months, totals = t12_report_rows(landlord, 2026)
+        may_row = months[4]
+
+        self.assertEqual(may_row["income_source"], "Spreadsheet")
+        self.assertEqual(may_row["online_income"], Decimal("0.00"))
+        self.assertEqual(may_row["spreadsheet_income"], Decimal("2000.00"))
+        self.assertEqual(may_row["total_income"], Decimal("2000.00"))
+        self.assertEqual(may_row["operating_expenses"], Decimal("300.00"))
+        self.assertEqual(may_row["debt_service"], Decimal("500.00"))
+        self.assertEqual(may_row["net_operating_income"], Decimal("1700.00"))
+        self.assertEqual(may_row["cash_flow_after_debt"], Decimal("1200.00"))
 
     def test_t12_report_can_be_filtered_to_one_property(self):
         owner = User.objects.create_user(

@@ -62,6 +62,7 @@
             <thead>
                 <tr>
                     <th>Month</th>
+                    <th>Income Source</th>
                     <th>Online Income</th>
                     <th>Spreadsheet Income</th>
                     <th>Total Income</th>
@@ -77,6 +78,7 @@
                 {% for month in months %}
                     <tr>
                         <td>{{ month.month_name }}</td>
+                        <td>{{ month.income_source|default:"-" }}</td>
                         <td>${{ month.online_income }}</td>
                         <td>${{ month.spreadsheet_income }}</td>
                         <td>${{ month.total_income }}</td>
@@ -90,6 +92,7 @@
 
                 <tr class="fw-bold">
                     <td>Total</td>
+                    <td>-</td>
                     <td>${{ totals.online_income }}</td>
                     <td>${{ totals.spreadsheet_income }}</td>
                     <td>${{ totals.total_income }}</td>

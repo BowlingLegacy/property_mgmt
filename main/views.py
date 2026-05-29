@@ -3417,6 +3417,7 @@ def export_t12_csv(request):
     writer = csv.writer(response)
     writer.writerow([
         "Month",
+        "Income Source",
         "Online Income",
         "Spreadsheet Income",
         "Total Income",
@@ -3430,6 +3431,7 @@ def export_t12_csv(request):
     for month in months:
         writer.writerow([
             month["month_name"],
+            month["income_source"],
             csv_money(month["online_income"]),
             csv_money(month["spreadsheet_income"]),
             csv_money(month["total_income"]),
@@ -3442,6 +3444,7 @@ def export_t12_csv(request):
 
     writer.writerow([
         "Total",
+        "",
         csv_money(totals["online_income"]),
         csv_money(totals["spreadsheet_income"]),
         csv_money(totals["total_income"]),
@@ -3525,7 +3528,7 @@ def t12_report_rows(user, year, report_properties=None):
     }
 
     for month_number in range(1, 13):
-        online_income = payment_amount_for_month(completed_payments, year, month_number, T12_INCOME_PAYMENT_TYPES)
+        portal_income = payment_amount_for_month(completed_payments, year, month_number, T12_INCOME_PAYMENT_TYPES)
         month_filter = Q(month=month_number) | Q(entry_date__month=month_number)
         spreadsheet_income = (
             financial_entries
@@ -3538,12 +3541,21 @@ def t12_report_rows(user, year, report_properties=None):
         debt_service = financial_entries.filter(month_filter, entry_type="debt_service").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
         capital_expenses = financial_entries.filter(month_filter, entry_type="capital_expense").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
 
-        total_income = online_income + spreadsheet_income
+        if spreadsheet_income > 0:
+            online_income = Decimal("0.00")
+            total_income = spreadsheet_income
+            income_source = "Spreadsheet"
+        else:
+            online_income = portal_income
+            total_income = portal_income
+            income_source = "Portal"
+
         net_operating_income = total_income - operating_expenses
         cash_flow_after_debt = net_operating_income - debt_service
 
         row = {
             "month_name": date(year, month_number, 1).strftime("%B"),
+            "income_source": income_source if total_income > 0 else "",
             "online_income": online_income,
             "spreadsheet_income": spreadsheet_income,
             "total_income": total_income,
