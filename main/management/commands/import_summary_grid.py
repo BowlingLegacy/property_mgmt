@@ -7,11 +7,22 @@ from main.models import FinancialUpload, Property
 from main.views import (
     create_financial_entry_from_import,
     money,
+    normalized_header,
     parse_month_header,
     read_financial_upload_rows,
     should_skip_summary_category,
     summary_category_entry_type,
 )
+
+
+IGNORED_T12_SUMMARY_CATEGORIES = {
+    "resident deposit",
+    "resident deposits",
+    "security deposit",
+    "security deposits",
+    "utility account",
+    "utility accounts",
+}
 
 
 class Command(BaseCommand):
@@ -52,9 +63,12 @@ class Command(BaseCommand):
 
         planned = []
         skipped_rows = 0
+        skipped_duplicate_entries = 0
+        seen_entries = set()
         for row in rows:
             category = str(row["data"].get(category_column, "") or "").strip()
-            if should_skip_summary_category(category, summary_categories):
+            clean_category = normalized_header(category)
+            if clean_category in IGNORED_T12_SUMMARY_CATEGORIES or should_skip_summary_category(category, summary_categories):
                 skipped_rows += 1
                 continue
 
@@ -69,6 +83,12 @@ class Command(BaseCommand):
                 if not entry_type:
                     continue
 
+                duplicate_key = (month_number, entry_type, clean_category, abs(amount))
+                if duplicate_key in seen_entries:
+                    skipped_duplicate_entries += 1
+                    continue
+
+                seen_entries.add(duplicate_key)
                 planned.append((row, month_number, column_name, entry_type, category, amount))
                 row_created += 1
 
@@ -83,6 +103,7 @@ class Command(BaseCommand):
         self.stdout.write(f"Category column: {category_column}")
         self.stdout.write(f"Month columns: {', '.join(month_columns)}")
         self.stdout.write(f"Rows skipped: {skipped_rows}")
+        self.stdout.write(f"Duplicate entries skipped: {skipped_duplicate_entries}")
         self.stdout.write(f"Entries selected: {len(planned)}")
 
         totals = {}

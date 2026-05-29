@@ -4600,6 +4600,10 @@ class LiveFlowTests(TestCase):
                 b"Rent,2000.00,2100.00,2200.00,6300.00,2300.00,2400.00\n"
                 b"TOTAL OPERATING EXPENSES,700.00,710.00,720.00,2130.00,730.00,740.00\n"
                 b"Debt Service,500.00,500.00,500.00,1500.00,500.00,500.00\n"
+                b"Resident Deposit,450.00,0.00,0.00,450.00,0.00,450.00\n"
+                b"Utility Account,100.00,110.00,120.00,330.00,130.00,140.00\n"
+                b"Insurance,0.00,0.00,880.47,1760.94,880.47,880.47\n"
+                b"Insurance,0.00,0.00,880.47,1760.94,880.47,880.47\n"
                 b"NOI,1300.00,1390.00,1480.00,4170.00,1570.00,1660.00\n"
             ),
             content_type="text/csv",
@@ -4623,7 +4627,8 @@ class LiveFlowTests(TestCase):
             stdout=preview,
         )
         self.assertEqual(FinancialEntry.objects.filter(upload=upload).count(), 0)
-        self.assertIn("Entries selected: 15", preview.getvalue())
+        self.assertIn("Duplicate entries skipped: 3", preview.getvalue())
+        self.assertIn("Entries selected: 13", preview.getvalue())
 
         output = StringIO()
         call_command(
@@ -4638,14 +4643,18 @@ class LiveFlowTests(TestCase):
             stdout=output,
         )
 
-        self.assertEqual(FinancialEntry.objects.filter(upload=upload).count(), 15)
+        entries = FinancialEntry.objects.filter(upload=upload)
+        self.assertEqual(entries.count(), 13)
+        self.assertFalse(entries.filter(category="Resident Deposit").exists())
+        self.assertFalse(entries.filter(category="Utility Account").exists())
+        self.assertEqual(entries.filter(category="Insurance").count(), 3)
         months, _totals = t12_report_rows(landlord, 2026)
         may_row = months[4]
         self.assertEqual(may_row["spreadsheet_income"], Decimal("2400.00"))
-        self.assertEqual(may_row["operating_expenses"], Decimal("740.00"))
+        self.assertEqual(may_row["operating_expenses"], Decimal("880.47"))
         self.assertEqual(may_row["debt_service"], Decimal("500.00"))
-        self.assertEqual(may_row["net_operating_income"], Decimal("1660.00"))
-        self.assertEqual(may_row["cash_flow_after_debt"], Decimal("1160.00"))
+        self.assertEqual(may_row["net_operating_income"], Decimal("1519.53"))
+        self.assertEqual(may_row["cash_flow_after_debt"], Decimal("1019.53"))
 
     def test_accounting_import_blocks_other_landlord_property(self):
         landlord = User.objects.create_user(
