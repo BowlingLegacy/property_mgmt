@@ -173,7 +173,7 @@ FINANCIAL_COLUMN_ALIASES = {
     "entry_date": ["date", "transaction date", "posted date", "posting date", "paid date", "receipt date"],
     "description": ["description", "memo", "payee", "vendor", "name", "transaction", "details"],
     "amount": ["amount", "debit", "credit", "paid", "payment", "total", "net amount"],
-    "category": ["category", "account", "expense category", "income category", "gl account", "class"],
+    "category": ["category", "account", "expense category", "income category", "gl account", "class", "overhead title", "overhead", "account title"],
     "entry_type": ["type", "entry type", "transaction type", "account type"],
     "property_name": ["property", "property name", "building", "location"],
 }
@@ -376,6 +376,9 @@ SUMMARY_CALCULATED_ROW_KEYWORDS = {
     "net income",
     "cash flow",
     "cashflow",
+    "after debt service",
+    "net after debt service",
+    "total net after debt service",
     "profit",
     "loss",
 }
@@ -435,7 +438,7 @@ def summary_has_detail_rows(category, all_categories):
             and clean_other not in SUMMARY_OPERATING_EXPENSE_LABELS
             and clean_other not in SUMMARY_DEBT_SERVICE_LABELS
             and not any(keyword in clean_other for keyword in SUMMARY_CALCULATED_ROW_KEYWORDS)
-            and "rent" not in clean_other
+            and summary_category_entry_type(clean_other, "operating_expense") == "operating_expense"
         ):
             return True
 

@@ -4498,12 +4498,15 @@ class LiveFlowTests(TestCase):
         csv_file = SimpleUploadedFile(
             "summary-total-expense.csv",
             (
-                b"Category,January,February,March,April,May\n"
-                b"Rent,2000.00,2100.00,2200.00,2300.00,2400.00\n"
-                b"Total Operating Expenses,700.00,710.00,720.00,730.00,740.00\n"
-                b"Debt Service,500.00,500.00,500.00,500.00,500.00\n"
-                b"NOI,1300.00,1390.00,1480.00,1570.00,1660.00\n"
-                b"Cash Flow,800.00,890.00,980.00,1070.00,1160.00\n"
+                b"OVERHEAD TITLE,January,February,March,Q1 2026,April,May\n"
+                b"Rent,2000.00,2100.00,2200.00,6300.00,2300.00,2400.00\n"
+                b"Other Income,100.00,110.00,120.00,330.00,130.00,140.00\n"
+                b"Total Operating Expenses,700.00,710.00,720.00,2130.00,730.00,740.00\n"
+                b"Debt Service,500.00,500.00,500.00,1500.00,500.00,500.00\n"
+                b"Resident Deposit,450.00,0.00,0.00,450.00,0.00,450.00\n"
+                b"NOI,1300.00,1390.00,1480.00,4170.00,1570.00,1660.00\n"
+                b"Total Net After Debt Service,800.00,890.00,980.00,2670.00,1070.00,1160.00\n"
+                b"Cash Flow,800.00,890.00,980.00,2670.00,1070.00,1160.00\n"
             ),
             content_type="text/csv",
         )
@@ -4521,27 +4524,31 @@ class LiveFlowTests(TestCase):
         response = self.client.post(reverse("parse_financial_upload", args=[upload.id]), {
             "import_mode": "summary_grid",
             "sheet_name": "CSV",
-            "summary_category_column": "Category",
+            "summary_category_column": "OVERHEAD TITLE",
             "summary_year": "2026",
             "summary_entry_type": "operating_expense",
-            "summary_month_columns": ["January", "February", "March", "April", "May"],
+            "summary_month_columns": ["January", "February", "March", "Q1 2026", "April", "May"],
         })
 
         self.assertRedirects(response, reverse("financial_upload"))
         entries = FinancialEntry.objects.filter(upload=upload)
-        self.assertEqual(entries.count(), 15)
+        self.assertEqual(entries.count(), 22)
         self.assertTrue(entries.filter(category="Total Operating Expenses", month=5, entry_type="operating_expense", amount=Decimal("740.00")).exists())
         self.assertTrue(entries.filter(category="Debt Service", month=5, entry_type="debt_service", amount=Decimal("500.00")).exists())
+        self.assertTrue(entries.filter(category="Other Income", month=5, entry_type="income", amount=Decimal("140.00")).exists())
+        self.assertTrue(entries.filter(category="Resident Deposit", month=5, entry_type="income", amount=Decimal("450.00")).exists())
+        self.assertFalse(entries.filter(description__icontains="Q1 2026").exists())
         self.assertFalse(entries.filter(category="NOI").exists())
         self.assertFalse(entries.filter(category="Cash Flow").exists())
+        self.assertFalse(entries.filter(category="Total Net After Debt Service").exists())
 
         months, totals = t12_report_rows(landlord, 2026)
         may_row = months[4]
-        self.assertEqual(may_row["spreadsheet_income"], Decimal("2400.00"))
+        self.assertEqual(may_row["spreadsheet_income"], Decimal("2540.00"))
         self.assertEqual(may_row["operating_expenses"], Decimal("740.00"))
         self.assertEqual(may_row["debt_service"], Decimal("500.00"))
-        self.assertEqual(may_row["net_operating_income"], Decimal("1660.00"))
-        self.assertEqual(may_row["cash_flow_after_debt"], Decimal("1160.00"))
+        self.assertEqual(may_row["net_operating_income"], Decimal("1800.00"))
+        self.assertEqual(may_row["cash_flow_after_debt"], Decimal("1300.00"))
 
     def test_accounting_import_blocks_other_landlord_property(self):
         landlord = User.objects.create_user(
