@@ -116,7 +116,30 @@
 
         <p class="text-muted">
             Payments sorted by property, month, and unit.
+            {% if month_filter_active %}
+                Showing {{ selected_month|date:"F Y" }}.
+            {% else %}
+                Showing all months.
+            {% endif %}
         </p>
+
+        <div class="d-flex gap-2 flex-wrap mt-3 report-actions">
+            {% if month_filter_active %}
+                <a href="{% url 'payment_log' %}?month={{ previous_month|date:'Y-m' }}" class="btn btn-outline-primary">
+                    Previous Month
+                </a>
+                <a href="{% url 'payment_log' %}" class="btn btn-outline-dark">
+                    All Months
+                </a>
+                <a href="{% url 'payment_log' %}?month={{ next_month|date:'Y-m' }}" class="btn btn-outline-primary">
+                    Next Month
+                </a>
+            {% else %}
+                <a href="{% url 'payment_log' %}?month={% now 'Y-m' %}" class="btn btn-outline-primary">
+                    Current Month Only
+                </a>
+            {% endif %}
+        </div>
     </div>
 
     {% for property_group in payment_log %}

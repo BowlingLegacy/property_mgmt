@@ -3378,6 +3378,15 @@ class LiveFlowTests(TestCase):
             ["January 2026", "February 2026", "March 2026", "April 2026", "May 2026", "June 2026"],
         )
 
+        filtered_response = self.client.get(f"{reverse('payment_log')}?month=2026-05")
+        filtered_groups = filtered_response.context["payment_log"][0]["months"]
+
+        self.assertTrue(filtered_response.context["month_filter_active"])
+        self.assertContains(filtered_response, "Showing May 2026.")
+        self.assertContains(filtered_response, "All Months")
+        self.assertEqual([month["month_label"] for month in filtered_groups], ["May 2026"])
+        self.assertNotContains(filtered_response, "January 2026")
+
     def test_rent_roll_lists_room_roster_before_profile_setup(self):
         landlord = User.objects.create_user(
             username="rent-roll-roster-landlord",

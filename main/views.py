@@ -3080,6 +3080,11 @@ Replying to this email will go to the resident's email address. To keep the conv
 @login_required
 @user_passes_test(staff_required)
 def payment_log(request):
+    raw_month = (request.GET.get("month") or "").strip()
+    month_filter_active = bool(raw_month)
+    selected_month = selected_report_month(request) if month_filter_active else None
+    previous_month = add_months(selected_month, -1) if selected_month else None
+    next_month = add_months(selected_month, 1) if selected_month else None
     completed_payments = (
         Payment.objects
         .filter(application__in=staff_managed_applications(request.user), status="completed")
@@ -3095,6 +3100,8 @@ def payment_log(request):
         payment.display_paid_at = payment.received_at or payment.created_at
         property_name = application.property.name if application.property else "No Property"
         accounting_month = payment_service_month(payment)
+        if selected_month and accounting_month != selected_month:
+            continue
         month_label = accounting_month.strftime("%B %Y")
 
         grouped.setdefault(property_name, OrderedDict())
@@ -3129,7 +3136,13 @@ def payment_log(request):
             "months": month_data,
         })
 
-    return render(request, "payment_log.html", {"payment_log": payment_log_data})
+    return render(request, "payment_log.html", {
+        "payment_log": payment_log_data,
+        "month_filter_active": month_filter_active,
+        "selected_month": selected_month,
+        "previous_month": previous_month,
+        "next_month": next_month,
+    })
 
 
 @login_required
