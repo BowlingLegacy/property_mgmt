@@ -25,7 +25,7 @@ from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.mail import EmailMessage, send_mail
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Max, Q, Sum
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
@@ -942,6 +942,28 @@ def decimal_percent(numerator, denominator):
     if denominator <= 0:
         return Decimal("0.00")
     return (Decimal(numerator or "0.00") / denominator * Decimal("100.00")).quantize(Decimal("0.01"))
+
+
+def summary_baseline_upload_ids_for_month(financial_entries, month_filter, entry_types=None):
+    queryset = financial_entries.filter(month_filter, source_receipt__isnull=True)
+    if entry_types:
+        queryset = queryset.filter(entry_type__in=entry_types)
+    return set(queryset.values_list("upload_id", flat=True).distinct())
+
+
+def latest_summary_baseline_time(financial_entries, month_filter):
+    summary_upload_ids = summary_baseline_upload_ids_for_month(financial_entries, month_filter, ["income", "operating_expense", "debt_service", "capital_expense"])
+    if not summary_upload_ids:
+        return None
+    return (
+        FinancialUpload.objects
+        .filter(id__in=summary_upload_ids)
+        .aggregate(latest=Max("uploaded_at"))["latest"]
+    )
+
+
+def entries_total(queryset):
+    return queryset.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
 
 
 def recalculate_application_balances(application):
@@ -3928,25 +3950,44 @@ def t12_report_rows(user, year, report_properties=None):
     for month_number in range(1, 13):
         portal_income = payment_amount_for_month(completed_payments, year, month_number, T12_INCOME_PAYMENT_TYPES)
         month_filter = Q(month=month_number) | Q(entry_date__month=month_number)
-        spreadsheet_income = (
-            financial_entries
-            .filter(month_filter, entry_type="income")
+        month_entries = financial_entries.filter(month_filter)
+        summary_entries = month_entries.filter(source_receipt__isnull=True)
+        receipt_entries = month_entries.filter(source_receipt__isnull=False)
+        baseline_time = latest_summary_baseline_time(financial_entries, month_filter)
+        if baseline_time:
+            receipt_entries = receipt_entries.filter(created_at__gt=baseline_time)
+
+        spreadsheet_income = entries_total(
+            summary_entries
+            .filter(entry_type="income")
             .exclude(category__icontains="deposit")
-            .aggregate(total=Sum("amount"))["total"]
-            or Decimal("0.00")
         )
-        operating_expenses = financial_entries.filter(month_filter, entry_type="operating_expense").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-        debt_service = financial_entries.filter(month_filter, entry_type="debt_service").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-        capital_expenses = financial_entries.filter(month_filter, entry_type="capital_expense").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        receipt_income = entries_total(
+            receipt_entries
+            .filter(entry_type="income")
+            .exclude(category__icontains="deposit")
+        )
+        operating_expenses = (
+            entries_total(summary_entries.filter(entry_type="operating_expense"))
+            + entries_total(receipt_entries.filter(entry_type="operating_expense"))
+        )
+        debt_service = (
+            entries_total(summary_entries.filter(entry_type="debt_service"))
+            + entries_total(receipt_entries.filter(entry_type="debt_service"))
+        )
+        capital_expenses = (
+            entries_total(summary_entries.filter(entry_type="capital_expense"))
+            + entries_total(receipt_entries.filter(entry_type="capital_expense"))
+        )
 
         if spreadsheet_income > 0:
             online_income = Decimal("0.00")
-            total_income = spreadsheet_income
-            income_source = "Spreadsheet"
+            total_income = spreadsheet_income + receipt_income
+            income_source = "Spreadsheet + Receipts" if receipt_income > 0 else "Spreadsheet"
         else:
             online_income = portal_income
-            total_income = portal_income
-            income_source = "Portal"
+            total_income = portal_income + receipt_income
+            income_source = "Portal + Receipts" if receipt_income > 0 else "Portal"
 
         net_operating_income = total_income - operating_expenses
         cash_flow_after_debt = net_operating_income - debt_service

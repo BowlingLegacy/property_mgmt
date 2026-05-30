@@ -4144,6 +4144,85 @@ class LiveFlowTests(TestCase):
         self.assertEqual(may_row["net_operating_income"], Decimal("1700.00"))
         self.assertEqual(may_row["cash_flow_after_debt"], Decimal("1200.00"))
 
+    def test_t12_adds_receipts_created_after_summary_baseline(self):
+        landlord = User.objects.create_user(
+            username="t12-receipt-landlord",
+            email="t12-receipt-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="T12 Receipt Property", landlord_email=landlord.email)
+        summary_upload = FinancialUpload.objects.create(
+            property=property_obj,
+            name="May Summary Snapshot",
+            file=SimpleUploadedFile("summary.csv", b"Category,May\n", content_type="text/csv"),
+        )
+        FinancialEntry.objects.create(
+            upload=summary_upload,
+            property_name=property_obj.name,
+            sheet_name="Summary",
+            row_number=1,
+            year=2026,
+            month=5,
+            entry_type="income",
+            category="Rent",
+            amount=Decimal("2000.00"),
+        )
+        FinancialEntry.objects.create(
+            upload=summary_upload,
+            property_name=property_obj.name,
+            sheet_name="Summary",
+            row_number=2,
+            year=2026,
+            month=5,
+            entry_type="operating_expense",
+            category="Repairs",
+            amount=Decimal("300.00"),
+        )
+        receipt_category = ExpenseCategory.objects.create(name="Post Summary Repair", entry_type="operating_expense")
+        receipt = AccountingReceipt.objects.create(
+            property=property_obj,
+            receipt_file="accounting_receipts/post-summary.pdf",
+            vendor="Post Summary Vendor",
+            receipt_date=date(2026, 5, 28),
+            category=receipt_category,
+            entry_type="operating_expense",
+            description="Expense after summary snapshot",
+            amount=Decimal("125.00"),
+            payment_method="cash",
+            status="approved",
+        )
+        receipt_upload = FinancialUpload.objects.create(
+            property=property_obj,
+            file="accounting_receipts/post-summary.pdf",
+            name="Receipt - Post Summary Vendor",
+            parsed_at=timezone.now(),
+        )
+        receipt.financial_upload = receipt_upload
+        receipt.financial_entry = FinancialEntry.objects.create(
+            upload=receipt_upload,
+            property_name=property_obj.name,
+            sheet_name="Receipt Upload",
+            row_number=receipt.id,
+            entry_date=receipt.receipt_date,
+            month=5,
+            year=2026,
+            entry_type="operating_expense",
+            category=receipt_category.name,
+            description=receipt.description,
+            amount=receipt.amount,
+        )
+        receipt.save(update_fields=["financial_upload", "financial_entry"])
+
+        months, _totals = t12_report_rows(landlord, 2026)
+        may_row = months[4]
+
+        self.assertEqual(may_row["income_source"], "Spreadsheet")
+        self.assertEqual(may_row["spreadsheet_income"], Decimal("2000.00"))
+        self.assertEqual(may_row["operating_expenses"], Decimal("425.00"))
+        self.assertEqual(may_row["net_operating_income"], Decimal("1575.00"))
+
     def test_t12_report_can_be_filtered_to_one_property(self):
         owner = User.objects.create_user(
             username="t12-filter-owner",
