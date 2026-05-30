@@ -835,7 +835,12 @@ def rent_roll_rows_for_properties(user, selected_month, properties):
     residents = (
         staff_managed_applications(user)
         .select_related("property")
-        .filter(property__in=properties, user__isnull=False)
+        .filter(
+            Q(user__isnull=False)
+            | Q(payments__status="completed", payments__service_month=selected_month),
+            property__in=properties,
+        )
+        .distinct()
         .order_by("property__name", "space_label", "full_name")
     )
 
@@ -877,8 +882,8 @@ def rent_roll_rows_for_properties(user, selected_month, properties):
 
     rows = sorted(rows_by_room.values(), key=lambda row: (row["property"].lower(), row["room_sort"], row["resident"].lower()))
     for row in rows:
-        row["rent_balance"] = max(row["rent_due_for_month"], row["current_rent_balance"])
-        row["utility_balance"] = max(row["utility_due_for_month"], row["current_utility_balance"])
+        row["rent_balance"] = row["rent_due_for_month"]
+        row["utility_balance"] = row["utility_due_for_month"]
         row["deposit_balance"] = row["deposit_due"]
     return rows
 

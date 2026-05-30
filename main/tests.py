@@ -13,7 +13,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .models import AccountingReceipt, ApplicantDocument, BlogComment, BlogPost, CompanyMailboxConnection, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, PropertyRoomRent, RentHistory, ResidentMessage, ResidentMessageReply, SignedDocument, SmsMessageLog, User
-from .views import apply_completed_payment_to_balance, ensure_existing_resident_portal_application, payment_amount_for_month, prorated_monthly_charge, t12_report_rows
+from .views import apply_completed_payment_to_balance, ensure_existing_resident_portal_application, payment_amount_for_month, prorated_monthly_charge, rent_roll_rows_for_properties, t12_report_rows
 
 
 @override_settings(
@@ -4655,6 +4655,85 @@ class LiveFlowTests(TestCase):
         self.assertEqual(may_row["debt_service"], Decimal("500.00"))
         self.assertEqual(may_row["net_operating_income"], Decimal("1519.53"))
         self.assertEqual(may_row["cash_flow_after_debt"], Decimal("1019.53"))
+
+    def test_import_monthly_rent_roll_command_imports_supporting_detail_without_t12_entries(self):
+        landlord = User.objects.create_user(
+            username="rent-roll-import-landlord",
+            email="rent-roll-import@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Rent Roll Import Property", landlord_email=landlord.email)
+        csv_file = SimpleUploadedFile(
+            "jan-rent-roll.csv",
+            (
+                b"Room #,Tenant Name,Lease Start,Monthly Rent,Rent Paid,over/under,Deposit,new deposit,Shared Utilities\n"
+                b"A,Office,,,,,,,\n"
+                b"B,Grady Bradley,7/13/2014,$506.00,$506.00,$0.00,$450,,$58.00\n"
+                b"C,Steven Bruno,2/26/2021,$610.00,$610.00,$0.00,$450,,$58.00\n"
+                b"Q,VACANT,,,,,,,\n"
+            ),
+            content_type="text/csv",
+        )
+        upload = FinancialUpload.objects.create(
+            property=property_obj,
+            ledger_scope="property",
+            name="Jan 26 Financial Upload",
+            file=csv_file,
+        )
+        FinancialEntry.objects.create(
+            upload=upload,
+            ledger_scope="property",
+            property_name=property_obj.name,
+            sheet_name="CSV",
+            row_number=2,
+            entry_type="income",
+            category="Rent",
+            amount=Decimal("1116.00"),
+        )
+
+        preview = StringIO()
+        call_command(
+            "import_monthly_rent_roll",
+            "--property-name",
+            property_obj.name,
+            "--upload-id",
+            str(upload.id),
+            "--month",
+            "2026-01",
+            stdout=preview,
+        )
+        self.assertIn("Resident rows selected: 2", preview.getvalue())
+        self.assertEqual(Payment.objects.filter(application__property=property_obj).count(), 0)
+        self.assertEqual(upload.entries.count(), 1)
+
+        output = StringIO()
+        call_command(
+            "import_monthly_rent_roll",
+            "--property-name",
+            property_obj.name,
+            "--upload-id",
+            str(upload.id),
+            "--month",
+            "2026-01",
+            "--confirm",
+            stdout=output,
+        )
+
+        self.assertEqual(upload.entries.count(), 0)
+        self.assertEqual(PropertyRoomRent.objects.filter(property=property_obj).count(), 2)
+        self.assertEqual(CurrentResidentRosterEntry.objects.filter(property=property_obj).count(), 2)
+        self.assertEqual(HousingApplication.objects.filter(property=property_obj, user__isnull=True).count(), 2)
+        self.assertEqual(Payment.objects.filter(application__property=property_obj, service_month=date(2026, 1, 1), status="completed").count(), 4)
+
+        rows = rent_roll_rows_for_properties(landlord, date(2026, 1, 1), Property.objects.filter(id=property_obj.id))
+        grady_row = next(row for row in rows if row["room"] == "B")
+        self.assertEqual(grady_row["resident"], "Grady Bradley")
+        self.assertEqual(grady_row["monthly_rent"], Decimal("506.00"))
+        self.assertEqual(grady_row["rent_paid"], Decimal("506.00"))
+        self.assertEqual(grady_row["utility_paid"], Decimal("58.00"))
+        self.assertEqual(grady_row["rent_balance"], Decimal("0.00"))
 
     def test_accounting_import_blocks_other_landlord_property(self):
         landlord = User.objects.create_user(
