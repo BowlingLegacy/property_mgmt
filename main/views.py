@@ -3094,18 +3094,23 @@ def payment_log(request):
         payment.display_unit_label = canonical_room_label(application.space_label or application.space_type)
         payment.display_paid_at = payment.received_at or payment.created_at
         property_name = application.property.name if application.property else "No Property"
-        month_label = payment_service_month(payment).strftime("%B %Y")
+        accounting_month = payment_service_month(payment)
+        month_label = accounting_month.strftime("%B %Y")
 
         grouped.setdefault(property_name, OrderedDict())
-        grouped[property_name].setdefault(month_label, [])
-        grouped[property_name][month_label].append(payment)
+        grouped[property_name].setdefault(month_label, {
+            "month_date": accounting_month,
+            "payments": [],
+        })
+        grouped[property_name][month_label]["payments"].append(payment)
 
     payment_log_data = []
 
     for property_name, months in grouped.items():
         month_data = []
 
-        for month_label, payments in months.items():
+        for month_label, month_group in sorted(months.items(), key=lambda item: item[1]["month_date"]):
+            payments = month_group["payments"]
             payments_sorted = sorted(
                 payments,
                 key=lambda p: (

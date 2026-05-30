@@ -3337,6 +3337,47 @@ class LiveFlowTests(TestCase):
         self.assertContains(payment_response, "Print Report")
         self.assertContains(payment_response, "window.print()")
 
+    def test_payment_log_orders_months_chronologically(self):
+        landlord = User.objects.create_user(
+            username="payment-month-order-landlord",
+            email="payment-month-order@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Payment Month Order Property", landlord_email=landlord.email)
+        resident_user = User.objects.create_user(username="payment-month-order-tenant", password="StrongPass123!", role="tenant")
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Payment Month Order Resident",
+            phone="555-0711",
+            email="month-order@example.com",
+            age=45,
+            space_label="B",
+            monthly_rent=Decimal("506.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        for service_month in [date(2026, 4, 1), date(2026, 3, 1), date(2026, 2, 1), date(2026, 1, 1), date(2026, 5, 1), date(2026, 6, 1)]:
+            Payment.objects.create(
+                application=resident,
+                payment_type="rent",
+                amount=Decimal("506.00"),
+                status="completed",
+                service_month=service_month,
+            )
+
+        self.client.login(username="payment-month-order-landlord", password="StrongPass123!")
+        response = self.client.get(reverse("payment_log"))
+        months = response.context["payment_log"][0]["months"]
+
+        self.assertEqual(
+            [month["month_label"] for month in months],
+            ["January 2026", "February 2026", "March 2026", "April 2026", "May 2026", "June 2026"],
+        )
+
     def test_rent_roll_lists_room_roster_before_profile_setup(self):
         landlord = User.objects.create_user(
             username="rent-roll-roster-landlord",
