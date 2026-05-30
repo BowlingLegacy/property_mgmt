@@ -41,6 +41,11 @@
             width: 105px;
             white-space: nowrap;
         }
+        .totals-row td {
+            background: #15110a !important;
+            color: #f7d77d !important;
+            font-weight: 800;
+        }
     </style>
 </head>
 
@@ -133,6 +138,24 @@
                         </tr>
                     {% endfor %}
                 </tbody>
+
+                {% if rows %}
+                    <tfoot>
+                        <tr class="totals-row">
+                            <td class="unit-col"></td>
+                            <td>Total</td>
+                            <td class="money-col">${{ totals.monthly_rent }}</td>
+                            <td class="money-col">${{ totals.rent_paid }}</td>
+                            <td class="money-col">${{ totals.rent_balance }}</td>
+                            <td class="money-col">${{ totals.utility_monthly }}</td>
+                            <td class="money-col">${{ totals.utility_paid }}</td>
+                            <td class="money-col">${{ totals.utility_balance }}</td>
+                            <td class="money-col">${{ totals.deposit_required }}</td>
+                            <td class="money-col">${{ totals.deposit_paid }}</td>
+                            <td class="money-col">${{ totals.deposit_balance }}</td>
+                        </tr>
+                    </tfoot>
+                {% endif %}
             </table>
         </div>
     {% endif %}

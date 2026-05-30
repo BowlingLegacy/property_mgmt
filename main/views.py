@@ -888,6 +888,24 @@ def rent_roll_rows_for_properties(user, selected_month, properties):
     return rows
 
 
+def rent_roll_totals(rows):
+    total_fields = [
+        "monthly_rent",
+        "rent_paid",
+        "rent_balance",
+        "utility_monthly",
+        "utility_paid",
+        "utility_balance",
+        "deposit_required",
+        "deposit_paid",
+        "deposit_balance",
+    ]
+    return {
+        field: sum((row.get(field, Decimal("0.00")) or Decimal("0.00") for row in rows), Decimal("0.00"))
+        for field in total_fields
+    }
+
+
 def recalculate_application_balances(application):
     completed_payments = application.payments.filter(status="completed")
     rent_paid = completed_payments.filter(payment_type="rent").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
@@ -3252,9 +3270,11 @@ def rent_roll(request):
     next_month = add_months(selected_month, 1)
     properties, selected_property, show_property_picker = selected_property_scope(request)
     rows = [] if show_property_picker else rent_roll_rows_for_properties(request.user, selected_month, properties)
+    totals = rent_roll_totals(rows)
 
     return render(request, "rent_roll.html", {
         "rows": rows,
+        "totals": totals,
         "properties": properties,
         "selected_property": selected_property,
         "show_property_picker": show_property_picker,
@@ -3465,6 +3485,7 @@ def export_rent_roll_csv(request):
     ])
 
     rows = rent_roll_rows_for_properties(request.user, selected_month, properties)
+    totals = rent_roll_totals(rows)
     for row in rows:
         writer.writerow([
             selected_month.strftime("%B %Y"),
@@ -3480,6 +3501,20 @@ def export_rent_roll_csv(request):
             row["deposit_paid"],
             row["deposit_balance"],
         ])
+    writer.writerow([
+        selected_month.strftime("%B %Y"),
+        "TOTAL",
+        "",
+        totals["monthly_rent"],
+        totals["rent_paid"],
+        totals["rent_balance"],
+        totals["utility_monthly"],
+        totals["utility_paid"],
+        totals["utility_balance"],
+        totals["deposit_required"],
+        totals["deposit_paid"],
+        totals["deposit_balance"],
+    ])
 
     return response
 

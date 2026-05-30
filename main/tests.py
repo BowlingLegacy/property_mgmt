@@ -3175,6 +3175,12 @@ class LiveFlowTests(TestCase):
         self.assertLess(content.index('class="unit-col">B</td>'), content.index('class="unit-col">C</td>'))
         self.assertContains(response, "$300.00")
         self.assertContains(response, "$250.00")
+        self.assertEqual(response.context["totals"]["monthly_rent"], Decimal("1875.00"))
+        self.assertEqual(response.context["totals"]["rent_paid"], Decimal("300.00"))
+        self.assertEqual(response.context["totals"]["rent_balance"], Decimal("1575.00"))
+        self.assertEqual(response.context["totals"]["utility_monthly"], Decimal("187.00"))
+        self.assertEqual(response.context["totals"]["deposit_required"], Decimal("1350.00"))
+        self.assertContains(response, "<td>Total</td>", html=True)
 
     def test_rent_roll_prompts_for_property_when_multiple_properties_exist(self):
         superuser = User.objects.create_user(
@@ -3284,6 +3290,7 @@ class LiveFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("June 2026,CSV Resident,G", content)
         self.assertIn("Utilities Paid", content)
+        self.assertIn("June 2026,TOTAL,,560.00,0.00,560.00,55.00,55.00,0.00,450.00,0.00,450.00", content)
         self.assertNotIn("Property", content.splitlines()[0])
         self.assertNotIn("Utilities Paid This Month", content)
         self.assertNotIn("CSV Applicant", content)
