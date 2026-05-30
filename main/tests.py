@@ -2551,6 +2551,7 @@ class LiveFlowTests(TestCase):
             "advertises_available_units": "on",
             "uses_automatic_late_fees": "on",
             "needs_custom_reports": "on",
+            "desired_reports": ["valuation_estimate", "vendor_expense", "utility_cost_trend"],
             "offers_renters_insurance": "on",
             "dashboard_goals": "Show NOI and rent collection by property.",
         })
@@ -2567,6 +2568,7 @@ class LiveFlowTests(TestCase):
         self.assertTrue(intake.advertises_available_units)
         self.assertTrue(intake.uses_automatic_late_fees)
         self.assertTrue(intake.needs_custom_reports)
+        self.assertEqual(intake.desired_reports, "valuation_estimate, vendor_expense, utility_cost_trend")
         self.assertTrue(intake.offers_renters_insurance)
 
     def test_existing_resident_intake_button_opens_for_new_property_and_saves_profile(self):
@@ -3858,6 +3860,115 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "Floor replacement")
         self.assertContains(response, "$525.00")
         self.assertNotContains(response, "May rent")
+
+    def test_commercial_custom_reports_use_scoped_property_data(self):
+        owner = User.objects.create_user(
+            username="commercial-report-owner",
+            email="commercial-owner@example.com",
+            password="StrongPass123!",
+            role="property_owner",
+        )
+        property_obj = Property.objects.create(name="Commercial Report Property", owner_email=owner.email)
+        hidden_property = Property.objects.create(name="Hidden Commercial Property", owner_email="hidden@example.com")
+        PropertyRoomRent.objects.create(property=property_obj, room_unit_label="A", monthly_rent=Decimal("900.00"))
+        PropertyRoomRent.objects.create(property=property_obj, room_unit_label="B", monthly_rent=Decimal("950.00"))
+        tenant_user = User.objects.create_user(username="commercial-report-tenant", password="StrongPass123!", role="tenant")
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=tenant_user,
+            full_name="Commercial Report Resident",
+            phone="555-0888",
+            email="commercial-resident@example.com",
+            age=44,
+            space_label="A",
+            monthly_rent=Decimal("900.00"),
+            balance=Decimal("100.00"),
+            utility_balance=Decimal("25.00"),
+            deposit_required=Decimal("450.00"),
+            deposit_paid=Decimal("300.00"),
+            income_source="Employment",
+            monthly_income=Decimal("3200.00"),
+            housing_need="Current resident.",
+        )
+        Payment.objects.create(
+            application=resident,
+            payment_type="rent",
+            amount=Decimal("900.00"),
+            status="completed",
+            service_month=date(2026, 5, 1),
+        )
+        upload = FinancialUpload.objects.create(
+            property=property_obj,
+            name="Commercial Summary",
+            file=SimpleUploadedFile("summary.csv", b"category,amount\n", content_type="text/csv"),
+        )
+        for entry_type, category, amount in [
+            ("income", "Rent", Decimal("1000.00")),
+            ("operating_expense", "Power", Decimal("200.00")),
+            ("operating_expense", "Insurance", Decimal("300.00")),
+            ("debt_service", "Debt Service", Decimal("250.00")),
+            ("capital_expense", "Windows", Decimal("500.00")),
+        ]:
+            FinancialEntry.objects.create(
+                upload=upload,
+                property_name=property_obj.name,
+                sheet_name="Summary",
+                row_number=1,
+                entry_date=date(2026, 5, 1),
+                year=2026,
+                month=5,
+                entry_type=entry_type,
+                category=category,
+                description=f"{category} line",
+                amount=amount,
+            )
+        hidden_upload = FinancialUpload.objects.create(
+            property=hidden_property,
+            name="Hidden Summary",
+            file=SimpleUploadedFile("hidden.csv", b"category,amount\n", content_type="text/csv"),
+        )
+        FinancialEntry.objects.create(
+            upload=hidden_upload,
+            property_name=hidden_property.name,
+            sheet_name="Summary",
+            row_number=1,
+            entry_date=date(2026, 5, 1),
+            year=2026,
+            month=5,
+            entry_type="operating_expense",
+            category="Hidden Expense",
+            description="Should not show",
+            amount=Decimal("999.00"),
+        )
+        AccountingReceipt.objects.create(
+            property=property_obj,
+            vendor="Pacific Power",
+            receipt_file=SimpleUploadedFile("receipt.txt", b"receipt", content_type="text/plain"),
+            receipt_date=date(2026, 5, 2),
+            amount=Decimal("200.00"),
+            status="approved",
+        )
+
+        self.client.login(username="commercial-report-owner", password="StrongPass123!")
+
+        valuation = self.client.get(reverse("custom_reports"), {"report_type": "valuation_estimate", "property_id": property_obj.id, "start_date": "2026-05-01"})
+        utility = self.client.get(reverse("custom_reports"), {"report_type": "utility_cost_trend", "property_id": property_obj.id})
+        vendor = self.client.get(reverse("custom_reports"), {"report_type": "vendor_expense", "property_id": property_obj.id})
+        occupancy = self.client.get(reverse("custom_reports"), {"report_type": "occupancy_vacancy", "property_id": property_obj.id})
+        delinquency = self.client.get(reverse("custom_reports"), {"report_type": "delinquency_report", "property_id": property_obj.id})
+        capital = self.client.get(reverse("custom_reports"), {"report_type": "capital_improvement_log", "property_id": property_obj.id})
+        insurance = self.client.get(reverse("custom_reports"), {"report_type": "insurance_compliance", "property_id": property_obj.id})
+
+        self.assertContains(valuation, "Valuation Estimate Report")
+        self.assertContains(valuation, "1 months annualized")
+        self.assertContains(utility, "Power")
+        self.assertContains(vendor, "Pacific Power")
+        self.assertContains(occupancy, "Occupancy / Vacancy Report")
+        self.assertContains(occupancy, "50.00%")
+        self.assertContains(delinquency, "Commercial Report Resident")
+        self.assertContains(capital, "Windows")
+        self.assertContains(insurance, "Insurance / Compliance Report")
+        self.assertNotContains(utility, "Hidden Expense")
 
     def test_t12_report_includes_uploaded_income_and_expenses(self):
         landlord = User.objects.create_user(

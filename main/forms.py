@@ -375,11 +375,32 @@ class OwnerLandlordInviteForm(forms.ModelForm):
 
 
 class PropertyOwnerIntakeForm(forms.ModelForm):
+    REPORT_CHOICES = [
+        ("t12", "T-12 / NOI report"),
+        ("rent_roll", "Rent roll"),
+        ("delinquency_report", "Delinquency report"),
+        ("deposit_liability", "Deposit liability report"),
+        ("income_statement", "Income statement / P&L"),
+        ("expense_by_category", "Expense detail by category"),
+        ("vendor_expense", "Vendor expense report"),
+        ("property_performance_summary", "Property performance summary"),
+        ("valuation_estimate", "Valuation estimate report"),
+        ("insurance_compliance", "Insurance / compliance report"),
+        ("capital_improvement_log", "Capital improvement log"),
+        ("utility_cost_trend", "Utility usage/cost trend"),
+    ]
+
     property_types = forms.MultipleChoiceField(
         choices=PropertyOwnerIntake.PROPERTY_TYPE_CHOICES,
         required=False,
         widget=forms.CheckboxSelectMultiple,
         label="Property types",
+    )
+    desired_reports = forms.MultipleChoiceField(
+        choices=REPORT_CHOICES,
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        label="Reports you want available",
     )
 
     class Meta:
@@ -410,6 +431,7 @@ class PropertyOwnerIntakeForm(forms.ModelForm):
             "advertises_available_units",
             "uses_automatic_late_fees",
             "needs_custom_reports",
+            "desired_reports",
             "offers_renters_insurance",
             "onboarding_timeline",
             "dashboard_goals",
@@ -436,6 +458,7 @@ class PropertyOwnerIntakeForm(forms.ModelForm):
             "advertises_available_units": "Advertises available units",
             "uses_automatic_late_fees": "Automatically charges late fees",
             "needs_custom_reports": "Needs custom reports",
+            "desired_reports": "Reports you want available",
             "offers_renters_insurance": "Offers or requires renters insurance",
             "onboarding_timeline": "When do you need to start?",
             "dashboard_goals": "What should your dashboard make easy?",
@@ -460,6 +483,9 @@ class PropertyOwnerIntakeForm(forms.ModelForm):
             "dashboard_goals": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
             "additional_notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
         }
+
+    def clean_desired_reports(self):
+        return ", ".join(self.cleaned_data.get("desired_reports") or [])
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -731,7 +757,18 @@ class CustomReportForm(forms.Form):
     REPORT_TYPE_CHOICES = [
         ("resident_phone_list", "Resident Phone List"),
         ("resident_roster", "Resident Roster"),
+        ("delinquency_report", "Delinquency Report"),
+        ("deposit_liability", "Deposit Liability Report"),
         ("payment_summary", "Payment Summary"),
+        ("property_performance_summary", "Property Performance Summary"),
+        ("valuation_estimate", "Valuation Estimate"),
+        ("income_statement", "Income Statement / P&L"),
+        ("expense_by_category", "Expense Detail by Category"),
+        ("vendor_expense", "Vendor Expense Report"),
+        ("occupancy_vacancy", "Occupancy / Vacancy Report"),
+        ("capital_improvement_log", "Capital Improvement Log"),
+        ("utility_cost_trend", "Utility Usage / Cost Trend"),
+        ("insurance_compliance", "Insurance / Compliance Report"),
         ("financial_entries", "Financial Entries / Expenses"),
     ]
 

@@ -208,6 +208,21 @@
                     </section>
                 </div>
 
+                <div class="col-12">
+                    <section class="section-panel">
+                        <h2 class="section-title h4 mb-3">Reports Needed</h2>
+                        <div class="feature-grid">
+                            {% for checkbox in form.desired_reports %}
+                                <div class="feature-check">
+                                    {{ checkbox.tag }}
+                                    <label for="{{ checkbox.id_for_label }}">{{ checkbox.choice_label }}</label>
+                                </div>
+                            {% endfor %}
+                        </div>
+                        {{ form.desired_reports.errors }}
+                    </section>
+                </div>
+
                 <div class="col-lg-6">
                     <section class="section-panel">
                         <h2 class="section-title h4 mb-3">Current Records</h2>

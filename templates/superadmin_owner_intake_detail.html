@@ -58,6 +58,7 @@
             <div class="col-md-6"><div class="file-panel"><div class="file-label">Current Software</div><div class="file-value">{{ intake.current_software|default:"Not entered" }}</div></div></div>
             <div class="col-12"><div class="file-panel"><div class="file-label">Current Pain Points</div><div>{{ intake.current_pain_points|linebreaks|default:"Not entered" }}</div></div></div>
             <div class="col-12"><div class="file-panel"><div class="file-label">Migration Notes</div><div>{{ intake.migration_notes|linebreaks|default:"Not entered" }}</div></div></div>
+            <div class="col-12"><div class="file-panel"><div class="file-label">Requested Reports</div><div>{{ intake.desired_reports|default:"Not entered" }}</div></div></div>
             <div class="col-12"><div class="file-panel"><div class="file-label">Dashboard Goals</div><div>{{ intake.dashboard_goals|linebreaks|default:"Not entered" }}</div></div></div>
             <div class="col-12"><div class="file-panel"><div class="file-label">Additional Notes</div><div>{{ intake.additional_notes|linebreaks|default:"Not entered" }}</div></div></div>
         </div>

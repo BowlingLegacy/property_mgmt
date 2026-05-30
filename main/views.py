@@ -906,6 +906,44 @@ def rent_roll_totals(rows):
     }
 
 
+UTILITY_REPORT_KEYWORDS = [
+    "power",
+    "electric",
+    "gas",
+    "water",
+    "sewer",
+    "trash",
+    "garbage",
+    "internet",
+    "utility",
+    "utilities",
+    "city of medford",
+]
+
+
+def custom_report_financial_entries(query_properties, entry_types=None, start_date=None, end_date=None):
+    property_names = list(query_properties.values_list("name", flat=True))
+    entries = FinancialEntry.objects.filter(property_name__in=property_names).select_related("upload")
+    if entry_types:
+        entries = entries.filter(entry_type__in=entry_types)
+    if start_date:
+        entries = entries.filter(entry_date__gte=start_date)
+    if end_date:
+        entries = entries.filter(entry_date__lte=end_date)
+    return entries.order_by("property_name", "year", "month", "category", "description")
+
+
+def custom_report_period_year(start_date):
+    return start_date.year if start_date else timezone.localdate().year
+
+
+def decimal_percent(numerator, denominator):
+    denominator = Decimal(denominator or "0.00")
+    if denominator <= 0:
+        return Decimal("0.00")
+    return (Decimal(numerator or "0.00") / denominator * Decimal("100.00")).quantize(Decimal("0.01"))
+
+
 def recalculate_application_balances(application):
     completed_payments = application.payments.filter(status="completed")
     rent_paid = completed_payments.filter(payment_type="rent").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
@@ -3404,24 +3442,251 @@ def custom_reports(request):
                 "All Matching Payments": payments.aggregate(total=Sum("amount"))["total"] or Decimal("0.00"),
             }
 
+        elif report_type == "delinquency_report":
+            report_title = "Delinquency Report"
+            report_columns = ["Property", "Room / Unit", "Resident", "Rent Balance", "Utility Balance", "Deposit Due", "Total Due"]
+            total_due_sum = Decimal("0.00")
+            for resident in residents:
+                deposit_due = max(resident.deposit_required - resident.deposit_paid, Decimal("0.00"))
+                total_due = resident.balance + resident.utility_balance + deposit_due
+                if total_due <= 0:
+                    continue
+                total_due_sum += total_due
+                report_rows.append([
+                    resident.property.name if resident.property else "No Property",
+                    resident.space_label or resident.space_type or "",
+                    resident.full_name,
+                    resident.balance,
+                    resident.utility_balance,
+                    deposit_due,
+                    total_due,
+                ])
+            totals = {"Total Due": total_due_sum}
+
+        elif report_type == "deposit_liability":
+            report_title = "Deposit Liability Report"
+            report_columns = ["Property", "Room / Unit", "Resident", "Deposit Required", "Deposit Held", "Deposit Balance"]
+            deposit_required_total = Decimal("0.00")
+            deposit_held_total = Decimal("0.00")
+            deposit_balance_total = Decimal("0.00")
+            for resident in residents:
+                deposit_balance = max(resident.deposit_required - resident.deposit_paid, Decimal("0.00"))
+                deposit_required_total += resident.deposit_required
+                deposit_held_total += resident.deposit_paid
+                deposit_balance_total += deposit_balance
+                report_rows.append([
+                    resident.property.name if resident.property else "No Property",
+                    resident.space_label or resident.space_type or "",
+                    resident.full_name,
+                    resident.deposit_required,
+                    resident.deposit_paid,
+                    deposit_balance,
+                ])
+            totals = {
+                "Deposit Required": deposit_required_total,
+                "Deposit Held": deposit_held_total,
+                "Deposit Balance": deposit_balance_total,
+            }
+
+        elif report_type == "property_performance_summary":
+            report_title = "Property Performance Summary"
+            report_columns = ["Property", "Year", "Units", "Occupied", "Occupancy %", "Income", "Operating Expenses", "NOI", "Debt Service", "Cash Flow"]
+            report_year = custom_report_period_year(start_date)
+            for property_obj in filtered_properties:
+                property_qs = Property.objects.filter(id=property_obj.id)
+                months, property_totals = t12_report_rows(request.user, report_year, property_qs)
+                units = PropertyRoomRent.objects.filter(property=property_obj, is_active=True).count()
+                occupied = (
+                    HousingApplication.objects
+                    .filter(property=property_obj)
+                    .filter(Q(user__isnull=False) | Q(payments__status="completed"))
+                    .exclude(space_label="")
+                    .values("space_label")
+                    .distinct()
+                    .count()
+                )
+                report_rows.append([
+                    property_obj.name,
+                    report_year,
+                    units,
+                    occupied,
+                    f"{decimal_percent(occupied, units)}%",
+                    property_totals["total_income"],
+                    property_totals["operating_expenses"],
+                    property_totals["net_operating_income"],
+                    property_totals["debt_service"],
+                    property_totals["cash_flow_after_debt"],
+                ])
+
+        elif report_type == "valuation_estimate":
+            report_title = "Valuation Estimate Report"
+            report_columns = ["Property", "NOI Used", "Cap Rate", "Estimated Value", "Method"]
+            report_year = custom_report_period_year(start_date)
+            cap_rates = [Decimal("0.060"), Decimal("0.065"), Decimal("0.070"), Decimal("0.075"), Decimal("0.080"), Decimal("0.085")]
+            for property_obj in filtered_properties:
+                property_qs = Property.objects.filter(id=property_obj.id)
+                months, property_totals = t12_report_rows(request.user, report_year, property_qs)
+                active_months = sum(1 for month in months if month["total_income"] > 0 or month["operating_expenses"] > 0)
+                noi_used = property_totals["net_operating_income"]
+                method = f"{report_year} actual"
+                if active_months and active_months < 12:
+                    noi_used = (noi_used / Decimal(active_months) * Decimal("12.00")).quantize(Decimal("0.01"))
+                    method = f"{active_months} months annualized"
+                for cap_rate in cap_rates:
+                    estimated_value = (noi_used / cap_rate).quantize(Decimal("0.01")) if cap_rate else Decimal("0.00")
+                    report_rows.append([
+                        property_obj.name,
+                        noi_used,
+                        f"{(cap_rate * Decimal('100')).quantize(Decimal('0.1'))}%",
+                        estimated_value,
+                        method,
+                    ])
+
+        elif report_type == "income_statement":
+            report_title = "Income Statement / P&L"
+            report_columns = ["Property", "Month", "Type", "Category", "Amount"]
+            entries = custom_report_financial_entries(filtered_properties, ["income", "operating_expense", "debt_service", "capital_expense"], start_date, end_date)
+            for entry in entries:
+                report_rows.append([
+                    entry.property_name,
+                    entry.entry_date.strftime("%B %Y") if entry.entry_date else f"{entry.year or ''}-{entry.month or ''}",
+                    entry.get_entry_type_display(),
+                    entry.category,
+                    entry.amount,
+                ])
+            totals = {"Report Total": entries.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")}
+
+        elif report_type == "expense_by_category":
+            report_title = "Expense Detail by Category"
+            report_columns = ["Property", "Type", "Category", "Amount"]
+            entries = custom_report_financial_entries(filtered_properties, ["operating_expense", "capital_expense", "debt_service"], start_date, end_date)
+            grouped_entries = (
+                entries.values("property_name", "entry_type", "category")
+                .annotate(total=Sum("amount"))
+                .order_by("property_name", "entry_type", "category")
+            )
+            for entry in grouped_entries:
+                report_rows.append([
+                    entry["property_name"],
+                    dict(FinancialEntry.ENTRY_TYPE_CHOICES).get(entry["entry_type"], entry["entry_type"]),
+                    entry["category"],
+                    entry["total"],
+                ])
+            totals = {"Expense Total": entries.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")}
+
+        elif report_type == "vendor_expense":
+            report_title = "Vendor Expense Report"
+            report_columns = ["Property", "Vendor", "Category", "Amount", "Status"]
+            receipts = AccountingReceipt.objects.filter(property__in=filtered_properties)
+            if start_date:
+                receipts = receipts.filter(receipt_date__gte=start_date)
+            if end_date:
+                receipts = receipts.filter(receipt_date__lte=end_date)
+            grouped_receipts = (
+                receipts.values("property__name", "vendor", "category__name", "status")
+                .annotate(total=Sum("amount"))
+                .order_by("property__name", "vendor", "category__name")
+            )
+            for receipt in grouped_receipts:
+                report_rows.append([
+                    receipt["property__name"],
+                    receipt["vendor"] or "Unassigned Vendor",
+                    receipt["category__name"] or "Unassigned Category",
+                    receipt["total"],
+                    receipt["status"],
+                ])
+            totals = {"Vendor Expense Total": receipts.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")}
+
+        elif report_type == "occupancy_vacancy":
+            report_title = "Occupancy / Vacancy Report"
+            report_columns = ["Property", "Units", "Occupied", "Vacant", "Occupancy %", "Vacant Units"]
+            total_units = 0
+            total_occupied = 0
+            for property_obj in filtered_properties:
+                room_settings = PropertyRoomRent.objects.filter(property=property_obj, is_active=True)
+                unit_labels = {normalized_room_label(room.room_unit_label) for room in room_settings}
+                occupied_labels = {
+                    normalized_room_label(application.space_label)
+                    for application in HousingApplication.objects.filter(property=property_obj)
+                    .filter(Q(user__isnull=False) | Q(payments__status="completed"))
+                    .exclude(space_label="")
+                }
+                vacant_labels = sorted(label.upper() for label in unit_labels if label and label not in occupied_labels)
+                units = len(unit_labels)
+                occupied = len([label for label in unit_labels if label in occupied_labels])
+                total_units += units
+                total_occupied += occupied
+                report_rows.append([
+                    property_obj.name,
+                    units,
+                    occupied,
+                    max(units - occupied, 0),
+                    f"{decimal_percent(occupied, units)}%",
+                    ", ".join(vacant_labels) or "-",
+                ])
+            totals = {
+                "Units": Decimal(total_units),
+                "Occupied": Decimal(total_occupied),
+                "Vacant": Decimal(max(total_units - total_occupied, 0)),
+            }
+
+        elif report_type == "capital_improvement_log":
+            report_title = "Capital Improvement Log"
+            report_columns = ["Date", "Property", "Category", "Description", "Amount", "Source"]
+            entries = custom_report_financial_entries(filtered_properties, ["capital_expense"], start_date, end_date)
+            for entry in entries:
+                report_rows.append([
+                    entry.entry_date or f"{entry.year or ''}-{entry.month or ''}",
+                    entry.property_name,
+                    entry.category,
+                    entry.description,
+                    entry.amount,
+                    entry.upload.name,
+                ])
+            totals = {"Capital Improvements": entries.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")}
+
+        elif report_type == "utility_cost_trend":
+            report_title = "Utility Usage / Cost Trend"
+            report_columns = ["Property", "Month", "Category", "Amount"]
+            entries = custom_report_financial_entries(filtered_properties, ["operating_expense"], start_date, end_date)
+            entries = entries.filter(
+                Q(category__icontains="power") |
+                Q(category__icontains="electric") |
+                Q(category__icontains="gas") |
+                Q(category__icontains="water") |
+                Q(category__icontains="trash") |
+                Q(category__icontains="internet") |
+                Q(category__icontains="utility") |
+                Q(category__icontains="utilities") |
+                Q(category__icontains="City of Medford")
+            )
+            for entry in entries:
+                report_rows.append([
+                    entry.property_name,
+                    entry.entry_date.strftime("%B %Y") if entry.entry_date else f"{entry.year or ''}-{entry.month or ''}",
+                    entry.category,
+                    entry.amount,
+                ])
+            totals = {"Utility Cost Total": entries.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")}
+
+        elif report_type == "insurance_compliance":
+            report_title = "Insurance / Compliance Report"
+            report_columns = ["Property", "Renters Insurance Provider", "Renters Insurance Link", "Insurance Expense Total", "Notes"]
+            for property_obj in filtered_properties:
+                insurance_entries = custom_report_financial_entries(Property.objects.filter(id=property_obj.id), ["operating_expense"], start_date, end_date).filter(category__icontains="insurance")
+                report_rows.append([
+                    property_obj.name,
+                    property_obj.renters_insurance_provider_name or "Not set",
+                    property_obj.renters_insurance_url or "Not set",
+                    insurance_entries.aggregate(total=Sum("amount"))["total"] or Decimal("0.00"),
+                    property_obj.renters_insurance_notes or "",
+                ])
+
         elif report_type == "financial_entries":
             selected_entry_types = form.cleaned_data.get("financial_entry_types") or ["operating_expense"]
             report_title = "Financial Entries / Expenses"
             report_columns = ["Date", "Ledger", "Property", "Type", "Category", "Description", "Amount", "Source"]
-            property_names = list(filtered_properties.values_list("name", flat=True))
-            entry_scope_filter = Q(property_name__in=property_names)
-            if request.user.is_superuser or getattr(request.user, "role", "") == "admin":
-                entry_scope_filter = entry_scope_filter | Q(ledger_scope__in=["company", "bank"])
-            entries = (
-                FinancialEntry.objects
-                .filter(entry_scope_filter, entry_type__in=selected_entry_types)
-                .select_related("upload")
-                .order_by("property_name", "year", "month", "category", "description")
-            )
-            if start_date:
-                entries = entries.filter(entry_date__gte=start_date)
-            if end_date:
-                entries = entries.filter(entry_date__lte=end_date)
+            entries = custom_report_financial_entries(filtered_properties, selected_entry_types, start_date, end_date)
 
             for entry in entries:
                 report_rows.append([

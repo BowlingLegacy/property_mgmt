@@ -786,6 +786,7 @@ class PropertyOwnerIntake(models.Model):
     uses_automatic_late_fees = models.BooleanField(default=False)
     needs_custom_reports = models.BooleanField(default=False)
     offers_renters_insurance = models.BooleanField(default=False)
+    desired_reports = models.TextField(blank=True)
 
     onboarding_timeline = models.CharField(max_length=255, blank=True)
     dashboard_goals = models.TextField(blank=True)
