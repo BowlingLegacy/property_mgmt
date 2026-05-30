@@ -46,6 +46,26 @@
             color: #f7d77d !important;
             font-weight: 800;
         }
+        @media print {
+            nav,
+            .report-actions,
+            .no-print {
+                display: none !important;
+            }
+
+            body {
+                background: white !important;
+            }
+
+            .container-fluid {
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            .table-responsive {
+                overflow: visible !important;
+            }
+        }
     </style>
 </head>
 
@@ -72,12 +92,13 @@
         {% endif %}
     </p>
 
-    <div class="d-flex gap-2 flex-wrap mb-4">
+    <div class="d-flex gap-2 flex-wrap mb-4 report-actions">
         <a href="{% url 'rent_roll' %}?month={{ previous_month|date:'Y-m' }}{% if selected_property %}&property_id={{ selected_property.id }}{% endif %}" class="btn btn-outline-primary btn-sm">Previous Month</a>
         <a href="{% url 'rent_roll' %}{% if selected_property %}?property_id={{ selected_property.id }}{% endif %}" class="btn btn-outline-dark btn-sm">Current Month</a>
         <a href="{% url 'rent_roll' %}?month={{ next_month|date:'Y-m' }}{% if selected_property %}&property_id={{ selected_property.id }}{% endif %}" class="btn btn-outline-primary btn-sm">Next Month</a>
         {% if not show_property_picker %}
             <a href="{% url 'export_rent_roll_csv' %}?month={{ selected_month|date:'Y-m' }}{% if selected_property %}&property_id={{ selected_property.id }}{% endif %}" class="btn btn-success btn-sm">Download CSV</a>
+            <button type="button" class="btn btn-dark btn-sm" onclick="window.print()">Print Report</button>
         {% endif %}
     </div>
 

@@ -48,6 +48,33 @@
             color: #fff;
             font-weight: 800;
         }
+
+        @media print {
+            nav,
+            .report-actions,
+            .receipt-col,
+            .no-print {
+                display: none !important;
+            }
+
+            body {
+                background: white !important;
+            }
+
+            .container {
+                margin: 0 !important;
+                max-width: none !important;
+            }
+
+            .card {
+                border: none !important;
+                box-shadow: none !important;
+            }
+
+            .table-responsive {
+                overflow: visible !important;
+            }
+        }
     </style>
 </head>
 
@@ -73,7 +100,7 @@
     <div class="mb-4">
         <h1 class="fw-bold">Payment Log</h1>
 
-        <div class="d-flex gap-2 mt-3">
+        <div class="d-flex gap-2 mt-3 report-actions">
             <a href="{% url 'record_manual_payment' %}" class="btn btn-primary">
                 Record Manual Payment
             </a>
@@ -81,6 +108,10 @@
             <a href="{% url 'export_payment_log_csv' %}" class="btn btn-success">
                 Download CSV
             </a>
+
+            <button type="button" class="btn btn-dark" onclick="window.print()">
+                Print Report
+            </button>
         </div>
 
         <p class="text-muted">
@@ -116,7 +147,7 @@
                                         <th class="money-col">Deposit</th>
                                         <th class="datetime-col">Date/Time</th>
                                         <th class="status-col">Status</th>
-                                        <th>Receipt</th>
+                                        <th class="receipt-col">Receipt</th>
                                     </tr>
                                 </thead>
 
@@ -130,7 +161,7 @@
                                             <td>{{ payment.description }}</td>
                                             <td>{{ payment.reference_number }}</td>
                                             <td class="money-col">${{ payment.amount }}</td>
-                                            <td>
+                                            <td class="receipt-col">
                                                 {{ payment.accounting_month_label }}
                                                 {% if payment.months_covered > 1 %}
                                                     <br><span class="text-muted small">{{ payment.months_covered }} months covered</span>

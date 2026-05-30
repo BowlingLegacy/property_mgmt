@@ -3181,6 +3181,8 @@ class LiveFlowTests(TestCase):
         self.assertEqual(response.context["totals"]["utility_monthly"], Decimal("187.00"))
         self.assertEqual(response.context["totals"]["deposit_required"], Decimal("1350.00"))
         self.assertContains(response, "<td>Total</td>", html=True)
+        self.assertContains(response, "Print Report")
+        self.assertContains(response, "window.print()")
 
     def test_rent_roll_prompts_for_property_when_multiple_properties_exist(self):
         superuser = User.objects.create_user(
@@ -3294,6 +3296,46 @@ class LiveFlowTests(TestCase):
         self.assertNotIn("Property", content.splitlines()[0])
         self.assertNotIn("Utilities Paid This Month", content)
         self.assertNotIn("CSV Applicant", content)
+
+    def test_t12_and_payment_log_have_print_actions(self):
+        landlord = User.objects.create_user(
+            username="print-report-landlord",
+            email="print-report@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Print Report Property", landlord_email=landlord.email)
+        tenant_user = User.objects.create_user(username="print-report-tenant", password="StrongPass123!", role="tenant")
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=tenant_user,
+            full_name="Print Report Resident",
+            phone="555-0710",
+            email="print-resident@example.com",
+            age=45,
+            space_label="A",
+            monthly_rent=Decimal("560.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        Payment.objects.create(
+            application=resident,
+            payment_type="rent",
+            amount=Decimal("560.00"),
+            status="completed",
+            service_month=date(2026, 6, 1),
+        )
+
+        self.client.login(username="print-report-landlord", password="StrongPass123!")
+        t12_response = self.client.get(reverse("t12_report"))
+        payment_response = self.client.get(reverse("payment_log"))
+
+        self.assertContains(t12_response, "Print Report")
+        self.assertContains(t12_response, "window.print()")
+        self.assertContains(payment_response, "Print Report")
+        self.assertContains(payment_response, "window.print()")
 
     def test_rent_roll_lists_room_roster_before_profile_setup(self):
         landlord = User.objects.create_user(
