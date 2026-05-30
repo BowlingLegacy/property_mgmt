@@ -4668,6 +4668,8 @@ class LiveFlowTests(TestCase):
         csv_file = SimpleUploadedFile(
             "jan-rent-roll.csv",
             (
+                b"Painted Lady January Rent Roll,,,,,,,,\n"
+                b",,,,,,,,\n"
                 b"Room #,Tenant Name,Lease Start,Monthly Rent,Rent Paid,over/under,Deposit,new deposit,Shared Utilities\n"
                 b"A,Office,,,,,,,\n"
                 b"B,Grady Bradley,7/13/2014,$506.00,$506.00,$0.00,$450,,$58.00\n"

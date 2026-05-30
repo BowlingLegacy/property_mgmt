@@ -1,8 +1,11 @@
 from datetime import datetime
 from decimal import Decimal
+import csv
+from io import TextIOWrapper
 
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
+from openpyxl import load_workbook
 
 from main.models import (
     CurrentResidentRosterEntry,
@@ -12,7 +15,7 @@ from main.models import (
     Property,
     PropertyRoomRent,
 )
-from main.views import canonical_room_label, money, normalized_header, normalized_room_label, read_financial_upload_rows
+from main.views import canonical_room_label, money, normalized_header, normalized_room_label, unique_headers
 
 
 SKIP_TENANT_LABELS = {"", "office", "shop", "vacant", "total", "totals"}
@@ -72,6 +75,61 @@ def column_lookup(headers):
     return found
 
 
+def read_raw_upload_rows(upload, selected_sheet_name=None):
+    file_name = upload.file.name.lower()
+    upload.file.open("rb")
+    try:
+        if file_name.endswith(".xlsx"):
+            workbook = load_workbook(upload.file, read_only=True, data_only=True)
+            sheet_name = selected_sheet_name or workbook.sheetnames[0]
+            if sheet_name not in workbook.sheetnames:
+                raise CommandError(f"Sheet not found: {sheet_name}")
+            worksheet = workbook[sheet_name]
+            raw_rows = [
+                [cell for cell in row]
+                for row in worksheet.iter_rows(values_only=True)
+            ]
+            return sheet_name, raw_rows
+
+        wrapper = TextIOWrapper(upload.file, encoding="utf-8-sig", newline="")
+        try:
+            return "CSV", list(csv.reader(wrapper))
+        except UnicodeDecodeError:
+            upload.file.seek(0)
+            wrapper = TextIOWrapper(upload.file, encoding="latin-1", newline="")
+            return "CSV", list(csv.reader(wrapper))
+    finally:
+        upload.file.close()
+
+
+def read_rent_roll_rows(upload, selected_sheet_name=None):
+    sheet_name, raw_rows = read_raw_upload_rows(upload, selected_sheet_name)
+    non_empty_rows = [
+        list(row)
+        for row in raw_rows
+        if any(str(cell or "").strip() for cell in row)
+    ]
+    required_columns = ["room", "tenant", "monthly_rent", "rent_paid"]
+    for header_index, raw_header_row in enumerate(non_empty_rows):
+        headers = unique_headers(raw_header_row)
+        columns = column_lookup(headers)
+        if all(column in columns for column in required_columns):
+            rows = []
+            for row_number, raw_row in enumerate(non_empty_rows[header_index + 1:], start=header_index + 2):
+                row_data = {}
+                for index, header in enumerate(headers):
+                    row_data[header] = raw_row[index] if index < len(raw_row) else ""
+                rows.append({"row_number": row_number, "data": row_data})
+            return sheet_name, headers, rows, columns, header_index + 1
+
+    preview_rows = [" | ".join(str(cell or "").strip() for cell in row[:10]) for row in non_empty_rows[:8]]
+    raise CommandError(
+        "Missing required column(s): room, tenant, monthly_rent, rent_paid. "
+        "Could not find a header row matching Room #, Tenant Name, Monthly Rent, Rent Paid. "
+        f"First rows seen: {' / '.join(preview_rows)}"
+    )
+
+
 class Command(BaseCommand):
     help = "Import one monthly rent roll sheet into room settings, roster records, and completed historical payments."
 
@@ -95,12 +153,7 @@ class Command(BaseCommand):
 
         service_month = parse_month(options["month"])
         default_deposit_required = money(options["default_deposit_required"])
-        sheet_name, headers, rows = read_financial_upload_rows(upload, selected_sheet_name=options.get("sheet_name"))
-        columns = column_lookup(headers)
-        required_columns = ["room", "tenant", "monthly_rent", "rent_paid"]
-        missing = [column for column in required_columns if column not in columns]
-        if missing:
-            raise CommandError(f"Missing required column(s): {', '.join(missing)}")
+        sheet_name, headers, rows, columns, header_row_number = read_rent_roll_rows(upload, selected_sheet_name=options.get("sheet_name"))
 
         planned = []
         skipped = []
@@ -136,6 +189,7 @@ class Command(BaseCommand):
         self.stdout.write(f"Property: {property_obj.name}")
         self.stdout.write(f"Upload: {upload.id} | {upload.name}")
         self.stdout.write(f"Sheet: {sheet_name}")
+        self.stdout.write(f"Header row: {header_row_number}")
         self.stdout.write(f"Month: {service_month.strftime('%B %Y')}")
         self.stdout.write(f"Financial entries attached to upload: {upload.entries.count()}")
         self.stdout.write(f"Resident rows selected: {len(planned)}")
