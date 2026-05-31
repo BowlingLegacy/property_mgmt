@@ -7,6 +7,7 @@ from django.contrib import admin
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.db.models import Sum
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
@@ -3880,6 +3881,26 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "size: landscape")
         self.assertContains(response, "table-layout: fixed")
         self.assertNotContains(response, "May rent")
+
+    def test_demo_reset_refuses_live_mode(self):
+        with self.assertRaises(CommandError):
+            call_command("reset_demo_environment", "--confirm", stdout=StringIO())
+
+    @override_settings(DEMO_MODE=True, DEMO_ADMIN_USERNAME="demo-admin")
+    def test_demo_reset_seeds_temporary_workspace_and_demo_entry(self):
+        call_command("reset_demo_environment", "--confirm", stdout=StringIO())
+
+        self.assertTrue(User.objects.filter(username="demo-admin", role="admin").exists())
+        self.assertTrue(Property.objects.filter(name="Demo Ridge Apartments").exists())
+        self.assertEqual(HousingApplication.objects.filter(property__name="Demo Ridge Apartments").count(), 4)
+        self.assertTrue(Payment.objects.filter(application__property__name="Demo Ridge Apartments", status="completed").exists())
+        self.assertTrue(FinancialEntry.objects.filter(property_name="Demo Ridge Apartments").exists())
+
+        response = self.client.get(reverse("demo_entry"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("superadmin_dashboard"))
+        self.assertEqual(self.client.session.get("_auth_user_id"), str(User.objects.get(username="demo-admin").id))
 
     def test_commercial_custom_reports_use_scoped_property_data(self):
         owner = User.objects.create_user(

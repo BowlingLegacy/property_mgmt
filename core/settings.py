@@ -8,6 +8,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ---------------------------------------------------------
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")
 DEBUG = os.environ.get("DEBUG", "False") == "True"
+DEMO_MODE = os.environ.get("DEMO_MODE", "False") == "True"
+DEMO_SESSION_SECONDS = int(os.environ.get("DEMO_SESSION_SECONDS", "7200"))
+DEMO_ADMIN_USERNAME = os.environ.get("DEMO_ADMIN_USERNAME", "demo-admin")
 
 ALLOWED_HOSTS = [
     "localhost",
@@ -15,6 +18,11 @@ ALLOWED_HOSTS = [
     "bowlinglegacy.com",
     "www.bowlinglegacy.com",
 ]
+ALLOWED_HOSTS.extend([
+    host.strip()
+    for host in os.environ.get("DEMO_ALLOWED_HOSTS", "").split(",")
+    if host.strip()
+])
 
 # ---------------------------------------------------------
 # STRIPE
@@ -65,6 +73,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "main.context_processors.demo_mode",
             ],
         },
     },
@@ -145,6 +154,11 @@ DEFAULT_FROM_EMAIL = os.environ.get(
     "DEFAULT_FROM_EMAIL",
     EMAIL_HOST_USER,
 )
+
+if DEMO_MODE:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+    SESSION_COOKIE_AGE = DEMO_SESSION_SECONDS
+    SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
 # ---------------------------------------------------------
 # SMS SETTINGS

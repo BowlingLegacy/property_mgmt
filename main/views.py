@@ -24,9 +24,10 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.core.management import call_command
 from django.core.mail import EmailMessage, send_mail
 from django.db.models import Count, Max, Q, Sum
-from django.http import JsonResponse, HttpResponse
+from django.http import Http404, JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.utils.html import strip_tags
@@ -1011,6 +1012,24 @@ def home(request):
             and property_existing_resident_intake_open(painted_lady_profile_property)
         ),
     })
+
+
+def demo_entry(request):
+    if not getattr(settings, "DEMO_MODE", False):
+        raise Http404("Demo mode is not enabled.")
+
+    demo_user = User.objects.filter(username=settings.DEMO_ADMIN_USERNAME).first()
+    if not demo_user:
+        call_command("reset_demo_environment", "--confirm", verbosity=0)
+        demo_user = User.objects.get(username=settings.DEMO_ADMIN_USERNAME)
+
+    login(request, demo_user, backend="django.contrib.auth.backends.ModelBackend")
+    request.session.set_expiry(getattr(settings, "DEMO_SESSION_SECONDS", 7200))
+    messages.info(
+        request,
+        "You are using a temporary demo workspace. Sample data resets automatically and should not contain real information.",
+    )
+    return redirect("superadmin_dashboard")
     
 def properties_list(request):
     properties = Property.objects.all().order_by("name")
@@ -5203,6 +5222,17 @@ def create_checkout_session(request, application_id, payment_type="rent"):
         amount=amount,
         status="pending",
     )
+
+    if getattr(settings, "DEMO_MODE", False):
+        payment.payment_method = "other"
+        payment.status = "completed"
+        payment.description = f"Demo payment - {description}"
+        payment.received_at = timezone.now()
+        payment.service_month = timezone.localdate().replace(day=1)
+        payment.save(update_fields=["payment_method", "status", "description", "received_at", "service_month"])
+        apply_completed_payment_to_balance(payment)
+        messages.success(request, "Demo payment recorded. No real card or bank transaction was processed.")
+        return redirect("payment_success")
 
     session = stripe.checkout.Session.create(
         payment_method_types=["card", "cashapp"],
