@@ -3187,6 +3187,8 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "<td>Total</td>", html=True)
         self.assertContains(response, "Print Report")
         self.assertContains(response, "window.print()")
+        self.assertContains(response, "size: landscape")
+        self.assertContains(response, "table-layout: fixed")
 
     def test_rent_roll_prompts_for_property_when_multiple_properties_exist(self):
         superuser = User.objects.create_user(
@@ -3338,8 +3340,12 @@ class LiveFlowTests(TestCase):
 
         self.assertContains(t12_response, "Print Report")
         self.assertContains(t12_response, "window.print()")
+        self.assertContains(t12_response, "size: landscape")
+        self.assertContains(t12_response, "table-layout: fixed")
         self.assertContains(payment_response, "Print Report")
         self.assertContains(payment_response, "window.print()")
+        self.assertContains(payment_response, "size: landscape")
+        self.assertContains(payment_response, "table-layout: fixed")
 
     def test_payment_log_orders_months_chronologically(self):
         landlord = User.objects.create_user(
@@ -3861,6 +3867,8 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "Plumbing repair")
         self.assertContains(response, "Floor replacement")
         self.assertContains(response, "$525.00")
+        self.assertContains(response, "size: landscape")
+        self.assertContains(response, "table-layout: fixed")
         self.assertNotContains(response, "May rent")
 
     def test_commercial_custom_reports_use_scoped_property_data(self):

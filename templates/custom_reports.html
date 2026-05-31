@@ -92,6 +92,11 @@ body {
 }
 
 @media print {
+    @page {
+        size: landscape;
+        margin: .35in;
+    }
+
     nav,
     footer,
     .site-header,
@@ -102,6 +107,7 @@ body {
 
     body {
         background: white !important;
+        font-size: 9px !important;
     }
 
     .soft-card {
@@ -112,6 +118,28 @@ body {
     .page-shell {
         margin: 0 !important;
         padding: 0 !important;
+        width: 100% !important;
+    }
+
+    .report-shell {
+        padding: 0 !important;
+    }
+
+    .table-responsive {
+        overflow: visible !important;
+    }
+
+    .report-table {
+        width: 100% !important;
+        table-layout: fixed;
+    }
+
+    .report-table th,
+    .report-table td {
+        font-size: 8px !important;
+        padding: 3px 4px !important;
+        white-space: normal !important;
+        word-break: break-word;
     }
 }
 </style>

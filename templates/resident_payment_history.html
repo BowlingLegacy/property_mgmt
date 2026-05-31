@@ -17,17 +17,40 @@
     padding: 1.5rem;
 }
 @media print {
+    @page {
+        size: landscape;
+        margin: .35in;
+    }
+
     .no-print,
     .footer {
         display: none !important;
     }
     body {
         background: #fff !important;
+        font-size: 9px !important;
     }
     .history-shell {
         border: 0;
         border-radius: 0;
         box-shadow: none;
+        max-width: none !important;
+        width: 100% !important;
+    }
+    .table-responsive {
+        overflow: visible !important;
+        padding: 0 !important;
+    }
+    table {
+        width: 100% !important;
+        table-layout: fixed;
+    }
+    th,
+    td {
+        font-size: 8px !important;
+        padding: 3px 4px !important;
+        white-space: normal !important;
+        word-break: break-word;
     }
 }
 </style>
