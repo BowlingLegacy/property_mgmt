@@ -135,12 +135,12 @@
                 Record Manual Payment
             </a>
 
-            <a href="{% url 'export_payment_log_csv' %}" class="btn btn-success">
+            <a href="{% url 'export_payment_log_csv' %}{% if month_filter_active %}?month={{ selected_month|date:'Y-m' }}{% endif %}" class="btn btn-success">
                 Download CSV
             </a>
 
             <button type="button" class="btn btn-dark" onclick="window.print()">
-                Print Report
+                {% if month_filter_active %}Print {{ selected_month|date:"F Y" }}{% else %}Print All Months{% endif %}
             </button>
         </div>
 
@@ -153,7 +153,20 @@
             {% endif %}
         </p>
 
-        <div class="d-flex gap-2 flex-wrap mt-3 report-actions">
+        <form method="get" class="d-flex gap-2 flex-wrap align-items-end mt-3 report-actions">
+            <div>
+                <label for="payment-log-month" class="form-label fw-bold small mb-1">Choose Month To View Or Print</label>
+                <input
+                    id="payment-log-month"
+                    type="month"
+                    name="month"
+                    class="form-control"
+                    value="{% if month_filter_active %}{{ selected_month|date:'Y-m' }}{% endif %}"
+                >
+            </div>
+            <button type="submit" class="btn btn-outline-primary">
+                View Month
+            </button>
             {% if month_filter_active %}
                 <a href="{% url 'payment_log' %}?month={{ previous_month|date:'Y-m' }}" class="btn btn-outline-primary">
                     Previous Month
@@ -169,7 +182,7 @@
                     Current Month Only
                 </a>
             {% endif %}
-        </div>
+        </form>
     </div>
 
     {% for property_group in payment_log %}

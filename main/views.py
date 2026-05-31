@@ -3741,22 +3741,34 @@ def custom_reports(request):
 @login_required
 @user_passes_test(staff_required)
 def export_payment_log_csv(request):
+    raw_month = (request.GET.get("month") or "").strip()
+    selected_month = selected_report_month(request) if raw_month else None
     response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = 'attachment; filename="payment_log.csv"'
+    month_suffix = f"_{selected_month.strftime('%Y_%m')}" if selected_month else ""
+    response["Content-Disposition"] = f'attachment; filename="payment_log{month_suffix}.csv"'
 
     writer = csv.writer(response)
     writer.writerow(["Resident", "Property", "Payment Type", "Amount", "Status", "Date Received", "Applies To", "Months Covered"])
 
-    payments = Payment.objects.all().order_by("-created_at")
+    payments = (
+        Payment.objects
+        .filter(application__in=staff_managed_applications(request.user), status="completed")
+        .select_related("application", "application__property")
+        .order_by("application__property__name", "application__space_label", "application__full_name", "-created_at")
+    )
 
     for payment in payments:
+        accounting_month = payment_service_month(payment)
+        if selected_month and accounting_month != selected_month:
+            continue
+        display_paid_at = payment.received_at or payment.created_at
         writer.writerow([
             payment.application.full_name,
             payment.application.property.name if payment.application.property else "",
             payment.get_payment_type_display(),
             payment.amount,
             payment.status,
-            timezone.localtime(payment.created_at).strftime("%Y-%m-%d %H:%M"),
+            timezone.localtime(display_paid_at).strftime("%Y-%m-%d %H:%M"),
             payment.accounting_month_label,
             payment.months_covered,
         ])

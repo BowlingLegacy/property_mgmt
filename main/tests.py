@@ -3393,9 +3393,19 @@ class LiveFlowTests(TestCase):
 
         self.assertTrue(filtered_response.context["month_filter_active"])
         self.assertContains(filtered_response, "Showing May 2026.")
+        self.assertContains(filtered_response, "Choose Month To View Or Print")
+        self.assertContains(filtered_response, 'value="2026-05"')
+        self.assertContains(filtered_response, "Print May 2026")
         self.assertContains(filtered_response, "All Months")
         self.assertEqual([month["month_label"] for month in filtered_groups], ["May 2026"])
         self.assertNotContains(filtered_response, "January 2026")
+
+        csv_response = self.client.get(f"{reverse('export_payment_log_csv')}?month=2026-05")
+        csv_content = csv_response.content.decode()
+
+        self.assertIn('filename="payment_log_2026_05.csv"', csv_response["Content-Disposition"])
+        self.assertIn("May 2026", csv_content)
+        self.assertNotIn("January 2026", csv_content)
 
     def test_rent_roll_lists_room_roster_before_profile_setup(self):
         landlord = User.objects.create_user(
