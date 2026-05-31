@@ -1016,7 +1016,11 @@ def home(request):
 
 def demo_entry(request):
     if not getattr(settings, "DEMO_MODE", False):
-        raise Http404("Demo mode is not enabled.")
+        return HttpResponse(
+            "Demo route is installed, but DEMO_MODE is not enabled on this Render service.",
+            status=403,
+            content_type="text/plain",
+        )
 
     demo_user = User.objects.filter(username=settings.DEMO_ADMIN_USERNAME).first()
     if not demo_user:
@@ -1030,7 +1034,15 @@ def demo_entry(request):
         "You are using a temporary demo workspace. Sample data resets automatically and should not contain real information.",
     )
     return redirect("superadmin_dashboard")
-    
+
+
+def demo_status(request):
+    return JsonResponse({
+        "demo_route_installed": True,
+        "demo_mode": getattr(settings, "DEMO_MODE", False),
+        "demo_admin_username": getattr(settings, "DEMO_ADMIN_USERNAME", ""),
+    })
+     
 def properties_list(request):
     properties = Property.objects.all().order_by("name")
 

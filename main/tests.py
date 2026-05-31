@@ -3902,6 +3902,13 @@ class LiveFlowTests(TestCase):
         self.assertEqual(response.url, reverse("superadmin_dashboard"))
         self.assertEqual(self.client.session.get("_auth_user_id"), str(User.objects.get(username="demo-admin").id))
 
+    def test_demo_status_reports_running_demo_settings(self):
+        response = self.client.get(reverse("demo_status"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["demo_route_installed"])
+        self.assertFalse(response.json()["demo_mode"])
+
     def test_commercial_custom_reports_use_scoped_property_data(self):
         owner = User.objects.create_user(
             username="commercial-report-owner",
