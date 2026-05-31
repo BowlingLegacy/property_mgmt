@@ -725,13 +725,15 @@ class LiveFlowTests(TestCase):
 
         payment_log = self.client.get(reverse("payment_log"))
         self.assertContains(payment_log, "June 2026")
-        self.assertContains(payment_log, "CASH-JUNE")
         self.assertContains(payment_log, "Unit")
         self.assertContains(payment_log, "Date/Time")
         self.assertContains(payment_log, "Rent Balance")
         self.assertNotContains(payment_log, "Room / Unit")
         self.assertNotContains(payment_log, "Date / Time Paid")
         self.assertNotContains(payment_log, "Rent Balance Owed")
+        self.assertNotContains(payment_log, "<th>Description</th>", html=True)
+        self.assertNotContains(payment_log, "<th>Reference</th>", html=True)
+        self.assertNotContains(payment_log, "CASH-JUNE")
 
     def test_multi_month_payment_is_allocated_across_reporting_months(self):
         application = HousingApplication.objects.create(

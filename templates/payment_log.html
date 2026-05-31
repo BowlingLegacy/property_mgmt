@@ -161,8 +161,6 @@
                                         <th>Resident</th>
                                         <th>Type</th>
                                         <th>Method</th>
-                                        <th>Description</th>
-                                        <th>Reference</th>
                                         <th class="money-col">Paid</th>
                                         <th>Applies To</th>
                                         <th class="money-col">Rent Balance</th>
@@ -181,10 +179,8 @@
                                             <td>{{ payment.application.full_name }}</td>
                                             <td>{{ payment.get_payment_type_display }}</td>
                                             <td>{{ payment.get_payment_method_display }}</td>
-                                            <td>{{ payment.description }}</td>
-                                            <td>{{ payment.reference_number }}</td>
                                             <td class="money-col">${{ payment.amount }}</td>
-                                            <td class="receipt-col">
+                                            <td>
                                                 {{ payment.accounting_month_label }}
                                                 {% if payment.months_covered > 1 %}
                                                     <br><span class="text-muted small">{{ payment.months_covered }} months covered</span>
@@ -201,7 +197,7 @@
                                                     {{ payment.get_status_display }}
                                                 {% endif %}
                                             </td>
-                                            <td>
+                                            <td class="receipt-col">
                                                 <a href="{% url 'edit_manual_payment' payment.id %}" class="btn btn-outline-primary btn-sm">
                                                     Edit
                                                 </a>
@@ -212,7 +208,7 @@
                                         </tr>
                                         {% if payment.application.move_in_rent_charge or payment.application.move_in_utility_charge %}
                                             <tr>
-                                                <td colspan="14" class="small text-muted">
+                                                <td colspan="12" class="small text-muted">
                                                     Move-in charges for this file:
                                                     rent ${{ payment.application.move_in_rent_charge }},
                                                     utilities ${{ payment.application.move_in_utility_charge }}.
