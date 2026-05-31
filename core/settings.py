@@ -3,12 +3,21 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+def env_bool(name, default=False):
+    raw_value = os.environ.get(name)
+    if raw_value is None:
+        return default
+    normalized = raw_value.strip().strip('"').strip("'").lower()
+    return normalized in {"1", "true", "yes", "on"}
+
+
 # ---------------------------------------------------------
 # SECURITY
 # ---------------------------------------------------------
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")
-DEBUG = os.environ.get("DEBUG", "False") == "True"
-DEMO_MODE = os.environ.get("DEMO_MODE", "False") == "True"
+DEBUG = env_bool("DEBUG")
+DEMO_MODE = env_bool("DEMO_MODE")
 DEMO_SESSION_SECONDS = int(os.environ.get("DEMO_SESSION_SECONDS", "7200"))
 DEMO_ADMIN_USERNAME = os.environ.get("DEMO_ADMIN_USERNAME", "demo-admin")
 
