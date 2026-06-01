@@ -4,6 +4,7 @@ from decimal import Decimal
 from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
+from django.core.files import File
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils.text import slugify
@@ -104,6 +105,7 @@ class Command(BaseCommand):
                 "rent_amount": Decimal("1250.00"),
                 "deposit_amount": Decimal("900.00"),
                 "utilities_cost": "Resident electric, shared water billed monthly",
+                "image": "photo03.JPG",
                 "rooms": [
                     ("101", "Avery Brooks", "avery@example.com", Decimal("1250.00"), Decimal("75.00"), Decimal("900.00"), Decimal("900.00"), Decimal("0.00"), Decimal("0.00")),
                     ("102", "Bianca Carter", "bianca@example.com", Decimal("1325.00"), Decimal("75.00"), Decimal("900.00"), Decimal("450.00"), Decimal("1325.00"), Decimal("75.00")),
@@ -129,6 +131,7 @@ class Command(BaseCommand):
                 "rent_amount": Decimal("1850.00"),
                 "deposit_amount": Decimal("1200.00"),
                 "utilities_cost": "Commercial utilities reimbursed monthly",
+                "image": "photo01.JPG",
                 "rooms": [
                     ("Retail A", "Harper Foods LLC", "harper-foods@example.com", Decimal("2600.00"), Decimal("185.00"), Decimal("1800.00"), Decimal("1800.00"), Decimal("0.00"), Decimal("0.00")),
                     ("Loft 2B", "Eli Turner", "eli.turner@example.com", Decimal("1725.00"), Decimal("95.00"), Decimal("1100.00"), Decimal("1100.00"), Decimal("0.00"), Decimal("0.00")),
@@ -153,6 +156,7 @@ class Command(BaseCommand):
                 "rent_amount": Decimal("1540.00"),
                 "deposit_amount": Decimal("1000.00"),
                 "utilities_cost": "Residents pay utilities directly",
+                "image": "photo02.JPG",
                 "rooms": [
                     ("Villa 1", "Noah Reed", "noah.reed@example.com", Decimal("1500.00"), Decimal("0.00"), Decimal("1000.00"), Decimal("1000.00"), Decimal("0.00"), Decimal("0.00")),
                     ("Villa 2", "Isla Green", "isla.green@example.com", Decimal("1540.00"), Decimal("0.00"), Decimal("1000.00"), Decimal("1000.00"), Decimal("0.00"), Decimal("0.00")),
@@ -177,6 +181,7 @@ class Command(BaseCommand):
                 "rent_amount": Decimal("980.00"),
                 "deposit_amount": Decimal("650.00"),
                 "utilities_cost": "Flat shared utilities",
+                "image": "photo03.JPG",
                 "rooms": [
                     ("Studio A", "Ruth Mills", "ruth.mills@example.com", Decimal("980.00"), Decimal("60.00"), Decimal("650.00"), Decimal("650.00"), Decimal("0.00"), Decimal("0.00")),
                     ("Studio B", "Frank Lee", "frank.lee@example.com", Decimal("1025.00"), Decimal("60.00"), Decimal("650.00"), Decimal("650.00"), Decimal("0.00"), Decimal("0.00")),
@@ -211,6 +216,7 @@ class Command(BaseCommand):
                 requires_background_check=True,
                 background_check_fee_amount=Decimal("35.00"),
             )
+            self.attach_demo_property_photo(property_obj, spec["image"])
 
             demo_residents = []
             for room_index, (room, name, email, rent, utilities, deposit_required, deposit_paid, rent_balance, utility_balance) in enumerate(spec["rooms"], start=1):
@@ -345,3 +351,11 @@ class Command(BaseCommand):
             desired_reports="T-12, Rent Roll, NOI, Utility Trends, Vendor Expense, Valuation Estimate",
             status="submitted",
         )
+
+    def attach_demo_property_photo(self, property_obj, image_name):
+        image_path = settings.BASE_DIR / "static" / "images" / image_name
+        if not image_path.exists():
+            return
+
+        with image_path.open("rb") as image_file:
+            property_obj.photo.save(f"demo-{slugify(property_obj.name)}-{image_name}", File(image_file), save=True)
