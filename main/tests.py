@@ -3691,6 +3691,24 @@ class LiveFlowTests(TestCase):
             status="completed",
             service_month=date(2026, 5, 1),
         )
+        current_month = timezone.localdate().replace(day=1)
+        if current_month != date(2026, 5, 1):
+            Payment.objects.create(
+                application=resident,
+                payment_type="rent",
+                payment_method="cash",
+                amount=resident.monthly_rent,
+                status="completed",
+                service_month=current_month,
+            )
+            Payment.objects.create(
+                application=resident,
+                payment_type="utility",
+                payment_method="cash",
+                amount=resident.utility_monthly,
+                status="completed",
+                service_month=current_month,
+            )
 
         self.client.login(username="move-in-prorate-landlord", password="StrongPass123!")
         rent_roll_response = self.client.get(f"{reverse('rent_roll')}?month=2026-05")
@@ -3892,9 +3910,16 @@ class LiveFlowTests(TestCase):
 
         self.assertTrue(User.objects.filter(username="demo-admin", role="admin").exists())
         self.assertTrue(Property.objects.filter(name="Demo Ridge Apartments").exists())
+        self.assertTrue(Property.objects.filter(name="Cedar Market Lofts").exists())
+        self.assertTrue(Property.objects.filter(name="Pine Street Villas").exists())
+        self.assertTrue(Property.objects.filter(name="Harbor View Senior Living").exists())
+        self.assertEqual(Property.objects.count(), 4)
         self.assertEqual(HousingApplication.objects.filter(property__name="Demo Ridge Apartments").count(), 4)
+        self.assertEqual(HousingApplication.objects.count(), 13)
         self.assertTrue(Payment.objects.filter(application__property__name="Demo Ridge Apartments", status="completed").exists())
+        self.assertTrue(Payment.objects.filter(application__property__name="Cedar Market Lofts", status="completed").exists())
         self.assertTrue(FinancialEntry.objects.filter(property_name="Demo Ridge Apartments").exists())
+        self.assertTrue(FinancialEntry.objects.filter(property_name="Harbor View Senior Living").exists())
 
         response = self.client.get(reverse("demo_entry"))
 
