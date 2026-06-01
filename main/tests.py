@@ -5575,6 +5575,14 @@ class LiveFlowTests(TestCase):
 
         self.assertNotContains(closed_response, "Set Up My Profile")
 
+    @override_settings(DEMO_PUBLIC_URL="https://bowlinglegacy-demo.onrender.com/demo/")
+    def test_homepage_shows_public_demo_link_when_configured(self):
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Try Demo")
+        self.assertContains(response, "https://bowlinglegacy-demo.onrender.com/demo/")
+
     def test_admin_can_issue_property_owner_invite_from_intake(self):
         invite_admin = User.objects.create_superuser(
             username="invite-admin",

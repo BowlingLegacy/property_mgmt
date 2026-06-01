@@ -115,6 +115,9 @@
             <a href="/" class="nav-link-bl active">Home</a>
             <a href="/creed/" class="nav-link-bl">The Creed</a>
             <a href="{% url 'properties_list' %}" class="nav-link-bl">Properties</a>
+            {% if demo_public_url %}
+                <a href="{{ demo_public_url }}" class="nav-link-bl">Try Demo</a>
+            {% endif %}
             <a href="{% url 'login' %}?next={% url 'tenant_dashboard' %}" class="nav-link-bl">Portal</a>
         </nav>
     </div>
@@ -148,6 +151,9 @@
                         <a href="{% url 'existing_resident_intake' painted_lady_profile_property.pk %}" class="gold-btn">Resident Profile Setup</a>
                     {% endif %}
                     <a href="{% url 'properties_list' %}" class="dark-btn">View Properties</a>
+                    {% if demo_public_url %}
+                        <a href="{{ demo_public_url }}" class="gold-btn">Try Demo</a>
+                    {% endif %}
                     <a href="{% url 'login' %}?next={% url 'tenant_dashboard' %}" class="outline-btn">Tenant Portal</a>
                 </div>
             </div>
