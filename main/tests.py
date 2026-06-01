@@ -420,6 +420,73 @@ class LiveFlowTests(TestCase):
         self.assertEqual(lease.landlord_signature, "Michael Bowling")
         self.assertEqual(lease.deposit_payment_plan, "ninety_day_plan")
 
+    def test_create_tenant_uses_room_rent_setup_over_application_values(self):
+        staff_user = User.objects.create_user(
+            username="room-setup-staff",
+            email="room-setup-staff@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Room Setup Approval Property", landlord_email=staff_user.email)
+        PropertyRoomRent.objects.create(
+            property=property_obj,
+            room_unit_label="D",
+            monthly_rent=Decimal("616.00"),
+            rent_due_day=1,
+            utility_monthly=Decimal("55.00"),
+            deposit_required=Decimal("450.00"),
+            deposit_paid=Decimal("0.00"),
+        )
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Ron Rucker",
+            phone="555-0131",
+            email="ron-rucker@example.com",
+            age=52,
+            space_type="Room",
+            space_label="D",
+            monthly_rent=Decimal("650.00"),
+            utility_monthly=Decimal("0.00"),
+            deposit_required=Decimal("0.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+
+        self.client.login(username="room-setup-staff", password="StrongPass123!")
+        get_response = self.client.get(f"{reverse('landlord_create_tenant')}?application={application.id}")
+
+        self.assertContains(get_response, 'value="616.00"')
+        self.assertContains(get_response, 'value="55.00"')
+
+        response = self.client.post(
+            f"{reverse('landlord_create_tenant')}?application={application.id}",
+            {
+                "monthly_rent": "650.00",
+                "balance": "650.00",
+                "rent_due_day": "17",
+                "lease_start_date": "2026-06-01",
+                "deposit_required": "0.00",
+                "deposit_paid": "0.00",
+                "deposit_payment_plan": "paid_in_full",
+                "utility_monthly": "0.00",
+                "utility_balance": "0.00",
+                "space_type": "Room",
+                "space_label": "D",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        application.refresh_from_db()
+        self.assertEqual(application.monthly_rent, Decimal("616.00"))
+        self.assertEqual(application.balance, Decimal("616.00"))
+        self.assertEqual(application.utility_monthly, Decimal("55.00"))
+        self.assertEqual(application.utility_balance, Decimal("55.00"))
+        self.assertEqual(application.deposit_required, Decimal("450.00"))
+        self.assertEqual(application.deposit_paid, Decimal("0.00"))
+        self.assertEqual(application.rent_due_day, 1)
+
     def test_approving_application_prorates_move_in_rent_and_utilities(self):
         staff_user = User.objects.create_user(
             username="prorate-staff",
