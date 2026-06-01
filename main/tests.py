@@ -2078,6 +2078,52 @@ class LiveFlowTests(TestCase):
         log = SmsMessageLog.objects.get(application=application)
         self.assertEqual(log.status, "skipped_no_consent")
 
+    @override_settings(SMS_PROVIDER="telnyx", TELNYX_API_KEY="key-local", TELNYX_FROM_NUMBER="+15415550100")
+    @patch("main.views.urlopen")
+    def test_telnyx_sms_provider_sends_opted_in_group_message(self, mocked_urlopen):
+        class FakeResponse:
+            def read(self):
+                return b'{"data":{"id":"telnyx-message-123"}}'
+
+        mocked_urlopen.return_value = FakeResponse()
+        landlord = User.objects.create_user(
+            username="telnyx-sms-landlord",
+            email="telnyx-sms-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        resident_user = User.objects.create_user(username="telnyx-sms-resident", password="StrongPass123!", role="tenant")
+        property_obj = Property.objects.create(name="Telnyx SMS Property", landlord_email=landlord.email)
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Telnyx SMS Resident",
+            phone="541-555-0110",
+            email="telnyx-sms-resident@example.com",
+            age=46,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            sms_opted_in=True,
+        )
+
+        self.client.login(username="telnyx-sms-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("group_resident_message"), {
+            "property_id": str(property_obj.id),
+            "delivery_method": "portal_sms",
+            "subject": "SMS Notice",
+            "message": "This notice should be sent through Telnyx.",
+        })
+
+        self.assertRedirects(response, reverse("group_resident_message"))
+        log = SmsMessageLog.objects.get(application=application)
+        self.assertEqual(log.status, "sent")
+        self.assertEqual(log.provider_message_id, "telnyx-message-123")
+        request = mocked_urlopen.call_args.args[0]
+        self.assertEqual(request.full_url, "https://api.telnyx.com/v2/messages")
+        self.assertIn(b'"to": "+15415550110"', request.data)
+
     def test_twilio_stop_webhook_opts_out_matching_resident_phone(self):
         resident_user = User.objects.create_user(username="sms-stop-resident", password="StrongPass123!", role="tenant")
         application = HousingApplication.objects.create(

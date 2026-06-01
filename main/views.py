@@ -544,7 +544,13 @@ def normalized_import_amount(amount, entry_type):
     return abs(amount)
 
 
+def sms_provider_name():
+    return getattr(settings, "SMS_PROVIDER", "twilio").lower()
+
+
 def sms_provider_configured():
+    if sms_provider_name() == "telnyx":
+        return bool(settings.TELNYX_API_KEY and settings.TELNYX_FROM_NUMBER)
     return bool(settings.TWILIO_ACCOUNT_SID and settings.TWILIO_AUTH_TOKEN and settings.TWILIO_FROM_NUMBER)
 
 
@@ -559,6 +565,53 @@ def resident_can_receive_sms(application):
 def sms_body(subject, message):
     body = f"{subject}\n\n{message}\n\nReply STOP to opt out."
     return body[:1500]
+
+
+def sms_e164_phone(value):
+    digits = normalize_phone_digits(value)
+    if len(digits) == 10:
+        return f"+1{digits}"
+    if len(digits) == 11 and digits.startswith("1"):
+        return f"+{digits}"
+    if str(value or "").strip().startswith("+"):
+        return str(value).strip()
+    return value
+
+
+def send_twilio_sms(application, body):
+    endpoint = f"https://api.twilio.com/2010-04-01/Accounts/{settings.TWILIO_ACCOUNT_SID}/Messages.json"
+    payload = urlencode({
+        "To": sms_e164_phone(application.phone),
+        "From": settings.TWILIO_FROM_NUMBER,
+        "Body": body,
+    }).encode("utf-8")
+    credentials = f"{settings.TWILIO_ACCOUNT_SID}:{settings.TWILIO_AUTH_TOKEN}".encode("utf-8")
+    request = Request(endpoint, data=payload)
+    request.add_header("Authorization", f"Basic {base64.b64encode(credentials).decode('ascii')}")
+    response = urlopen(request, timeout=10)
+    return response.read().decode("utf-8")
+
+
+def send_telnyx_sms(application, body):
+    request = Request(
+        "https://api.telnyx.com/v2/messages",
+        data=json.dumps({
+            "to": sms_e164_phone(application.phone),
+            "from": settings.TELNYX_FROM_NUMBER,
+            "text": body,
+            "type": "SMS",
+        }).encode("utf-8"),
+    )
+    request.add_header("Authorization", f"Bearer {settings.TELNYX_API_KEY}")
+    request.add_header("Content-Type", "application/json")
+    request.add_header("Accept", "application/json")
+    response = urlopen(request, timeout=10)
+    response_body = response.read().decode("utf-8")
+    try:
+        payload = json.loads(response_body)
+        return payload.get("data", {}).get("id") or response_body[:255]
+    except json.JSONDecodeError:
+        return response_body[:255]
 
 
 def send_sms_message(application, body, sender, resident_message=None):
@@ -578,23 +631,15 @@ def send_sms_message(application, body, sender, resident_message=None):
 
     if not sms_provider_configured():
         log.status = "not_configured"
-        log.error_message = "Twilio environment variables are not configured."
+        log.error_message = f"{sms_provider_name().title()} environment variables are not configured."
         log.save(update_fields=["status", "error_message"])
         return log
 
-    endpoint = f"https://api.twilio.com/2010-04-01/Accounts/{settings.TWILIO_ACCOUNT_SID}/Messages.json"
-    payload = urlencode({
-        "To": application.phone,
-        "From": settings.TWILIO_FROM_NUMBER,
-        "Body": body,
-    }).encode("utf-8")
-    credentials = f"{settings.TWILIO_ACCOUNT_SID}:{settings.TWILIO_AUTH_TOKEN}".encode("utf-8")
-    request = Request(endpoint, data=payload)
-    request.add_header("Authorization", f"Basic {base64.b64encode(credentials).decode('ascii')}")
-
     try:
-        response = urlopen(request, timeout=10)
-        response_body = response.read().decode("utf-8")
+        if sms_provider_name() == "telnyx":
+            provider_message_id = send_telnyx_sms(application, body)
+        else:
+            provider_message_id = send_twilio_sms(application, body)
     except Exception as exc:
         log.status = "failed"
         log.error_message = str(exc)
@@ -602,7 +647,7 @@ def send_sms_message(application, body, sender, resident_message=None):
         return log
 
     log.status = "sent"
-    log.provider_message_id = response_body[:255]
+    log.provider_message_id = provider_message_id[:255]
     log.sent_at = timezone.now()
     log.save(update_fields=["status", "provider_message_id", "sent_at"])
     return log

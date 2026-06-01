@@ -173,9 +173,12 @@ if DEMO_MODE:
 # ---------------------------------------------------------
 # SMS SETTINGS
 # ---------------------------------------------------------
+SMS_PROVIDER = os.environ.get("SMS_PROVIDER", "twilio").strip().lower()
 TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID", "")
 TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "")
 TWILIO_FROM_NUMBER = os.environ.get("TWILIO_FROM_NUMBER", "")
+TELNYX_API_KEY = os.environ.get("TELNYX_API_KEY", "")
+TELNYX_FROM_NUMBER = os.environ.get("TELNYX_FROM_NUMBER", "")
 
 # ---------------------------------------------------------
 # MICROSOFT GRAPH MAILBOX SETTINGS
