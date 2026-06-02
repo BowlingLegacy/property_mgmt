@@ -25,6 +25,36 @@ def clean_match_value(value):
     return "".join(character.lower() for character in str(value or "") if character.isalnum())
 
 
+def name_tokens(value):
+    return {
+        token.lower()
+        for token in str(value or "").replace("/", " ").split()
+        if token.strip()
+    }
+
+
+def names_are_compatible(left, right):
+    left_tokens = name_tokens(left)
+    right_tokens = name_tokens(right)
+
+    if not left_tokens or not right_tokens:
+        return False
+
+    if left_tokens.issubset(right_tokens) or right_tokens.issubset(left_tokens):
+        return True
+
+    left_parts = str(left or "").strip().split()
+    right_parts = str(right or "").strip().split()
+    if len(left_parts) >= 2 and len(right_parts) >= 2:
+        left_first, left_last = left_parts[0].lower(), left_parts[-1].lower()
+        right_first, right_last = right_parts[0].lower(), right_parts[-1].lower()
+        return left_last == right_last and (
+            left_first.startswith(right_first[:3]) or right_first.startswith(left_first[:3])
+        )
+
+    return False
+
+
 def split_name(full_name):
     parts = str(full_name or "").strip().split()
     if not parts:
@@ -296,6 +326,22 @@ class Command(BaseCommand):
         for application in applications:
             if clean_match_value(application.full_name) == target_name and normalized_room_label(application.space_label) == target_room:
                 return application
+
+        room_matches = [
+            application
+            for application in applications
+            if normalized_room_label(application.space_label) == target_room
+            and names_are_compatible(application.full_name, item["tenant_name"])
+        ]
+        if room_matches:
+            return sorted(
+                room_matches,
+                key=lambda application: (
+                    application.user_id is None,
+                    -application.payments.count(),
+                    application.id,
+                ),
+            )[0]
 
         return HousingApplication.objects.create(
             property=property_obj,
