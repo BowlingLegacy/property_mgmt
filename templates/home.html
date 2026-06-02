@@ -108,7 +108,7 @@
             <img src="/static/images/bl-logo.png" class="brand-logo" alt="Bowling Legacy">
             <div>
                 <div class="brand-script">Bowling Legacy</div>
-                <div class="brand-subtitle">RentLogic</div>
+                <div class="brand-subtitle">Rental Ledger Pro</div>
             </div>
         </a>
         <nav class="nav-wrap d-flex gap-2 flex-wrap align-items-center">
@@ -128,7 +128,7 @@
     <div class="container">
         <div>
             <div class="resident-start-title">Already live at The Painted Lady Inn?</div>
-            <p class="resident-start-copy">Start here first. Set up your resident profile so we can prepare your RentLogic access.</p>
+            <p class="resident-start-copy">Start here first. Set up your resident profile so we can prepare your Rental Ledger Pro access.</p>
         </div>
         <a href="{% url 'existing_resident_intake' painted_lady_profile_property.pk %}" class="resident-start-btn">
             Set Up My Profile
@@ -197,9 +197,9 @@
             </a>
         </div>
         <div class="col-md-3">
-            <a href="#rentlogicModal" class="soft-card value-card value-card-link" role="button" data-bs-toggle="modal" data-bs-target="#rentlogicModal">
+            <a href="#rentalLedgerProModal" class="soft-card value-card value-card-link" role="button" data-bs-toggle="modal" data-bs-target="#rentalLedgerProModal">
                 <div class="value-icon">⌂</div>
-                <div class="value-title">RentLogic</div>
+                <div class="value-title">Rental Ledger Pro</div>
                 <p class="text-muted mb-0">Technology built from real property operations to simplify management.</p>
             </a>
         </div>
@@ -229,7 +229,7 @@
                     receiving long-overdue improvements and a renewed commitment to stable housing.
                 </p>
                 <p class="text-muted">
-                    From that work came this website and the foundation for RentLogic, a commercial multifamily
+                    From that work came this website and the foundation for Rental Ledger Pro, a commercial multifamily
                     property management system built to be comprehensive, reliable, and easy to use for tenants,
                     owners, and operators. The goal is to build the best system in the industry by pairing serious
                     management tools with a clear, approachable user experience.
@@ -246,19 +246,19 @@
     </div>
 </div>
 
-<div class="modal fade" id="rentlogicModal" tabindex="-1" aria-labelledby="rentlogicModalLabel" aria-hidden="true">
+<div class="modal fade" id="rentalLedgerProModal" tabindex="-1" aria-labelledby="rentalLedgerProModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content soft-card">
             <div class="modal-header border-0">
                 <div>
-                    <div class="founder-kicker mb-1">RentLogic</div>
-                    <h2 class="section-title mb-0" id="rentlogicModalLabel">Built From Real Property Operations</h2>
+                    <div class="founder-kicker mb-1">Rental Ledger Pro</div>
+                    <h2 class="section-title mb-0" id="rentalLedgerProModalLabel">Built From Real Property Operations</h2>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body pt-0">
                 <p class="text-muted fs-5">
-                    RentLogic is growing out of the daily operating needs of Bowling Legacy and The Painted Lady Inn.
+                    Rental Ledger Pro is growing out of the daily operating needs of Bowling Legacy and The Painted Lady Inn.
                     The goal is a comprehensive commercial multifamily management system that keeps the interface clear
                     for residents, property owners, landlords, and operators.
                 </p>
@@ -286,7 +286,7 @@
 
 <section class="journal-wrap"><div class="container"><h2 class="section-title mb-4">Journal & Updates</h2>{% for post in posts %}<article class="soft-card journal-post">{% if post.image %}<img src="{{ post.image.url }}" class="journal-img" alt="{{ post.title }}">{% endif %}<h3 class="section-title" style="font-size:1.55rem;">{{ post.title }}</h3><p class="text-muted small">{{ post.created_at }}</p><div class="journal-body">{{ post.body|linebreaksbr }}</div><hr><h6 class="fw-bold">Comments</h6>{% for comment in post.comments.all %}{% if comment.approved %}<div class="border rounded p-2 mb-2 bg-light"><strong>{{ comment.name }}</strong><p class="mb-0">{{ comment.comment|linebreaks }}</p></div>{% endif %}{% empty %}<p class="text-muted">No comments yet.</p>{% endfor %}<button class="outline-btn mt-2" type="button" data-bs-toggle="collapse" data-bs-target="#commentForm{{ post.id }}">Comment</button><div class="collapse mt-3" id="commentForm{{ post.id }}"><form method="post" action="{% url 'add_blog_comment' post.id %}">{% csrf_token %}<input type="text" name="name" class="form-control mb-2" placeholder="Your name" required><input type="email" name="email" class="form-control mb-2" placeholder="Your email optional"><textarea name="comment" class="form-control mb-2" rows="3" placeholder="Write your comment..." required></textarea><button type="submit" class="gold-btn">Submit Comment</button><p class="text-muted small mt-2">Comments appear after approval.</p></form></div></article>{% empty %}<p class="text-muted">No updates yet.</p>{% endfor %}</div></section>
 
-<footer class="site-footer"><div class="container d-flex justify-content-between align-items-center flex-wrap gap-3"><div class="footer-script">A legacy is not what I leave for people,<br>but what I leave in people. — TRMF</div><div class="text-end"><div>&copy; {{ year|default:2026 }} Bowling Legacy LLC</div><div class="small" style="color:#d8ab3b;">Tenant experience powered by RentLogic</div></div></div></footer>
+<footer class="site-footer"><div class="container d-flex justify-content-between align-items-center flex-wrap gap-3"><div class="footer-script">A legacy is not what I leave for people,<br>but what I leave in people. — TRMF</div><div class="text-end"><div>&copy; {{ year|default:2026 }} Bowling Legacy LLC</div><div class="small" style="color:#d8ab3b;">Tenant experience powered by Rental Ledger Pro</div></div></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

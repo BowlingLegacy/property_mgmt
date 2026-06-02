@@ -125,7 +125,7 @@ class AccountingReceiptForm(forms.ModelForm):
             "amount": "Amount",
         }
         help_texts = {
-            "receipt_file": "Upload the original receipt, invoice, or PDF. RentLogic stores it as proof.",
+            "receipt_file": "Upload the original receipt, invoice, or PDF. Rental Ledger Pro stores it as proof.",
             "amount": "Enter the amount from the receipt. Automatic reading can be added later, but this keeps the books reliable now.",
         }
         widgets = {
