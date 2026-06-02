@@ -804,6 +804,20 @@ def rent_roll_room_sort_key(room_label):
     return (1, normalized_label)
 
 
+def resident_sort_key(resident):
+    property_name = resident.property.name if getattr(resident, "property", None) else "No Property"
+    return (
+        property_name.lower(),
+        rent_roll_room_sort_key(resident.space_label or ""),
+        (resident.full_name or "").lower(),
+        resident.id or 0,
+    )
+
+
+def sorted_resident_list(residents):
+    return sorted(list(residents), key=resident_sort_key)
+
+
 def rent_roll_base_row(property_obj, room_label, resident_name="No profile yet"):
     clean_room_label = canonical_room_label(room_label)
     return {
@@ -933,14 +947,7 @@ def rent_roll_rows_for_properties(user, selected_month, properties):
         row["rent_balance"] = row["rent_due_for_month"]
         row["utility_balance"] = row["utility_due_for_month"]
         row["deposit_balance"] = row["deposit_due"]
-    return sorted(
-        rows,
-        key=lambda row: (
-            row["property"],
-            rent_roll_room_sort_key(row["unit"]),
-            row["application"].full_name,
-        ),
-    )
+    return rows
 
 
 def rent_roll_totals(rows):
@@ -1460,11 +1467,7 @@ def monthly_collection_watch_rows(applications):
 
     return sorted(
         rows,
-        key=lambda row: (
-            row["property"],
-            rent_roll_room_sort_key(row["unit"]),
-            row["application"].full_name,
-        ),
+        key=lambda row: resident_sort_key(row["application"]),
     )
 
 
@@ -1569,7 +1572,7 @@ def get_landlord_workspace_context(user):
     month_start, _next_month = current_month_bounds()
 
     return {
-        "applications": resident_files,
+        "applications": sorted_resident_list(resident_files),
         "properties": properties,
         "payments": payments,
         "landlord_inbox": landlord_inbox,
@@ -1715,7 +1718,7 @@ def room_rent_setup_rows(user, property_obj=None):
         .exclude(space_label="")
         .order_by("property__name", "space_label", "full_name")
     )
-    for application in existing_files:
+    for application in sorted_resident_list(existing_files):
         if is_orphan_existing_resident_setup_file(application):
             continue
         if not application.property_id:
@@ -1745,7 +1748,14 @@ def room_rent_setup_rows(user, property_obj=None):
         room_map[key]["room_unit_label"] = canonical_room_label(setting.room_unit_label)
         room_map[key]["setting"] = setting
 
-    return list(room_map.values())
+    return sorted(
+        room_map.values(),
+        key=lambda row: (
+            row["property"].name.lower() if row["property"] else "",
+            rent_roll_room_sort_key(row["room_unit_label"]),
+            ", ".join(row["residents"]).lower(),
+        ),
+    )
 
 
 def is_existing_resident_setup_file(application):
@@ -1832,7 +1842,7 @@ def dedupe_attention_applications(applications):
         seen[key] = application
         deduped.append(application)
 
-    return deduped
+    return sorted_resident_list(deduped)
 
 
 def matching_room_rent_settings(property_id, room_unit_label):
@@ -2185,7 +2195,7 @@ def landlord_rent_setup(request, property_id=None):
         "properties": accessible_properties,
         "selected_property": selected_property,
         "room_rows": room_rows,
-        "residents": residents,
+        "residents": sorted_resident_list(residents),
     })
 
 
@@ -2229,7 +2239,7 @@ def get_superadmin_workspace_context():
     context = {
         "properties": properties,
         "users": users,
-        "applications": applications,
+        "applications": sorted_resident_list(applications),
         "recent_messages": recent_messages,
         "owner_groups": owner_groups,
         "site_payment_total": site_payment_total,
@@ -3377,10 +3387,7 @@ def payment_log(request):
             payments = month_group["payments"]
             payments_sorted = sorted(
                 payments,
-                key=lambda p: (
-                    normalized_room_label(p.display_unit_label),
-                    p.application.full_name.lower(),
-                )
+                key=lambda p: resident_sort_key(p.application),
             )
 
             month_data.append({
@@ -3596,6 +3603,7 @@ def custom_reports(request):
             .filter(property__in=filtered_properties)
             .order_by("property__name", "space_label", "full_name")
         )
+        sorted_residents = sorted_resident_list(residents)
 
         if report_type == "resident_phone_list":
             report_title = "Resident Phone List"
@@ -3608,13 +3616,13 @@ def custom_reports(request):
                     phone_format(resident.phone),
                     resident.email,
                 ]
-                for resident in residents
+                for resident in sorted_residents
             ]
 
         elif report_type == "resident_roster":
             report_title = "Resident Roster"
             report_columns = ["Property", "Room / Unit", "Resident", "Phone", "Monthly Rent", "Balance", "Deposit Due"]
-            for resident in residents:
+            for resident in sorted_residents:
                 deposit_due = max(resident.deposit_required - resident.deposit_paid, Decimal("0.00"))
                 report_rows.append([
                     resident.property.name if resident.property else "No Property",
@@ -3665,7 +3673,7 @@ def custom_reports(request):
             report_title = "Delinquency Report"
             report_columns = ["Property", "Room / Unit", "Resident", "Rent Balance", "Utility Balance", "Deposit Due", "Total Due"]
             total_due_sum = Decimal("0.00")
-            for resident in residents:
+            for resident in sorted_residents:
                 deposit_due = max(resident.deposit_required - resident.deposit_paid, Decimal("0.00"))
                 total_due = resident.balance + resident.utility_balance + deposit_due
                 if total_due <= 0:
@@ -3688,7 +3696,7 @@ def custom_reports(request):
             deposit_required_total = Decimal("0.00")
             deposit_held_total = Decimal("0.00")
             deposit_balance_total = Decimal("0.00")
-            for resident in residents:
+            for resident in sorted_residents:
                 deposit_balance = max(resident.deposit_required - resident.deposit_paid, Decimal("0.00"))
                 deposit_required_total += resident.deposit_required
                 deposit_held_total += resident.deposit_paid
@@ -3954,7 +3962,16 @@ def export_payment_log_csv(request):
         .order_by("application__property__name", "application__space_label", "application__full_name", "-created_at")
     )
 
-    for payment in payments:
+    sorted_payments = sorted(
+        payments,
+        key=lambda payment: (
+            resident_sort_key(payment.application),
+            -(payment.received_at or payment.created_at).timestamp(),
+            payment.id,
+        ),
+    )
+
+    for payment in sorted_payments:
         accounting_month = payment_service_month(payment)
         if selected_month and accounting_month != selected_month:
             continue
@@ -4538,7 +4555,7 @@ def property_financials(request, property_name):
 
     return render(request, "property_financials.html", {
         "property": property_obj,
-        "residents": residents,
+        "residents": sorted_resident_list(residents),
         "monthly_rent": monthly_rent,
         "balances_due": balances_due,
         "utilities_due": utilities_due,
