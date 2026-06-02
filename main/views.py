@@ -933,7 +933,14 @@ def rent_roll_rows_for_properties(user, selected_month, properties):
         row["rent_balance"] = row["rent_due_for_month"]
         row["utility_balance"] = row["utility_due_for_month"]
         row["deposit_balance"] = row["deposit_due"]
-    return rows
+    return sorted(
+        rows,
+        key=lambda row: (
+            row["property"],
+            rent_roll_room_sort_key(row["unit"]),
+            row["application"].full_name,
+        ),
+    )
 
 
 def rent_roll_totals(rows):
@@ -1451,7 +1458,14 @@ def monthly_collection_watch_rows(applications):
                 "utility_due": utility_due,
             })
 
-    return rows
+    return sorted(
+        rows,
+        key=lambda row: (
+            row["property"],
+            rent_roll_room_sort_key(row["unit"]),
+            row["application"].full_name,
+        ),
+    )
 
 
 def get_landlord_workspace_context(user):
