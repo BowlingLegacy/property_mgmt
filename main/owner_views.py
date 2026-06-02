@@ -104,6 +104,7 @@ def owner_property_create(request):
             PropertyImage(property=property_obj, image=image)
             for image in form.cleaned_data["gallery_images"]
         ])
+        form.save_utility_vendors(property_obj)
 
         messages.success(request, f"{property_obj.name} was added to your owner dashboard.")
         return redirect("owner_property_onboarding_documents", property_id=property_obj.id)

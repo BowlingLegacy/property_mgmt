@@ -76,6 +76,8 @@ from .models import (
     ExistingResidentIntake,
     CurrentResidentRosterEntry,
     PropertyRoomRent,
+    PropertyUtilityVendor,
+    ResidentUtilitySetup,
     LandlordIntake,
     CompanyMailboxConnection,
 )
@@ -2913,6 +2915,8 @@ def tenant_dashboard(request):
     deposit_due = Decimal("0.00")
     utility_due = Decimal("0.00")
     show_utilities = False
+    utility_setup_items = []
+    utility_setup_complete = False
 
     if application:
         payments = application.payments.all().order_by("-created_at")
@@ -2923,7 +2927,9 @@ def tenant_dashboard(request):
         rent_due = application.balance if application.balance > 0 else Decimal("0.00")
         deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
         utility_due = application.utility_balance if application.utility_balance > 0 else Decimal("0.00")
-        show_utilities = utility_due > 0 or application.utility_monthly > 0
+        show_utilities = resident_has_portal_utility_charge(application)
+        utility_setup_items = resident_utility_setup_items(application)
+        utility_setup_complete = bool(utility_setup_items) and all(item.completed_at for item in utility_setup_items)
 
         total_due = rent_due + deposit_due + utility_due
         if application.property:
@@ -2946,6 +2952,8 @@ def tenant_dashboard(request):
         "deposit_due": deposit_due,
         "utility_due": utility_due,
         "show_utilities": show_utilities,
+        "utility_setup_items": utility_setup_items,
+        "utility_setup_complete": utility_setup_complete,
         "stripe_public_key": settings.STRIPE_PUBLIC_KEY,
         "resident_balance_url": resident_portal_url("resident_balance_detail", is_superadmin_inspecting, application),
         "resident_payment_history_url": resident_portal_url("resident_payment_history", is_superadmin_inspecting, application),
@@ -2974,6 +2982,105 @@ def resident_portal_url(view_name, is_superadmin_inspecting, application):
     return url
 
 
+def resident_has_portal_utility_charge(application):
+    if not application:
+        return False
+    return application.utility_balance > 0 or application.utility_monthly > 0
+
+
+def resident_utility_setup_items(application):
+    if not application or not application.property_id:
+        return []
+
+    vendors = list(
+        PropertyUtilityVendor.objects
+        .filter(property=application.property, is_active=True)
+        .order_by("sort_order", "service_type", "provider_name")
+    )
+
+    for vendor in vendors:
+        ResidentUtilitySetup.objects.get_or_create(application=application, vendor=vendor)
+
+    return list(
+        ResidentUtilitySetup.objects
+        .select_related("vendor")
+        .filter(application=application, vendor__in=vendors)
+        .order_by("vendor__sort_order", "vendor__service_type", "vendor__provider_name")
+    )
+
+
+def notify_landlord_utility_setup_complete(application):
+    if not application:
+        return
+
+    subject = "Utility setup completed"
+    if ResidentMessage.objects.filter(application=application, subject=subject, message_type="general").exists():
+        return
+
+    ResidentMessage.objects.create(
+        application=application,
+        message_type="general",
+        subject=subject,
+        message=(
+            f"{application.full_name} has opened every required tenant utility setup item "
+            f"for {application.property.name if application.property else 'their property'}."
+        ),
+        status="submitted",
+        locked=True,
+    )
+
+
+@login_required
+def resident_utility_setup_open(request, setup_id):
+    application, is_superadmin_inspecting = get_resident_portal_application(request)
+
+    setup_queryset = ResidentUtilitySetup.objects.select_related("vendor", "application", "application__property")
+
+    if application:
+        setup = get_object_or_404(setup_queryset, id=setup_id, application=application)
+    elif staff_required(request.user):
+        setup = get_object_or_404(
+            setup_queryset,
+            id=setup_id,
+            application__property__in=staff_managed_properties(request.user),
+        )
+        application = setup.application
+        is_superadmin_inspecting = True
+    else:
+        messages.error(request, "No resident file connected.")
+        return redirect("tenant_dashboard")
+
+    now = timezone.now()
+    update_fields = []
+
+    if not setup.opened_at:
+        setup.opened_at = now
+        update_fields.append("opened_at")
+
+    if not setup.completed_at:
+        setup.completed_at = now
+        update_fields.append("completed_at")
+
+    if update_fields:
+        setup.save(update_fields=update_fields)
+
+    remaining = ResidentUtilitySetup.objects.filter(
+        application=application,
+        vendor__property=application.property,
+        vendor__is_active=True,
+        completed_at__isnull=True,
+    ).exists()
+
+    if not remaining:
+        notify_landlord_utility_setup_complete(application)
+
+    if setup.vendor.setup_url:
+        return redirect(setup.vendor.setup_url)
+
+    messages.success(request, f"{setup.vendor.service_type} setup marked complete.")
+    return redirect(resident_portal_url("tenant_dashboard", is_superadmin_inspecting, application))
+
+
 @login_required
 def resident_balance_detail(request):
     application, is_superadmin_inspecting = get_resident_portal_application(request)
@@ -2985,7 +3092,7 @@ def resident_balance_detail(request):
     rent_due = application.balance if application.balance > 0 else Decimal("0.00")
     deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
     utility_due = application.utility_balance if application.utility_balance > 0 else Decimal("0.00")
-    show_utilities = utility_due > 0 or application.utility_monthly > 0
+    show_utilities = resident_has_portal_utility_charge(application)
 
     return render(request, "resident_balance_detail.html", {
         "application": application,

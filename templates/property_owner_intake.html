@@ -257,6 +257,12 @@
                             {{ form.dashboard_goals }}
                             {{ form.dashboard_goals.errors }}
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="{{ form.tenant_utility_setup_notes.id_for_label }}">{{ form.tenant_utility_setup_notes.label }}</label>
+                            {{ form.tenant_utility_setup_notes }}
+                            {{ form.tenant_utility_setup_notes.errors }}
+                            <div class="form-text">List any tenant-paid accounts residents must set up, including vendor links or phone numbers.</div>
+                        </div>
                         <div>
                             <label class="form-label fw-bold" for="{{ form.additional_notes.id_for_label }}">{{ form.additional_notes.label }}</label>
                             {{ form.additional_notes }}

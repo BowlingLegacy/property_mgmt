@@ -21,6 +21,7 @@ from main.models import (
     Property,
     PropertyOwnerIntake,
     PropertyRoomRent,
+    PropertyUtilityVendor,
     ResidentMessage,
     User,
 )
@@ -105,6 +106,9 @@ class Command(BaseCommand):
                 "rent_amount": Decimal("1250.00"),
                 "deposit_amount": Decimal("900.00"),
                 "utilities_cost": "Resident electric, shared water billed monthly",
+                "utility_vendors": [
+                    ("Electric", "Pacific Power", "https://www.pacificpower.net", "888-221-7070"),
+                ],
                 "image": "photo03.JPG",
                 "rooms": [
                     ("101", "Avery Brooks", "avery@example.com", Decimal("1250.00"), Decimal("75.00"), Decimal("900.00"), Decimal("900.00"), Decimal("0.00"), Decimal("0.00")),
@@ -131,6 +135,10 @@ class Command(BaseCommand):
                 "rent_amount": Decimal("1850.00"),
                 "deposit_amount": Decimal("1200.00"),
                 "utilities_cost": "Commercial utilities reimbursed monthly",
+                "utility_vendors": [
+                    ("Electric", "Eugene Water & Electric Board", "https://www.eweb.org", "541-685-7000"),
+                    ("Trash", "Sanipac", "https://www.sanipac.com", "541-736-3600"),
+                ],
                 "image": "photo01.JPG",
                 "rooms": [
                     ("Retail A", "Harper Foods LLC", "harper-foods@example.com", Decimal("2600.00"), Decimal("185.00"), Decimal("1800.00"), Decimal("1800.00"), Decimal("0.00"), Decimal("0.00")),
@@ -156,6 +164,11 @@ class Command(BaseCommand):
                 "rent_amount": Decimal("1540.00"),
                 "deposit_amount": Decimal("1000.00"),
                 "utilities_cost": "Residents pay utilities directly",
+                "utility_vendors": [
+                    ("Power", "Pacific Power", "https://www.pacificpower.net", "888-221-7070"),
+                    ("Water/Sewer", "City Utility Billing", "https://www.grantspassoregon.gov", "541-450-6035"),
+                    ("Trash", "Republic Services", "https://www.republicservices.com", "541-779-4161"),
+                ],
                 "image": "photo02.JPG",
                 "rooms": [
                     ("Villa 1", "Noah Reed", "noah.reed@example.com", Decimal("1500.00"), Decimal("0.00"), Decimal("1000.00"), Decimal("1000.00"), Decimal("0.00"), Decimal("0.00")),
@@ -181,6 +194,7 @@ class Command(BaseCommand):
                 "rent_amount": Decimal("980.00"),
                 "deposit_amount": Decimal("650.00"),
                 "utilities_cost": "Flat shared utilities",
+                "utility_vendors": [],
                 "image": "photo03.JPG",
                 "rooms": [
                     ("Studio A", "Ruth Mills", "ruth.mills@example.com", Decimal("980.00"), Decimal("60.00"), Decimal("650.00"), Decimal("650.00"), Decimal("0.00"), Decimal("0.00")),
@@ -217,6 +231,16 @@ class Command(BaseCommand):
                 background_check_fee_amount=Decimal("35.00"),
             )
             self.attach_demo_property_photo(property_obj, spec["image"])
+
+            for sort_order, (service_type, provider_name, setup_url, phone) in enumerate(spec.get("utility_vendors", []), start=1):
+                PropertyUtilityVendor.objects.create(
+                    property=property_obj,
+                    service_type=service_type,
+                    provider_name=provider_name,
+                    setup_url=setup_url,
+                    phone=phone,
+                    sort_order=sort_order,
+                )
 
             demo_residents = []
             for room_index, (room, name, email, rent, utilities, deposit_required, deposit_paid, rent_balance, utility_balance) in enumerate(spec["rooms"], start=1):

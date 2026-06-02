@@ -214,6 +214,12 @@ class OwnerPropertyForm(forms.ModelForm):
         help_text="Add up to 9 property gallery pictures.",
         widget=MultipleImageInput(attrs={"class": "form-control", "accept": "image/*"}),
     )
+    tenant_utility_vendors = forms.CharField(
+        required=False,
+        label="Tenant utility setup vendors",
+        help_text="Optional. One per line: Service | Provider | setup link | phone | notes. Example: Power | Pacific Power | https://www.pacificpower.net | 888-221-7070",
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 5}),
+    )
 
     class Meta:
         model = Property
@@ -282,6 +288,33 @@ class OwnerPropertyForm(forms.ModelForm):
             "availability_status": forms.Select(attrs={"class": "form-select"}),
             "availability_message": forms.TextInput(attrs={"class": "form-control"}),
         }
+
+    def save_utility_vendors(self, property_obj):
+        from .models import PropertyUtilityVendor
+
+        raw_lines = self.cleaned_data.get("tenant_utility_vendors", "").splitlines()
+        PropertyUtilityVendor.objects.filter(property=property_obj).delete()
+
+        for index, raw_line in enumerate(raw_lines, start=1):
+            parts = [part.strip() for part in raw_line.split("|")]
+            parts += [""] * (5 - len(parts))
+            service_type, provider_name, setup_url, phone, notes = parts[:5]
+
+            if not service_type or not provider_name:
+                continue
+
+            if setup_url and not setup_url.lower().startswith(("http://", "https://")):
+                setup_url = f"https://{setup_url}"
+
+            PropertyUtilityVendor.objects.create(
+                property=property_obj,
+                service_type=service_type,
+                provider_name=provider_name,
+                setup_url=setup_url,
+                phone=phone,
+                notes=notes,
+                sort_order=index,
+            )
 
     def clean_gallery_images(self):
         gallery_images = self.cleaned_data.get("gallery_images", [])
@@ -433,6 +466,7 @@ class PropertyOwnerIntakeForm(forms.ModelForm):
             "needs_custom_reports",
             "desired_reports",
             "offers_renters_insurance",
+            "tenant_utility_setup_notes",
             "onboarding_timeline",
             "dashboard_goals",
             "additional_notes",
@@ -460,6 +494,7 @@ class PropertyOwnerIntakeForm(forms.ModelForm):
             "needs_custom_reports": "Needs custom reports",
             "desired_reports": "Reports you want available",
             "offers_renters_insurance": "Offers or requires renters insurance",
+            "tenant_utility_setup_notes": "Utility accounts tenants must set up",
             "onboarding_timeline": "When do you need to start?",
             "dashboard_goals": "What should your dashboard make easy?",
         }
@@ -481,6 +516,11 @@ class PropertyOwnerIntakeForm(forms.ModelForm):
                 "placeholder": "Example: this month, next quarter, evaluating options",
             }),
             "dashboard_goals": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
+            "tenant_utility_setup_notes": forms.Textarea(attrs={
+                "class": "form-control",
+                "rows": 4,
+                "placeholder": "Example: Power | Pacific Power | https://www.pacificpower.net | 888-221-7070",
+            }),
             "additional_notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
         }
 

@@ -52,6 +52,7 @@ urlpatterns = [
     path("tenant-dashboard/payment-history/", views.resident_payment_history, name="resident_payment_history"),
     path("tenant-dashboard/requests/", views.resident_requests, name="resident_requests"),
     path("tenant-dashboard/profile-photo/", views.update_resident_profile_photo, name="update_resident_profile_photo"),
+    path("tenant-dashboard/utility-setup/<int:setup_id>/open/", views.resident_utility_setup_open, name="resident_utility_setup_open"),
     path("landlord-dashboard/", views.landlord_dashboard, name="landlord_dashboard"),
     path("landlord-dashboard/attention/", views.landlord_attention, name="landlord_attention"),
     path("landlord-dashboard/residents/", views.landlord_resident_files, name="landlord_resident_files"),

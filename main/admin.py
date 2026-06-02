@@ -6,6 +6,7 @@ from .models import (
     Property,
     PropertyImage,
     PropertyRoomRent,
+    PropertyUtilityVendor,
     PropertyOnboardingDocument,
     HousingApplication,
     ApplicantDocument,
@@ -19,6 +20,7 @@ from .models import (
     AccountingReceipt,
     ResidentMessage,
     ResidentMessageReply,
+    ResidentUtilitySetup,
     SmsMessageLog,
     SignedDocument,
     PropertyOwnerIntake,
@@ -178,9 +180,14 @@ class PropertyRoomRentInline(admin.TabularInline):
     extra = 0
 
 
+class PropertyUtilityVendorInline(admin.TabularInline):
+    model = PropertyUtilityVendor
+    extra = 0
+
+
 @admin.register(Property)
 class PropertyAdmin(admin.ModelAdmin):
-    inlines = [PropertyImageInline, PropertyRoomRentInline, PropertyOnboardingDocumentInline]
+    inlines = [PropertyImageInline, PropertyRoomRentInline, PropertyUtilityVendorInline, PropertyOnboardingDocumentInline]
     list_display = ("name", "availability_status", "available_date", "owner_email", "landlord_email", "charges_application_fee", "requires_background_check")
     list_filter = ("availability_status", "charges_application_fee", "requires_background_check")
 
@@ -190,6 +197,30 @@ class PropertyRoomRentAdmin(admin.ModelAdmin):
     list_display = ("property", "room_unit_label", "monthly_rent", "rent_due_day", "utility_monthly", "deposit_required", "deposit_paid", "is_active", "updated_at")
     list_filter = ("property", "is_active")
     search_fields = ("property__name", "room_unit_label")
+
+
+@admin.register(PropertyUtilityVendor)
+class PropertyUtilityVendorAdmin(admin.ModelAdmin):
+    list_display = ("property", "service_type", "provider_name", "setup_url", "phone", "is_active", "sort_order")
+    list_filter = ("property", "service_type", "is_active")
+    search_fields = ("property__name", "service_type", "provider_name", "phone")
+
+
+@admin.register(ResidentUtilitySetup)
+class ResidentUtilitySetupAdmin(admin.ModelAdmin):
+    list_display = ("application", "property_name", "service_type", "provider_name", "opened_at", "completed_at")
+    list_filter = ("vendor__property", "vendor__service_type", "completed_at")
+    search_fields = ("application__full_name", "application__email", "vendor__provider_name", "vendor__service_type")
+    readonly_fields = ("created_at",)
+
+    def property_name(self, obj):
+        return obj.vendor.property.name
+
+    def service_type(self, obj):
+        return obj.vendor.service_type
+
+    def provider_name(self, obj):
+        return obj.vendor.provider_name
 
 
 @admin.register(PropertyOwnerIntake)

@@ -186,6 +186,25 @@ class PropertyRoomRent(models.Model):
         return f"{self.property.name} {self.room_unit_label} - ${self.monthly_rent}"
 
 
+class PropertyUtilityVendor(models.Model):
+    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name="utility_vendors")
+    service_type = models.CharField(max_length=80)
+    provider_name = models.CharField(max_length=255)
+    setup_url = models.URLField(blank=True)
+    phone = models.CharField(max_length=50, blank=True)
+    notes = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["property__name", "sort_order", "service_type", "provider_name"]
+        unique_together = ("property", "service_type", "provider_name")
+
+    def __str__(self):
+        return f"{self.property.name} - {self.service_type}: {self.provider_name}"
+
+
 class PropertyOnboardingDocument(models.Model):
     DOCUMENT_TYPE_CHOICES = [
         ("application", "Rental Application"),
@@ -338,6 +357,25 @@ class HousingApplication(models.Model):
 
     def __str__(self):
         return self.full_name
+
+
+class ResidentUtilitySetup(models.Model):
+    application = models.ForeignKey(HousingApplication, on_delete=models.CASCADE, related_name="utility_setups")
+    vendor = models.ForeignKey(PropertyUtilityVendor, on_delete=models.CASCADE, related_name="resident_setups")
+    opened_at = models.DateTimeField(blank=True, null=True)
+    completed_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["vendor__sort_order", "vendor__service_type", "vendor__provider_name"]
+        unique_together = ("application", "vendor")
+
+    @property
+    def is_completed(self):
+        return bool(self.completed_at)
+
+    def __str__(self):
+        return f"{self.application.full_name} - {self.vendor.service_type}"
 
 
 class ApplicantDocument(models.Model):
@@ -787,6 +825,10 @@ class PropertyOwnerIntake(models.Model):
     needs_custom_reports = models.BooleanField(default=False)
     offers_renters_insurance = models.BooleanField(default=False)
     desired_reports = models.TextField(blank=True)
+    tenant_utility_setup_notes = models.TextField(
+        blank=True,
+        help_text="Utility accounts tenants must set up, with vendor names, links, phones, or notes.",
+    )
 
     onboarding_timeline = models.CharField(max_length=255, blank=True)
     dashboard_goals = models.TextField(blank=True)
