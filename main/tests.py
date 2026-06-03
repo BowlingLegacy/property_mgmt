@@ -6137,6 +6137,57 @@ class LiveFlowTests(TestCase):
         self.assertContains(history_response, "Payment History")
         self.assertContains(requests_response, "Sink request")
 
+    def test_resident_payment_history_hides_prior_room_occupant_payments(self):
+        resident_user = User.objects.create_user(
+            username="room-history-resident",
+            email="room-history-resident@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        application = HousingApplication.objects.create(
+            user=resident_user,
+            full_name="Room History Resident",
+            phone="555-0136",
+            email="room-history-resident@example.com",
+            age=44,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+            space_label="H",
+            lease_start_date=date(2026, 5, 25),
+            monthly_rent=Decimal("650.00"),
+            utility_monthly=Decimal("55.00"),
+        )
+        Payment.objects.create(
+            application=application,
+            payment_type="rent",
+            payment_method="cash",
+            amount=Decimal("650.00"),
+            status="completed",
+            service_month=date(2026, 4, 1),
+            description="Prior occupant April rent",
+        )
+        Payment.objects.create(
+            application=application,
+            payment_type="rent",
+            payment_method="cash",
+            amount=Decimal("105.00"),
+            status="completed",
+            service_month=date(2026, 5, 1),
+            description="Move-in prorated May rent",
+        )
+
+        self.client.login(username="room-history-resident", password="StrongPass123!")
+        dashboard_response = self.client.get(reverse("tenant_dashboard"))
+        history_response = self.client.get(reverse("resident_payment_history"))
+
+        self.assertEqual(
+            [payment.description for payment in dashboard_response.context["payments"]],
+            ["Move-in prorated May rent"],
+        )
+        self.assertContains(history_response, "Move-in prorated May rent")
+        self.assertNotContains(history_response, "Prior occupant April rent")
+
     def test_resident_can_reply_only_to_own_message(self):
         resident_user = User.objects.create_user(
             username="reply-resident",

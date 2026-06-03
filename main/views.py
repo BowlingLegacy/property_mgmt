@@ -2964,7 +2964,7 @@ def tenant_dashboard(request):
     utility_setup_complete = False
 
     if application:
-        payments = application.payments.all().order_by("-created_at")
+        payments = resident_visible_payments(application)
         resident_messages = application.resident_messages.all().order_by("-created_at")
         if not is_superadmin_inspecting:
             profile_photo_form = ResidentProfilePhotoForm(instance=application)
@@ -3025,6 +3025,23 @@ def resident_portal_url(view_name, is_superadmin_inspecting, application):
     if is_superadmin_inspecting and application:
         return f"{url}?resident={application.id}"
     return url
+
+
+def resident_visible_payments(application):
+    if not application:
+        return []
+
+    payments = list(application.payments.all().order_by("-created_at"))
+
+    if not application.lease_start_date:
+        return payments
+
+    lease_start_month = application.lease_start_date.replace(day=1)
+    return [
+        payment
+        for payment in payments
+        if payment.accounting_month >= lease_start_month
+    ]
 
 
 def resident_has_portal_utility_charge(application):
@@ -3161,7 +3178,7 @@ def resident_payment_history(request):
 
     return render(request, "resident_payment_history.html", {
         "application": application,
-        "payments": application.payments.all().order_by("-created_at"),
+        "payments": resident_visible_payments(application),
         "dashboard_url": resident_portal_url("tenant_dashboard", is_superadmin_inspecting, application),
     })
 
