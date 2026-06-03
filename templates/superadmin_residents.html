@@ -20,7 +20,12 @@
                         <tr>
                             <td><strong>{{ application.full_name }}</strong><br><span class="text-muted small">{{ application.email }}</span></td>
                             <td>{{ application.property.name|default:"No Property" }}</td>
-                            <td>{{ application.space_type }} {{ application.space_label }}</td>
+                            <td>
+                                {{ application.display_unit_label|default:"Unassigned" }}
+                                {% if application.inspection_duplicate_count > 1 %}
+                                    <br><span class="badge text-bg-warning">{{ application.inspection_duplicate_count }} duplicate records</span>
+                                {% endif %}
+                            </td>
                             <td>{% if application.user %}Linked{% else %}No Login{% endif %}</td>
                             <td class="d-flex gap-2 flex-wrap">
                                 <a href="{% url 'tenant_dashboard' %}?resident={{ application.id }}" class="btn btn-dark btn-sm">Inspect Tenant Dashboard</a>

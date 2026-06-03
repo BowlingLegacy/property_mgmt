@@ -2484,6 +2484,51 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "Renters Insurance")
         self.assertContains(response, "Back to Super Admin Dashboard")
 
+    def test_superadmin_resident_inspection_collapses_duplicate_units(self):
+        superuser = User.objects.create_user(
+            username="superadmin-resident-dedupe",
+            email="super-resident-dedupe@example.com",
+            password="StrongPass123!",
+            role="admin",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Inspection Dedupe Property")
+
+        for index, room_label in enumerate(["Room G", "G", "G"], start=1):
+            resident_user = User.objects.create_user(
+                username=f"inspection-dedupe-resident-{index}",
+                password="StrongPass123!",
+                role="tenant",
+            )
+            HousingApplication.objects.create(
+                property=property_obj,
+                user=resident_user,
+                full_name="Inspection Duplicate Resident",
+                phone=f"555-016{index}",
+                email=f"inspection-dedupe-{index}@example.com",
+                age=45,
+                income_source="Employment",
+                monthly_income=Decimal("3000.00"),
+                housing_need="Current resident.",
+                space_type="Room",
+                space_label=room_label,
+                lease_start_date=date(2026, 5, index),
+            )
+
+        self.client.login(username="superadmin-resident-dedupe", password="StrongPass123!")
+        response = self.client.get(reverse("superadmin_residents"))
+
+        resident_rows = [
+            application
+            for application in response.context["applications"]
+            if application.property == property_obj
+        ]
+        self.assertEqual(len(resident_rows), 1)
+        self.assertEqual(resident_rows[0].display_unit_label, "G")
+        self.assertEqual(resident_rows[0].inspection_duplicate_count, 3)
+        self.assertContains(response, "3 duplicate records")
+        self.assertNotContains(response, "Room Room G")
+
     def test_superadmin_owners_page_lists_properties_without_owner_email(self):
         User.objects.create_user(
             username="superadmin",

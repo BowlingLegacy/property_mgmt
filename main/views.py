@@ -1866,6 +1866,46 @@ def dedupe_attention_applications(applications):
     return sorted_resident_list(deduped)
 
 
+def choose_primary_resident_application(applications):
+    return sorted(
+        applications,
+        key=lambda application: (
+            application.user_id is None,
+            not bool(application.user and application.user.has_usable_password()),
+            -application.lease_start_date.toordinal() if application.lease_start_date else 0,
+            -application.signed_documents.filter(locked=True).count(),
+            -application.payments.count(),
+            -(application.id or 0),
+        ),
+    )[0]
+
+
+def dedupe_resident_inspection_applications(applications):
+    grouped = OrderedDict()
+
+    for application in sorted_resident_list(applications):
+        unit_label = canonical_room_label(application.space_label)
+        if unit_label:
+            key = ("property-unit", application.property_id, normalized_room_label(unit_label))
+        else:
+            key = attention_identity_key(
+                application.property_id,
+                application.email,
+                application.full_name,
+                application.space_label,
+            )
+        grouped.setdefault(key, []).append(application)
+
+    deduped = []
+    for duplicate_group in grouped.values():
+        primary = choose_primary_resident_application(duplicate_group)
+        primary.inspection_duplicate_count = len(duplicate_group)
+        primary.display_unit_label = canonical_room_label(primary.space_label or primary.space_type) or "Unassigned"
+        deduped.append(primary)
+
+    return sorted_resident_list(deduped)
+
+
 def matching_room_rent_settings(property_id, room_unit_label):
     target_label = normalized_room_label(room_unit_label)
     return [
@@ -2260,7 +2300,7 @@ def get_superadmin_workspace_context():
     context = {
         "properties": properties,
         "users": users,
-        "applications": sorted_resident_list(applications),
+        "applications": dedupe_resident_inspection_applications(applications),
         "recent_messages": recent_messages,
         "owner_groups": owner_groups,
         "site_payment_total": site_payment_total,
