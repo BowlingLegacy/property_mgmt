@@ -8,6 +8,7 @@ from . import blog_views
 
 urlpatterns = [
     path("", views.home, name="home"),
+    path("rental-ledger-pro/", views.rental_ledger_pro_home, name="rental_ledger_pro_home"),
     path("demo/", views.demo_entry, name="demo_entry"),
     path("demo/status/", views.demo_status, name="demo_status"),
     path("properties/", views.properties_list, name="properties_list"),

@@ -1075,6 +1075,10 @@ def home(request):
     })
 
 
+def rental_ledger_pro_home(request):
+    return render(request, "rental_ledger_pro_home.html")
+
+
 def demo_entry(request):
     if not getattr(settings, "DEMO_MODE", False):
         return HttpResponse(
