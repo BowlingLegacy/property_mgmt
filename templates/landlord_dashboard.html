@@ -282,7 +282,7 @@ body {
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <a href="{% url 'record_manual_payment' %}?application={{ row.application.id }}" class="small-action">
+                                        <a href="{% url 'record_manual_payment' %}?application={{ row.application.id }}&return=dashboard" class="small-action">
                                             Record Payment
                                         </a>
                                     </td>

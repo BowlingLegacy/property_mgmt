@@ -696,6 +696,29 @@ class GroupResidentMessageForm(forms.Form):
 
 
 class ManualPaymentForm(forms.ModelForm):
+    utility_amount = forms.DecimalField(
+        label="Utilities Amount",
+        required=False,
+        max_digits=10,
+        decimal_places=2,
+        min_value=0,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+        help_text="Optional. Use this to record current utilities at the same time as rent.",
+    )
+    utility_payment_method = forms.ChoiceField(
+        label="Utilities Method",
+        required=False,
+        choices=[("", "Same as rent payment")] + list(Payment.PAYMENT_METHOD_CHOICES),
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    utility_reference_number = forms.CharField(
+        label="Utilities Reference",
+        required=False,
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": "Optional utility check number, transfer id, or note.",
+        }),
+    )
     service_month = forms.DateField(
         label="Applies To Month",
         required=False,

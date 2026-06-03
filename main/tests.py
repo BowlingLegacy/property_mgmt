@@ -669,6 +669,104 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "Payment Receipt")
         self.assertContains(response, "BANK-123")
 
+    def test_dashboard_payment_link_returns_to_dashboard_and_records_utilities(self):
+        staff_user = User.objects.create_user(
+            username="dashboard-payment-staff",
+            email="dashboard-payment@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Dashboard Payment Property", landlord_email=staff_user.email)
+        resident_user = User.objects.create_user(username="dashboard-payment-resident", password="StrongPass123!", role="tenant")
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Dashboard Payment Resident",
+            phone="555-0133",
+            email="dashboard-payment-resident@example.com",
+            age=44,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            monthly_rent=Decimal("650.00"),
+            balance=Decimal("650.00"),
+            utility_monthly=Decimal("55.00"),
+            utility_balance=Decimal("55.00"),
+        )
+
+        self.client.login(username="dashboard-payment-staff", password="StrongPass123!")
+        response = self.client.post(reverse("record_manual_payment"), {
+            "application": application.id,
+            "payment_type": "rent",
+            "payment_method": "check",
+            "amount": "650.00",
+            "utility_amount": "55.00",
+            "utility_payment_method": "cash",
+            "utility_reference_number": "UTILITY-CASH",
+            "service_month": "2026-06",
+            "months_covered": "1",
+            "reference_number": "RENT-CHECK",
+            "description": "June rent",
+            "return_to": "dashboard",
+        })
+
+        self.assertRedirects(response, reverse("landlord_dashboard"))
+        application.refresh_from_db()
+        self.assertEqual(application.balance, Decimal("0.00"))
+        self.assertEqual(application.utility_balance, Decimal("0.00"))
+
+        rent_payment = Payment.objects.get(application=application, payment_type="rent")
+        utility_payment = Payment.objects.get(application=application, payment_type="utility")
+        self.assertEqual(rent_payment.payment_method, "check")
+        self.assertEqual(rent_payment.reference_number, "RENT-CHECK")
+        self.assertEqual(utility_payment.payment_method, "cash")
+        self.assertEqual(utility_payment.reference_number, "UTILITY-CASH")
+        self.assertEqual(utility_payment.service_month, date(2026, 6, 1))
+
+    def test_landlord_collection_watch_collapses_duplicate_resident_records_by_unit(self):
+        staff_user = User.objects.create_user(
+            username="watch-dedupe-staff",
+            email="watch-dedupe@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Watch Dedupe Property", landlord_email=staff_user.email)
+
+        for index, room_label in enumerate(["Room G", "G", "G"], start=1):
+            resident_user = User.objects.create_user(
+                username=f"watch-dedupe-resident-{index}",
+                password="StrongPass123!",
+                role="tenant",
+            )
+            HousingApplication.objects.create(
+                property=property_obj,
+                user=resident_user,
+                full_name="Duplicate Watch Resident",
+                phone=f"555-014{index}",
+                email=f"watch-dedupe-resident-{index}@example.com",
+                age=44,
+                income_source="Employment",
+                monthly_income=Decimal("3000.00"),
+                housing_need="Current resident.",
+                space_label=room_label,
+                monthly_rent=Decimal("560.00"),
+                utility_monthly=Decimal("55.00"),
+            )
+
+        self.client.login(username="watch-dedupe-staff", password="StrongPass123!")
+        response = self.client.get(reverse("landlord_dashboard"))
+
+        unit_g_rows = [
+            row
+            for row in response.context["collection_watch_rows"]
+            if row["property"] == property_obj.name and row["unit"] == "G"
+        ]
+        self.assertEqual(len(unit_g_rows), 1)
+        self.assertEqual(unit_g_rows[0]["rent_due"], Decimal("560.00"))
+        self.assertEqual(unit_g_rows[0]["utility_due"], Decimal("55.00"))
+
     def test_record_payment_prompts_for_property_when_multiple_properties_exist(self):
         staff_user = User.objects.create_user(
             username="payment-picker-staff",

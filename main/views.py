@@ -1414,9 +1414,26 @@ def current_month_bounds():
 def monthly_collection_watch_rows(applications):
     month_start, next_month = current_month_bounds()
     rows = []
+    grouped_applications = OrderedDict()
 
-    for application in applications:
-        monthly_payments = list(application.payments.filter(status="completed"))
+    for application in sorted_resident_list(applications):
+        unit_label = canonical_room_label(application.space_label)
+        if unit_label:
+            key = ("property-unit", application.property_id, normalized_room_label(unit_label))
+        else:
+            key = attention_identity_key(
+                application.property_id,
+                application.email,
+                application.full_name,
+                application.space_label,
+            )
+        grouped_applications.setdefault(key, []).append(application)
+
+    for duplicate_group in grouped_applications.values():
+        application = duplicate_group[0]
+        monthly_payments = []
+        for grouped_application in duplicate_group:
+            monthly_payments.extend(grouped_application.payments.filter(status="completed"))
 
         rent_paid = payment_amount_for_month(monthly_payments, month_start.year, month_start.month, ["rent"])
         utility_paid = payment_amount_for_month(monthly_payments, month_start.year, month_start.month, ["utility"])
@@ -1431,8 +1448,8 @@ def monthly_collection_watch_rows(applications):
             Decimal("0.00"),
         )
 
-        rent_expected = expected_rent_for_month(application, month_start)
-        utility_expected = expected_utility_for_month(application, month_start)
+        rent_expected = max((expected_rent_for_month(grouped_application, month_start) for grouped_application in duplicate_group), default=Decimal("0.00"))
+        utility_expected = max((expected_utility_for_month(grouped_application, month_start) for grouped_application in duplicate_group), default=Decimal("0.00"))
 
         if combined_paid > 0:
             rent_shortfall = max(rent_expected - rent_paid, Decimal("0.00"))
@@ -3419,6 +3436,7 @@ def record_manual_payment(request, property_id=None):
     accessible_properties = staff_managed_properties(request.user).order_by("name")
     selected_property = None
     application_id = request.GET.get("application")
+    return_to = request.GET.get("return") or request.POST.get("return_to")
 
     if application_id:
         selected_application = get_object_or_404(
@@ -3457,13 +3475,53 @@ def record_manual_payment(request, property_id=None):
             payment.save()
             apply_completed_payment_to_balance(payment)
 
-            messages.success(request, "Manual payment recorded and resident balance updated.")
+            utility_amount = form.cleaned_data.get("utility_amount")
+            utility_payment = None
+            if utility_amount and utility_amount > 0:
+                utility_payment = Payment.objects.create(
+                    application=payment.application,
+                    payment_type="utility",
+                    payment_method=form.cleaned_data.get("utility_payment_method") or payment.payment_method,
+                    amount=utility_amount,
+                    status="completed",
+                    recorded_by=request.user,
+                    received_at=payment.received_at,
+                    service_month=payment.service_month,
+                    months_covered=payment.months_covered,
+                    reference_number=form.cleaned_data.get("utility_reference_number") or payment.reference_number,
+                    description="Manual utilities payment recorded with rent",
+                    notes=payment.notes,
+                )
+                apply_completed_payment_to_balance(utility_payment)
+
+            if utility_payment:
+                messages.success(request, "Manual rent and utilities payments recorded and resident balances updated.")
+            else:
+                messages.success(request, "Manual payment recorded and resident balance updated.")
+            if return_to == "dashboard":
+                return redirect("landlord_dashboard")
             return redirect("payment_receipt", payment_id=payment.id)
     else:
         initial = {}
 
         if application_id:
             initial["application"] = application_id
+            selected_application = get_object_or_404(
+                staff_managed_applications(request.user).select_related("property"),
+                id=application_id,
+            )
+            month_start, _next_month = current_month_bounds()
+            monthly_payments = list(selected_application.payments.filter(status="completed"))
+            rent_paid = payment_amount_for_month(monthly_payments, month_start.year, month_start.month, ["rent"])
+            utility_paid = payment_amount_for_month(monthly_payments, month_start.year, month_start.month, ["utility"])
+            rent_due = max(expected_rent_for_month(selected_application, month_start) - rent_paid, Decimal("0.00"))
+            utility_due = max(expected_utility_for_month(selected_application, month_start) - utility_paid, Decimal("0.00"))
+            if rent_due > 0:
+                initial["payment_type"] = "rent"
+                initial["amount"] = rent_due
+            if utility_due > 0:
+                initial["utility_amount"] = utility_due
+            initial["service_month"] = month_start
 
         form = ManualPaymentForm(initial=initial)
         form.fields["application"].queryset = application_queryset
@@ -3473,6 +3531,7 @@ def record_manual_payment(request, property_id=None):
         "properties": accessible_properties,
         "selected_property": selected_property,
         "show_property_picker": not selected_property and not application_id,
+        "return_to": return_to or "",
     })
 
 

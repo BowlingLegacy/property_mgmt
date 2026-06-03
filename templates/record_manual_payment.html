@@ -80,6 +80,7 @@
         {% else %}
         <form method="post">
             {% csrf_token %}
+            <input type="hidden" name="return_to" value="{{ return_to }}">
 
             {% if form.non_field_errors %}
                 <div class="alert alert-danger">
@@ -131,6 +132,31 @@
                     {{ form.months_covered }}
                     {{ form.months_covered.errors }}
                     <div class="form-text">{{ form.months_covered.help_text }}</div>
+                </div>
+
+                <div class="col-md-12">
+                    <div class="alert alert-info mb-0">
+                        To settle rent and utilities together, enter the rent amount above and the utilities amount below. Leave utilities blank if only rent is being paid.
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Utilities Amount</label>
+                    {{ form.utility_amount }}
+                    {{ form.utility_amount.errors }}
+                    <div class="form-text">{{ form.utility_amount.help_text }}</div>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Utilities Method</label>
+                    {{ form.utility_payment_method }}
+                    {{ form.utility_payment_method.errors }}
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Utilities Reference</label>
+                    {{ form.utility_reference_number }}
+                    {{ form.utility_reference_number.errors }}
                 </div>
 
                 <div class="col-md-12">
