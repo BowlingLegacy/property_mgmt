@@ -2819,6 +2819,14 @@ def landlord_message_detail(request, message_id):
 
     if request.method == "POST":
         reply_body = request.POST.get("reply_body", "").strip()
+        new_status = request.POST.get("status")
+        status_updated = False
+
+        if new_status in ["submitted", "reviewed", "closed"] and resident_message.status != new_status:
+            resident_message.status = new_status
+            resident_message.save(update_fields=["status"])
+            status_updated = True
+
         if reply_body:
             ResidentMessageReply.objects.create(
                 message=resident_message,
@@ -2826,7 +2834,7 @@ def landlord_message_detail(request, message_id):
                 body=reply_body,
                 visible_to_resident=True,
             )
-            if resident_message.status == "submitted":
+            if resident_message.status == "submitted" and not status_updated:
                 resident_message.status = "reviewed"
                 resident_message.save(update_fields=["status"])
             try:
@@ -2848,16 +2856,13 @@ def landlord_message_detail(request, message_id):
                 messages.info(request, f"Text notification not sent: {sms_log.get_status_display()}.")
             else:
                 messages.warning(request, f"Text notification failed: {sms_log.error_message}")
-            return redirect("landlord_message_detail", message_id=resident_message.id)
 
-        new_status = request.POST.get("status")
-
-        if new_status in ["submitted", "reviewed", "closed"]:
-            resident_message.status = new_status
-            resident_message.save()
+        elif status_updated:
             messages.success(request, "Message status updated.")
+        else:
+            messages.info(request, "No reply or status change was entered.")
 
-        return redirect("landlord_message_detail", message_id=resident_message.id)
+        return redirect("landlord_attention")
 
     return render(request, "landlord_message_detail.html", {
         "resident_message": resident_message,

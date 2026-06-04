@@ -1242,14 +1242,15 @@ class LiveFlowTests(TestCase):
         self.client.login(username="reply-landlord", password="StrongPass123!")
         response = self.client.post(reverse("landlord_message_detail", args=[resident_message.id]), {
             "reply_body": "I will check this today.",
+            "status": "closed",
         })
 
-        self.assertRedirects(response, reverse("landlord_message_detail", args=[resident_message.id]))
+        self.assertRedirects(response, reverse("landlord_attention"))
         reply = ResidentMessageReply.objects.get(message=resident_message)
         self.assertEqual(reply.sender, landlord)
         self.assertEqual(reply.body, "I will check this today.")
         resident_message.refresh_from_db()
-        self.assertEqual(resident_message.status, "reviewed")
+        self.assertEqual(resident_message.status, "closed")
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ["reply-resident@example.com"])
         self.assertIn("new secure reply", mail.outbox[0].body.lower())
@@ -1257,6 +1258,43 @@ class LiveFlowTests(TestCase):
         self.assertIn("ask for your login", mail.outbox[0].body)
         sms_log = SmsMessageLog.objects.get(resident_message=resident_message)
         self.assertEqual(sms_log.status, "skipped_no_consent")
+
+    def test_landlord_message_action_can_save_status_without_reply(self):
+        landlord = User.objects.create_user(
+            username="status-only-landlord",
+            email="status-only-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Status Only Property", landlord_email=landlord.email)
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Status Resident",
+            phone="555-0110",
+            email="status-resident@example.com",
+            age=44,
+            income_source="Employment",
+            monthly_income=Decimal("2000.00"),
+            housing_need="Existing resident.",
+        )
+        resident_message = ResidentMessage.objects.create(
+            application=resident,
+            subject="Question",
+            message="Please close this.",
+            status="reviewed",
+        )
+
+        self.client.login(username="status-only-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("landlord_message_detail", args=[resident_message.id]), {
+            "reply_body": "",
+            "status": "closed",
+        })
+
+        self.assertRedirects(response, reverse("landlord_attention"))
+        resident_message.refresh_from_db()
+        self.assertEqual(resident_message.status, "closed")
+        self.assertFalse(ResidentMessageReply.objects.filter(message=resident_message).exists())
         self.assertIn(reverse("resident_requests"), sms_log.body)
 
     def test_landlord_cannot_reply_to_other_property_message(self):

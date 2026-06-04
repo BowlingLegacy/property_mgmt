@@ -4,8 +4,8 @@
 <div class="card shadow-sm mb-4" style="border-radius:22px;">
     <div class="card-body p-4">
 
-        <a href="{% url 'landlord_dashboard' %}" class="btn btn-outline-secondary rounded-pill mb-3">
-            Back to Landlord Dashboard
+        <a href="{% url 'landlord_attention' %}" class="btn btn-outline-secondary rounded-pill mb-3">
+            Back to Message Inbox
         </a>
 
         <h2 class="fw-bold" style="color:#1e3a5f;">Resident Communication</h2>
@@ -59,17 +59,10 @@
             {% endfor %}
         </div>
 
-        <form method="POST" class="card p-3 bg-light border-0 mb-4" style="border-radius:18px;">
+        <form method="POST" class="card p-3 bg-light border-0" style="border-radius:18px;">
             {% csrf_token %}
             <label class="form-label fw-bold">Reply to Resident</label>
             <textarea name="reply_body" class="form-control mb-3" rows="4" placeholder="Write a secure portal reply..."></textarea>
-            <button type="submit" class="btn btn-primary rounded-pill">
-                Send Reply
-            </button>
-        </form>
-
-        <form method="POST" class="card p-3 bg-light border-0" style="border-radius:18px;">
-            {% csrf_token %}
 
             <label class="form-label fw-bold">Status</label>
             <select name="status" class="form-select mb-3">
@@ -79,7 +72,7 @@
             </select>
 
             <button type="submit" class="btn btn-primary rounded-pill">
-                Save Status
+                Save Status / Send Reply
             </button>
         </form>
 
