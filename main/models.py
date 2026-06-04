@@ -857,10 +857,10 @@ class ExistingResidentIntake(models.Model):
         on_delete=models.CASCADE,
         related_name="existing_resident_intakes",
     )
-    application = models.OneToOneField(
+    application = models.ForeignKey(
         "HousingApplication",
         on_delete=models.SET_NULL,
-        related_name="existing_resident_intake",
+        related_name="existing_resident_intakes",
         blank=True,
         null=True,
     )

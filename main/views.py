@@ -1735,7 +1735,7 @@ def room_rent_setup_rows(user, property_obj=None):
 
     existing_files = (
         staff_managed_applications(user)
-        .select_related("property", "existing_resident_intake")
+        .select_related("property")
         .exclude(space_label="")
         .order_by("property__name", "space_label", "full_name")
     )
@@ -1793,9 +1793,7 @@ def is_orphan_existing_resident_setup_file(application):
     if application.user:
         return False
 
-    try:
-        application.existing_resident_intake
-    except ExistingResidentIntake.DoesNotExist:
+    if not application.existing_resident_intakes.exists():
         return True
 
     return False
@@ -2929,14 +2927,8 @@ def group_resident_message(request):
     })
 
 
-@csrf_exempt
-def twilio_sms_webhook(request):
-    if request.method != "POST":
-        return HttpResponse("", content_type="text/xml")
-
-    from_phone = request.POST.get("From", "")
-    body = request.POST.get("Body", "").strip().lower()
-
+def process_sms_opt_out(from_phone, body):
+    body = str(body or "").strip().lower()
     if body in {"stop", "stopall", "unsubscribe", "cancel", "end", "quit"}:
         phone_digits = normalize_phone_digits(from_phone)
         applications = HousingApplication.objects.filter(sms_opted_in=True)
@@ -2946,7 +2938,37 @@ def twilio_sms_webhook(request):
                 application.sms_opted_out_at = timezone.now()
                 application.save(update_fields=["sms_opted_in", "sms_opted_out_at"])
 
+
+@csrf_exempt
+def twilio_sms_webhook(request):
+    if request.method != "POST":
+        return HttpResponse("", content_type="text/xml")
+
+    process_sms_opt_out(request.POST.get("From", ""), request.POST.get("Body", ""))
     return HttpResponse("<Response></Response>", content_type="text/xml")
+
+
+@csrf_exempt
+def telnyx_sms_webhook(request):
+    if request.method != "POST":
+        return JsonResponse({"ok": True})
+
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        payload = {}
+
+    data = payload.get("data", {})
+    event_payload = data.get("payload", data)
+    from_value = event_payload.get("from", "")
+    if isinstance(from_value, dict):
+        from_phone = from_value.get("phone_number", "")
+    else:
+        from_phone = from_value
+    body = event_payload.get("text") or event_payload.get("body") or ""
+    process_sms_opt_out(from_phone, body)
+
+    return JsonResponse({"ok": True})
 
 
 @login_required
@@ -3009,9 +3031,15 @@ def tenant_dashboard(request):
         if not is_superadmin_inspecting:
             profile_photo_form = ResidentProfilePhotoForm(instance=application)
 
-        rent_due = application.balance if application.balance > 0 else Decimal("0.00")
+        month_start, _next_month = current_month_bounds()
+        current_rent_paid = payment_amount_for_month(payments, month_start.year, month_start.month, ["rent"])
+        current_utility_paid = payment_amount_for_month(payments, month_start.year, month_start.month, ["utility"])
+        current_rent_due = max(expected_rent_for_month(application, month_start) - current_rent_paid, Decimal("0.00"))
+        current_utility_due = max(expected_utility_for_month(application, month_start) - current_utility_paid, Decimal("0.00"))
+
+        rent_due = current_rent_due
         deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
-        utility_due = application.utility_balance if application.utility_balance > 0 else Decimal("0.00")
+        utility_due = current_utility_due
         show_utilities = resident_has_portal_utility_charge(application)
         utility_setup_items = resident_utility_setup_items(application)
         utility_setup_complete = bool(utility_setup_items) and all(item.completed_at for item in utility_setup_items)
@@ -3071,7 +3099,13 @@ def resident_visible_payments(application):
     if not application:
         return []
 
-    payments = list(application.payments.all().order_by("-created_at"))
+    related_applications = resident_related_applications(application)
+    payments = list(
+        Payment.objects
+        .filter(application__in=related_applications)
+        .select_related("application")
+        .order_by("-created_at")
+    )
 
     if not application.lease_start_date:
         return payments
@@ -3081,6 +3115,72 @@ def resident_visible_payments(application):
         payment
         for payment in payments
         if payment.accounting_month >= lease_start_month
+    ]
+
+
+def resident_name_parts(value):
+    return [clean_match_value(part) for part in str(value or "").split() if clean_match_value(part)]
+
+
+def resident_names_compatible(first_name, second_name):
+    first_parts = resident_name_parts(first_name)
+    second_parts = resident_name_parts(second_name)
+
+    if not first_parts or not second_parts:
+        return False
+
+    if first_parts == second_parts:
+        return True
+
+    if first_parts[-1] != second_parts[-1]:
+        return False
+
+    first_given = first_parts[:-1]
+    second_given = second_parts[:-1]
+    if not first_given or not second_given:
+        return True
+
+    if set(first_given).intersection(second_given):
+        return True
+
+    first_initials = {part[0] for part in first_given if part}
+    second_initials = {part[0] for part in second_given if part}
+    return bool(first_initials.intersection(second_initials))
+
+
+def resident_applications_compatible(primary, candidate):
+    if primary.id == candidate.id:
+        return True
+
+    if primary.user_id and primary.user_id == candidate.user_id:
+        return True
+
+    primary_email = str(primary.email or "").strip().lower()
+    candidate_email = str(candidate.email or "").strip().lower()
+    if primary_email and candidate_email and primary_email == candidate_email:
+        return True
+
+    return resident_names_compatible(primary.full_name, candidate.full_name)
+
+
+def resident_related_applications(application):
+    if not application:
+        return []
+
+    candidates = HousingApplication.objects.select_related("property", "user").filter(property=application.property)
+    unit_label = canonical_room_label(application.space_label)
+    if unit_label:
+        target_unit = normalized_room_label(unit_label)
+        candidates = [
+            candidate for candidate in candidates
+            if normalized_room_label(candidate.space_label) == target_unit
+        ]
+    else:
+        candidates = list(candidates)
+
+    return [
+        candidate for candidate in candidates
+        if resident_applications_compatible(application, candidate)
     ]
 
 
@@ -3191,9 +3291,13 @@ def resident_balance_detail(request):
         messages.error(request, "No resident file connected.")
         return redirect("tenant_dashboard")
 
-    rent_due = application.balance if application.balance > 0 else Decimal("0.00")
+    payments = resident_visible_payments(application)
+    month_start, _next_month = current_month_bounds()
+    rent_paid = payment_amount_for_month(payments, month_start.year, month_start.month, ["rent"])
+    utility_paid = payment_amount_for_month(payments, month_start.year, month_start.month, ["utility"])
+    rent_due = max(expected_rent_for_month(application, month_start) - rent_paid, Decimal("0.00"))
     deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
-    utility_due = application.utility_balance if application.utility_balance > 0 else Decimal("0.00")
+    utility_due = max(expected_utility_for_month(application, month_start) - utility_paid, Decimal("0.00"))
     show_utilities = resident_has_portal_utility_charge(application)
 
     return render(request, "resident_balance_detail.html", {
@@ -4792,6 +4896,48 @@ def current_roster_match_status(intake):
     return "no_roster"
 
 
+def existing_application_for_current_resident_intake(intake):
+    application = (
+        HousingApplication.objects
+        .select_related("user")
+        .filter(id=intake.application_id)
+        .first()
+    )
+    if application:
+        return application
+
+    roster_match = find_current_roster_match(intake)
+    target_unit = normalized_room_label(intake.room_unit_label or (roster_match.room_unit_label if roster_match else ""))
+    intake_phone = normalize_phone_digits(intake.phone)
+    intake_email = str(intake.email or "").strip().lower()
+    intake_name = intake.full_name()
+
+    candidates = (
+        HousingApplication.objects
+        .select_related("user")
+        .filter(property=intake.property)
+        .order_by("-user_id", "-lease_start_date", "-id")
+    )
+
+    for candidate in candidates:
+        if target_unit and normalized_room_label(candidate.space_label) != target_unit:
+            continue
+
+        candidate_email = str(candidate.email or "").strip().lower()
+        candidate_phone = normalize_phone_digits(candidate.phone)
+
+        if intake_email and candidate_email and intake_email == candidate_email:
+            return candidate
+
+        if target_unit and intake_phone and candidate_phone and intake_phone == candidate_phone:
+            return candidate
+
+        if resident_names_compatible(intake_name, candidate.full_name):
+            return candidate
+
+    return None
+
+
 def ensure_existing_resident_portal_application(intake):
     room_rent_setting = find_room_rent_setting(intake.property, intake.room_unit_label)
     monthly_rent = (
@@ -4804,12 +4950,7 @@ def ensure_existing_resident_portal_application(intake):
     deposit_required = room_rent_setting.deposit_required if room_rent_setting else Decimal("0.00")
     deposit_paid = min(room_rent_setting.deposit_paid, deposit_required) if room_rent_setting else Decimal("0.00")
 
-    application = (
-        HousingApplication.objects
-        .select_related("user")
-        .filter(id=intake.application_id)
-        .first()
-    )
+    application = existing_application_for_current_resident_intake(intake)
 
     if not application:
         application = HousingApplication.objects.create(
@@ -4836,10 +4977,21 @@ def ensure_existing_resident_portal_application(intake):
             housing_need="Existing resident profile setup.",
             additional_notes=intake.additional_notes,
         )
-        intake.application = application
-        intake.save(update_fields=["application"])
     else:
         update_fields = []
+        allow_contact_update = not application.user or not application.user.has_usable_password()
+
+        if allow_contact_update and intake.full_name() and application.full_name != intake.full_name():
+            application.full_name = intake.full_name()
+            update_fields.append("full_name")
+
+        if allow_contact_update and intake.email and application.email != intake.email:
+            application.email = intake.email
+            update_fields.append("email")
+
+        if allow_contact_update and intake.phone and application.phone != intake.phone:
+            application.phone = intake.phone
+            update_fields.append("phone")
 
         if intake.room_unit_label and application.space_label != intake.room_unit_label:
             application.space_type = application.space_type or "Room"
@@ -4855,6 +5007,10 @@ def ensure_existing_resident_portal_application(intake):
         if update_fields:
             application.save(update_fields=update_fields)
 
+    if intake.application_id != application.id:
+        intake.application = application
+        intake.save(update_fields=["application"])
+
     if not application.user:
         application.user = create_pending_portal_user(
             intake.full_name(),
@@ -4863,6 +5019,9 @@ def ensure_existing_resident_portal_application(intake):
             application.id,
         )
         application.save(update_fields=["user"])
+    elif not application.user.has_usable_password() and intake.email and application.user.email != intake.email:
+        application.user.email = intake.email
+        application.user.save(update_fields=["email"])
 
     ensure_existing_resident_onboarding_documents(application)
 
@@ -5215,6 +5374,10 @@ def delete_existing_resident_intake(request, intake_id):
         property__in=staff_managed_properties(request.user),
     )
     application = HousingApplication.objects.select_related("user").filter(id=intake.application_id).first()
+    other_linked_intakes_exist = bool(
+        application
+        and ExistingResidentIntake.objects.filter(application=application).exclude(id=intake.id).exists()
+    )
 
     if application and application.user and application.user.has_usable_password():
         messages.error(
@@ -5236,7 +5399,7 @@ def delete_existing_resident_intake(request, intake_id):
         return redirect("landlord_existing_resident_intake_detail", intake_id=intake.id)
 
     resident_name = intake.full_name()
-    if application:
+    if application and not other_linked_intakes_exist:
         temp_user = application.user
         application.delete()
         if temp_user and not temp_user.has_usable_password():

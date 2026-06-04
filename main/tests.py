@@ -1,6 +1,7 @@
 from decimal import Decimal
 from datetime import date, datetime
 from io import BytesIO, StringIO
+import json
 from unittest.mock import patch
 
 from django.contrib import admin
@@ -14,7 +15,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .models import AccountingReceipt, ApplicantDocument, BlogComment, BlogPost, CompanyMailboxConnection, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, PropertyRoomRent, RentHistory, ResidentMessage, ResidentMessageReply, SignedDocument, SmsMessageLog, User
-from .views import apply_completed_payment_to_balance, ensure_existing_resident_portal_application, payment_amount_for_month, prorated_monthly_charge, rent_roll_rows_for_properties, t12_report_rows
+from .views import apply_completed_payment_to_balance, current_month_bounds, ensure_existing_resident_portal_application, payment_amount_for_month, prorated_monthly_charge, rent_roll_rows_for_properties, t12_report_rows
 
 
 @override_settings(
@@ -2307,6 +2308,38 @@ class LiveFlowTests(TestCase):
             "From": "+1 (555) 0111",
             "Body": "STOP",
         })
+
+        self.assertEqual(response.status_code, 200)
+        application.refresh_from_db()
+        self.assertFalse(application.sms_opted_in)
+        self.assertIsNotNone(application.sms_opted_out_at)
+
+    def test_telnyx_stop_webhook_opts_out_matching_resident_phone(self):
+        resident_user = User.objects.create_user(username="telnyx-stop-resident", password="StrongPass123!", role="tenant")
+        application = HousingApplication.objects.create(
+            user=resident_user,
+            full_name="Telnyx Stop Resident",
+            phone="+15550112",
+            email="telnyx-stop-resident@example.com",
+            age=46,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            sms_opted_in=True,
+        )
+
+        response = self.client.post(
+            reverse("telnyx_sms_webhook"),
+            data=json.dumps({
+                "data": {
+                    "payload": {
+                        "from": {"phone_number": "+1 (555) 0112"},
+                        "text": "STOP",
+                    },
+                },
+            }),
+            content_type="application/json",
+        )
 
         self.assertEqual(response.status_code, 200)
         application.refresh_from_db()
@@ -5693,18 +5726,17 @@ class LiveFlowTests(TestCase):
         first_application = ensure_existing_resident_portal_application(first_intake)
         second_application = ensure_existing_resident_portal_application(second_intake)
 
-        self.assertNotEqual(first_application.id, second_application.id)
+        self.assertEqual(first_application.id, second_application.id)
         self.assertEqual(first_intake.application_id, first_application.id)
-        self.assertEqual(second_intake.application_id, second_application.id)
+        self.assertEqual(second_intake.application_id, first_application.id)
 
         self.client.login(username="duplicate-current-resident-intake", password="StrongPass123!")
         response = self.client.post(reverse("delete_existing_resident_intake", args=[first_intake.id]))
 
         self.assertRedirects(response, reverse("landlord_attention"))
         self.assertFalse(ExistingResidentIntake.objects.filter(id=first_intake.id).exists())
-        self.assertFalse(HousingApplication.objects.filter(id=first_application.id).exists())
+        self.assertTrue(HousingApplication.objects.filter(id=first_application.id).exists())
         self.assertTrue(ExistingResidentIntake.objects.filter(id=second_intake.id).exists())
-        self.assertTrue(HousingApplication.objects.filter(id=second_application.id).exists())
 
     def test_landlord_can_upload_current_resident_roster(self):
         landlord = User.objects.create_user(
@@ -6232,6 +6264,59 @@ class LiveFlowTests(TestCase):
         )
         self.assertContains(history_response, "Move-in prorated May rent")
         self.assertNotContains(history_response, "Prior occupant April rent")
+
+    def test_resident_dashboard_uses_matching_duplicate_file_payments_for_current_month(self):
+        resident_user = User.objects.create_user(
+            username="duplicate-payment-resident",
+            email="duplicate-payment-resident@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        property_obj = Property.objects.create(name="Duplicate Payment Property")
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Steven Bruno",
+            phone="555-0139",
+            email="duplicate-payment-resident@example.com",
+            age=44,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+            space_label="C",
+            monthly_rent=Decimal("610.00"),
+            utility_monthly=Decimal("55.00"),
+        )
+        duplicate_application = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Steven Bruno",
+            phone="555-0139",
+            email="other-steven-file@example.com",
+            age=44,
+            income_source="Existing resident intake",
+            monthly_income=Decimal("0.00"),
+            housing_need="Existing resident profile setup.",
+            space_label="Room C",
+            monthly_rent=Decimal("610.00"),
+            utility_monthly=Decimal("55.00"),
+        )
+        month_start, _next_month = current_month_bounds()
+        Payment.objects.create(
+            application=duplicate_application,
+            payment_type="rent",
+            payment_method="cash",
+            amount=Decimal("610.00"),
+            status="completed",
+            service_month=month_start,
+            description="Rent paid on duplicate file",
+        )
+
+        self.client.login(username="duplicate-payment-resident", password="StrongPass123!")
+        response = self.client.get(reverse("tenant_dashboard"))
+
+        self.assertEqual(response.context["rent_due"], Decimal("0.00"))
+        self.assertEqual(response.context["utility_due"], Decimal("55.00"))
+        self.assertEqual([payment.description for payment in response.context["payments"]], ["Rent paid on duplicate file"])
 
     def test_resident_can_reply_only_to_own_message(self):
         resident_user = User.objects.create_user(
