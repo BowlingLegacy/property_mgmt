@@ -5379,6 +5379,15 @@ def delete_existing_resident_intake(request, intake_id):
         and ExistingResidentIntake.objects.filter(application=application).exclude(id=intake.id).exists()
     )
 
+    if application and other_linked_intakes_exist:
+        resident_name = intake.full_name()
+        intake.delete()
+        messages.success(
+            request,
+            f"Deleted duplicate setup attempt for {resident_name}. The completed resident file was kept.",
+        )
+        return redirect("landlord_attention")
+
     if application and application.user and application.user.has_usable_password():
         messages.error(
             request,
