@@ -220,6 +220,9 @@ body {
                 <a href="{% url 'financial_upload' %}">Expense Imports</a>
 
                 <div class="ops-nav-label">Account</div>
+                {% if request.user.is_superuser or request.user.role == "admin" or request.user.role == "assistant" %}
+                    <a href="{% url 'property_owner_dashboard' %}">Owner Portfolio</a>
+                {% endif %}
                 {% if request.user.is_superuser or request.user.role == "admin" %}
                     <a href="{% url 'superadmin_dashboard' %}">Back to Super Admin</a>
                 {% endif %}

@@ -63,6 +63,8 @@ class User(AbstractUser):
         if self.role in ["tenant", "property_owner"]:
             self.is_staff = False
             self.is_superuser = False
+        elif self.role in ["landlord", "assistant", "admin"]:
+            self.is_staff = True
 
         super().save(*args, **kwargs)
 

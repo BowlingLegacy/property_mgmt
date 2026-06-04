@@ -333,6 +333,55 @@ class LiveFlowTests(TestCase):
         self.assertTrue(intake.user.is_staff)
         self.assertEqual(intake.status, "registered")
 
+    def test_assistant_invite_code_creates_staff_assistant_without_intake(self):
+        temp_user = User.objects.create_user(
+            username="pending-assistant",
+            email="assistant@example.com",
+            password=None,
+            role="assistant",
+            is_staff=True,
+        )
+        temp_user.refresh_invite_code()
+
+        response = self.client.post(reverse("enter_invite_code"), {"invite_code": temp_user.invite_code})
+        self.assertRedirects(response, reverse("signup"))
+
+        response = self.client.post(reverse("signup"), {
+            "full_name": "Diane Torgerson",
+            "phone": "541-326-7293",
+            "address": "1005 W Main St",
+            "username": "diane-assistant",
+            "email": "assistant@example.com",
+            "password1": "StrongPass123!",
+            "password2": "StrongPass123!",
+        })
+
+        self.assertRedirects(response, reverse("landlord_dashboard"))
+        assistant = User.objects.get(username="diane-assistant")
+        self.assertEqual(assistant.role, "assistant")
+        self.assertTrue(assistant.is_staff)
+        self.assertFalse(User.objects.filter(id=temp_user.id).exists())
+
+    def test_create_assistant_invite_command_emails_setup_code(self):
+        output = StringIO()
+
+        call_command(
+            "create_assistant_invite",
+            "--name",
+            "Diane Torgerson",
+            "--email",
+            "dctthatsme@gmail.com",
+            stdout=output,
+        )
+
+        assistant = User.objects.get(email="dctthatsme@gmail.com")
+        self.assertEqual(assistant.role, "assistant")
+        self.assertTrue(assistant.is_staff)
+        self.assertFalse(assistant.has_usable_password())
+        self.assertTrue(assistant.invite_code)
+        self.assertIn(assistant.invite_code, mail.outbox[0].body)
+        self.assertIn("Setup code:", output.getvalue())
+
     def test_unregistered_user_can_request_replacement_invite_code(self):
         temp_user = User.objects.create_user(
             username="replacement-applicant",

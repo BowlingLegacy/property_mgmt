@@ -1215,7 +1215,7 @@ def signup(request):
         owner_intake = get_object_or_404(PropertyOwnerIntake, user=pending_user)
     elif pending_user.role == "landlord":
         landlord_intake_obj = get_object_or_404(LandlordIntake, user=pending_user)
-    else:
+    elif pending_user.role != "assistant":
         messages.error(request, "No portal intake is connected to this code yet.")
         return redirect("enter_invite_code")
 
@@ -1227,7 +1227,7 @@ def signup(request):
         return redirect("request_invite_code")
 
     if request.method == "POST":
-        form_class = LandlordSignUpForm if pending_user.role == "landlord" else SignUpForm
+        form_class = LandlordSignUpForm if pending_user.role in ["landlord", "assistant"] else SignUpForm
         form = form_class(request.POST)
 
         if form.is_valid():
@@ -1269,7 +1269,7 @@ def signup(request):
             from .auth_views import dashboard_for_user
             return redirect(dashboard_for_user(user))
     else:
-        form_class = LandlordSignUpForm if pending_user.role == "landlord" else SignUpForm
+        form_class = LandlordSignUpForm if pending_user.role in ["landlord", "assistant"] else SignUpForm
         initial = {"email": pending_user.email}
 
         if landlord_intake_obj:
@@ -1310,7 +1310,7 @@ def enter_invite_code(request):
         owner_intake = PropertyOwnerIntake.objects.filter(user=user_with_code).first()
         landlord_intake_obj = LandlordIntake.objects.filter(user=user_with_code).first()
 
-        if not profile and not owner_intake and not landlord_intake_obj:
+        if not profile and not owner_intake and not landlord_intake_obj and user_with_code.role != "assistant":
             messages.error(request, "No approved portal intake is connected to this code yet.")
             return redirect("enter_invite_code")
 
