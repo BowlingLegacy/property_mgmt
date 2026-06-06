@@ -382,6 +382,35 @@ class LiveFlowTests(TestCase):
         self.assertIn(assistant.invite_code, mail.outbox[0].body)
         self.assertIn("Setup code:", output.getvalue())
 
+    def test_send_account_recovery_command_emails_username_and_reset_link(self):
+        user = User.objects.create_user(
+            username="mark-moore",
+            email="mark@example.com",
+            password="OldPass123!",
+            role="tenant",
+        )
+        property_obj = Property.objects.create(name="Recovery Property")
+        HousingApplication.objects.create(
+            property=property_obj,
+            user=user,
+            full_name="Mark Moore",
+            phone="555-0144",
+            email=user.email,
+            age=42,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Existing resident.",
+        )
+        output = StringIO()
+
+        call_command("send_account_recovery", "--name", "Mark Moore", stdout=output)
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["mark@example.com"])
+        self.assertIn("mark-moore", mail.outbox[0].body)
+        self.assertIn("https://bowlinglegacy.com/password-reset-confirm/", mail.outbox[0].body)
+        self.assertIn("Recovery email sent.", output.getvalue())
+
     def test_unregistered_user_can_request_replacement_invite_code(self):
         temp_user = User.objects.create_user(
             username="replacement-applicant",
