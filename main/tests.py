@@ -64,6 +64,21 @@ class LiveFlowTests(TestCase):
         self.assertContains(privacy_response, "does not sell, rent, or share mobile phone numbers")
         self.assertContains(terms_response, "Reply STOP to opt out")
 
+    def test_public_sms_consent_pages_render_required_language(self):
+        digital_response = self.client.get(reverse("sms_consent"))
+        paper_response = self.client.get(reverse("sms_paper_consent"))
+
+        self.assertContains(digital_response, "Mobile Phone Number")
+        self.assertContains(digital_response, "Yes, I agree to receive text messages from Bowling Legacy")
+        self.assertContains(digital_response, "Message frequency may vary")
+        self.assertContains(digital_response, "Reply STOP to opt out")
+        self.assertContains(digital_response, "will not sell, rent, or share your mobile information")
+
+        self.assertContains(paper_response, "Resident Signature")
+        self.assertContains(paper_response, "By signing this form")
+        self.assertContains(paper_response, "Reply HELP for help")
+        self.assertContains(paper_response, "Confirmation text sent after written consent is entered")
+
     def test_application_sms_opt_in_records_consent_timestamp(self):
         property_obj = Property.objects.create(name="SMS Consent Property")
         payload = self.application_payload()

@@ -1142,6 +1142,14 @@ def terms_of_service(request):
     return render(request, "terms_of_service.html")
 
 
+def sms_consent(request):
+    return render(request, "sms_consent.html")
+
+
+def sms_paper_consent(request):
+    return render(request, "sms_paper_consent.html")
+
+
 def property_owner_intake(request):
     form = PropertyOwnerIntakeForm(request.POST or None)
 

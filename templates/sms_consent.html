@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="soft-card p-4 p-md-5" style="max-width:920px;margin:0 auto;">
+    <div class="mb-4">
+        <p class="text-uppercase fw-bold text-muted mb-2" style="letter-spacing:.08em;">SMS Opt-In Example</p>
+        <h1 class="section-title mb-2">Bowling Legacy Resident Text Message Consent</h1>
+        <p class="text-muted mb-0">
+            This public page shows the SMS consent language used when a resident chooses to receive text messages.
+            Residents are not required to opt in to rent from Bowling Legacy.
+        </p>
+    </div>
+
+    <form>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label fw-bold" for="sms_full_name">Resident Name</label>
+                <input class="form-control" id="sms_full_name" type="text" placeholder="Resident full name">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-bold" for="sms_phone">Mobile Phone Number</label>
+                <input class="form-control" id="sms_phone" type="tel" placeholder="Example: 541-326-0589">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-bold" for="sms_email">Email Address</label>
+                <input class="form-control" id="sms_email" type="email" placeholder="resident@example.com">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-bold" for="sms_property">Property / Unit</label>
+                <input class="form-control" id="sms_property" type="text" placeholder="Property name and room/unit">
+            </div>
+        </div>
+
+        <div class="border rounded-3 p-3 mt-4" style="background:#fffaf0;">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="sms_opt_in">
+                <label class="form-check-label fw-bold" for="sms_opt_in">
+                    Yes, I agree to receive text messages from Bowling Legacy.
+                </label>
+            </div>
+            <p class="small text-muted mt-3 mb-0">
+                By providing your mobile phone number and selecting this checkbox, you agree to receive account-related
+                SMS text messages from Bowling Legacy. Messages may include resident portal notifications, rent reminders,
+                utility reminders, maintenance notices, building notices, and urgent property updates. Message frequency
+                may vary. Message and data rates may apply. Reply STOP to opt out. Reply HELP for help. Consent is not
+                a condition of renting from Bowling Legacy. Bowling Legacy will not sell, rent, or share your mobile
+                information with third parties for their marketing or promotional purposes.
+            </p>
+        </div>
+
+        <div class="mt-4 d-flex flex-wrap gap-2">
+            <button class="gold-btn" type="button">Submit SMS Consent</button>
+            <a class="message-btn" href="{% url 'privacy_policy' %}">Privacy Policy</a>
+            <a class="message-btn" href="{% url 'terms_of_service' %}">Terms of Service</a>
+        </div>
+    </form>
+</div>
+
+{% endblock %}

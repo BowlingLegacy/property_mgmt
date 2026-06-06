@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="soft-card p-4 p-md-5" style="max-width:920px;margin:0 auto;">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-4">
+        <div>
+            <p class="text-uppercase fw-bold text-muted mb-2" style="letter-spacing:.08em;">Printable SMS Consent</p>
+            <h1 class="section-title mb-2">Bowling Legacy Written Resident Text Message Consent</h1>
+            <p class="text-muted mb-0">
+                Residents may sign this form during onboarding, lease renewal, or resident file updates.
+            </p>
+        </div>
+        <button class="message-btn" type="button" onclick="window.print()">Print Form</button>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label class="form-label fw-bold">Resident Name</label>
+            <div class="border-bottom py-3">&nbsp;</div>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label fw-bold">Mobile Phone Number</label>
+            <div class="border-bottom py-3">&nbsp;</div>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label fw-bold">Email Address</label>
+            <div class="border-bottom py-3">&nbsp;</div>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label fw-bold">Property / Room / Unit</label>
+            <div class="border-bottom py-3">&nbsp;</div>
+        </div>
+    </div>
+
+    <div class="border rounded-3 p-3 mt-4" style="background:#fffaf0;">
+        <p class="fw-bold mb-2">SMS consent statement</p>
+        <p class="mb-0">
+            By signing this form and providing your mobile phone number, you agree to receive account-related SMS text
+            messages from Bowling Legacy. Messages may include resident portal notifications, rent reminders, utility
+            reminders, maintenance notices, building notices, and urgent property updates. Message frequency may vary.
+            Message and data rates may apply. Reply STOP to opt out. Reply HELP for help. Consent is not a condition of
+            renting from Bowling Legacy. Bowling Legacy will not sell, rent, or share your mobile information with third
+            parties for their marketing or promotional purposes.
+        </p>
+    </div>
+
+    <div class="row g-4 mt-4">
+        <div class="col-md-6">
+            <label class="form-label fw-bold">Resident Signature</label>
+            <div class="border-bottom py-4">&nbsp;</div>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label fw-bold">Date</label>
+            <div class="border-bottom py-4">&nbsp;</div>
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <p class="fw-bold mb-2">Confirmation text sent after written consent is entered</p>
+        <p class="border rounded-3 p-3 mb-0" style="background:#fff;">
+            Bowling Legacy: Thanks for subscribing to resident account and property update texts. Message frequency may
+            vary. Msg&amp;data rates may apply. Reply STOP to opt out or HELP for help.
+        </p>
+    </div>
+</div>
+
+{% endblock %}
