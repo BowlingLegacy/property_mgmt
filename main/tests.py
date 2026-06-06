@@ -2406,6 +2406,43 @@ class LiveFlowTests(TestCase):
         self.assertEqual(request.full_url, "https://api.telnyx.com/v2/messages")
         self.assertIn(b'"to": "+15415550110"', request.data)
 
+    @patch("main.views.send_resident_portal_notification_email", side_effect=Exception("email failed"))
+    @patch("main.views.send_sms_message")
+    def test_group_sms_message_does_not_crash_when_email_notice_fails(self, mocked_send_sms, _mocked_email):
+        mocked_send_sms.return_value = type("SmsResult", (), {"status": "sent"})()
+        landlord = User.objects.create_user(
+            username="group-sms-email-fail-landlord",
+            email="group-sms-email-fail-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        resident_user = User.objects.create_user(username="group-sms-email-fail-resident", password="StrongPass123!", role="tenant")
+        property_obj = Property.objects.create(name="Group SMS Email Fail Property", landlord_email=landlord.email)
+        HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Group SMS Email Fail Resident",
+            phone="541-555-0110",
+            email="group-sms-email-fail-resident@example.com",
+            age=46,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            sms_opted_in=True,
+        )
+
+        self.client.login(username="group-sms-email-fail-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("group_resident_message"), {
+            "property_id": str(property_obj.id),
+            "delivery_method": "portal_sms",
+            "subject": "SMS Notice",
+            "message": "This notice should not crash if email fails.",
+        })
+
+        self.assertRedirects(response, reverse("group_resident_message"))
+        self.assertTrue(mocked_send_sms.called)
+
     def test_twilio_stop_webhook_opts_out_matching_resident_phone(self):
         resident_user = User.objects.create_user(username="sms-stop-resident", password="StrongPass123!", role="tenant")
         application = HousingApplication.objects.create(

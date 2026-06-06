@@ -2892,6 +2892,10 @@ def group_resident_message(request):
         )
         created_count = 0
         sms_attempt_count = 0
+        sms_sent_count = 0
+        sms_failed_count = 0
+        sms_skipped_count = 0
+        email_failed_count = 0
 
         for application in recipients:
             resident_message = ResidentMessage.objects.create(
@@ -2903,27 +2907,49 @@ def group_resident_message(request):
                 locked=True,
             )
             created_count += 1
-            send_resident_portal_notification_email(
-                request,
-                application,
-                f"New secure portal message: {form.cleaned_data['subject']}",
-                "You have a new secure message in your Bowling Legacy resident portal.",
-                "resident_requests",
-            )
+            try:
+                send_resident_portal_notification_email(
+                    request,
+                    application,
+                    f"New secure portal message: {form.cleaned_data['subject']}",
+                    "You have a new secure message in your Bowling Legacy resident portal.",
+                    "resident_requests",
+                )
+            except Exception:
+                email_failed_count += 1
 
             if form.cleaned_data["delivery_method"] == "portal_sms":
-                send_sms_message(
-                    application,
-                    sms_body(form.cleaned_data["subject"], form.cleaned_data["message"]),
-                    request.user,
-                    resident_message=resident_message,
-                )
                 sms_attempt_count += 1
+                try:
+                    sms_log = send_sms_message(
+                        application,
+                        sms_body(form.cleaned_data["subject"], form.cleaned_data["message"]),
+                        request.user,
+                        resident_message=resident_message,
+                    )
+                    if sms_log.status == "sent":
+                        sms_sent_count += 1
+                    elif sms_log.status in ["skipped_no_consent", "not_configured"]:
+                        sms_skipped_count += 1
+                    else:
+                        sms_failed_count += 1
+                except Exception:
+                    sms_failed_count += 1
 
         if sms_attempt_count:
-            messages.success(request, f"Secure portal message sent to {created_count} resident file(s). SMS attempted for {sms_attempt_count} resident file(s).")
+            messages.success(
+                request,
+                f"Secure portal message created for {created_count} resident file(s). "
+                f"SMS attempted for {sms_attempt_count}: {sms_sent_count} sent, "
+                f"{sms_skipped_count} skipped, {sms_failed_count} failed.",
+            )
         else:
             messages.success(request, f"Secure portal message sent to {created_count} resident file(s).")
+        if email_failed_count:
+            messages.warning(
+                request,
+                f"Portal email notice failed for {email_failed_count} resident file(s), but the portal message was still created.",
+            )
         return redirect("group_resident_message")
 
     return render(request, "group_resident_message.html", {
