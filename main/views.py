@@ -590,7 +590,7 @@ def send_twilio_sms(application, body):
     credentials = f"{settings.TWILIO_ACCOUNT_SID}:{settings.TWILIO_AUTH_TOKEN}".encode("utf-8")
     request = Request(endpoint, data=payload)
     request.add_header("Authorization", f"Basic {base64.b64encode(credentials).decode('ascii')}")
-    response = urlopen(request, timeout=10)
+    response = urlopen(request, timeout=5)
     return response.read().decode("utf-8")
 
 
@@ -607,13 +607,24 @@ def send_telnyx_sms(application, body):
     request.add_header("Authorization", f"Bearer {settings.TELNYX_API_KEY}")
     request.add_header("Content-Type", "application/json")
     request.add_header("Accept", "application/json")
-    response = urlopen(request, timeout=10)
+    response = urlopen(request, timeout=5)
     response_body = response.read().decode("utf-8")
     try:
         payload = json.loads(response_body)
         return payload.get("data", {}).get("id") or response_body[:255]
     except json.JSONDecodeError:
         return response_body[:255]
+
+
+def sms_exception_message(exc):
+    if isinstance(exc, HTTPError):
+        try:
+            response_body = exc.read().decode("utf-8", errors="replace")
+        except Exception:
+            response_body = ""
+        if response_body:
+            return f"HTTP {exc.code}: {response_body[:1000]}"
+    return str(exc)
 
 
 def send_sms_message(application, body, sender, resident_message=None):
@@ -644,12 +655,12 @@ def send_sms_message(application, body, sender, resident_message=None):
             provider_message_id = send_twilio_sms(application, body)
     except Exception as exc:
         log.status = "failed"
-        log.error_message = str(exc)
+        log.error_message = sms_exception_message(exc)
         log.save(update_fields=["status", "error_message"])
         return log
 
     log.status = "sent"
-    log.provider_message_id = provider_message_id[:255]
+    log.provider_message_id = str(provider_message_id or "")[:255]
     log.sent_at = timezone.now()
     log.save(update_fields=["status", "provider_message_id", "sent_at"])
     return log

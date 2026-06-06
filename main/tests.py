@@ -2,6 +2,7 @@ from decimal import Decimal
 from datetime import date, datetime
 from io import BytesIO, StringIO
 import json
+from urllib.error import HTTPError
 from unittest.mock import patch
 
 from django.contrib import admin
@@ -15,7 +16,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .models import AccountingReceipt, ApplicantDocument, BlogComment, BlogPost, CompanyMailboxConnection, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, PropertyRoomRent, RentHistory, ResidentMessage, ResidentMessageReply, SignedDocument, SmsMessageLog, User
-from .views import apply_completed_payment_to_balance, current_month_bounds, ensure_existing_resident_portal_application, payment_amount_for_month, prorated_monthly_charge, rent_roll_rows_for_properties, t12_report_rows
+from .views import apply_completed_payment_to_balance, current_month_bounds, ensure_existing_resident_portal_application, payment_amount_for_month, prorated_monthly_charge, rent_roll_rows_for_properties, send_sms_message, t12_report_rows
 
 
 @override_settings(
@@ -2405,6 +2406,42 @@ class LiveFlowTests(TestCase):
         request = mocked_urlopen.call_args.args[0]
         self.assertEqual(request.full_url, "https://api.telnyx.com/v2/messages")
         self.assertIn(b'"to": "+15415550110"', request.data)
+
+    @override_settings(SMS_PROVIDER="telnyx", TELNYX_API_KEY="key-local", TELNYX_FROM_NUMBER="+15415550100")
+    @patch("main.views.urlopen")
+    def test_telnyx_http_error_body_is_saved_to_sms_log(self, mocked_urlopen):
+        mocked_urlopen.side_effect = HTTPError(
+            "https://api.telnyx.com/v2/messages",
+            403,
+            "Forbidden",
+            hdrs=None,
+            fp=BytesIO(b'{"errors":[{"detail":"Messaging profile is not authorized for this number."}]}'),
+        )
+        landlord = User.objects.create_user(
+            username="telnyx-error-landlord",
+            email="telnyx-error-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        resident_user = User.objects.create_user(username="telnyx-error-resident", password="StrongPass123!", role="tenant")
+        application = HousingApplication.objects.create(
+            user=resident_user,
+            full_name="Telnyx Error Resident",
+            phone="541-555-0110",
+            email="telnyx-error-resident@example.com",
+            age=46,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            sms_opted_in=True,
+        )
+
+        sms_log = send_sms_message(application, "Test message", landlord)
+
+        self.assertEqual(sms_log.status, "failed")
+        self.assertIn("HTTP 403", sms_log.error_message)
+        self.assertIn("Messaging profile is not authorized", sms_log.error_message)
 
     @patch("main.views.send_resident_portal_notification_email", side_effect=Exception("email failed"))
     @patch("main.views.send_sms_message")
