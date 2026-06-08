@@ -616,6 +616,16 @@ def send_telnyx_sms(application, body):
         return response_body[:255]
 
 
+def send_sms_to_phone_number(phone, body):
+    if not sms_provider_configured():
+        raise RuntimeError(f"{sms_provider_name().title()} environment variables are not configured.")
+
+    target = type("SmsTarget", (), {"phone": phone})()
+    if sms_provider_name() == "telnyx":
+        return send_telnyx_sms(target, body)
+    return send_twilio_sms(target, body)
+
+
 def sms_exception_message(exc):
     if isinstance(exc, HTTPError):
         try:
@@ -664,6 +674,19 @@ def send_sms_message(application, body, sender, resident_message=None):
     log.sent_at = timezone.now()
     log.save(update_fields=["status", "provider_message_id", "sent_at"])
     return log
+
+
+def parse_sms_copy_numbers(raw_value):
+    numbers = []
+    seen = set()
+    for raw_number in re.split(r"[,;\n]+", raw_value or ""):
+        normalized = sms_e164_phone(raw_number.strip())
+        digits = normalize_phone_digits(normalized)
+        if not digits or digits in seen:
+            continue
+        seen.add(digits)
+        numbers.append(normalized)
+    return numbers
 
 
 def staff_required(user):
@@ -2914,7 +2937,10 @@ def group_resident_message(request):
         sms_sent_count = 0
         sms_failed_count = 0
         sms_skipped_count = 0
+        staff_sms_sent_count = 0
+        staff_sms_failed_count = 0
         email_failed_count = 0
+        sms_message_body = sms_body(form.cleaned_data["subject"], form.cleaned_data["message"])
 
         for application in recipients:
             resident_message = ResidentMessage.objects.create(
@@ -2942,7 +2968,7 @@ def group_resident_message(request):
                 try:
                     sms_log = send_sms_message(
                         application,
-                        sms_body(form.cleaned_data["subject"], form.cleaned_data["message"]),
+                        sms_message_body,
                         request.user,
                         resident_message=resident_message,
                     )
@@ -2955,12 +2981,21 @@ def group_resident_message(request):
                 except Exception:
                     sms_failed_count += 1
 
+        if form.cleaned_data["delivery_method"] == "portal_sms":
+            for copy_number in parse_sms_copy_numbers(form.cleaned_data.get("staff_sms_copy_numbers")):
+                try:
+                    send_sms_to_phone_number(copy_number, sms_message_body)
+                    staff_sms_sent_count += 1
+                except Exception:
+                    staff_sms_failed_count += 1
+
         if sms_attempt_count:
             messages.success(
                 request,
                 f"Secure portal message created for {created_count} resident file(s). "
                 f"SMS attempted for {sms_attempt_count}: {sms_sent_count} sent, "
-                f"{sms_skipped_count} skipped, {sms_failed_count} failed.",
+                f"{sms_skipped_count} skipped, {sms_failed_count} failed. "
+                f"Staff copies: {staff_sms_sent_count} sent, {staff_sms_failed_count} failed.",
             )
         else:
             messages.success(request, f"Secure portal message sent to {created_count} resident file(s).")

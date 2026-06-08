@@ -1,4 +1,5 @@
 from django import forms
+from django.conf import settings
 from django.contrib.auth.forms import UserCreationForm
 
 from .models import (
@@ -686,6 +687,15 @@ class GroupResidentMessageForm(forms.Form):
             "placeholder": "Write the message residents will see in their secure portal...",
         }),
     )
+    staff_sms_copy_numbers = forms.CharField(
+        label="Staff SMS copy numbers",
+        required=False,
+        help_text="Optional. Comma-separated numbers for owner/assistant copies. These do not create resident file messages.",
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": "Example: 5413268047, 5413267293",
+        }),
+    )
 
     def __init__(self, *args, properties=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -693,6 +703,7 @@ class GroupResidentMessageForm(forms.Form):
         if properties is not None:
             property_choices.extend((str(property_obj.id), property_obj.name) for property_obj in properties)
         self.fields["property_id"].choices = property_choices
+        self.fields["staff_sms_copy_numbers"].initial = getattr(settings, "GROUP_SMS_COPY_NUMBERS", "")
 
 
 class ManualPaymentForm(forms.ModelForm):
