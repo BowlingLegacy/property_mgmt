@@ -1061,7 +1061,13 @@ class SmsMessageLog(models.Model):
         ("failed", "Failed"),
     ]
 
-    application = models.ForeignKey(HousingApplication, on_delete=models.CASCADE, related_name="sms_logs")
+    application = models.ForeignKey(
+        HousingApplication,
+        on_delete=models.CASCADE,
+        related_name="sms_logs",
+        blank=True,
+        null=True,
+    )
     resident_message = models.ForeignKey(
         ResidentMessage,
         on_delete=models.SET_NULL,
@@ -1069,6 +1075,7 @@ class SmsMessageLog(models.Model):
         blank=True,
         null=True,
     )
+    recipient_label = models.CharField(max_length=255, blank=True)
     to_phone = models.CharField(max_length=50)
     body = models.TextField()
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="queued")

@@ -676,6 +676,42 @@ def send_sms_message(application, body, sender, resident_message=None):
     return log
 
 
+def send_staff_sms_copy(phone, body, sender, label="Staff copy"):
+    log = SmsMessageLog.objects.create(
+        application=None,
+        recipient_label=label,
+        to_phone=phone,
+        body=body,
+        sent_by=sender,
+    )
+
+    if not normalize_phone_digits(phone):
+        log.status = "failed"
+        log.error_message = "No valid phone number was provided."
+        log.save(update_fields=["status", "error_message"])
+        return log
+
+    if not sms_provider_configured():
+        log.status = "not_configured"
+        log.error_message = f"{sms_provider_name().title()} environment variables are not configured."
+        log.save(update_fields=["status", "error_message"])
+        return log
+
+    try:
+        provider_message_id = send_sms_to_phone_number(phone, body)
+    except Exception as exc:
+        log.status = "failed"
+        log.error_message = sms_exception_message(exc)
+        log.save(update_fields=["status", "error_message"])
+        return log
+
+    log.status = "sent"
+    log.provider_message_id = str(provider_message_id or "")[:255]
+    log.sent_at = timezone.now()
+    log.save(update_fields=["status", "provider_message_id", "sent_at"])
+    return log
+
+
 def parse_sms_copy_numbers(raw_value):
     numbers = []
     seen = set()
@@ -2982,9 +3018,12 @@ def group_resident_message(request):
                     sms_failed_count += 1
 
         if form.cleaned_data["delivery_method"] == "portal_sms":
-            for copy_number in parse_sms_copy_numbers(form.cleaned_data.get("staff_sms_copy_numbers")):
+            for index, copy_number in enumerate(parse_sms_copy_numbers(form.cleaned_data.get("staff_sms_copy_numbers")), start=1):
                 try:
-                    send_sms_to_phone_number(copy_number, sms_message_body)
+                    staff_log = send_staff_sms_copy(copy_number, sms_message_body, request.user, label=f"Group message staff copy {index}")
+                    if staff_log.status != "sent":
+                        staff_sms_failed_count += 1
+                        continue
                     staff_sms_sent_count += 1
                 except Exception:
                     staff_sms_failed_count += 1

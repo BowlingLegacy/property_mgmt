@@ -677,12 +677,13 @@ class ResidentMessageAdmin(admin.ModelAdmin):
 
 @admin.register(SmsMessageLog)
 class SmsMessageLogAdmin(admin.ModelAdmin):
-    list_display = ("application", "to_phone", "status", "created_at", "sent_at")
+    list_display = ("application", "recipient_label", "to_phone", "status", "provider_message_id", "created_at", "sent_at")
     list_filter = ("status", "created_at")
-    search_fields = ("application__full_name", "application__phone", "body", "error_message")
+    search_fields = ("application__full_name", "application__phone", "recipient_label", "to_phone", "body", "provider_message_id", "error_message")
     readonly_fields = (
         "application",
         "resident_message",
+        "recipient_label",
         "to_phone",
         "body",
         "status",
