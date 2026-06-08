@@ -716,6 +716,83 @@ class ExpenseCategory(models.Model):
         return self.name
 
 
+class VendorCategoryRule(models.Model):
+    property = models.ForeignKey(
+        Property,
+        on_delete=models.CASCADE,
+        related_name="vendor_category_rules",
+        blank=True,
+        null=True,
+        help_text="Leave blank to use this rule for every property.",
+    )
+    vendor_contains = models.CharField(max_length=255)
+    category = models.ForeignKey(
+        ExpenseCategory,
+        on_delete=models.SET_NULL,
+        related_name="vendor_rules",
+        blank=True,
+        null=True,
+    )
+    entry_type = models.CharField(
+        max_length=50,
+        choices=ExpenseCategory.ENTRY_TYPE_CHOICES,
+        default="operating_expense",
+    )
+    description_template = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Optional description to use when a matching receipt has no description.",
+    )
+    is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        "User",
+        on_delete=models.SET_NULL,
+        related_name="created_vendor_category_rules",
+        blank=True,
+        null=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("property__name", "vendor_contains")
+        unique_together = ("property", "vendor_contains")
+
+    def __str__(self):
+        scope = self.property.name if self.property else "All properties"
+        return f"{scope}: {self.vendor_contains}"
+
+
+class AccountingPeriod(models.Model):
+    STATUS_CHOICES = [
+        ("open", "Open"),
+        ("closed", "Closed"),
+    ]
+
+    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name="accounting_periods")
+    month = models.PositiveSmallIntegerField()
+    year = models.PositiveIntegerField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="open")
+    closed_by = models.ForeignKey(
+        "User",
+        on_delete=models.SET_NULL,
+        related_name="closed_accounting_periods",
+        blank=True,
+        null=True,
+    )
+    closed_at = models.DateTimeField(blank=True, null=True)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-year", "-month", "property__name")
+        unique_together = ("property", "month", "year")
+
+    def __str__(self):
+        return f"{self.property.name} {self.month:02d}/{self.year} - {self.get_status_display()}"
+
+
 class AccountingReceipt(models.Model):
     STATUS_CHOICES = [
         ("needs_review", "Needs Review"),

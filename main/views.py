@@ -67,6 +67,8 @@ from .models import (
     FinancialEntry,
     AccountingReceipt,
     ExpenseCategory,
+    VendorCategoryRule,
+    AccountingPeriod,
     ResidentMessage,
     ResidentMessageReply,
     SmsMessageLog,
@@ -332,6 +334,58 @@ def duplicate_receipt_financial_entry_exists(receipt):
         description=receipt.description or receipt.vendor,
         amount=receipt.amount,
     ).exists()
+
+
+def accounting_period_is_closed(property_obj, receipt_date):
+    if not property_obj or not receipt_date:
+        return False
+
+    return AccountingPeriod.objects.filter(
+        property=property_obj,
+        month=receipt_date.month,
+        year=receipt_date.year,
+        status="closed",
+    ).exists()
+
+
+def apply_vendor_rule_to_receipt(receipt):
+    vendor = (receipt.vendor or "").strip().lower()
+    if not vendor:
+        return False
+
+    rules = (
+        VendorCategoryRule.objects
+        .select_related("property", "category")
+        .filter(is_active=True)
+        .filter(Q(property=receipt.property) | Q(property__isnull=True))
+    )
+    matches = [
+        rule for rule in rules
+        if rule.vendor_contains and rule.vendor_contains.strip().lower() in vendor
+    ]
+    if not matches:
+        return False
+
+    matches.sort(key=lambda rule: (0 if rule.property_id == receipt.property_id else 1, -len(rule.vendor_contains)))
+    rule = matches[0]
+    changed = False
+
+    if rule.category and receipt.category_id != rule.category_id:
+        receipt.category = rule.category
+        changed = True
+
+    if receipt.entry_type != rule.entry_type:
+        receipt.entry_type = rule.entry_type
+        changed = True
+
+    if rule.description_template and not receipt.description:
+        receipt.description = rule.description_template
+        changed = True
+
+    if changed:
+        receipt.save(update_fields=["category", "entry_type", "description"])
+
+    return changed
 
 
 MONTH_NAME_MAP = {
@@ -4623,7 +4677,9 @@ def accounting_receipts(request):
         )
 
         if form.is_valid():
-            form.save()
+            receipt = form.save()
+            if apply_vendor_rule_to_receipt(receipt):
+                messages.info(request, "A saved vendor rule filled in this receipt's accounting category.")
             messages.success(request, "Receipt uploaded and saved for accounting review.")
             return redirect("accounting_receipts")
     else:
@@ -4653,6 +4709,16 @@ def approve_accounting_receipt(request, receipt_id):
         id=receipt_id,
         property__in=staff_managed_properties(request.user),
     )
+
+    apply_vendor_rule_to_receipt(receipt)
+
+    if not receipt.receipt_date:
+        messages.error(request, "Enter the receipt date before approving it into the ledger.")
+        return redirect("accounting_receipts")
+
+    if accounting_period_is_closed(receipt.property, receipt.receipt_date):
+        messages.error(request, "That accounting month is closed. Reopen the month before approving this receipt.")
+        return redirect("accounting_receipts")
 
     if not receipt.category:
         messages.error(request, "Choose or create a category before approving this receipt.")
@@ -4701,6 +4767,43 @@ def approve_accounting_receipt(request, receipt_id):
     receipt.save()
 
     messages.success(request, "Receipt approved and added to the financial ledger.")
+    return redirect("accounting_receipts")
+
+
+@login_required
+@user_passes_test(reporting_required)
+def save_receipt_vendor_rule(request, receipt_id):
+    if request.method != "POST":
+        return redirect("accounting_receipts")
+
+    receipt = get_object_or_404(
+        AccountingReceipt.objects.select_related("property", "category"),
+        id=receipt_id,
+        property__in=staff_managed_properties(request.user),
+    )
+
+    vendor = (receipt.vendor or "").strip()
+    if not vendor:
+        messages.error(request, "Enter a vendor name before saving a vendor rule.")
+        return redirect("accounting_receipts")
+
+    if not receipt.category:
+        messages.error(request, "Choose a category before saving a vendor rule.")
+        return redirect("accounting_receipts")
+
+    rule, created = VendorCategoryRule.objects.update_or_create(
+        property=receipt.property,
+        vendor_contains=vendor,
+        defaults={
+            "category": receipt.category,
+            "entry_type": receipt.entry_type,
+            "description_template": receipt.description,
+            "is_active": True,
+            "created_by": request.user,
+        },
+    )
+    action = "created" if created else "updated"
+    messages.success(request, f"Vendor rule {action}: {rule.vendor_contains} will now use {receipt.category.name}.")
     return redirect("accounting_receipts")
 
 

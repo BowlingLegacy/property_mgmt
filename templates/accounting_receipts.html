@@ -108,6 +108,7 @@ body {
                     <thead>
                         <tr>
                             <th>Uploaded</th>
+                            <th>Date</th>
                             <th>Property</th>
                             <th>Vendor</th>
                             <th>Category</th>
@@ -121,6 +122,7 @@ body {
                         {% for receipt in receipts %}
                             <tr>
                                 <td>{{ receipt.uploaded_at|date:"M j, Y" }}</td>
+                                <td>{{ receipt.receipt_date|date:"M j, Y"|default:"Needs date" }}</td>
                                 <td>{{ receipt.property.name }}</td>
                                 <td>{{ receipt.vendor|default:"-" }}</td>
                                 <td>
@@ -143,6 +145,12 @@ body {
                                             {% csrf_token %}
                                             <button type="submit" class="message-btn">Approve</button>
                                         </form>
+                                        {% if receipt.vendor and receipt.category %}
+                                            <form method="post" action="{% url 'save_receipt_vendor_rule' receipt.id %}" class="mt-2">
+                                                {% csrf_token %}
+                                                <button type="submit" class="message-btn">Remember Vendor</button>
+                                            </form>
+                                        {% endif %}
                                     {% elif receipt.financial_entry %}
                                         Ledgered
                                     {% else %}
@@ -152,7 +160,7 @@ body {
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="8" class="text-muted p-4">No receipts uploaded yet.</td>
+                                <td colspan="9" class="text-muted p-4">No receipts uploaded yet.</td>
                             </tr>
                         {% endfor %}
                     </tbody>

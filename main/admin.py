@@ -17,6 +17,8 @@ from .models import (
     FinancialUpload,
     FinancialEntry,
     ExpenseCategory,
+    VendorCategoryRule,
+    AccountingPeriod,
     AccountingReceipt,
     ResidentMessage,
     ResidentMessageReply,
@@ -847,6 +849,21 @@ class ExpenseCategoryAdmin(admin.ModelAdmin):
     list_display = ("name", "entry_type", "is_active", "created_at")
     list_filter = ("entry_type", "is_active")
     search_fields = ("name",)
+
+
+@admin.register(VendorCategoryRule)
+class VendorCategoryRuleAdmin(admin.ModelAdmin):
+    list_display = ("vendor_contains", "property", "category", "entry_type", "is_active", "updated_at")
+    list_filter = ("property", "entry_type", "is_active")
+    search_fields = ("vendor_contains", "category__name", "property__name")
+
+
+@admin.register(AccountingPeriod)
+class AccountingPeriodAdmin(admin.ModelAdmin):
+    list_display = ("property", "month", "year", "status", "closed_by", "closed_at")
+    list_filter = ("property", "status", "year", "month")
+    search_fields = ("property__name", "notes")
+    readonly_fields = ("created_at", "updated_at", "closed_at")
 
 
 @admin.register(AccountingReceipt)
