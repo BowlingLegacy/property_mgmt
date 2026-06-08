@@ -5023,6 +5023,44 @@ class LiveFlowTests(TestCase):
             1,
         )
 
+    def test_accounting_receipt_can_be_ignored_without_ledger_entry(self):
+        landlord = User.objects.create_user(
+            username="ignore-receipt-landlord",
+            email="ignore-receipt-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Ignore Receipt Property", landlord_email=landlord.email)
+        category = ExpenseCategory.objects.create(name="Utilities", entry_type="operating_expense")
+        receipt = AccountingReceipt.objects.create(
+            property=property_obj,
+            receipt_file="accounting_receipts/avista-copy.pdf",
+            vendor="Avista",
+            receipt_date=timezone.datetime(2026, 6, 1).date(),
+            category=category,
+            entry_type="operating_expense",
+            description="Duplicate Avista invoice",
+            amount=Decimal("150.00"),
+            payment_method="check",
+        )
+
+        self.client.login(username="ignore-receipt-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("ignore_accounting_receipt", args=[receipt.id]))
+
+        self.assertRedirects(response, reverse("accounting_receipts"))
+        receipt.refresh_from_db()
+        self.assertEqual(receipt.status, "ignored")
+        self.assertIsNone(receipt.financial_entry)
+        self.assertFalse(
+            FinancialEntry.objects.filter(
+                property_name=property_obj.name,
+                category="Utilities",
+                description="Duplicate Avista invoice",
+                amount=Decimal("150.00"),
+            ).exists()
+        )
+
     def test_accounting_import_maps_csv_to_property_scoped_ledger_entries(self):
         landlord = User.objects.create_user(
             username="accounting-landlord",

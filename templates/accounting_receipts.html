@@ -45,6 +45,14 @@ body {
     color: #a57c18;
     font-weight: 800;
 }
+.danger-btn {
+    background: transparent;
+    border: 1px solid #b95c48;
+    border-radius: 12px;
+    padding: .65rem .9rem;
+    color: #983c2e;
+    font-weight: 800;
+}
 .receipt-table th {
     background: #f3ead7;
     color: #6f5411;
@@ -144,6 +152,10 @@ body {
                                         <form method="post" action="{% url 'approve_accounting_receipt' receipt.id %}">
                                             {% csrf_token %}
                                             <button type="submit" class="message-btn">Approve</button>
+                                        </form>
+                                        <form method="post" action="{% url 'ignore_accounting_receipt' receipt.id %}" class="mt-2">
+                                            {% csrf_token %}
+                                            <button type="submit" class="danger-btn">Ignore Duplicate</button>
                                         </form>
                                         {% if receipt.vendor and receipt.category %}
                                             <form method="post" action="{% url 'save_receipt_vendor_rule' receipt.id %}" class="mt-2">

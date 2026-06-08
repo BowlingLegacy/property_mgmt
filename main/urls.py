@@ -104,6 +104,7 @@ urlpatterns = [
     path("financial-upload/<int:upload_id>/parse/", views.parse_financial_upload, name="parse_financial_upload"),
     path("accounting/receipts/", views.accounting_receipts, name="accounting_receipts"),
     path("accounting/receipts/<int:receipt_id>/approve/", views.approve_accounting_receipt, name="approve_accounting_receipt"),
+    path("accounting/receipts/<int:receipt_id>/ignore/", views.ignore_accounting_receipt, name="ignore_accounting_receipt"),
     path("accounting/receipts/<int:receipt_id>/vendor-rule/", views.save_receipt_vendor_rule, name="save_receipt_vendor_rule"),
     path("documents/<int:document_id>/open/", views.open_applicant_document, name="open_applicant_document"),
 

@@ -4772,6 +4772,31 @@ def approve_accounting_receipt(request, receipt_id):
 
 @login_required
 @user_passes_test(reporting_required)
+def ignore_accounting_receipt(request, receipt_id):
+    if request.method != "POST":
+        return redirect("accounting_receipts")
+
+    receipt = get_object_or_404(
+        AccountingReceipt.objects.select_related("property", "financial_entry"),
+        id=receipt_id,
+        property__in=staff_managed_properties(request.user),
+    )
+
+    if receipt.financial_entry:
+        messages.error(request, "This receipt already has a ledger entry. Edit the ledger entry instead of ignoring the receipt.")
+        return redirect("accounting_receipts")
+
+    receipt.status = "ignored"
+    receipt.reviewed_by = request.user
+    receipt.reviewed_at = timezone.now()
+    receipt.save(update_fields=["status", "reviewed_by", "reviewed_at"])
+
+    messages.success(request, "Receipt marked as ignored/duplicate. It will not be counted in reports.")
+    return redirect("accounting_receipts")
+
+
+@login_required
+@user_passes_test(reporting_required)
 def save_receipt_vendor_rule(request, receipt_id):
     if request.method != "POST":
         return redirect("accounting_receipts")
