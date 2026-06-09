@@ -6550,6 +6550,48 @@ class LiveFlowTests(TestCase):
         self.assertContains(history_response, "Payment History")
         self.assertContains(requests_response, "Sink request")
 
+    def test_resident_inbox_is_opened_from_dashboard_file(self):
+        resident_user = User.objects.create_user(
+            username="inbox-resident",
+            email="inbox-resident@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        application = HousingApplication.objects.create(
+            user=resident_user,
+            full_name="Inbox Resident",
+            phone="555-0138",
+            email="inbox-resident@example.com",
+            age=44,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        ApplicantDocument.objects.create(
+            application=application,
+            document_type="other",
+            name="Uploaded Receipt",
+            file="applicant_documents/uploaded-receipt.pdf",
+            status="uploaded",
+        )
+        ResidentMessage.objects.create(
+            application=application,
+            message_type="general",
+            subject="Portal notice",
+            message="Please review your inbox.",
+        )
+
+        self.client.login(username="inbox-resident", password="StrongPass123!")
+
+        dashboard_response = self.client.get(reverse("tenant_dashboard"))
+        inbox_response = self.client.get(reverse("resident_inbox"))
+
+        self.assertContains(dashboard_response, "Open Resident Inbox")
+        self.assertContains(dashboard_response, "Portal notice")
+        self.assertNotContains(dashboard_response, "Uploaded Receipt")
+        self.assertContains(inbox_response, "Uploaded Receipt")
+        self.assertContains(inbox_response, "Portal notice")
+
     def test_resident_payment_history_hides_prior_room_occupant_payments(self):
         resident_user = User.objects.create_user(
             username="room-history-resident",

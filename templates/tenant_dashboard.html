@@ -537,9 +537,42 @@ body {
                     <div id="resident-inbox" class="soft-card h-100">
                         <div class="p-4 border-bottom d-flex justify-content-between align-items-center">
                             <div class="section-title">Inbox</div>
+                            <a href="{{ resident_inbox_url }}" class="gold-link">Open Inbox</a>
                         </div>
 
-                        <div class="table-responsive">
+                        <div class="p-4">
+                            <div class="row g-3 mb-3">
+                                <div class="col-4">
+                                    <div class="text-muted small">Documents</div>
+                                    <div class="fw-bold fs-4">{{ inbox_counts.documents }}</div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="text-muted small">Messages</div>
+                                    <div class="fw-bold fs-4">{{ inbox_counts.messages }}</div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="text-muted small">Total</div>
+                                    <div class="fw-bold fs-4">{{ inbox_counts.total }}</div>
+                                </div>
+                            </div>
+
+                            <a href="{{ resident_inbox_url }}" class="gold-btn d-inline-block text-decoration-none mb-3">
+                                Open Resident Inbox
+                            </a>
+
+                            <div class="text-muted small mb-2">Recent messages</div>
+                            {% for resident_message in resident_messages %}
+                                <div class="border-top py-2">
+                                    <strong>{{ resident_message.subject }}</strong><br>
+                                    <span class="text-muted small">{{ resident_message.get_message_type_display }} | {{ resident_message.created_at|date:"M j, Y" }}</span>
+                                </div>
+                            {% empty %}
+                                <div class="text-muted">No recent messages.</div>
+                            {% endfor %}
+                        </div>
+
+                        {% comment %}
+                        <div class="table-responsive d-none">
                             <table class="table">
                                 <tbody>
                                     {% for signed_document in application.signed_documents.all %}
@@ -611,6 +644,7 @@ body {
                                 </tbody>
                             </table>
                         </div>
+                        {% endcomment %}
                     </div>
                 </div>
 

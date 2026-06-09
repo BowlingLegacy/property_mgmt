@@ -3284,13 +3284,15 @@ def tenant_dashboard(request):
     rent_due = Decimal("0.00")
     deposit_due = Decimal("0.00")
     utility_due = Decimal("0.00")
+    inbox_counts = {"signed_documents": 0, "uploaded_documents": 0, "messages": 0, "total": 0}
     show_utilities = False
     utility_setup_items = []
     utility_setup_complete = False
 
     if application:
         payments = resident_visible_payments(application)
-        resident_messages = application.resident_messages.all().order_by("-created_at")
+        resident_messages = application.resident_messages.all().order_by("-created_at")[:3]
+        inbox_counts = resident_inbox_counts(application)
         if not is_superadmin_inspecting:
             profile_photo_form = ResidentProfilePhotoForm(instance=application)
 
@@ -3320,6 +3322,7 @@ def tenant_dashboard(request):
         "application": application,
         "payments": payments,
         "resident_messages": resident_messages,
+        "inbox_counts": inbox_counts,
         "property_blog_posts": property_blog_posts,
         "profile_photo_form": profile_photo_form,
         "is_superadmin_inspecting": is_superadmin_inspecting,
@@ -3332,6 +3335,7 @@ def tenant_dashboard(request):
         "utility_setup_complete": utility_setup_complete,
         "stripe_public_key": settings.STRIPE_PUBLIC_KEY,
         "resident_balance_url": resident_portal_url("resident_balance_detail", is_superadmin_inspecting, application),
+        "resident_inbox_url": resident_portal_url("resident_inbox", is_superadmin_inspecting, application),
         "resident_payment_history_url": resident_portal_url("resident_payment_history", is_superadmin_inspecting, application),
         "resident_requests_url": resident_portal_url("resident_requests", is_superadmin_inspecting, application),
     })
@@ -3356,6 +3360,19 @@ def resident_portal_url(view_name, is_superadmin_inspecting, application):
     if is_superadmin_inspecting and application:
         return f"{url}?resident={application.id}"
     return url
+
+
+def resident_inbox_counts(application):
+    signed_document_count = application.signed_documents.count()
+    uploaded_document_count = application.documents.count()
+    message_count = application.resident_messages.count()
+    return {
+        "signed_documents": signed_document_count,
+        "uploaded_documents": uploaded_document_count,
+        "documents": signed_document_count + uploaded_document_count,
+        "messages": message_count,
+        "total": signed_document_count + uploaded_document_count + message_count,
+    }
 
 
 def resident_visible_payments(application):
@@ -3572,6 +3589,24 @@ def resident_balance_detail(request):
         "total_due": rent_due + deposit_due + utility_due,
         "dashboard_url": resident_portal_url("tenant_dashboard", is_superadmin_inspecting, application),
         "is_superadmin_inspecting": is_superadmin_inspecting,
+    })
+
+
+@login_required
+def resident_inbox(request):
+    application, is_superadmin_inspecting = get_resident_portal_application(request)
+
+    if not application:
+        messages.error(request, "No resident file connected.")
+        return redirect("tenant_dashboard")
+
+    return render(request, "resident_inbox.html", {
+        "application": application,
+        "signed_documents": application.signed_documents.all(),
+        "uploaded_documents": application.documents.all(),
+        "resident_messages": application.resident_messages.prefetch_related("replies", "replies__sender").all().order_by("-created_at"),
+        "inbox_counts": resident_inbox_counts(application),
+        "dashboard_url": resident_portal_url("tenant_dashboard", is_superadmin_inspecting, application),
     })
 
 

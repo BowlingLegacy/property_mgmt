@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+body {
+    background: linear-gradient(180deg, #f8f3e8 0%, #efe3cc 100%);
+}
+.inbox-shell {
+    max-width: 1120px;
+    margin: 0 auto;
+}
+.soft-card {
+    background: rgba(255,255,255,.94);
+    border: 1px solid rgba(188,150,45,.16);
+    border-radius: 18px;
+    box-shadow: 0 8px 20px rgba(0,0,0,.06);
+}
+.section-title {
+    font-family: Georgia, serif;
+    font-weight: 800;
+}
+.gold-link {
+    color: #a57c18;
+    font-weight: 800;
+    text-decoration: none;
+}
+.metric {
+    border: 1px solid rgba(188,150,45,.18);
+    border-radius: 14px;
+    padding: 1rem;
+    background: #fffaf0;
+}
+</style>
+
+<div class="inbox-shell my-4">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-4">
+        <div>
+            <div class="text-uppercase small fw-bold text-muted">Resident File</div>
+            <h1 class="section-title mb-1">Inbox</h1>
+            <p class="text-muted mb-0">{{ application.full_name }} | {{ application.property.name|default:"Resident Portal" }}</p>
+        </div>
+        <a href="{{ dashboard_url }}" class="btn btn-outline-dark">Back to Dashboard</a>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4"><div class="metric"><div class="text-muted small">Signed / Onboarding Documents</div><div class="fs-3 fw-bold">{{ inbox_counts.signed_documents }}</div></div></div>
+        <div class="col-md-4"><div class="metric"><div class="text-muted small">Uploaded Documents</div><div class="fs-3 fw-bold">{{ inbox_counts.uploaded_documents }}</div></div></div>
+        <div class="col-md-4"><div class="metric"><div class="text-muted small">Messages</div><div class="fs-3 fw-bold">{{ inbox_counts.messages }}</div></div></div>
+    </div>
+
+    <section class="soft-card p-4 mb-4">
+        <h2 class="section-title h4 mb-3">Onboarding Documents</h2>
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead><tr><th>Document</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody>
+                    {% for signed_document in signed_documents %}
+                    <tr>
+                        <td><strong>{{ signed_document.title }}</strong><br><span class="text-muted small">{{ signed_document.get_document_type_display }}</span></td>
+                        <td>{% if signed_document.locked %}Locked Final{% else %}Needs Signature{% endif %}</td>
+                        <td>
+                            <a href="{% url 'onboarding_document' signed_document.id %}" class="gold-link">
+                                {% if signed_document.locked %}View{% else %}Sign{% endif %}
+                            </a>
+                            {% if signed_document.locked %}
+                                |
+                                <a href="{% url 'onboarding_document' signed_document.id %}?print=1" target="_blank" class="gold-link">Print</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" class="text-muted p-3">No onboarding documents yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="soft-card p-4 mb-4">
+        <h2 class="section-title h4 mb-3">Uploaded Documents</h2>
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead><tr><th>Document</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody>
+                    {% for document in uploaded_documents %}
+                    <tr>
+                        <td><strong>{{ document.name }}</strong><br><span class="text-muted small">{{ document.get_document_type_display }}</span></td>
+                        <td>{{ document.get_status_display }}</td>
+                        <td>
+                            {% if document.file %}
+                                <a href="{{ document.file.url }}" target="_blank" class="gold-link">View</a>
+                                |
+                                <a href="{{ document.file.url }}" target="_blank" class="gold-link">Print</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" class="text-muted p-3">No uploaded documents yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="soft-card p-4">
+        <h2 class="section-title h4 mb-3">Messages</h2>
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead><tr><th>Subject</th><th>Status</th><th>Date</th><th>Replies</th></tr></thead>
+                <tbody>
+                    {% for resident_message in resident_messages %}
+                    <tr>
+                        <td><strong>{{ resident_message.subject }}</strong><br><span class="text-muted small">{{ resident_message.get_message_type_display }}</span></td>
+                        <td>{{ resident_message.get_status_display }}</td>
+                        <td>{{ resident_message.created_at|date:"M j, Y" }}</td>
+                        <td>{{ resident_message.replies.count }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="text-muted p-3">No messages yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+{% endblock %}

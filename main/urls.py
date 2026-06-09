@@ -52,6 +52,7 @@ urlpatterns = [
 
     path("tenant-dashboard/", views.tenant_dashboard, name="tenant_dashboard"),
     path("tenant-dashboard/balance/", views.resident_balance_detail, name="resident_balance_detail"),
+    path("tenant-dashboard/inbox/", views.resident_inbox, name="resident_inbox"),
     path("tenant-dashboard/payment-history/", views.resident_payment_history, name="resident_payment_history"),
     path("tenant-dashboard/requests/", views.resident_requests, name="resident_requests"),
     path("tenant-dashboard/profile-photo/", views.update_resident_profile_photo, name="update_resident_profile_photo"),
