@@ -497,6 +497,7 @@ class HousingApplicationAdmin(admin.ModelAdmin):
         "balance",
         "utility_balance",
         "deposit_paid",
+        "application_folder",
         "application_fee_paid",
         "background_check_status",
     )
@@ -504,6 +505,7 @@ class HousingApplicationAdmin(admin.ModelAdmin):
     list_filter = (
         "property",
         "space_type",
+        "application_folder",
         "background_check_status",
     )
 
@@ -523,6 +525,8 @@ class HousingApplicationAdmin(admin.ModelAdmin):
                 "property",
                 "space_type",
                 "space_label",
+                "application_folder",
+                "application_folder_updated_at",
             )
         }),
         ("Resident Information", {
@@ -619,7 +623,7 @@ class HousingApplicationAdmin(admin.ModelAdmin):
         }),
     )
 
-    readonly_fields = ("created_at",)
+    readonly_fields = ("created_at", "application_folder_updated_at")
 
 
 @admin.register(ResidentMessage)

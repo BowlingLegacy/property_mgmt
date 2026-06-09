@@ -83,6 +83,18 @@
                             <td class="d-flex gap-2 flex-wrap">
                                 <a href="{% url 'application_detail' application.id %}" class="btn btn-outline-secondary btn-sm">Open</a>
                                 <a href="{% url 'landlord_create_tenant' %}?application={{ application.id }}" class="btn btn-primary btn-sm">Create File</a>
+                                <form method="post" action="{% url 'move_application_folder' application.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="target_folder" value="waiting">
+                                    <input type="hidden" name="next" value="{% url 'landlord_attention' %}">
+                                    <button type="submit" class="btn btn-outline-primary btn-sm">Waiting List</button>
+                                </form>
+                                <form method="post" action="{% url 'move_application_folder' application.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="target_folder" value="archived">
+                                    <input type="hidden" name="next" value="{% url 'landlord_attention' %}">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm">Archive</button>
+                                </form>
                             </td>
                         </tr>
                     {% empty %}

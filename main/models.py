@@ -241,6 +241,11 @@ class HousingApplication(models.Model):
         ("paid_in_full", "Paid in full at move-in"),
         ("ninety_day_plan", "Three payments over 90 days"),
     ]
+    APPLICATION_FOLDER_CHOICES = [
+        ("active", "Active"),
+        ("waiting", "Waiting List"),
+        ("archived", "Archived"),
+    ]
     COMMUNICATION_PREFERENCE_CHOICES = [
         ("portal", "Portal Only"),
         ("sms", "SMS Text"),
@@ -352,6 +357,12 @@ class HousingApplication(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     landlord_reviewed_at = models.DateTimeField(blank=True, null=True)
+    application_folder = models.CharField(
+        max_length=20,
+        choices=APPLICATION_FOLDER_CHOICES,
+        default="active",
+    )
+    application_folder_updated_at = models.DateTimeField(blank=True, null=True)
 
     def deposit_balance(self):
         remaining = self.deposit_required - self.deposit_paid

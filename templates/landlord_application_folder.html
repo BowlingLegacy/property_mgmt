@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container my-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+        <div>
+            <h1 class="fw-bold mb-1">{{ folder_title }}</h1>
+            <p class="text-muted mb-0">{{ applications.count }} application{{ applications.count|pluralize }} in this folder, newest first.</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'landlord_attention' %}" class="btn btn-outline-primary">Needs Attention</a>
+            <a href="{% url 'landlord_dashboard' %}" class="btn btn-outline-dark">Back to Landlord Menu</a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Applicant</th>
+                            <th>Property</th>
+                            <th>Submitted</th>
+                            <th>Moved</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for application in applications %}
+                        <tr>
+                            <td>
+                                <strong>{{ application.full_name }}</strong><br>
+                                <span class="text-muted small">{{ application.email|default:"No email" }}</span><br>
+                                <span class="text-muted small">{{ application.phone|default:"No phone" }}</span>
+                            </td>
+                            <td>{{ application.property.name|default:"No Property" }}</td>
+                            <td>{{ application.created_at|date:"M j, Y, g:i A" }}</td>
+                            <td>{{ application.application_folder_updated_at|date:"M j, Y, g:i A"|default:"-" }}</td>
+                            <td class="d-flex gap-2 flex-wrap">
+                                <a href="{% url 'application_detail' application.id %}" class="btn btn-outline-secondary btn-sm">Open</a>
+                                <a href="{% url 'landlord_create_tenant' %}?application={{ application.id }}" class="btn btn-primary btn-sm">Create File</a>
+
+                                <form method="post" action="{% url 'move_application_folder' application.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="target_folder" value="active">
+                                    <input type="hidden" name="next" value="{% url 'landlord_application_folder' folder %}">
+                                    <button type="submit" class="btn btn-outline-success btn-sm">Restore Active</button>
+                                </form>
+
+                                {% if folder != "waiting" %}
+                                    <form method="post" action="{% url 'move_application_folder' application.id %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="target_folder" value="waiting">
+                                        <input type="hidden" name="next" value="{% url 'landlord_application_folder' folder %}">
+                                        <button type="submit" class="btn btn-outline-primary btn-sm">Waiting List</button>
+                                    </form>
+                                {% endif %}
+
+                                {% if folder != "archived" %}
+                                    <form method="post" action="{% url 'move_application_folder' application.id %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="target_folder" value="archived">
+                                        <input type="hidden" name="next" value="{% url 'landlord_application_folder' folder %}">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm">Archive</button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-muted p-4">No applications are in this folder.</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

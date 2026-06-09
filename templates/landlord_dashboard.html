@@ -240,6 +240,7 @@ body {
             <div class="metric-grid">
                 <div class="metric-card"><div class="metric-label">Needs Attention</div><div class="metric-value">{{ attention_count }}</div></div>
                 <div class="metric-card"><div class="metric-label">New Applications</div><div class="metric-value">{{ new_application_count }}</div></div>
+                <div class="metric-card"><div class="metric-label">Waiting List</div><div class="metric-value">{{ waiting_application_count }}</div></div>
                 <div class="metric-card"><div class="metric-label">New Messages</div><div class="metric-value">{{ new_message_count }}</div></div>
                 <div class="metric-card"><div class="metric-label">Resident Files</div><div class="metric-value">{{ applications.count }}</div></div>
                 <div class="metric-card"><div class="metric-label">Unpaid This Month</div><div class="metric-value">{{ collection_watch_count }}</div></div>
@@ -307,6 +308,18 @@ body {
                     <div class="badge-count">{{ attention_count }}</div>
                     <h2>Needs Attention</h2>
                     <p class="text-muted mb-0">New applications, current resident setups, messages, and incoming documents.</p>
+                </a>
+
+                <a href="{% url 'landlord_application_folder' 'waiting' %}" class="workspace-card">
+                    <div class="badge-count">{{ waiting_application_count }}</div>
+                    <h2>Waiting List</h2>
+                    <p class="text-muted mb-0">Applicants to keep available without leaving them in the new application pile.</p>
+                </a>
+
+                <a href="{% url 'landlord_application_folder' 'archived' %}" class="workspace-card">
+                    <div class="badge-count">{{ archived_application_count }}</div>
+                    <h2>Archived Applications</h2>
+                    <p class="text-muted mb-0">Old applications retained for records, newest first.</p>
                 </a>
 
                 <a href="{% url 'group_resident_message' %}" class="workspace-card">

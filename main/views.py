@@ -1646,10 +1646,25 @@ def get_landlord_workspace_context(user):
     new_applications_queryset = (
         HousingApplication.objects
         .select_related("property", "user")
-        .filter(property__in=properties, user__isnull=True, landlord_reviewed_at__isnull=True)
+        .filter(
+            property__in=properties,
+            user__isnull=True,
+            landlord_reviewed_at__isnull=True,
+            application_folder="active",
+        )
         .order_by("-created_at")
     )
     new_applications = dedupe_attention_applications(new_applications_queryset)
+    waiting_application_count = HousingApplication.objects.filter(
+        property__in=properties,
+        user__isnull=True,
+        application_folder="waiting",
+    ).count()
+    archived_application_count = HousingApplication.objects.filter(
+        property__in=properties,
+        user__isnull=True,
+        application_folder="archived",
+    ).count()
 
     new_messages = (
         ResidentMessage.objects
@@ -1732,6 +1747,8 @@ def get_landlord_workspace_context(user):
         "new_message_count": new_message_count,
         "new_applications": new_applications,
         "new_application_count": len(new_applications),
+        "waiting_application_count": waiting_application_count,
+        "archived_application_count": archived_application_count,
         "new_messages": new_messages,
         "new_documents": new_documents,
         "new_document_count": new_documents.count(),
@@ -1759,6 +1776,74 @@ def landlord_dashboard(request):
 @user_passes_test(staff_required)
 def landlord_attention(request):
     return render(request, "landlord_attention.html", get_landlord_workspace_context(request.user))
+
+
+@login_required
+@user_passes_test(staff_required)
+def landlord_application_folder(request, folder):
+    folder_labels = {
+        "waiting": "Waiting List",
+        "archived": "Archived Applications",
+    }
+    if folder not in folder_labels:
+        raise Http404("Application folder not found.")
+
+    applications = (
+        HousingApplication.objects
+        .select_related("property", "user")
+        .filter(
+            property__in=staff_managed_properties(request.user),
+            user__isnull=True,
+            application_folder=folder,
+        )
+        .order_by("-created_at")
+    )
+
+    return render(request, "landlord_application_folder.html", {
+        "folder": folder,
+        "folder_title": folder_labels[folder],
+        "applications": applications,
+    })
+
+
+@login_required
+@user_passes_test(staff_required)
+def move_application_folder(request, application_id):
+    if request.method != "POST":
+        return redirect("landlord_attention")
+
+    target_folder = request.POST.get("target_folder")
+    valid_folders = dict(HousingApplication.APPLICATION_FOLDER_CHOICES)
+    if target_folder not in valid_folders:
+        messages.error(request, "That application folder is not valid.")
+        return redirect("landlord_attention")
+
+    application = get_object_or_404(
+        HousingApplication.objects.select_related("property", "user"),
+        id=application_id,
+        property__in=staff_managed_properties(request.user),
+        user__isnull=True,
+    )
+
+    application.application_folder = target_folder
+    application.application_folder_updated_at = timezone.now()
+    update_fields = ["application_folder", "application_folder_updated_at", "landlord_reviewed_at"]
+
+    if target_folder == "active":
+        application.landlord_reviewed_at = None
+    elif not application.landlord_reviewed_at:
+        application.landlord_reviewed_at = timezone.now()
+
+    application.save(update_fields=update_fields)
+    messages.success(request, f"{application.full_name} moved to {valid_folders[target_folder]}.")
+
+    next_url = request.POST.get("next") or ""
+    if next_url:
+        if next_url.startswith("/") and not next_url.startswith("//"):
+            return redirect(next_url)
+    if target_folder in ["waiting", "archived"]:
+        return redirect("landlord_application_folder", folder=target_folder)
+    return redirect("landlord_attention")
 
 
 @login_required

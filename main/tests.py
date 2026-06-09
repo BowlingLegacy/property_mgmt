@@ -1200,6 +1200,46 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "Uploaded ID")
         self.assertContains(response, "Mark Reviewed")
 
+    def test_landlord_can_move_application_to_waiting_list(self):
+        staff_user = User.objects.create_user(
+            username="waiting-staff",
+            email="waiting-staff@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Waiting Property", landlord_email=staff_user.email)
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Waiting Applicant",
+            phone="555-0109",
+            email="waiting@example.com",
+            age=39,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Good candidate, no current vacancy.",
+        )
+
+        self.client.login(username="waiting-staff", password="StrongPass123!")
+        response = self.client.post(reverse("move_application_folder", args=[application.id]), {
+            "target_folder": "waiting",
+        })
+
+        self.assertRedirects(response, reverse("landlord_application_folder", args=["waiting"]))
+        application.refresh_from_db()
+        self.assertEqual(application.application_folder, "waiting")
+        self.assertIsNotNone(application.landlord_reviewed_at)
+
+        attention_response = self.client.get(reverse("landlord_attention"))
+        self.assertEqual(attention_response.status_code, 200)
+        self.assertEqual(attention_response.context["new_application_count"], 0)
+        self.assertEqual(attention_response.context["waiting_application_count"], 1)
+        self.assertNotContains(attention_response, "Waiting Applicant")
+
+        folder_response = self.client.get(reverse("landlord_application_folder", args=["waiting"]))
+        self.assertEqual(folder_response.status_code, 200)
+        self.assertContains(folder_response, "Waiting Applicant")
+
     def test_landlord_attention_collapses_duplicate_profile_setups_and_applications(self):
         staff_user = User.objects.create_user(
             username="dedupe-staff",
