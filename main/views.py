@@ -90,6 +90,7 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 
 LATE_FEE_AMOUNT = Decimal("25.00")
 T12_INCOME_PAYMENT_TYPES = ["rent", "utility", "late_fee", "application_fee", "background_check_fee", "other"]
+TEST_RESIDENT_MESSAGE_SUBJECTS = {"test", "testing", "retest", "final test"}
 
 
 def notify_resident_of_portal_reply(request, resident_message):
@@ -3291,7 +3292,7 @@ def tenant_dashboard(request):
 
     if application:
         payments = resident_visible_payments(application)
-        resident_messages = application.resident_messages.all().order_by("-created_at")[:3]
+        resident_messages = resident_visible_messages(application)[:3]
         inbox_counts = resident_inbox_counts(application)
         if not is_superadmin_inspecting:
             profile_photo_form = ResidentProfilePhotoForm(instance=application)
@@ -3365,7 +3366,7 @@ def resident_portal_url(view_name, is_superadmin_inspecting, application):
 def resident_inbox_counts(application):
     signed_document_count = application.signed_documents.count()
     uploaded_document_count = application.documents.count()
-    message_count = application.resident_messages.count()
+    message_count = resident_visible_messages(application).count()
     return {
         "signed_documents": signed_document_count,
         "uploaded_documents": uploaded_document_count,
@@ -3373,6 +3374,14 @@ def resident_inbox_counts(application):
         "messages": message_count,
         "total": signed_document_count + uploaded_document_count + message_count,
     }
+
+
+def resident_visible_messages(application):
+    hidden_subject_filter = Q()
+    for subject in TEST_RESIDENT_MESSAGE_SUBJECTS:
+        hidden_subject_filter |= Q(subject__iexact=subject)
+
+    return application.resident_messages.exclude(hidden_subject_filter).order_by("-created_at")
 
 
 def resident_visible_payments(application):
@@ -3604,7 +3613,7 @@ def resident_inbox(request):
         "application": application,
         "signed_documents": application.signed_documents.all(),
         "uploaded_documents": application.documents.all(),
-        "resident_messages": application.resident_messages.prefetch_related("replies", "replies__sender").all().order_by("-created_at"),
+        "resident_messages": resident_visible_messages(application).prefetch_related("replies", "replies__sender"),
         "inbox_counts": resident_inbox_counts(application),
         "dashboard_url": resident_portal_url("tenant_dashboard", is_superadmin_inspecting, application),
     })
@@ -3659,7 +3668,7 @@ def resident_requests(request):
 
     return render(request, "resident_requests.html", {
         "application": application,
-        "requests": application.resident_messages.prefetch_related("replies", "replies__sender").all().order_by("-created_at"),
+        "requests": resident_visible_messages(application).prefetch_related("replies", "replies__sender"),
         "dashboard_url": resident_portal_url("tenant_dashboard", is_superadmin_inspecting, application),
     })
 

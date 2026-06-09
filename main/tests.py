@@ -6592,6 +6592,49 @@ class LiveFlowTests(TestCase):
         self.assertContains(inbox_response, "Uploaded Receipt")
         self.assertContains(inbox_response, "Portal notice")
 
+    def test_resident_inbox_hides_test_subject_messages(self):
+        resident_user = User.objects.create_user(
+            username="hidden-test-message-resident",
+            email="hidden-test-message-resident@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        application = HousingApplication.objects.create(
+            user=resident_user,
+            full_name="Hidden Test Message Resident",
+            phone="555-0139",
+            email="hidden-test-message-resident@example.com",
+            age=44,
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        ResidentMessage.objects.create(
+            application=application,
+            message_type="general",
+            subject="final test",
+            message="This should not show to the resident.",
+        )
+        ResidentMessage.objects.create(
+            application=application,
+            message_type="general",
+            subject="Real notice",
+            message="This should show to the resident.",
+        )
+
+        self.client.login(username="hidden-test-message-resident", password="StrongPass123!")
+
+        dashboard_response = self.client.get(reverse("tenant_dashboard"))
+        inbox_response = self.client.get(reverse("resident_inbox"))
+        requests_response = self.client.get(reverse("resident_requests"))
+
+        self.assertContains(dashboard_response, "Real notice")
+        self.assertNotContains(dashboard_response, "final test")
+        self.assertContains(inbox_response, "Real notice")
+        self.assertNotContains(inbox_response, "final test")
+        self.assertContains(requests_response, "Real notice")
+        self.assertNotContains(requests_response, "final test")
+
     def test_resident_payment_history_hides_prior_room_occupant_payments(self):
         resident_user = User.objects.create_user(
             username="room-history-resident",
