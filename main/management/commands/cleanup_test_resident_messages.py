@@ -6,7 +6,7 @@ from main.models import ResidentMessage
 class Command(BaseCommand):
     help = "Delete resident messages with test subject lines from resident files."
 
-    DEFAULT_SUBJECTS = ["test", "testing", "retest", "final test"]
+    DEFAULT_SUBJECTS = ["test", "testing", "retest", "final test", "testing the system"]
 
     def add_arguments(self, parser):
         parser.add_argument(

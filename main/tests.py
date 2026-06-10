@@ -6612,7 +6612,7 @@ class LiveFlowTests(TestCase):
         ResidentMessage.objects.create(
             application=application,
             message_type="general",
-            subject="final test",
+            subject="testing the system",
             message="This should not show to the resident.",
         )
         ResidentMessage.objects.create(
@@ -6629,11 +6629,11 @@ class LiveFlowTests(TestCase):
         requests_response = self.client.get(reverse("resident_requests"))
 
         self.assertContains(dashboard_response, "Real notice")
-        self.assertNotContains(dashboard_response, "final test")
+        self.assertNotContains(dashboard_response, "testing the system")
         self.assertContains(inbox_response, "Real notice")
-        self.assertNotContains(inbox_response, "final test")
+        self.assertNotContains(inbox_response, "testing the system")
         self.assertContains(requests_response, "Real notice")
-        self.assertNotContains(requests_response, "final test")
+        self.assertNotContains(requests_response, "testing the system")
 
     def test_resident_payment_history_hides_prior_room_occupant_payments(self):
         resident_user = User.objects.create_user(

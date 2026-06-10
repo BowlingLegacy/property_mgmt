@@ -90,7 +90,7 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 
 LATE_FEE_AMOUNT = Decimal("25.00")
 T12_INCOME_PAYMENT_TYPES = ["rent", "utility", "late_fee", "application_fee", "background_check_fee", "other"]
-TEST_RESIDENT_MESSAGE_SUBJECTS = {"test", "testing", "retest", "final test"}
+TEST_RESIDENT_MESSAGE_SUBJECTS = {"test", "testing", "retest", "final test", "testing the system"}
 
 
 def notify_resident_of_portal_reply(request, resident_message):
