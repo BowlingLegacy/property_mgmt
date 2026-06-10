@@ -1145,7 +1145,9 @@ class SmsMessageLog(models.Model):
         ("not_configured", "Provider Not Configured"),
         ("skipped_no_consent", "Skipped - No Consent"),
         ("queued", "Queued"),
-        ("sent", "Sent"),
+        ("sent", "Accepted by Provider"),
+        ("delivered", "Delivered"),
+        ("undelivered", "Undelivered"),
         ("failed", "Failed"),
     ]
 
@@ -1168,6 +1170,7 @@ class SmsMessageLog(models.Model):
     body = models.TextField()
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="queued")
     provider_message_id = models.CharField(max_length=255, blank=True)
+    provider_status = models.CharField(max_length=100, blank=True)
     error_message = models.TextField(blank=True)
     sent_by = models.ForeignKey(
         "User",
@@ -1178,12 +1181,14 @@ class SmsMessageLog(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     sent_at = models.DateTimeField(blank=True, null=True)
+    delivery_updated_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"{self.application.full_name} - {self.get_status_display()}"
+        recipient = self.application.full_name if self.application else self.recipient_label or self.to_phone
+        return f"{recipient} - {self.get_status_display()}"
 
 
 class CompanyMailboxConnection(models.Model):

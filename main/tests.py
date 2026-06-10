@@ -2591,6 +2591,67 @@ class LiveFlowTests(TestCase):
         self.assertFalse(application.sms_opted_in)
         self.assertIsNotNone(application.sms_opted_out_at)
 
+    def test_telnyx_delivery_webhook_updates_sms_log(self):
+        staff_user = User.objects.create_user(username="sms-staff", password="StrongPass123!", role="landlord")
+        log = SmsMessageLog.objects.create(
+            recipient_label="Manual staff SMS test",
+            to_phone="5413268047",
+            body="Test",
+            status="sent",
+            provider_message_id="40319ea6-d4fa-435f-8631-3f38f8a4d4c0",
+            sent_by=staff_user,
+        )
+
+        response = self.client.post(
+            reverse("telnyx_sms_webhook"),
+            data=json.dumps({
+                "data": {
+                    "event_type": "message.delivered",
+                    "payload": {
+                        "id": "40319ea6-d4fa-435f-8631-3f38f8a4d4c0",
+                        "status": "delivered",
+                    },
+                },
+            }),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        log.refresh_from_db()
+        self.assertEqual(log.status, "delivered")
+        self.assertEqual(log.provider_status, "delivered")
+        self.assertIsNotNone(log.delivery_updated_at)
+
+    def test_telnyx_failed_delivery_webhook_updates_sms_log(self):
+        log = SmsMessageLog.objects.create(
+            recipient_label="Manual staff SMS test",
+            to_phone="5413267293",
+            body="Test",
+            status="sent",
+            provider_message_id="40319ea6-d4fc-48bb-8f3c-1732a0cbd20c",
+        )
+
+        response = self.client.post(
+            reverse("telnyx_sms_webhook"),
+            data=json.dumps({
+                "data": {
+                    "event_type": "message.failed",
+                    "payload": {
+                        "id": "40319ea6-d4fc-48bb-8f3c-1732a0cbd20c",
+                        "status": "failed",
+                        "errors": [{"detail": "Carrier rejected message"}],
+                    },
+                },
+            }),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        log.refresh_from_db()
+        self.assertEqual(log.status, "undelivered")
+        self.assertEqual(log.provider_status, "failed")
+        self.assertIn("Carrier rejected message", log.error_message)
+
     def test_create_tenant_without_application_redirects_to_dashboard(self):
         staff_user = User.objects.create_user(
             username="staff",

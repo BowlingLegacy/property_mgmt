@@ -24,5 +24,8 @@ class Command(BaseCommand):
 
             self.stdout.write(
                 f"{log.id} | {recipient} | {log.to_phone} | {log.status} | "
-                f"provider={log.provider_message_id or '-'} | error={log.error_message or '-'}"
+                f"provider={log.provider_message_id or '-'} | "
+                f"provider_status={log.provider_status or '-'} | "
+                f"delivery_updated={log.delivery_updated_at or '-'} | "
+                f"error={log.error_message or '-'}"
             )

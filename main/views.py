@@ -3110,10 +3110,10 @@ def group_resident_message(request):
         )
         created_count = 0
         sms_attempt_count = 0
-        sms_sent_count = 0
+        sms_accepted_count = 0
         sms_failed_count = 0
         sms_skipped_count = 0
-        staff_sms_sent_count = 0
+        staff_sms_accepted_count = 0
         staff_sms_failed_count = 0
         email_failed_count = 0
         sms_message_body = sms_body(form.cleaned_data["subject"], form.cleaned_data["message"])
@@ -3149,7 +3149,7 @@ def group_resident_message(request):
                         resident_message=resident_message,
                     )
                     if sms_log.status == "sent":
-                        sms_sent_count += 1
+                        sms_accepted_count += 1
                     elif sms_log.status in ["skipped_no_consent", "not_configured"]:
                         sms_skipped_count += 1
                     else:
@@ -3164,7 +3164,7 @@ def group_resident_message(request):
                     if staff_log.status != "sent":
                         staff_sms_failed_count += 1
                         continue
-                    staff_sms_sent_count += 1
+                    staff_sms_accepted_count += 1
                 except Exception:
                     staff_sms_failed_count += 1
 
@@ -3172,9 +3172,9 @@ def group_resident_message(request):
             messages.success(
                 request,
                 f"Secure portal message created for {created_count} resident file(s). "
-                f"SMS attempted for {sms_attempt_count}: {sms_sent_count} sent, "
+                f"SMS attempted for {sms_attempt_count}: {sms_accepted_count} accepted by provider, "
                 f"{sms_skipped_count} skipped, {sms_failed_count} failed. "
-                f"Staff copies: {staff_sms_sent_count} sent, {staff_sms_failed_count} failed.",
+                f"Staff copies: {staff_sms_accepted_count} accepted by provider, {staff_sms_failed_count} failed.",
             )
         else:
             messages.success(request, f"Secure portal message sent to {created_count} resident file(s).")
@@ -3203,6 +3203,67 @@ def process_sms_opt_out(from_phone, body):
                 application.save(update_fields=["sms_opted_in", "sms_opted_out_at"])
 
 
+def telnyx_delivery_message_id(event_payload):
+    candidates = [
+        event_payload.get("id"),
+        event_payload.get("message_id"),
+        event_payload.get("record_id"),
+        event_payload.get("message_uuid"),
+    ]
+    message = event_payload.get("message")
+    if isinstance(message, dict):
+        candidates.extend([
+            message.get("id"),
+            message.get("message_id"),
+            message.get("record_id"),
+            message.get("message_uuid"),
+        ])
+
+    for candidate in candidates:
+        if candidate:
+            return str(candidate)
+    return ""
+
+
+def update_telnyx_delivery_status(event_type, event_payload):
+    provider_message_id = telnyx_delivery_message_id(event_payload)
+    if not provider_message_id:
+        return
+
+    status_value = str(
+        event_payload.get("status")
+        or event_payload.get("delivery_status")
+        or event_payload.get("state")
+        or event_type
+        or ""
+    ).lower()
+    event_type_value = str(event_type or "").lower()
+    combined_status = f"{event_type_value} {status_value}".strip()
+
+    new_status = ""
+    if "delivered" in combined_status:
+        new_status = "delivered"
+    elif any(marker in combined_status for marker in ["failed", "undeliver", "rejected", "expired"]):
+        new_status = "undelivered"
+    elif any(marker in combined_status for marker in ["queued", "sending"]):
+        new_status = "queued"
+    elif any(marker in combined_status for marker in ["sent", "finalized"]):
+        new_status = "sent"
+
+    update_fields = {
+        "provider_status": (status_value or event_type_value)[:100],
+        "delivery_updated_at": timezone.now(),
+    }
+    if new_status:
+        update_fields["status"] = new_status
+
+    error_detail = event_payload.get("error") or event_payload.get("errors")
+    if error_detail:
+        update_fields["error_message"] = str(error_detail)[:1000]
+
+    SmsMessageLog.objects.filter(provider_message_id=provider_message_id).update(**update_fields)
+
+
 @csrf_exempt
 def twilio_sms_webhook(request):
     if request.method != "POST":
@@ -3223,7 +3284,11 @@ def telnyx_sms_webhook(request):
         payload = {}
 
     data = payload.get("data", {})
+    event_type = data.get("event_type") or payload.get("event_type") or ""
     event_payload = data.get("payload", data)
+
+    update_telnyx_delivery_status(event_type, event_payload)
+
     from_value = event_payload.get("from", "")
     if isinstance(from_value, dict):
         from_phone = from_value.get("phone_number", "")
