@@ -7136,6 +7136,68 @@ class LiveFlowTests(TestCase):
         self.assertFalse(Property.objects.filter(id=newtest_property.id).exists())
         self.assertTrue(Property.objects.filter(id=real_property.id).exists())
 
+    def test_resident_dedupe_collapses_duplicate_onboarding_documents(self):
+        property_obj = Property.objects.create(name="Document Dedupe Property")
+        user = User.objects.create_user(
+            username="document-dedupe-resident",
+            email="document-dedupe-resident@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        primary = HousingApplication.objects.create(
+            property=property_obj,
+            user=user,
+            full_name="Steven Bruno",
+            phone="555-0600",
+            email="steven@example.com",
+            age=50,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            space_label="C",
+        )
+        duplicate = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Steve Bruno",
+            phone="555-0600",
+            email="steven@example.com",
+            age=50,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Duplicate resident file.",
+            space_label="Room C",
+        )
+        unsigned_document = SignedDocument.objects.create(
+            application=primary,
+            document_type="lease",
+            title="Resident Lease Agreement",
+            locked=False,
+        )
+        locked_document = SignedDocument.objects.create(
+            application=duplicate,
+            document_type="lease",
+            title="Resident Lease Agreement",
+            resident_signature="Steven Bruno",
+            signature_agreement=True,
+            signed_at=timezone.now(),
+            locked=True,
+        )
+
+        output = StringIO()
+        call_command(
+            "dedupe_resident_records",
+            "--property-name",
+            "Document Dedupe Property",
+            "--confirm",
+            stdout=output,
+        )
+
+        self.assertIn("Resident duplicate cleanup complete", output.getvalue())
+        self.assertTrue(HousingApplication.objects.filter(id=primary.id).exists())
+        self.assertFalse(HousingApplication.objects.filter(id=duplicate.id).exists())
+        self.assertFalse(SignedDocument.objects.filter(id=unsigned_document.id).exists())
+        self.assertTrue(SignedDocument.objects.filter(id=locked_document.id, application=primary, locked=True).exists())
+
     def test_issue_painted_lady_platform_lease_command_preserves_signed_lease(self):
         property_obj = Property.objects.create(name="The Painted Lady Inn")
         application = HousingApplication.objects.create(

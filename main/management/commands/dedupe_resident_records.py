@@ -84,6 +84,12 @@ class Command(BaseCommand):
             applications = list(applications)
 
         duplicate_groups = self.find_duplicate_application_groups(applications)
+        primary_by_duplicate_id = {
+            duplicate.id: primary
+            for primary, duplicates in duplicate_groups
+            for duplicate in duplicates
+        }
+        duplicate_signed_documents = self.find_duplicate_signed_documents(applications, primary_by_duplicate_id)
         duplicate_payments = self.find_duplicate_payments(applications)
 
         self.stdout.write("Resident duplicate cleanup preview")
@@ -99,6 +105,21 @@ class Command(BaseCommand):
                 self.stdout.write(
                     f"  MERGE app {duplicate.id} | Room {duplicate.space_label} | "
                     f"{duplicate.full_name} | user {duplicate.user_id or '-'}"
+                )
+
+        self.stdout.write("")
+        self.stdout.write(f"Duplicate onboarding documents: {len(duplicate_signed_documents)}")
+        for keep_document, delete_documents in duplicate_signed_documents:
+            self.stdout.write(
+                f"KEEP document {keep_document.id} | app {self.effective_application_id(keep_document.application, primary_by_duplicate_id)} | "
+                f"{keep_document.get_document_type_display()} | {keep_document.title} | "
+                f"locked={keep_document.locked} | signed={bool(keep_document.signed_at)}"
+            )
+            for document in delete_documents:
+                self.stdout.write(
+                    f"  DELETE document {document.id} | app {document.application_id} | "
+                    f"{document.get_document_type_display()} | {document.title} | "
+                    f"locked={document.locked} | signed={bool(document.signed_at)}"
                 )
 
         self.stdout.write("")
@@ -137,6 +158,9 @@ class Command(BaseCommand):
             else:
                 refreshed_applications = list(refreshed_applications)
 
+            for _keep_document, delete_documents in self.find_duplicate_signed_documents(refreshed_applications):
+                SignedDocument.objects.filter(id__in=[document.id for document in delete_documents]).delete()
+
             for _keep_payment, delete_payments in self.find_duplicate_payments(refreshed_applications):
                 Payment.objects.filter(id__in=[payment.id for payment in delete_payments]).delete()
 
@@ -168,6 +192,47 @@ class Command(BaseCommand):
                     groups.append((primary, duplicates))
 
         return groups
+
+    def effective_application_id(self, application, primary_by_duplicate_id=None):
+        primary_by_duplicate_id = primary_by_duplicate_id or {}
+        primary = primary_by_duplicate_id.get(application.id)
+        return primary.id if primary else application.id
+
+    def signed_document_key(self, document, primary_by_duplicate_id=None):
+        return (
+            self.effective_application_id(document.application, primary_by_duplicate_id),
+            document.document_type,
+            str(document.title or "").strip().lower(),
+        )
+
+    def find_duplicate_signed_documents(self, applications, primary_by_duplicate_id=None):
+        application_ids = [application.id for application in applications if application.id]
+        by_key = defaultdict(list)
+
+        for document in (
+            SignedDocument.objects
+            .filter(application_id__in=application_ids)
+            .select_related("application")
+            .order_by("id")
+        ):
+            by_key[self.signed_document_key(document, primary_by_duplicate_id)].append(document)
+
+        duplicate_groups = []
+        for documents in by_key.values():
+            if len(documents) <= 1:
+                continue
+
+            keep_document = sorted(
+                documents,
+                key=lambda document: (
+                    not document.locked,
+                    document.signed_at is None,
+                    document.id,
+                ),
+            )[0]
+            duplicate_groups.append((keep_document, [document for document in documents if document.id != keep_document.id]))
+
+        return duplicate_groups
 
     def choose_primary(self, applications):
         return sorted(
