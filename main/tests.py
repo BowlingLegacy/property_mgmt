@@ -2461,6 +2461,7 @@ class LiveFlowTests(TestCase):
         request = mocked_urlopen.call_args.args[0]
         self.assertEqual(request.full_url, "https://api.telnyx.com/v2/messages")
         self.assertIn(b'"to": "+15415550110"', request.data)
+        self.assertIn(b'"webhook_url": "https://bowlinglegacy.com/sms/telnyx/webhook/"', request.data)
 
     @override_settings(SMS_PROVIDER="telnyx", TELNYX_API_KEY="key-local", TELNYX_FROM_NUMBER="+15415550100")
     @patch("main.views.urlopen")

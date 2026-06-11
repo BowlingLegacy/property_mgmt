@@ -179,6 +179,10 @@ TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "")
 TWILIO_FROM_NUMBER = os.environ.get("TWILIO_FROM_NUMBER", "")
 TELNYX_API_KEY = os.environ.get("TELNYX_API_KEY", "")
 TELNYX_FROM_NUMBER = os.environ.get("TELNYX_FROM_NUMBER", "")
+TELNYX_DELIVERY_WEBHOOK_URL = os.environ.get(
+    "TELNYX_DELIVERY_WEBHOOK_URL",
+    "https://bowlinglegacy.com/sms/telnyx/webhook/",
+)
 
 # ---------------------------------------------------------
 # MICROSOFT GRAPH MAILBOX SETTINGS

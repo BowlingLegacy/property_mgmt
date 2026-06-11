@@ -650,14 +650,18 @@ def send_twilio_sms(application, body):
 
 
 def send_telnyx_sms(application, body):
+    payload = {
+        "to": sms_e164_phone(application.phone),
+        "from": settings.TELNYX_FROM_NUMBER,
+        "text": body,
+        "type": "SMS",
+    }
+    if getattr(settings, "TELNYX_DELIVERY_WEBHOOK_URL", ""):
+        payload["webhook_url"] = settings.TELNYX_DELIVERY_WEBHOOK_URL
+
     request = Request(
         "https://api.telnyx.com/v2/messages",
-        data=json.dumps({
-            "to": sms_e164_phone(application.phone),
-            "from": settings.TELNYX_FROM_NUMBER,
-            "text": body,
-            "type": "SMS",
-        }).encode("utf-8"),
+        data=json.dumps(payload).encode("utf-8"),
     )
     request.add_header("Authorization", f"Bearer {settings.TELNYX_API_KEY}")
     request.add_header("Content-Type", "application/json")
