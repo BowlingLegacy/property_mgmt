@@ -2714,6 +2714,39 @@ class LiveFlowTests(TestCase):
         self.assertEqual(log.provider_status, "delivered")
         self.assertIsNotNone(log.delivery_updated_at)
 
+    def test_telnyx_finalized_webhook_uses_recipient_delivery_status(self):
+        log = SmsMessageLog.objects.create(
+            recipient_label="Finalized staff SMS test",
+            to_phone="5413268047",
+            body="Test",
+            status="sent",
+            provider_message_id="40319eb7-d45b-4e99-a758-564fd5cf7279",
+        )
+
+        response = self.client.post(
+            reverse("telnyx_sms_webhook"),
+            data=json.dumps({
+                "data": {
+                    "event_type": "message.finalized",
+                    "payload": {
+                        "id": "40319eb7-d45b-4e99-a758-564fd5cf7279",
+                        "to": [
+                            {
+                                "phone_number": "+15417786203",
+                                "status": "delivered",
+                            }
+                        ],
+                    },
+                },
+            }),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        log.refresh_from_db()
+        self.assertEqual(log.status, "delivered")
+        self.assertEqual(log.provider_status, "delivered")
+
     def test_telnyx_failed_delivery_webhook_updates_sms_log(self):
         log = SmsMessageLog.objects.create(
             recipient_label="Manual staff SMS test",

@@ -3253,10 +3253,16 @@ def update_telnyx_delivery_status(event_type, event_payload):
     if not provider_message_id:
         return
 
+    recipient_statuses = []
+    for recipient in event_payload.get("to") or []:
+        if isinstance(recipient, dict) and recipient.get("status"):
+            recipient_statuses.append(str(recipient["status"]).lower())
+
     status_value = str(
         event_payload.get("status")
         or event_payload.get("delivery_status")
         or event_payload.get("state")
+        or (recipient_statuses[0] if recipient_statuses else "")
         or event_type
         or ""
     ).lower()
