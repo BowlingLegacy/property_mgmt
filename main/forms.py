@@ -1,3 +1,5 @@
+import re
+
 from django import forms
 from django.conf import settings
 from django.contrib.auth.forms import UserCreationForm
@@ -662,6 +664,8 @@ class GroupResidentMessageForm(forms.Form):
     DELIVERY_CHOICES = [
         ("portal", "Secure portal only"),
         ("portal_sms", "Secure portal + SMS text"),
+        ("sms_only", "SMS text only"),
+        ("staff_sms_only", "Staff SMS test only"),
     ]
 
     property_id = forms.ChoiceField(
@@ -669,6 +673,7 @@ class GroupResidentMessageForm(forms.Form):
         widget=forms.Select(attrs={"class": "form-select"}),
     )
     delivery_method = forms.ChoiceField(
+        label="Delivery Method",
         choices=DELIVERY_CHOICES,
         initial="portal",
         widget=forms.Select(attrs={"class": "form-select"}),
@@ -690,7 +695,7 @@ class GroupResidentMessageForm(forms.Form):
     staff_sms_copy_numbers = forms.CharField(
         label="Staff SMS copy numbers",
         required=False,
-        help_text="Optional. Comma-separated numbers for owner/assistant copies. These do not create resident file messages.",
+        help_text="Optional. Comma-separated numbers for owner/assistant copies. Required when using Staff SMS test only.",
         widget=forms.TextInput(attrs={
             "class": "form-control",
             "placeholder": "Example: 5413268047, 5413267293",
@@ -704,6 +709,20 @@ class GroupResidentMessageForm(forms.Form):
             property_choices.extend((str(property_obj.id), property_obj.name) for property_obj in properties)
         self.fields["property_id"].choices = property_choices
         self.fields["staff_sms_copy_numbers"].initial = getattr(settings, "GROUP_SMS_COPY_NUMBERS", "")
+
+    def clean(self):
+        cleaned_data = super().clean()
+        delivery_method = cleaned_data.get("delivery_method")
+        staff_sms_copy_numbers = cleaned_data.get("staff_sms_copy_numbers")
+
+        if delivery_method == "staff_sms_only" and not parse_phone_copy_numbers(staff_sms_copy_numbers):
+            self.add_error("staff_sms_copy_numbers", "Enter at least one staff phone number for a staff-only SMS test.")
+
+        return cleaned_data
+
+
+def parse_phone_copy_numbers(raw_value):
+    return [value.strip() for value in re.split(r"[,;\n]+", raw_value or "") if value.strip()]
 
 
 class ManualPaymentForm(forms.ModelForm):

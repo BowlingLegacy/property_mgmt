@@ -2464,6 +2464,97 @@ class LiveFlowTests(TestCase):
 
     @override_settings(SMS_PROVIDER="telnyx", TELNYX_API_KEY="key-local", TELNYX_FROM_NUMBER="+15415550100")
     @patch("main.views.urlopen")
+    def test_group_message_staff_sms_only_sends_no_resident_messages(self, mocked_urlopen):
+        class FakeResponse:
+            def read(self):
+                return b'{"data":{"id":"staff-message-123"}}'
+
+        mocked_urlopen.return_value = FakeResponse()
+        landlord = User.objects.create_user(
+            username="staff-only-sms-landlord",
+            email="staff-only-sms-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        resident_user = User.objects.create_user(username="staff-only-resident", password="StrongPass123!", role="tenant")
+        property_obj = Property.objects.create(name="Staff Only SMS Property", landlord_email=landlord.email)
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Staff Only Resident",
+            phone="541-555-0110",
+            email="staff-only-resident@example.com",
+            age=46,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            sms_opted_in=True,
+        )
+
+        self.client.login(username="staff-only-sms-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("group_resident_message"), {
+            "property_id": str(property_obj.id),
+            "delivery_method": "staff_sms_only",
+            "subject": "Staff Test",
+            "message": "This should only go to staff copy numbers.",
+            "staff_sms_copy_numbers": "5413268047",
+        })
+
+        self.assertRedirects(response, reverse("group_resident_message"))
+        self.assertFalse(ResidentMessage.objects.filter(application=application).exists())
+        self.assertFalse(SmsMessageLog.objects.filter(application=application).exists())
+        staff_log = SmsMessageLog.objects.get(application__isnull=True)
+        self.assertEqual(staff_log.status, "sent")
+        self.assertEqual(staff_log.provider_message_id, "staff-message-123")
+        self.assertEqual(staff_log.to_phone, "+15413268047")
+
+    @override_settings(SMS_PROVIDER="telnyx", TELNYX_API_KEY="key-local", TELNYX_FROM_NUMBER="+15415550100")
+    @patch("main.views.urlopen")
+    def test_group_message_sms_only_does_not_create_portal_message(self, mocked_urlopen):
+        class FakeResponse:
+            def read(self):
+                return b'{"data":{"id":"resident-sms-only-123"}}'
+
+        mocked_urlopen.return_value = FakeResponse()
+        landlord = User.objects.create_user(
+            username="sms-only-landlord",
+            email="sms-only-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        resident_user = User.objects.create_user(username="sms-only-resident", password="StrongPass123!", role="tenant")
+        property_obj = Property.objects.create(name="SMS Only Property", landlord_email=landlord.email)
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="SMS Only Resident",
+            phone="541-555-0110",
+            email="sms-only-resident@example.com",
+            age=46,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            sms_opted_in=True,
+        )
+
+        self.client.login(username="sms-only-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("group_resident_message"), {
+            "property_id": str(property_obj.id),
+            "delivery_method": "sms_only",
+            "subject": "SMS Only Notice",
+            "message": "This should text without creating a portal message.",
+        })
+
+        self.assertRedirects(response, reverse("group_resident_message"))
+        self.assertFalse(ResidentMessage.objects.filter(application=application).exists())
+        resident_log = SmsMessageLog.objects.get(application=application)
+        self.assertEqual(resident_log.status, "sent")
+        self.assertIsNone(resident_log.resident_message)
+
+    @override_settings(SMS_PROVIDER="telnyx", TELNYX_API_KEY="key-local", TELNYX_FROM_NUMBER="+15415550100")
+    @patch("main.views.urlopen")
     def test_telnyx_http_error_body_is_saved_to_sms_log(self, mocked_urlopen):
         mocked_urlopen.side_effect = HTTPError(
             "https://api.telnyx.com/v2/messages",

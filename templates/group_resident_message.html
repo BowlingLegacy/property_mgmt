@@ -6,15 +6,15 @@
         <div>
             <h1 class="section-title mb-1">Group Resident Message</h1>
             <p class="text-muted mb-0">
-                Send one secure portal message to every resident in one property, or every resident you can manage.
+                Send a secure portal message, SMS text, or staff-only SMS test for one property or every property you manage.
             </p>
         </div>
         <a href="{% url 'landlord_dashboard' %}" class="message-btn">Back to Dashboard</a>
     </div>
 
     <div class="alert alert-info">
-        This creates a private copy in each resident file. It does not create a shared group thread where residents can see each other.
-        SMS only sends to residents who have opted in. Staff copy numbers can receive a separate text copy without creating resident files.
+        Portal messages create a private copy in each resident file. SMS-only sends text messages to opted-in residents without creating resident file messages.
+        Staff SMS test only sends to the staff copy numbers and does not contact residents.
     </div>
 
     {% if messages %}
@@ -59,7 +59,7 @@
 
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <span class="text-muted">Accessible portal resident files: {{ preview_count }}</span>
-            <button type="submit" class="gold-btn">Send Secure Message</button>
+            <button type="submit" class="gold-btn">Send Message</button>
         </div>
     </form>
 </div>

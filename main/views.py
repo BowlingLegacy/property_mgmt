@@ -3097,6 +3097,7 @@ def group_resident_message(request):
 
     if request.method == "POST" and form.is_valid():
         selected_property_id = form.cleaned_data["property_id"]
+        delivery_method = form.cleaned_data["delivery_method"]
         target_properties = properties
 
         if selected_property_id != "all":
@@ -3117,47 +3118,54 @@ def group_resident_message(request):
         staff_sms_failed_count = 0
         email_failed_count = 0
         sms_message_body = sms_body(form.cleaned_data["subject"], form.cleaned_data["message"])
+        create_portal_messages = delivery_method in ["portal", "portal_sms"]
+        send_resident_sms = delivery_method in ["portal_sms", "sms_only"]
+        send_staff_sms = delivery_method in ["portal_sms", "sms_only", "staff_sms_only"]
 
-        for application in recipients:
-            resident_message = ResidentMessage.objects.create(
-                application=application,
-                message_type="general",
-                subject=form.cleaned_data["subject"],
-                message=form.cleaned_data["message"],
-                status="reviewed",
-                locked=True,
-            )
-            created_count += 1
-            try:
-                send_resident_portal_notification_email(
-                    request,
-                    application,
-                    f"New secure portal message: {form.cleaned_data['subject']}",
-                    "You have a new secure message in your Bowling Legacy resident portal.",
-                    "resident_requests",
-                )
-            except Exception:
-                email_failed_count += 1
+        if delivery_method != "staff_sms_only":
+            for application in recipients:
+                resident_message = None
 
-            if form.cleaned_data["delivery_method"] == "portal_sms":
-                sms_attempt_count += 1
-                try:
-                    sms_log = send_sms_message(
-                        application,
-                        sms_message_body,
-                        request.user,
-                        resident_message=resident_message,
+                if create_portal_messages:
+                    resident_message = ResidentMessage.objects.create(
+                        application=application,
+                        message_type="general",
+                        subject=form.cleaned_data["subject"],
+                        message=form.cleaned_data["message"],
+                        status="reviewed",
+                        locked=True,
                     )
-                    if sms_log.status == "sent":
-                        sms_accepted_count += 1
-                    elif sms_log.status in ["skipped_no_consent", "not_configured"]:
-                        sms_skipped_count += 1
-                    else:
-                        sms_failed_count += 1
-                except Exception:
-                    sms_failed_count += 1
+                    created_count += 1
+                    try:
+                        send_resident_portal_notification_email(
+                            request,
+                            application,
+                            f"New secure portal message: {form.cleaned_data['subject']}",
+                            "You have a new secure message in your Bowling Legacy resident portal.",
+                            "resident_requests",
+                        )
+                    except Exception:
+                        email_failed_count += 1
 
-        if form.cleaned_data["delivery_method"] == "portal_sms":
+                if send_resident_sms:
+                    sms_attempt_count += 1
+                    try:
+                        sms_log = send_sms_message(
+                            application,
+                            sms_message_body,
+                            request.user,
+                            resident_message=resident_message,
+                        )
+                        if sms_log.status == "sent":
+                            sms_accepted_count += 1
+                        elif sms_log.status in ["skipped_no_consent", "not_configured"]:
+                            sms_skipped_count += 1
+                        else:
+                            sms_failed_count += 1
+                    except Exception:
+                        sms_failed_count += 1
+
+        if send_staff_sms:
             for index, copy_number in enumerate(parse_sms_copy_numbers(form.cleaned_data.get("staff_sms_copy_numbers")), start=1):
                 try:
                     staff_log = send_staff_sms_copy(copy_number, sms_message_body, request.user, label=f"Group message staff copy {index}")
@@ -3168,10 +3176,21 @@ def group_resident_message(request):
                 except Exception:
                     staff_sms_failed_count += 1
 
-        if sms_attempt_count:
+        if delivery_method == "staff_sms_only":
             messages.success(
                 request,
+                f"Staff SMS test complete. Staff copies: {staff_sms_accepted_count} accepted by provider, "
+                f"{staff_sms_failed_count} failed. No resident file messages were created.",
+            )
+        elif send_resident_sms:
+            resident_file_note = (
                 f"Secure portal message created for {created_count} resident file(s). "
+                if create_portal_messages
+                else "SMS-only send selected; no resident file messages were created. "
+            )
+            messages.success(
+                request,
+                resident_file_note +
                 f"SMS attempted for {sms_attempt_count}: {sms_accepted_count} accepted by provider, "
                 f"{sms_skipped_count} skipped, {sms_failed_count} failed. "
                 f"Staff copies: {staff_sms_accepted_count} accepted by provider, {staff_sms_failed_count} failed.",
