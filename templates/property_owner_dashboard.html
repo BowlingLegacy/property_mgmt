@@ -130,7 +130,7 @@
     <div class="owner-header d-flex justify-content-between align-items-center flex-wrap gap-3">
         <div>
             <h1 class="fw-bold mb-1">Property Owner Dashboard</h1>
-            <p class="mb-0">Portfolio view organized by property financial folders.</p>
+            <p class="mb-0">Portfolio view organized by property, resident files, and report-ready financials.</p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
             {% if request.user.is_superuser or request.user.role == "admin" %}
@@ -138,7 +138,7 @@
             {% endif %}
             <a href="{% url 'property_blog_manager' %}" class="btn-dark-soft">Property Blogs</a>
             <a href="{% url 'landlord_dashboard' %}" class="btn-dark-soft">Landlord Operations</a>
-            <a href="{% url 'rent_roll' %}" class="btn-owner">Monthly Rent Roll</a>
+            <a href="{% url 'rent_roll' %}?month={{ selected_month|date:'Y-m' }}" class="btn-owner">Monthly Rent Roll</a>
         </div>
     </div>
 
@@ -158,9 +158,9 @@
 
     <div class="row g-3 mb-4">
         <div class="col-md-3 col-sm-6"><div class="summary-card"><div class="summary-label">Properties</div><div class="summary-value">{{ total_properties }}</div></div></div>
-        <div class="col-md-3 col-sm-6"><div class="summary-card"><div class="summary-label">Residents</div><div class="summary-value">{{ total_residents }}</div></div></div>
+        <div class="col-md-3 col-sm-6"><div class="summary-card"><div class="summary-label">Occupied Units / Residents</div><div class="summary-value">{{ total_occupied_units }} / {{ total_residents }}</div></div></div>
         <div class="col-md-3 col-sm-6"><div class="summary-card"><div class="summary-label">Scheduled Rent</div><div class="summary-value">${{ portfolio_monthly_rent }}</div></div></div>
-        <div class="col-md-3 col-sm-6"><div class="summary-card"><div class="summary-label">Collected</div><div class="summary-value">${{ portfolio_collected }}</div></div></div>
+        <div class="col-md-3 col-sm-6"><div class="summary-card"><div class="summary-label">Rent Collected {{ selected_month|date:"M Y" }}</div><div class="summary-value">${{ portfolio_rent_collected_month }}</div></div></div>
     </div>
 
     <div class="mb-3">
@@ -189,27 +189,28 @@
                     <div class="col-lg-4">
                         <div class="fin-section">
                             <div class="fin-title">Property Snapshot</div>
-                            <a class="metric-btn" href="{% url 'rent_roll' %}"><span class="metric-label">Units / Residents</span><span class="metric-value">{{ card.resident_count }}</span></a>
-                            <a class="metric-btn" href="{% url 'rent_roll' %}"><span class="metric-label">Total Scheduled Rent</span><span class="metric-value">${{ card.monthly_rent }}</span></a>
-                            <a class="metric-btn" href="{% url 'payment_log' %}"><span class="metric-label">Total Collected Rent</span><span class="metric-value">${{ card.total_collected }}</span></a>
+                            <a class="metric-btn" href="{{ card.links.resident_roster }}"><span class="metric-label">Occupied Units / Residents</span><span class="metric-value">{{ card.occupied_unit_count }} / {{ card.resident_count }}</span></a>
+                            <a class="metric-btn" href="{{ card.links.rent_roll }}"><span class="metric-label">Scheduled Rent</span><span class="metric-value">${{ card.monthly_rent }}</span></a>
+                            <a class="metric-btn" href="{{ card.links.payment_summary }}"><span class="metric-label">Rent Collected {{ selected_month|date:"M" }}</span><span class="metric-value">${{ card.rent_collected_month }}</span></a>
+                            <a class="metric-btn" href="{{ card.links.payment_summary }}"><span class="metric-label">Rent Collected YTD</span><span class="metric-value">${{ card.rent_collected_ytd }}</span></a>
                         </div>
                     </div>
 
                     <div class="col-lg-4">
                         <div class="fin-section">
                             <div class="fin-title">Expenses & Debt Position</div>
-                            <a class="metric-btn" href="{% url 'property_financials' card.property.name %}"><span class="metric-label">Operating Expenses</span><span class="metric-value">Open</span></a>
-                            <a class="metric-btn" href="{% url 'property_financials' card.property.name %}"><span class="metric-label">Debt Service</span><span class="metric-value">Open</span></a>
-                            <a class="metric-btn" href="{% url 'property_financials' card.property.name %}"><span class="metric-label">Capital Expenses</span><span class="metric-value">Open</span></a>
+                            <a class="metric-btn" href="{{ card.links.operating_expenses }}"><span class="metric-label">Operating Expenses YTD</span><span class="metric-value">${{ card.operating_expenses_ytd }}</span></a>
+                            <a class="metric-btn" href="{{ card.links.debt_service }}"><span class="metric-label">Debt Service YTD</span><span class="metric-value">${{ card.debt_service_ytd }}</span></a>
+                            <a class="metric-btn" href="{{ card.links.capital_expenses }}"><span class="metric-label">Capital Expenses YTD</span><span class="metric-value">${{ card.capital_expenses_ytd }}</span></a>
                         </div>
                     </div>
 
                     <div class="col-lg-4">
                         <div class="fin-section">
                             <div class="fin-title">Performance</div>
-                            <a class="metric-btn" href="{% url 't12_report' %}?property_id={{ card.property.id }}"><span class="metric-label">NOI</span><span class="metric-value">Open</span></a>
-                            <a class="metric-btn" href="{% url 't12_report' %}?property_id={{ card.property.id }}"><span class="metric-label">Cash Flow After Debt</span><span class="metric-value">Open</span></a>
-                            <a class="metric-btn" href="{% url 'property_financials' card.property.name %}"><span class="metric-label">Occupancy / Collection %</span><span class="metric-value">Open</span></a>
+                            <a class="metric-btn" href="{{ card.links.noi }}"><span class="metric-label">NOI YTD</span><span class="metric-value">${{ card.noi_ytd }}</span></a>
+                            <a class="metric-btn" href="{{ card.links.cash_flow }}"><span class="metric-label">Cash Flow YTD</span><span class="metric-value">${{ card.cash_flow_ytd }}</span></a>
+                            <a class="metric-btn" href="{{ card.links.occupancy }}"><span class="metric-label">Occupancy / Vacancy</span><span class="metric-value">Open</span></a>
                         </div>
                     </div>
                 </div>

@@ -4225,7 +4225,8 @@ def custom_reports(request):
         residents = (
             HousingApplication.objects
             .select_related("property")
-            .filter(property__in=filtered_properties)
+            .filter(property__in=filtered_properties, application_folder="active")
+            .exclude(space_label="")
             .order_by("property__name", "space_label", "full_name")
         )
         sorted_residents = sorted_resident_list(residents)
