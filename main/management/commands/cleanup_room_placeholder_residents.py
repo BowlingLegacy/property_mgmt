@@ -57,6 +57,11 @@ class Command(BaseCommand):
             action="store_true",
             help="Also select named no-login records in units that already have a linked resident.",
         )
+        parser.add_argument(
+            "--include-no-unit-no-login",
+            action="store_true",
+            help="Also select no-login active records with no unit assignment.",
+        )
         parser.add_argument("--delete", action="store_true", help="Hard-delete placeholders instead of archiving them.")
         parser.add_argument("--confirm", action="store_true", help="Actually archive/delete selected placeholder records.")
 
@@ -90,6 +95,9 @@ class Command(BaseCommand):
         candidates = []
         for application in applications:
             room_key = normalized_room_label(application.space_label)
+            if not application.user_id and not room_key and options["include_no_unit_no_login"]:
+                candidates.append((application, []))
+                continue
             if application.user_id or room_key not in linked_by_room:
                 continue
             if is_room_placeholder(application) or options["include_named_no_login"]:
@@ -105,7 +113,7 @@ class Command(BaseCommand):
         self.stdout.write(f"Placeholders selected: {len(candidates)}")
 
         for application, linked_residents in candidates:
-            linked_names = ", ".join(f"app {resident.id} {resident.full_name}" for resident in linked_residents)
+            linked_names = ", ".join(f"app {resident.id} {resident.full_name}" for resident in linked_residents) or "-"
             self.stdout.write(
                 f"{action} | app {application.id} | Room {canonical_room_label(application.space_label)} | "
                 f"{application.full_name or '-'} | linked resident(s): {linked_names}"
@@ -127,7 +135,10 @@ class Command(BaseCommand):
                     application.delete()
                     continue
 
-                if is_room_placeholder(application):
+                if not normalized_room_label(application.space_label):
+                    note = "Archived no-login record with no unit assignment because it was not an active tenant file."
+                    reason = "Non-tenant no-unit record"
+                elif is_room_placeholder(application):
                     note = "Archived duplicate no-login room placeholder after linked resident file was found for the same unit."
                     reason = "Duplicate room placeholder"
                 else:

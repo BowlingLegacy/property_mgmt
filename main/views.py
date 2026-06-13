@@ -1737,6 +1737,8 @@ def visible_resident_files(applications):
     visible = []
     for application in applications:
         application.display_unit_label = canonical_room_label(application.space_label or application.space_type) or "Unassigned"
+        if not application.user_id and not normalized_room_label(application.space_label):
+            continue
         if (
             not application.user_id
             and is_room_placeholder_application(application)
