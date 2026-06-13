@@ -117,14 +117,6 @@
 
         <div class="summary-grid mb-4">
             <div class="summary-box">
-                <div class="summary-label">Stored Rent Balance</div>
-                <div class="summary-value">${{ application.balance|floatformat:2 }}</div>
-            </div>
-            <div class="summary-box">
-                <div class="summary-label">Stored Utility Balance</div>
-                <div class="summary-value">${{ application.utility_balance|floatformat:2 }}</div>
-            </div>
-            <div class="summary-box">
                 <div class="summary-label">Deposit Paid</div>
                 <div class="summary-value">${{ application.deposit_paid|floatformat:2 }}</div>
             </div>
@@ -156,8 +148,7 @@
 
         <div class="alert alert-info">
             This statement calculates the move-out amount from the charges and credits listed below.
-            Stored dashboard balances are shown only as a reference snapshot and do not control the final move-out total.
-            Stored balance snapshot: ${{ stored_balance_snapshot|floatformat:2 }}.
+            Dashboard balance fields are not used for the final move-out total.
         </div>
 
         <h2 class="h5 fw-bold">Move-Out Charges / Credits</h2>
