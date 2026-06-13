@@ -9,7 +9,10 @@
                 {{ application.full_name }}{% if application.property %} · {{ application.property.name }}{% endif %}
             </p>
         </div>
-        <a href="{% url 'landlord_resident_files' %}" class="btn btn-outline-dark">Back to Resident Files</a>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'move_out_statement' application.id %}" class="btn btn-dark">Move-Out Statement</a>
+            <a href="{% url 'landlord_resident_files' %}" class="btn btn-outline-dark">Back to Resident Files</a>
+        </div>
     </div>
 
     <div class="alert alert-warning">

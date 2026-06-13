@@ -4483,6 +4483,71 @@ def edit_resident_balances(request, application_id):
 
 @login_required
 @user_passes_test(staff_required)
+def move_out_statement(request, application_id):
+    application = get_object_or_404(
+        HousingApplication.objects.select_related("property", "user"),
+        id=application_id,
+        id__in=staff_managed_applications(request.user).values_list("id", flat=True),
+    )
+
+    statement_rows = []
+    completed_payments = application.payments.filter(status="completed").order_by("received_at", "created_at", "id")
+    for payment in completed_payments:
+        paid_at = payment.received_at or payment.created_at
+        statement_rows.append({
+            "date": paid_at,
+            "service_month": payment.accounting_month_label,
+            "kind": "Payment",
+            "description": payment.description or payment.get_payment_type_display(),
+            "method": payment.get_payment_method_display(),
+            "charge": Decimal("0.00"),
+            "credit": payment.amount,
+            "notes": payment.reference_number,
+        })
+
+    balance_entries = application.balance_entries.select_related("recorded_by").order_by("created_at", "id")
+    for entry in balance_entries:
+        if entry.description == "Late fee charge":
+            category = "Late Fee"
+        elif entry.description == SECURITY_DEPOSIT_CREDIT_DESCRIPTION:
+            category = "Security Deposit"
+        else:
+            category = entry.get_balance_type_display()
+        is_charge = entry.entry_kind == "charge"
+        statement_rows.append({
+            "date": entry.created_at,
+            "service_month": entry.service_month_label or "-",
+            "kind": entry.get_entry_kind_display(),
+            "description": entry.description or category,
+            "method": category,
+            "charge": entry.amount if is_charge else Decimal("0.00"),
+            "credit": Decimal("0.00") if is_charge else entry.amount,
+            "notes": entry.notes,
+        })
+
+    statement_rows.sort(key=lambda row: (row["date"], row["kind"], row["description"]))
+    total_charges = sum((row["charge"] for row in statement_rows), Decimal("0.00"))
+    total_credits = sum((row["credit"] for row in statement_rows), Decimal("0.00"))
+    deposit_applied_total = security_deposit_applied_total(application)
+    deposit_available_to_apply = security_deposit_available_to_apply(application)
+    deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
+    final_balance = application.balance + application.utility_balance + deposit_due
+
+    return render(request, "move_out_statement.html", {
+        "application": application,
+        "statement_rows": statement_rows,
+        "total_charges": total_charges,
+        "total_credits": total_credits,
+        "deposit_applied_total": deposit_applied_total,
+        "deposit_available_to_apply": deposit_available_to_apply,
+        "deposit_due": deposit_due,
+        "final_balance": final_balance,
+        "generated_at": timezone.now(),
+    })
+
+
+@login_required
+@user_passes_test(staff_required)
 def payment_receipt(request, payment_id):
     payment = get_object_or_404(
         Payment.objects.select_related("application", "application__property", "recorded_by"),

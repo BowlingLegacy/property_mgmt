@@ -44,6 +44,7 @@
                                 <a href="{% url 'application_detail' resident.id %}" class="btn btn-outline-secondary btn-sm">Open</a>
                                 <a href="{% url 'transfer_resident_room' resident.id %}" class="btn btn-outline-primary btn-sm">Move Room</a>
                                 <a href="{% url 'edit_resident_balances' resident.id %}" class="btn btn-outline-primary btn-sm">Edit Balances</a>
+                                <a href="{% url 'move_out_statement' resident.id %}" class="btn btn-outline-dark btn-sm">Statement</a>
                                 <a href="{% url 'printable_application' resident.id %}" class="btn btn-outline-secondary btn-sm">Print</a>
                                 <a href="{% url 'record_manual_payment' %}?application={{ resident.id }}" class="btn btn-outline-primary btn-sm">Record Payment</a>
                                 <a href="{% url 'end_resident_tenancy' resident.id %}" class="btn btn-outline-danger btn-sm">End Tenancy</a>
