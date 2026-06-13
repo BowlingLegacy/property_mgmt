@@ -36,7 +36,7 @@
                         <tr>
                             <td><strong>{{ resident.full_name }}</strong><br><span class="text-muted small">{{ resident.email }}</span></td>
                             <td>{{ resident.property.name|default:"No Property" }}</td>
-                            <td>{{ resident.space_type }} {{ resident.space_label }}</td>
+                            <td>{{ resident.space_type|default:"Unit" }} {{ resident.display_unit_label|default:resident.space_label }}</td>
                             <td>${{ resident.monthly_rent }}</td>
                             <td>${{ resident.balance }}</td>
                             <td>{% if resident.user %}Linked{% else %}No Login{% endif %}</td>

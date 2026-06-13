@@ -1713,6 +1713,41 @@ def monthly_collection_watch_rows(applications):
     )
 
 
+def is_room_placeholder_application(application):
+    room_label = canonical_room_label(application.space_label or "")
+    if not room_label:
+        return False
+
+    resident_name = " ".join(str(application.full_name or "").strip().lower().split())
+    if not resident_name:
+        return True
+
+    room_name = room_label.lower()
+    return resident_name in {room_name, f"room {room_name}"}
+
+
+def visible_resident_files(applications):
+    applications = list(applications)
+    linked_room_keys = {
+        (application.property_id, normalized_room_label(application.space_label))
+        for application in applications
+        if application.user_id and normalized_room_label(application.space_label)
+    }
+
+    visible = []
+    for application in applications:
+        application.display_unit_label = canonical_room_label(application.space_label or application.space_type) or "Unassigned"
+        if (
+            not application.user_id
+            and is_room_placeholder_application(application)
+            and (application.property_id, normalized_room_label(application.space_label)) in linked_room_keys
+        ):
+            continue
+        visible.append(application)
+
+    return sorted_resident_list(visible)
+
+
 def get_landlord_workspace_context(user):
     properties = staff_managed_properties(user).order_by("name")
 
@@ -1826,11 +1861,12 @@ def get_landlord_workspace_context(user):
         landlord_inbox[property_name].append(resident_message)
 
     new_message_count = new_messages.count()
-    collection_watch_rows = monthly_collection_watch_rows(resident_files)
+    applications = visible_resident_files(resident_files)
+    collection_watch_rows = monthly_collection_watch_rows(applications)
     month_start, _next_month = current_month_bounds()
 
     return {
-        "applications": sorted_resident_list(resident_files),
+        "applications": applications,
         "properties": properties,
         "payments": payments,
         "landlord_inbox": landlord_inbox,
@@ -2264,9 +2300,16 @@ def is_orphan_existing_resident_setup_file(application):
 
 def normalized_room_label(room_unit_label):
     label = clean_match_value(room_unit_label)
-    for prefix in ["room", "unit", "space", "apt", "apartment"]:
-        if label.startswith(prefix) and len(label) > len(prefix):
-            return label[len(prefix):]
+    prefixes = ["room", "unit", "space", "apt", "apartment"]
+    changed = True
+    while changed:
+        changed = False
+        for prefix in prefixes:
+            prefix_value = f"{prefix} "
+            if label.startswith(prefix_value):
+                label = label[len(prefix_value):].strip()
+                changed = True
+                break
     return label
 
 
