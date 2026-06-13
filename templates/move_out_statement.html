@@ -129,19 +129,32 @@
                 <div class="summary-value">${{ application.deposit_paid|floatformat:2 }}</div>
             </div>
             <div class="summary-box">
-                <div class="summary-label">Deposit Applied</div>
+                <div class="summary-label">Deposit Applied In Ledger</div>
                 <div class="summary-value">${{ deposit_applied_total|floatformat:2 }}</div>
             </div>
             <div class="summary-box">
-                <div class="summary-label">Deposit Available</div>
+                <div class="summary-label">Deposit Available Before Credit</div>
                 <div class="summary-value">${{ deposit_available_to_apply|floatformat:2 }}</div>
             </div>
             <div class="summary-box">
-                <div class="summary-label">Total Due</div>
+                <div class="summary-label">Deposit Credit On Statement</div>
+                <div class="summary-value">${{ statement_deposit_credit|floatformat:2 }}</div>
+            </div>
+            <div class="summary-box">
+                <div class="summary-label">Deposit Remaining</div>
+                <div class="summary-value">${{ deposit_remaining_after_statement|floatformat:2 }}</div>
+            </div>
+            <div class="summary-box">
+                <div class="summary-label">Balance Before Deposit</div>
+                <div class="summary-value">${{ balance_before_available_deposit|floatformat:2 }}</div>
+            </div>
+            <div class="summary-box">
+                <div class="summary-label">Total Due After Deposit</div>
                 <div class="summary-value">${{ final_balance|floatformat:2 }}</div>
             </div>
         </div>
 
+        <h2 class="h5 fw-bold">Move-Out Charges / Credits</h2>
         <div class="table-responsive">
             <table class="table table-sm align-middle">
                 <thead>
@@ -157,7 +170,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for row in statement_rows %}
+                    {% for row in adjustment_rows %}
                         <tr>
                             <td>{{ row.date|date:"M j, Y" }}</td>
                             <td>{{ row.service_month }}</td>
@@ -170,15 +183,68 @@
                         </tr>
                     {% empty %}
                         <tr>
-                            <td colspan="8" class="text-muted">No payments or balance adjustments recorded.</td>
+                            <td colspan="8" class="text-muted">No move-out charges or balance credits recorded.</td>
+                        </tr>
+                    {% endfor %}
+                    {% if statement_deposit_credit > 0 %}
+                        <tr>
+                            <td>{{ generated_at|date:"M j, Y" }}</td>
+                            <td>Move-out</td>
+                            <td>Credit</td>
+                            <td>Security Deposit</td>
+                            <td>Security deposit available to apply to move-out balance</td>
+                            <td class="money">-</td>
+                            <td class="money">${{ statement_deposit_credit|floatformat:2 }}</td>
+                            <td>Statement calculation</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th colspan="5" class="text-end">Move-Out Adjustment Totals</th>
+                        <th class="money">${{ adjustment_charges|floatformat:2 }}</th>
+                        <th class="money">${{ adjustment_credits_with_statement|floatformat:2 }}</th>
+                        <th></th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <h2 class="h5 fw-bold mt-4">Payment Ledger</h2>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Date Paid</th>
+                        <th>Applies To</th>
+                        <th>Payment Type</th>
+                        <th>Method</th>
+                        <th>Description</th>
+                        <th class="money">Payment</th>
+                        <th>Reference</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in payment_rows %}
+                        <tr>
+                            <td>{{ row.date|date:"M j, Y" }}</td>
+                            <td>{{ row.service_month }}</td>
+                            <td>{{ row.payment_type }}</td>
+                            <td>{{ row.method }}</td>
+                            <td>{{ row.description }}</td>
+                            <td class="money">${{ row.credit|floatformat:2 }}</td>
+                            <td>{{ row.notes|default:"-" }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-muted">No completed payments recorded.</td>
                         </tr>
                     {% endfor %}
                 </tbody>
                 <tfoot>
                     <tr>
-                        <th colspan="5" class="text-end">Statement Totals</th>
-                        <th class="money">${{ total_charges|floatformat:2 }}</th>
-                        <th class="money">${{ total_credits|floatformat:2 }}</th>
+                        <th colspan="5" class="text-end">Payment Ledger Total</th>
+                        <th class="money">${{ payment_total|floatformat:2 }}</th>
                         <th></th>
                     </tr>
                 </tfoot>

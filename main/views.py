@@ -4490,14 +4490,15 @@ def move_out_statement(request, application_id):
         id__in=staff_managed_applications(request.user).values_list("id", flat=True),
     )
 
-    statement_rows = []
+    payment_rows = []
     completed_payments = application.payments.filter(status="completed").order_by("received_at", "created_at", "id")
     for payment in completed_payments:
         paid_at = payment.received_at or payment.created_at
-        statement_rows.append({
+        payment_rows.append({
             "date": paid_at,
             "service_month": payment.accounting_month_label,
             "kind": "Payment",
+            "payment_type": payment.get_payment_type_display(),
             "description": payment.description or payment.get_payment_type_display(),
             "method": payment.get_payment_method_display(),
             "charge": Decimal("0.00"),
@@ -4505,6 +4506,7 @@ def move_out_statement(request, application_id):
             "notes": payment.reference_number,
         })
 
+    adjustment_rows = []
     balance_entries = application.balance_entries.select_related("recorded_by").order_by("created_at", "id")
     for entry in balance_entries:
         if entry.description == "Late fee charge":
@@ -4514,7 +4516,7 @@ def move_out_statement(request, application_id):
         else:
             category = entry.get_balance_type_display()
         is_charge = entry.entry_kind == "charge"
-        statement_rows.append({
+        adjustment_rows.append({
             "date": entry.created_at,
             "service_month": entry.service_month_label or "-",
             "kind": entry.get_entry_kind_display(),
@@ -4525,22 +4527,34 @@ def move_out_statement(request, application_id):
             "notes": entry.notes,
         })
 
-    statement_rows.sort(key=lambda row: (row["date"], row["kind"], row["description"]))
-    total_charges = sum((row["charge"] for row in statement_rows), Decimal("0.00"))
-    total_credits = sum((row["credit"] for row in statement_rows), Decimal("0.00"))
+    payment_rows.sort(key=lambda row: (row["date"], row["service_month"], row["description"]))
+    adjustment_rows.sort(key=lambda row: (row["date"], row["service_month"], row["description"]))
+    adjustment_charges = sum((row["charge"] for row in adjustment_rows), Decimal("0.00"))
+    adjustment_credits = sum((row["credit"] for row in adjustment_rows), Decimal("0.00"))
+    payment_total = sum((row["credit"] for row in payment_rows), Decimal("0.00"))
     deposit_applied_total = security_deposit_applied_total(application)
     deposit_available_to_apply = security_deposit_available_to_apply(application)
     deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
-    final_balance = application.balance + application.utility_balance + deposit_due
+    balance_before_available_deposit = application.balance + application.utility_balance + deposit_due
+    statement_deposit_credit = min(deposit_available_to_apply, balance_before_available_deposit)
+    final_balance = max(balance_before_available_deposit - statement_deposit_credit, Decimal("0.00"))
+    adjustment_credits_with_statement = adjustment_credits + statement_deposit_credit
+    deposit_remaining_after_statement = max(deposit_available_to_apply - statement_deposit_credit, Decimal("0.00"))
 
     return render(request, "move_out_statement.html", {
         "application": application,
-        "statement_rows": statement_rows,
-        "total_charges": total_charges,
-        "total_credits": total_credits,
+        "adjustment_rows": adjustment_rows,
+        "payment_rows": payment_rows,
+        "adjustment_charges": adjustment_charges,
+        "adjustment_credits": adjustment_credits,
+        "adjustment_credits_with_statement": adjustment_credits_with_statement,
+        "payment_total": payment_total,
         "deposit_applied_total": deposit_applied_total,
         "deposit_available_to_apply": deposit_available_to_apply,
+        "statement_deposit_credit": statement_deposit_credit,
+        "deposit_remaining_after_statement": deposit_remaining_after_statement,
         "deposit_due": deposit_due,
+        "balance_before_available_deposit": balance_before_available_deposit,
         "final_balance": final_balance,
         "generated_at": timezone.now(),
     })
