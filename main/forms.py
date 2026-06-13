@@ -951,6 +951,14 @@ class ResidentBalanceAdjustmentForm(forms.Form):
         min_value=0,
         widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
     )
+    late_fee_charge = forms.DecimalField(
+        label="Add Late Fee",
+        required=False,
+        max_digits=10,
+        decimal_places=2,
+        min_value=0,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+    )
     deposit_to_rent = forms.DecimalField(
         label="Apply Deposit To Rent",
         required=False,
@@ -984,6 +992,7 @@ class ResidentBalanceAdjustmentForm(forms.Form):
         amounts = [
             cleaned_data.get("rent_charge") or 0,
             cleaned_data.get("utility_charge") or 0,
+            cleaned_data.get("late_fee_charge") or 0,
             cleaned_data.get("deposit_to_rent") or 0,
             cleaned_data.get("deposit_to_utilities") or 0,
         ]

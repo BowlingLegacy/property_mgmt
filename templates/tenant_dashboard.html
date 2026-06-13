@@ -669,7 +669,7 @@ body {
                                 <tbody>
                                     {% for payment in payments %}
                                     <tr>
-                                        <td>{{ payment.created_at|date:"M j, Y" }}</td>
+                                        <td>{{ payment.received_at|default:payment.created_at|date:"M j, Y" }}</td>
                                         <td>{{ payment.get_payment_type_display }}</td>
                                         <td>${{ payment.amount }}</td>
                                         <td>{{ payment.get_status_display }}</td>

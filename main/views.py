@@ -4409,6 +4409,20 @@ def edit_resident_balances(request, application_id):
                     )
                     created_count += 1
 
+                late_fee_charge = adjustment_form.cleaned_data.get("late_fee_charge") or Decimal("0.00")
+                if late_fee_charge > 0:
+                    post_resident_balance_entry(
+                        application,
+                        entry_kind="charge",
+                        balance_type="rent",
+                        amount=late_fee_charge,
+                        service_month=service_month,
+                        description="Late fee charge",
+                        notes=notes,
+                        recorded_by=request.user,
+                    )
+                    created_count += 1
+
                 deposit_to_rent = adjustment_form.cleaned_data.get("deposit_to_rent") or Decimal("0.00")
                 if deposit_to_rent > 0:
                     if apply_deposit_credit_to_balance(
