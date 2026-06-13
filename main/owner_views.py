@@ -3,7 +3,7 @@ from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -32,7 +32,8 @@ def owner_dashboard_report_url(report_type, property_obj, extra_params=None):
 def owner_dashboard_active_residents(property_obj):
     return (
         HousingApplication.objects
-        .filter(property=property_obj, application_folder="active")
+        .filter(property=property_obj, application_folder="active", tenancy_status="active")
+        .filter(Q(user__isnull=False) | Q(landlord_reviewed_at__isnull=False))
         .exclude(space_label="")
         .select_related("property")
         .order_by("space_label", "full_name")

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container my-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+        <div>
+            <h1 class="fw-bold mb-1">End Tenancy</h1>
+            <p class="text-muted mb-0">{{ application.full_name }} | {{ application.property.name|default:"No Property" }} | {{ application.space_type }} {{ application.space_label }}</p>
+        </div>
+        <a href="{% url 'landlord_resident_files' %}" class="btn btn-outline-dark">Back to Resident Files</a>
+    </div>
+
+    <div class="alert alert-warning">
+        This moves the resident file to <strong>Former Tenants</strong>. It does not delete payments, documents, messages, or history.
+        The applicant archive is not used.
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-4">
+            <form method="post">
+                {% csrf_token %}
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                {% endif %}
+                <div class="row g-3">
+                    <div class="col-md-4">{{ form.move_out_date.label_tag }}{{ form.move_out_date }}{{ form.move_out_date.errors }}</div>
+                    <div class="col-md-8">{{ form.tenancy_end_reason.label_tag }}{{ form.tenancy_end_reason }}{{ form.tenancy_end_reason.errors }}</div>
+                    <div class="col-md-4">{{ form.final_balance.label_tag }}{{ form.final_balance }}{{ form.final_balance.errors }}</div>
+                    <div class="col-md-4">{{ form.final_utility_balance.label_tag }}{{ form.final_utility_balance }}{{ form.final_utility_balance.errors }}</div>
+                    <div class="col-12">
+                        <div class="form-check">
+                            {{ form.disable_portal_login }}
+                            <label class="form-check-label fw-bold" for="{{ form.disable_portal_login.id_for_label }}">{{ form.disable_portal_login.label }}</label>
+                        </div>
+                    </div>
+                    <div class="col-12">{{ form.notes.label_tag }}{{ form.notes }}{{ form.notes.errors }}</div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <a href="{% url 'application_detail' application.id %}" class="btn btn-outline-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-danger">End Tenancy & Archive</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

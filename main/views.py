@@ -51,6 +51,8 @@ from .forms import (
     ExistingResidentIntakeForm,
     CurrentResidentRosterUploadForm,
     ResidentRoomTransferForm,
+    EndTenancyForm,
+    BeginNewTenancyForm,
     GroupResidentMessageForm,
     CompanyEmailComposeForm,
     CompanyEmailReplyForm,
@@ -1024,7 +1026,7 @@ def selected_property_scope(request):
 
 def rent_roll_rows_for_properties(user, selected_month, properties):
     residents = (
-        staff_managed_applications(user)
+        active_staff_managed_applications(user)
         .select_related("property")
         .filter(
             Q(user__isnull=False)
@@ -1532,6 +1534,10 @@ def staff_managed_applications(user):
     return HousingApplication.objects.filter(property__in=staff_managed_properties(user))
 
 
+def active_staff_managed_applications(user):
+    return staff_managed_applications(user).filter(tenancy_status="active")
+
+
 def custom_report_accessible_properties(user):
     return staff_managed_properties(user).order_by("name")
 
@@ -1635,7 +1641,8 @@ def get_landlord_workspace_context(user):
     resident_files = (
         HousingApplication.objects
         .select_related("property", "user")
-        .filter(property__in=properties, user__isnull=False)
+        .filter(property__in=properties, tenancy_status="active")
+        .filter(Q(user__isnull=False) | Q(landlord_reviewed_at__isnull=False))
         .order_by("property__name", "space_label", "full_name")
     )
 
@@ -1859,6 +1866,161 @@ def landlord_resident_files(request):
 
 @login_required
 @user_passes_test(staff_required)
+def former_tenant_files(request):
+    former_residents = (
+        HousingApplication.objects
+        .select_related("property", "user")
+        .filter(property__in=staff_managed_properties(request.user), tenancy_status="former")
+        .order_by("-move_out_date", "-former_tenant_archived_at", "property__name", "space_label", "full_name")
+    )
+
+    return render(request, "former_tenant_files.html", {
+        "former_residents": former_residents,
+    })
+
+
+@login_required
+@user_passes_test(staff_required)
+def end_resident_tenancy(request, application_id):
+    application = get_object_or_404(
+        HousingApplication.objects.select_related("property", "user"),
+        id=application_id,
+        property__in=staff_managed_properties(request.user),
+        tenancy_status="active",
+    )
+
+    if request.method == "POST":
+        form = EndTenancyForm(request.POST)
+        if form.is_valid():
+            application.tenancy_status = "former"
+            application.move_out_date = form.cleaned_data["move_out_date"]
+            application.former_tenant_archived_at = timezone.now()
+            application.tenancy_end_reason = form.cleaned_data.get("tenancy_end_reason", "").strip()
+            application.tenancy_archive_notes = form.cleaned_data.get("notes", "").strip()
+            application.balance = form.cleaned_data.get("final_balance") or Decimal("0.00")
+            application.utility_balance = form.cleaned_data.get("final_utility_balance") or Decimal("0.00")
+
+            note_line = (
+                f"{timezone.localdate()}: Tenancy ended. Move-out date {application.move_out_date}. "
+                f"Reason: {application.tenancy_end_reason or 'Not entered'}."
+            )
+            if application.tenancy_archive_notes:
+                note_line += f" Notes: {application.tenancy_archive_notes}"
+            application.additional_notes = f"{application.additional_notes}\n\n{note_line}".strip()
+            application.save(update_fields=[
+                "tenancy_status",
+                "move_out_date",
+                "former_tenant_archived_at",
+                "tenancy_end_reason",
+                "tenancy_archive_notes",
+                "balance",
+                "utility_balance",
+                "additional_notes",
+            ])
+
+            if form.cleaned_data.get("disable_portal_login") and application.user:
+                application.user.is_active = False
+                application.user.save(update_fields=["is_active"])
+
+            messages.success(request, f"{application.full_name} moved to Former Tenants. Unit {canonical_room_label(application.space_label)} is ready for a new tenancy.")
+            return redirect("begin_new_tenancy")
+    else:
+        form = EndTenancyForm(initial={
+            "move_out_date": timezone.localdate(),
+            "final_balance": application.balance,
+            "final_utility_balance": application.utility_balance,
+            "disable_portal_login": True,
+        })
+
+    return render(request, "end_resident_tenancy.html", {
+        "application": application,
+        "form": form,
+    })
+
+
+@login_required
+@user_passes_test(staff_required)
+def begin_new_tenancy(request):
+    properties = staff_managed_properties(request.user).order_by("name")
+    initial = {}
+    property_id = request.GET.get("property")
+    unit_label = request.GET.get("unit")
+
+    if property_id:
+        property_obj = get_object_or_404(properties, id=property_id)
+        initial["property"] = property_obj.id
+        if unit_label:
+            initial["space_label"] = canonical_room_label(unit_label)
+            room_setting = find_room_rent_setting(property_obj, unit_label)
+            if room_setting:
+                initial.update({
+                    "space_type": "Room",
+                    "monthly_rent": room_setting.monthly_rent,
+                    "rent_due_day": room_setting.rent_due_day,
+                    "deposit_required": room_setting.deposit_required,
+                    "deposit_paid": room_setting.deposit_paid,
+                    "utility_monthly": room_setting.utility_monthly,
+                    "balance": room_setting.monthly_rent,
+                    "utility_balance": room_setting.utility_monthly,
+                })
+
+    form = BeginNewTenancyForm(request.POST or None, properties=properties, initial=initial)
+
+    if request.method == "POST" and form.is_valid():
+        property_obj = form.cleaned_data["property"]
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            full_name=form.cleaned_data["full_name"],
+            phone=form.cleaned_data.get("phone") or "",
+            email=form.cleaned_data.get("email") or "",
+            age=form.cleaned_data.get("age") or 0,
+            space_type=form.cleaned_data.get("space_type") or "Room",
+            space_label=canonical_room_label(form.cleaned_data["space_label"]),
+            monthly_rent=form.cleaned_data["monthly_rent"],
+            balance=form.cleaned_data["balance"],
+            rent_due_day=form.cleaned_data["rent_due_day"],
+            lease_start_date=form.cleaned_data.get("lease_start_date"),
+            deposit_required=form.cleaned_data["deposit_required"],
+            deposit_paid=form.cleaned_data["deposit_paid"],
+            utility_monthly=form.cleaned_data["utility_monthly"],
+            utility_balance=form.cleaned_data["utility_balance"],
+            income_source="New tenancy created by landlord",
+            monthly_income=Decimal("0.00"),
+            housing_need="Resident tenancy file created directly from landlord dashboard.",
+            additional_notes=form.cleaned_data.get("notes") or "",
+            application_folder="active",
+            tenancy_status="active",
+            landlord_reviewed_at=timezone.now(),
+        )
+
+        user = None
+        email_sent = False
+        email_error = ""
+        if form.cleaned_data.get("send_invite"):
+            user = create_pending_portal_user(application.full_name, application.email, "tenant", application.id)
+            user.refresh_invite_code()
+            application.user = user
+            application.save(update_fields=["user"])
+            try:
+                email_sent = send_portal_access_invite_email(user, application.full_name, "Resident")
+            except Exception as exc:
+                email_error = str(exc)
+
+        messages.success(request, f"New tenancy file created for {application.full_name}.")
+        return render(request, "landlord_create_tenant_success.html", {
+            "application": application,
+            "created_user": user,
+            "email_sent": email_sent,
+            "email_error": email_error,
+        })
+
+    return render(request, "begin_new_tenancy.html", {
+        "form": form,
+    })
+
+
+@login_required
+@user_passes_test(staff_required)
 def transfer_resident_room(request, application_id):
     application = get_object_or_404(
         HousingApplication.objects.select_related("property"),
@@ -1956,8 +2118,9 @@ def room_rent_setup_rows(user, property_obj=None):
         room_map[key]["residents"].append(entry.full_name())
 
     existing_files = (
-        staff_managed_applications(user)
+        active_staff_managed_applications(user)
         .select_related("property")
+        .filter(Q(user__isnull=False) | Q(landlord_reviewed_at__isnull=False))
         .exclude(space_label="")
         .order_by("property__name", "space_label", "full_name")
     )
@@ -2257,7 +2420,7 @@ def landlord_rent_setup(request, property_id=None):
 
     room_rows = room_rent_setup_rows(request.user, selected_property)
     residents = (
-        staff_managed_applications(request.user)
+        active_staff_managed_applications(request.user)
         .select_related("property", "user")
         .order_by("property__name", "space_label", "full_name")
     )
@@ -3097,7 +3260,7 @@ def landlord_message_detail(request, message_id):
 def group_resident_message(request):
     properties = staff_managed_properties(request.user).order_by("name")
     form = GroupResidentMessageForm(request.POST or None, properties=properties)
-    preview_count = staff_managed_applications(request.user).filter(user__isnull=False).count()
+    preview_count = active_staff_managed_applications(request.user).filter(user__isnull=False).count()
 
     if request.method == "POST" and form.is_valid():
         selected_property_id = form.cleaned_data["property_id"]
@@ -3110,7 +3273,7 @@ def group_resident_message(request):
         recipients = (
             HousingApplication.objects
             .select_related("property", "user")
-            .filter(property__in=target_properties, user__isnull=False)
+            .filter(property__in=target_properties, user__isnull=False, tenancy_status="active")
             .order_by("property__name", "space_label", "full_name")
         )
         created_count = 0
@@ -4225,7 +4388,8 @@ def custom_reports(request):
         residents = (
             HousingApplication.objects
             .select_related("property")
-            .filter(property__in=filtered_properties, application_folder="active")
+            .filter(property__in=filtered_properties, application_folder="active", tenancy_status="active")
+            .filter(Q(user__isnull=False) | Q(landlord_reviewed_at__isnull=False))
             .exclude(space_label="")
             .order_by("property__name", "space_label", "full_name")
         )

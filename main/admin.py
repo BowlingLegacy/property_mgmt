@@ -498,6 +498,7 @@ class HousingApplicationAdmin(admin.ModelAdmin):
         "utility_balance",
         "deposit_paid",
         "application_folder",
+        "tenancy_status",
         "application_fee_paid",
         "background_check_status",
     )
@@ -506,6 +507,7 @@ class HousingApplicationAdmin(admin.ModelAdmin):
         "property",
         "space_type",
         "application_folder",
+        "tenancy_status",
         "background_check_status",
     )
 
@@ -527,6 +529,11 @@ class HousingApplicationAdmin(admin.ModelAdmin):
                 "space_label",
                 "application_folder",
                 "application_folder_updated_at",
+                "tenancy_status",
+                "move_out_date",
+                "former_tenant_archived_at",
+                "tenancy_end_reason",
+                "tenancy_archive_notes",
             )
         }),
         ("Resident Information", {
@@ -623,7 +630,7 @@ class HousingApplicationAdmin(admin.ModelAdmin):
         }),
     )
 
-    readonly_fields = ("created_at", "application_folder_updated_at")
+    readonly_fields = ("created_at", "application_folder_updated_at", "former_tenant_archived_at")
 
 
 @admin.register(ResidentMessage)

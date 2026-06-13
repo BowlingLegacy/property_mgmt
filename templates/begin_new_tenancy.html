@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container my-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+        <div>
+            <h1 class="fw-bold mb-1">Begin New Tenancy</h1>
+            <p class="text-muted mb-0">Create a fresh active resident file for a vacant unit.</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'former_tenant_files' %}" class="btn btn-outline-secondary">Former Tenants</a>
+            <a href="{% url 'landlord_resident_files' %}" class="btn btn-outline-dark">Active Resident Files</a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-4">
+            <form method="post">
+                {% csrf_token %}
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                {% endif %}
+
+                <h4 class="fw-bold mb-3">Resident</h4>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-5">{{ form.full_name.label_tag }}{{ form.full_name }}{{ form.full_name.errors }}</div>
+                    <div class="col-md-4">{{ form.email.label_tag }}{{ form.email }}{{ form.email.errors }}</div>
+                    <div class="col-md-3">{{ form.phone.label_tag }}{{ form.phone }}{{ form.phone.errors }}</div>
+                    <div class="col-md-2">{{ form.age.label_tag }}{{ form.age }}{{ form.age.errors }}</div>
+                </div>
+
+                <h4 class="fw-bold mb-3">Property / Unit</h4>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">{{ form.property.label_tag }}{{ form.property }}{{ form.property.errors }}</div>
+                    <div class="col-md-4">{{ form.space_type.label_tag }}{{ form.space_type }}{{ form.space_type.errors }}</div>
+                    <div class="col-md-4">{{ form.space_label.label_tag }}{{ form.space_label }}{{ form.space_label.errors }}</div>
+                </div>
+
+                <h4 class="fw-bold mb-3">Rent / Deposit / Utilities</h4>
+                <div class="row g-3">
+                    <div class="col-md-3">{{ form.lease_start_date.label_tag }}{{ form.lease_start_date }}{{ form.lease_start_date.errors }}</div>
+                    <div class="col-md-3">{{ form.monthly_rent.label_tag }}{{ form.monthly_rent }}{{ form.monthly_rent.errors }}</div>
+                    <div class="col-md-3">{{ form.balance.label_tag }}{{ form.balance }}{{ form.balance.errors }}</div>
+                    <div class="col-md-3">{{ form.rent_due_day.label_tag }}{{ form.rent_due_day }}{{ form.rent_due_day.errors }}</div>
+                    <div class="col-md-3">{{ form.deposit_required.label_tag }}{{ form.deposit_required }}{{ form.deposit_required.errors }}</div>
+                    <div class="col-md-3">{{ form.deposit_paid.label_tag }}{{ form.deposit_paid }}{{ form.deposit_paid.errors }}</div>
+                    <div class="col-md-3">{{ form.utility_monthly.label_tag }}{{ form.utility_monthly }}{{ form.utility_monthly.errors }}</div>
+                    <div class="col-md-3">{{ form.utility_balance.label_tag }}{{ form.utility_balance }}{{ form.utility_balance.errors }}</div>
+                    <div class="col-12">
+                        <div class="form-check">
+                            {{ form.send_invite }}
+                            <label class="form-check-label fw-bold" for="{{ form.send_invite.id_for_label }}">{{ form.send_invite.label }}</label>
+                        </div>
+                    </div>
+                    <div class="col-12">{{ form.notes.label_tag }}{{ form.notes }}{{ form.notes.errors }}</div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <a href="{% url 'landlord_resident_files' %}" class="btn btn-outline-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary">Create New Tenancy</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

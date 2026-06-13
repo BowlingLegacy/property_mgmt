@@ -246,6 +246,10 @@ class HousingApplication(models.Model):
         ("waiting", "Waiting List"),
         ("archived", "Archived"),
     ]
+    TENANCY_STATUS_CHOICES = [
+        ("active", "Active Tenant"),
+        ("former", "Former Tenant"),
+    ]
     COMMUNICATION_PREFERENCE_CHOICES = [
         ("portal", "Portal Only"),
         ("sms", "SMS Text"),
@@ -363,6 +367,15 @@ class HousingApplication(models.Model):
         default="active",
     )
     application_folder_updated_at = models.DateTimeField(blank=True, null=True)
+    tenancy_status = models.CharField(
+        max_length=20,
+        choices=TENANCY_STATUS_CHOICES,
+        default="active",
+    )
+    move_out_date = models.DateField(blank=True, null=True)
+    former_tenant_archived_at = models.DateTimeField(blank=True, null=True)
+    tenancy_end_reason = models.CharField(max_length=255, blank=True)
+    tenancy_archive_notes = models.TextField(blank=True)
 
     def deposit_balance(self):
         remaining = self.deposit_required - self.deposit_paid

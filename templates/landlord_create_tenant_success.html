@@ -77,11 +77,11 @@
 
         <div class="success-header">
             <h1 class="fw-bold mb-1">
-                Application Approved
+                Resident File Created
             </h1>
 
             <div class="text-white-50">
-                Resident onboarding invite has been created.
+                New tenancy file has been created.
             </div>
         </div>
 
@@ -89,16 +89,20 @@
 
             {% if email_sent %}
             <div class="alert alert-success">
-                The resident application has been approved and the onboarding invite email was sent.
+                The resident file has been created and the onboarding invite email was sent.
             </div>
-            {% else %}
+            {% elif created_user and created_user.invite_code %}
             <div class="alert alert-warning">
-                The resident application has been approved, but the invite email was not confirmed. Use the backup invite code below.
+                The resident file has been created, but the invite email was not confirmed. Use the backup invite code below.
                 {% if email_error %}
                     <div class="small mt-2">
                         Email error: {{ email_error }}
                     </div>
                 {% endif %}
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                The resident file has been created without a portal invite code.
             </div>
             {% endif %}
 
@@ -198,9 +202,11 @@
 
             </div>
 
-            <div class="alert alert-warning">
-                Next step: the resident follows the invite instructions, enters the code, creates their own username and password, then logs into the resident portal.
-            </div>
+            {% if created_user and created_user.invite_code %}
+                <div class="alert alert-warning">
+                    Next step: the resident follows the invite instructions, enters the code, creates their own username and password, then logs into the resident portal.
+                </div>
+            {% endif %}
 
             <div class="d-flex justify-content-end gap-2">
                 <a href="{% url 'landlord_dashboard' %}" class="btn-gold">

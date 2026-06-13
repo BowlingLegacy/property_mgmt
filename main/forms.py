@@ -660,6 +660,87 @@ class ResidentRoomTransferForm(forms.Form):
     )
 
 
+class EndTenancyForm(forms.Form):
+    move_out_date = forms.DateField(
+        label="Move-out date",
+        widget=forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+    )
+    tenancy_end_reason = forms.CharField(
+        label="Reason",
+        required=False,
+        max_length=255,
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": "Example: moved out, eviction, transfer, non-renewal",
+        }),
+    )
+    final_balance = forms.DecimalField(
+        label="Final rent balance",
+        required=False,
+        max_digits=10,
+        decimal_places=2,
+        min_value=0,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+    )
+    final_utility_balance = forms.DecimalField(
+        label="Final utility balance",
+        required=False,
+        max_digits=10,
+        decimal_places=2,
+        min_value=0,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+    )
+    disable_portal_login = forms.BooleanField(
+        label="Disable resident portal login",
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+    )
+    notes = forms.CharField(
+        label="Archive notes",
+        required=False,
+        widget=forms.Textarea(attrs={
+            "class": "form-control",
+            "rows": 4,
+            "placeholder": "Deposit disposition, forwarding address, keys returned, damages, or other move-out notes.",
+        }),
+    )
+
+
+class BeginNewTenancyForm(forms.Form):
+    property = forms.ModelChoiceField(queryset=Property.objects.none(), widget=forms.Select(attrs={"class": "form-select"}))
+    full_name = forms.CharField(max_length=255, widget=forms.TextInput(attrs={"class": "form-control"}))
+    email = forms.EmailField(required=False, widget=forms.EmailInput(attrs={"class": "form-control"}))
+    phone = forms.CharField(max_length=20, required=False, widget=forms.TextInput(attrs={"class": "form-control"}))
+    age = forms.IntegerField(required=False, min_value=0, initial=0, widget=forms.NumberInput(attrs={"class": "form-control"}))
+    space_type = forms.CharField(max_length=50, required=False, initial="Room", widget=forms.TextInput(attrs={"class": "form-control"}))
+    space_label = forms.CharField(max_length=50, widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Example: H, 101, Suite 2"}))
+    lease_start_date = forms.DateField(required=False, widget=forms.DateInput(attrs={"class": "form-control", "type": "date"}))
+    monthly_rent = forms.DecimalField(max_digits=10, decimal_places=2, initial=0, min_value=0, widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}))
+    rent_due_day = forms.IntegerField(initial=1, min_value=1, max_value=31, widget=forms.NumberInput(attrs={"class": "form-control"}))
+    deposit_required = forms.DecimalField(max_digits=10, decimal_places=2, initial=0, min_value=0, widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}))
+    deposit_paid = forms.DecimalField(max_digits=10, decimal_places=2, initial=0, min_value=0, widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}))
+    utility_monthly = forms.DecimalField(max_digits=10, decimal_places=2, initial=0, min_value=0, widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}))
+    balance = forms.DecimalField(label="Opening rent balance", max_digits=10, decimal_places=2, initial=0, min_value=0, widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}))
+    utility_balance = forms.DecimalField(label="Opening utility balance", max_digits=10, decimal_places=2, initial=0, min_value=0, widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}))
+    send_invite = forms.BooleanField(label="Create portal invite code", required=False, initial=True, widget=forms.CheckboxInput(attrs={"class": "form-check-input"}))
+    notes = forms.CharField(required=False, widget=forms.Textarea(attrs={"class": "form-control", "rows": 3}))
+
+    def __init__(self, *args, properties=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["property"].queryset = properties if properties is not None else Property.objects.none()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        deposit_required = cleaned_data.get("deposit_required")
+        deposit_paid = cleaned_data.get("deposit_paid")
+        if deposit_required is not None and deposit_paid is not None and deposit_paid > deposit_required:
+            self.add_error("deposit_paid", "Deposit paid cannot be greater than deposit required.")
+        if cleaned_data.get("send_invite") and not cleaned_data.get("email"):
+            self.add_error("email", "Email is required when creating a portal invite code.")
+        return cleaned_data
+
+
 class GroupResidentMessageForm(forms.Form):
     DELIVERY_CHOICES = [
         ("portal", "Secure portal only"),
