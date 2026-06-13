@@ -873,12 +873,28 @@ def post_resident_balance_entry(application, *, entry_kind, balance_type, amount
     return entry
 
 
+SECURITY_DEPOSIT_CREDIT_DESCRIPTION = "Security deposit applied to balance"
+
+
+def security_deposit_applied_total(application):
+    return (
+        application.balance_entries
+        .filter(entry_kind="credit", description=SECURITY_DEPOSIT_CREDIT_DESCRIPTION)
+        .aggregate(total=Sum("amount"))["total"]
+        or Decimal("0.00")
+    )
+
+
+def security_deposit_available_to_apply(application):
+    return max(application.deposit_paid - security_deposit_applied_total(application), Decimal("0.00"))
+
+
 def apply_deposit_credit_to_balance(application, *, balance_type, amount, service_month=None, notes="", recorded_by=None):
     amount = Decimal(amount or "0.00").quantize(Decimal("0.01"))
     if amount <= 0:
         return None
 
-    available_deposit = max(application.deposit_paid, Decimal("0.00"))
+    available_deposit = security_deposit_available_to_apply(application)
     if available_deposit <= 0:
         return None
 
@@ -893,13 +909,10 @@ def apply_deposit_credit_to_balance(application, *, balance_type, amount, servic
         balance_type=balance_type,
         amount=amount,
         service_month=service_month,
-        description="Security deposit applied to balance",
+        description=SECURITY_DEPOSIT_CREDIT_DESCRIPTION,
         notes=notes,
         recorded_by=recorded_by,
     )
-    application.refresh_from_db(fields=["deposit_paid"])
-    application.deposit_paid = max(Decimal("0.00"), application.deposit_paid - amount)
-    application.save(update_fields=["deposit_paid"])
     return entry
 
 
@@ -4461,12 +4474,16 @@ def edit_resident_balances(request, application_id):
                 return redirect("landlord_resident_files")
 
     balance_entries = application.balance_entries.select_related("recorded_by")[:25]
+    deposit_applied_total = security_deposit_applied_total(application)
+    deposit_available_to_apply = security_deposit_available_to_apply(application)
 
     return render(request, "edit_resident_balances.html", {
         "application": application,
         "form": correction_form,
         "adjustment_form": adjustment_form,
         "balance_entries": balance_entries,
+        "deposit_applied_total": deposit_applied_total,
+        "deposit_available_to_apply": deposit_available_to_apply,
     })
 
 
