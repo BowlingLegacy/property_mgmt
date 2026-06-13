@@ -4535,9 +4535,10 @@ def move_out_statement(request, application_id):
     deposit_applied_total = security_deposit_applied_total(application)
     deposit_available_to_apply = security_deposit_available_to_apply(application)
     deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
-    balance_before_available_deposit = application.balance + application.utility_balance + deposit_due
-    statement_deposit_credit = min(deposit_available_to_apply, balance_before_available_deposit)
-    final_balance = max(balance_before_available_deposit - statement_deposit_credit, Decimal("0.00"))
+    stored_balance_snapshot = application.balance + application.utility_balance + deposit_due
+    move_out_balance_before_deposit = max(adjustment_charges - adjustment_credits, Decimal("0.00"))
+    statement_deposit_credit = min(deposit_available_to_apply, move_out_balance_before_deposit)
+    final_balance = max(move_out_balance_before_deposit - statement_deposit_credit, Decimal("0.00"))
     adjustment_credits_with_statement = adjustment_credits + statement_deposit_credit
     deposit_remaining_after_statement = max(deposit_available_to_apply - statement_deposit_credit, Decimal("0.00"))
 
@@ -4554,7 +4555,8 @@ def move_out_statement(request, application_id):
         "statement_deposit_credit": statement_deposit_credit,
         "deposit_remaining_after_statement": deposit_remaining_after_statement,
         "deposit_due": deposit_due,
-        "balance_before_available_deposit": balance_before_available_deposit,
+        "stored_balance_snapshot": stored_balance_snapshot,
+        "move_out_balance_before_deposit": move_out_balance_before_deposit,
         "final_balance": final_balance,
         "generated_at": timezone.now(),
     })
