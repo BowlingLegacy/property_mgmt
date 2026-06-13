@@ -52,6 +52,11 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--property-name", required=True)
         parser.add_argument("--room", default="", help="Optional unit label such as M or Room M.")
+        parser.add_argument(
+            "--include-named-no-login",
+            action="store_true",
+            help="Also select named no-login records in units that already have a linked resident.",
+        )
         parser.add_argument("--delete", action="store_true", help="Hard-delete placeholders instead of archiving them.")
         parser.add_argument("--confirm", action="store_true", help="Actually archive/delete selected placeholder records.")
 
@@ -87,7 +92,7 @@ class Command(BaseCommand):
             room_key = normalized_room_label(application.space_label)
             if application.user_id or room_key not in linked_by_room:
                 continue
-            if is_room_placeholder(application):
+            if is_room_placeholder(application) or options["include_named_no_login"]:
                 candidates.append((application, linked_by_room[room_key]))
 
         action = "DELETE" if options["delete"] else "ARCHIVE"
@@ -122,13 +127,18 @@ class Command(BaseCommand):
                     application.delete()
                     continue
 
-                note = "Archived duplicate no-login room placeholder after linked resident file was found for the same unit."
+                if is_room_placeholder(application):
+                    note = "Archived duplicate no-login room placeholder after linked resident file was found for the same unit."
+                    reason = "Duplicate room placeholder"
+                else:
+                    note = "Archived no-login resident record after linked resident file was found for the same unit."
+                    reason = "Duplicate no-login resident record"
                 existing_notes = str(application.tenancy_archive_notes or "").strip()
                 application.tenancy_status = "former"
                 application.application_folder = "archived"
                 application.application_folder_updated_at = now
                 application.former_tenant_archived_at = now
-                application.tenancy_end_reason = "Duplicate room placeholder"
+                application.tenancy_end_reason = reason
                 application.tenancy_archive_notes = f"{existing_notes}\n{note}".strip()
                 application.save(update_fields=[
                     "tenancy_status",
