@@ -3632,15 +3632,9 @@ def tenant_dashboard(request):
         if not is_superadmin_inspecting:
             profile_photo_form = ResidentProfilePhotoForm(instance=application)
 
-        month_start, _next_month = current_month_bounds()
-        current_rent_paid = payment_amount_for_month(payments, month_start.year, month_start.month, ["rent"])
-        current_utility_paid = payment_amount_for_month(payments, month_start.year, month_start.month, ["utility"])
-        current_rent_due = max(expected_rent_for_month(application, month_start) - current_rent_paid, Decimal("0.00"))
-        current_utility_due = max(expected_utility_for_month(application, month_start) - current_utility_paid, Decimal("0.00"))
-
-        rent_due = current_rent_due
+        rent_due = max(application.balance, Decimal("0.00"))
         deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
-        utility_due = current_utility_due
+        utility_due = max(application.utility_balance, Decimal("0.00"))
         show_utilities = resident_has_portal_utility_charge(application)
         utility_setup_items = resident_utility_setup_items(application)
         utility_setup_complete = bool(utility_setup_items) and all(item.completed_at for item in utility_setup_items)

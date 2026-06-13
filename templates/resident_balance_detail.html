@@ -130,8 +130,16 @@
                                         <td>{{ entry.created_at|date:"M j, Y" }}</td>
                                         <td>{{ entry.service_month_label|default:"-" }}</td>
                                         <td>{{ entry.get_entry_kind_display }}</td>
-                                        <td>{{ entry.get_balance_type_display }}</td>
-                                        <td class="text-end">${{ entry.amount }}</td>
+                                        <td>
+                                            {% if entry.description == "Late fee charge" %}
+                                                Late Fee
+                                            {% elif entry.description == "Security deposit applied to balance" %}
+                                                Security Deposit
+                                            {% else %}
+                                                {{ entry.get_balance_type_display }}
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end">${{ entry.amount|floatformat:0 }}</td>
                                     </tr>
                                 {% endfor %}
                             </tbody>
