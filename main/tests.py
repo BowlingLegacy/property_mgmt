@@ -4937,6 +4937,101 @@ class LiveFlowTests(TestCase):
         self.assertEqual(may_row["net_operating_income"], Decimal("1700.00"))
         self.assertEqual(may_row["cash_flow_after_debt"], Decimal("1200.00"))
 
+    def test_statement_supported_entries_create_debt_service_without_receipts(self):
+        property_obj = Property.objects.create(
+            name="Statement Supported Property",
+            address="1005 W Main St",
+            city="Medford",
+            state="OR",
+            zip_code="97501",
+        )
+
+        preview = StringIO()
+        call_command(
+            "record_statement_supported_entries",
+            "--property-name",
+            property_obj.name,
+            "--year",
+            "2026",
+            "--months",
+            "5,6",
+            "--amount",
+            "4000",
+            "--entry-type",
+            "debt_service",
+            "--category",
+            "Debt Service",
+            "--vendor",
+            "Sherry",
+            "--day",
+            "6",
+            "--description",
+            "Monthly debt service payment; bank-statement supported.",
+            stdout=preview,
+        )
+        self.assertEqual(FinancialEntry.objects.count(), 0)
+        self.assertIn("Dry run only", preview.getvalue())
+
+        output = StringIO()
+        call_command(
+            "record_statement_supported_entries",
+            "--property-name",
+            property_obj.name,
+            "--year",
+            "2026",
+            "--months",
+            "5,6",
+            "--amount",
+            "4000",
+            "--entry-type",
+            "debt_service",
+            "--category",
+            "Debt Service",
+            "--vendor",
+            "Sherry",
+            "--day",
+            "6",
+            "--description",
+            "Monthly debt service payment; bank-statement supported.",
+            "--confirm",
+            stdout=output,
+        )
+        self.assertIn("Created 2", output.getvalue())
+        self.assertEqual(FinancialEntry.objects.filter(entry_type="debt_service").count(), 2)
+
+        may_entry = FinancialEntry.objects.get(month=5)
+        self.assertEqual(may_entry.entry_date, date(2026, 5, 6))
+        self.assertEqual(may_entry.amount, Decimal("4000.00"))
+        self.assertEqual(may_entry.category, "Debt Service")
+        self.assertIn("Sherry", may_entry.description)
+
+        rerun = StringIO()
+        call_command(
+            "record_statement_supported_entries",
+            "--property-name",
+            property_obj.name,
+            "--year",
+            "2026",
+            "--months",
+            "5,6",
+            "--amount",
+            "4000",
+            "--entry-type",
+            "debt_service",
+            "--category",
+            "Debt Service",
+            "--vendor",
+            "Sherry",
+            "--day",
+            "6",
+            "--description",
+            "Monthly debt service payment; bank-statement supported.",
+            "--confirm",
+            stdout=rerun,
+        )
+        self.assertEqual(FinancialEntry.objects.filter(entry_type="debt_service").count(), 2)
+        self.assertIn("SKIP duplicate", rerun.getvalue())
+
     def test_t12_adds_receipts_created_after_summary_baseline(self):
         landlord = User.objects.create_user(
             username="t12-receipt-landlord",
