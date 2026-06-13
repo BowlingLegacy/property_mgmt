@@ -20,6 +20,7 @@
         <div class="card-body">
             <form method="post">
                 {% csrf_token %}
+                <input type="hidden" name="action" value="correct">
 
                 {% if form.non_field_errors %}
                     <div class="alert alert-danger">{{ form.non_field_errors }}</div>
@@ -70,6 +71,104 @@
                     <button type="submit" class="btn btn-primary">Save Balance Correction</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mt-4">
+        <div class="card-body">
+            <h2 class="h5 fw-bold mb-1">Post Charge Or Deposit Credit</h2>
+            <p class="text-muted">
+                Use this for past due rent, prorated move-out charges, forgiven/adjusted utilities, and applying a held deposit against unpaid balances.
+            </p>
+
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="adjust">
+
+                {% if adjustment_form.non_field_errors %}
+                    <div class="alert alert-danger">{{ adjustment_form.non_field_errors }}</div>
+                {% endif %}
+
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        {{ adjustment_form.service_month.label_tag }}
+                        {{ adjustment_form.service_month }}
+                        {{ adjustment_form.service_month.errors }}
+                        <div class="form-text">{{ adjustment_form.service_month.help_text }}</div>
+                    </div>
+                    <div class="col-md-4">
+                        {{ adjustment_form.rent_charge.label_tag }}
+                        {{ adjustment_form.rent_charge }}
+                        {{ adjustment_form.rent_charge.errors }}
+                    </div>
+                    <div class="col-md-4">
+                        {{ adjustment_form.utility_charge.label_tag }}
+                        {{ adjustment_form.utility_charge }}
+                        {{ adjustment_form.utility_charge.errors }}
+                    </div>
+                    <div class="col-md-4">
+                        {{ adjustment_form.deposit_to_rent.label_tag }}
+                        {{ adjustment_form.deposit_to_rent }}
+                        {{ adjustment_form.deposit_to_rent.errors }}
+                    </div>
+                    <div class="col-md-4">
+                        {{ adjustment_form.deposit_to_utilities.label_tag }}
+                        {{ adjustment_form.deposit_to_utilities }}
+                        {{ adjustment_form.deposit_to_utilities.errors }}
+                    </div>
+                    <div class="col-md-12">
+                        {{ adjustment_form.notes.label_tag }}
+                        {{ adjustment_form.notes }}
+                        {{ adjustment_form.notes.errors }}
+                    </div>
+                </div>
+
+                <div class="alert alert-info mt-4 mb-0">
+                    Current rent balance: ${{ application.balance }}.
+                    Current utility balance: ${{ application.utility_balance }}.
+                    Deposit held: ${{ application.deposit_paid }}.
+                </div>
+
+                <div class="d-flex justify-content-end mt-4">
+                    <button type="submit" class="btn btn-success">Post Ledger Entry</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mt-4">
+        <div class="card-body">
+            <h2 class="h5 fw-bold mb-3">Recent Balance Ledger</h2>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Month</th>
+                            <th>Type</th>
+                            <th>Balance</th>
+                            <th class="text-end">Amount</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in balance_entries %}
+                            <tr>
+                                <td>{{ entry.created_at|date:"M j, Y" }}</td>
+                                <td>{{ entry.service_month_label|default:"-" }}</td>
+                                <td>{{ entry.get_entry_kind_display }}</td>
+                                <td>{{ entry.get_balance_type_display }}</td>
+                                <td class="text-end">${{ entry.amount }}</td>
+                                <td>{{ entry.description }}{% if entry.notes %}<div class="small text-muted">{{ entry.notes }}</div>{% endif %}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-muted">No balance ledger entries yet.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>

@@ -43,6 +43,7 @@ from .forms import (
     SignUpForm,
     ManualPaymentForm,
     ResidentBalanceCorrectionForm,
+    ResidentBalanceAdjustmentForm,
     CustomReportForm,
     ResidentProfilePhotoForm,
     ReplacementInviteCodeForm,
@@ -65,6 +66,7 @@ from .models import (
     HousingApplication,
     RentHistory,
     Payment,
+    ResidentBalanceEntry,
     FinancialUpload,
     FinancialEntry,
     AccountingReceipt,
@@ -836,6 +838,69 @@ def apply_completed_payment_to_balance(payment):
         application.utility_balance = max(Decimal("0.00"), application.utility_balance - utility_paid)
 
     application.save()
+
+
+def post_resident_balance_entry(application, *, entry_kind, balance_type, amount, service_month=None, description="", notes="", recorded_by=None):
+    amount = Decimal(amount or "0.00").quantize(Decimal("0.01"))
+    if amount <= 0:
+        return None
+
+    entry = ResidentBalanceEntry.objects.create(
+        application=application,
+        entry_kind=entry_kind,
+        balance_type=balance_type,
+        amount=amount,
+        service_month=service_month,
+        description=description,
+        notes=notes,
+        recorded_by=recorded_by,
+    )
+
+    if balance_type == "rent":
+        if entry_kind == "charge":
+            application.balance += amount
+        else:
+            application.balance = max(Decimal("0.00"), application.balance - amount)
+        application.save(update_fields=["balance"])
+
+    elif balance_type == "utility":
+        if entry_kind == "charge":
+            application.utility_balance += amount
+        else:
+            application.utility_balance = max(Decimal("0.00"), application.utility_balance - amount)
+        application.save(update_fields=["utility_balance"])
+
+    return entry
+
+
+def apply_deposit_credit_to_balance(application, *, balance_type, amount, service_month=None, notes="", recorded_by=None):
+    amount = Decimal(amount or "0.00").quantize(Decimal("0.01"))
+    if amount <= 0:
+        return None
+
+    available_deposit = max(application.deposit_paid, Decimal("0.00"))
+    if available_deposit <= 0:
+        return None
+
+    open_balance = application.balance if balance_type == "rent" else application.utility_balance
+    amount = min(amount, available_deposit, max(open_balance, Decimal("0.00")))
+    if amount <= 0:
+        return None
+
+    entry = post_resident_balance_entry(
+        application,
+        entry_kind="credit",
+        balance_type=balance_type,
+        amount=amount,
+        service_month=service_month,
+        description="Security deposit applied to balance",
+        notes=notes,
+        recorded_by=recorded_by,
+    )
+    application.refresh_from_db(fields=["deposit_paid"])
+    application.deposit_paid = max(Decimal("0.00"), application.deposit_paid - amount)
+    application.save(update_fields=["deposit_paid"])
+    return entry
 
 
 def recalculated_rent_due(application):
@@ -3837,13 +3902,9 @@ def resident_balance_detail(request):
         messages.error(request, "No resident file connected.")
         return redirect("tenant_dashboard")
 
-    payments = resident_visible_payments(application)
-    month_start, _next_month = current_month_bounds()
-    rent_paid = payment_amount_for_month(payments, month_start.year, month_start.month, ["rent"])
-    utility_paid = payment_amount_for_month(payments, month_start.year, month_start.month, ["utility"])
-    rent_due = max(expected_rent_for_month(application, month_start) - rent_paid, Decimal("0.00"))
+    rent_due = max(application.balance, Decimal("0.00"))
     deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
-    utility_due = max(expected_utility_for_month(application, month_start) - utility_paid, Decimal("0.00"))
+    utility_due = max(application.utility_balance, Decimal("0.00"))
     show_utilities = resident_has_portal_utility_charge(application)
 
     return render(request, "resident_balance_detail.html", {
@@ -3853,6 +3914,7 @@ def resident_balance_detail(request):
         "utility_due": utility_due,
         "show_utilities": show_utilities,
         "total_due": rent_due + deposit_due + utility_due,
+        "balance_entries": application.balance_entries.all()[:10],
         "dashboard_url": resident_portal_url("tenant_dashboard", is_superadmin_inspecting, application),
         "is_superadmin_inspecting": is_superadmin_inspecting,
     })
@@ -4307,16 +4369,90 @@ def edit_resident_balances(request, application_id):
         id__in=staff_managed_applications(request.user).filter(user__isnull=False).values_list("id", flat=True),
     )
 
-    form = ResidentBalanceCorrectionForm(request.POST or None, instance=application)
+    correction_form = ResidentBalanceCorrectionForm(instance=application)
+    adjustment_form = ResidentBalanceAdjustmentForm()
 
-    if request.method == "POST" and form.is_valid():
-        form.save()
-        messages.success(request, "Resident balances updated.")
-        return redirect("landlord_resident_files")
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "adjust":
+            adjustment_form = ResidentBalanceAdjustmentForm(request.POST)
+            if adjustment_form.is_valid():
+                service_month = adjustment_form.cleaned_data.get("service_month")
+                notes = adjustment_form.cleaned_data.get("notes") or ""
+                created_count = 0
+
+                rent_charge = adjustment_form.cleaned_data.get("rent_charge") or Decimal("0.00")
+                if rent_charge > 0:
+                    post_resident_balance_entry(
+                        application,
+                        entry_kind="charge",
+                        balance_type="rent",
+                        amount=rent_charge,
+                        service_month=service_month,
+                        description="Rent balance charge",
+                        notes=notes,
+                        recorded_by=request.user,
+                    )
+                    created_count += 1
+
+                utility_charge = adjustment_form.cleaned_data.get("utility_charge") or Decimal("0.00")
+                if utility_charge > 0:
+                    post_resident_balance_entry(
+                        application,
+                        entry_kind="charge",
+                        balance_type="utility",
+                        amount=utility_charge,
+                        service_month=service_month,
+                        description="Utility balance charge",
+                        notes=notes,
+                        recorded_by=request.user,
+                    )
+                    created_count += 1
+
+                deposit_to_rent = adjustment_form.cleaned_data.get("deposit_to_rent") or Decimal("0.00")
+                if deposit_to_rent > 0:
+                    if apply_deposit_credit_to_balance(
+                        application,
+                        balance_type="rent",
+                        amount=deposit_to_rent,
+                        service_month=service_month,
+                        notes=notes,
+                        recorded_by=request.user,
+                    ):
+                        created_count += 1
+
+                deposit_to_utilities = adjustment_form.cleaned_data.get("deposit_to_utilities") or Decimal("0.00")
+                if deposit_to_utilities > 0:
+                    if apply_deposit_credit_to_balance(
+                        application,
+                        balance_type="utility",
+                        amount=deposit_to_utilities,
+                        service_month=service_month,
+                        notes=notes,
+                        recorded_by=request.user,
+                    ):
+                        created_count += 1
+
+                application.refresh_from_db()
+                if created_count:
+                    messages.success(request, "Resident balance ledger updated.")
+                else:
+                    messages.warning(request, "No adjustment was posted. Deposit credits cannot exceed the held deposit or open balance.")
+                return redirect("edit_resident_balances", application_id=application.id)
+        else:
+            correction_form = ResidentBalanceCorrectionForm(request.POST, instance=application)
+            if correction_form.is_valid():
+                correction_form.save()
+                messages.success(request, "Resident balances updated.")
+                return redirect("landlord_resident_files")
+
+    balance_entries = application.balance_entries.select_related("recorded_by")[:25]
 
     return render(request, "edit_resident_balances.html", {
         "application": application,
-        "form": form,
+        "form": correction_form,
+        "adjustment_form": adjustment_form,
+        "balance_entries": balance_entries,
     })
 
 

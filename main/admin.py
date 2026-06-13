@@ -14,6 +14,7 @@ from .models import (
     BlogComment,
     RentHistory,
     Payment,
+    ResidentBalanceEntry,
     FinancialUpload,
     FinancialEntry,
     ExpenseCategory,
@@ -760,6 +761,22 @@ class PaymentAdmin(admin.ModelAdmin):
         "stripe_payment_intent",
         "created_at",
     )
+
+
+@admin.register(ResidentBalanceEntry)
+class ResidentBalanceEntryAdmin(admin.ModelAdmin):
+    list_display = (
+        "application",
+        "entry_kind",
+        "balance_type",
+        "amount",
+        "service_month",
+        "recorded_by",
+        "created_at",
+    )
+    list_filter = ("entry_kind", "balance_type", "service_month", "created_at")
+    search_fields = ("application__full_name", "application__space_label", "description", "notes")
+    readonly_fields = ("created_at",)
 
 
 @admin.register(RentHistory)

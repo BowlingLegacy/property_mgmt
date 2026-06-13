@@ -927,6 +927,71 @@ class ResidentBalanceCorrectionForm(forms.ModelForm):
         return cleaned_data
 
 
+class ResidentBalanceAdjustmentForm(forms.Form):
+    service_month = forms.DateField(
+        label="Applies To Month",
+        required=False,
+        input_formats=["%Y-%m", "%Y-%m-%d"],
+        widget=forms.DateInput(attrs={"class": "form-control", "type": "month"}),
+        help_text="Use this for past due months, current month prorates, or move-out charges.",
+    )
+    rent_charge = forms.DecimalField(
+        label="Add Rent Charge",
+        required=False,
+        max_digits=10,
+        decimal_places=2,
+        min_value=0,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+    )
+    utility_charge = forms.DecimalField(
+        label="Add Utility Charge",
+        required=False,
+        max_digits=10,
+        decimal_places=2,
+        min_value=0,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+    )
+    deposit_to_rent = forms.DecimalField(
+        label="Apply Deposit To Rent",
+        required=False,
+        max_digits=10,
+        decimal_places=2,
+        min_value=0,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+    )
+    deposit_to_utilities = forms.DecimalField(
+        label="Apply Deposit To Utilities",
+        required=False,
+        max_digits=10,
+        decimal_places=2,
+        min_value=0,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+    )
+    notes = forms.CharField(
+        label="Notes",
+        required=False,
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Example: June move-out prorate or deposit applied at move-out."}),
+    )
+
+    def clean_service_month(self):
+        service_month = self.cleaned_data.get("service_month")
+        if service_month:
+            return service_month.replace(day=1)
+        return service_month
+
+    def clean(self):
+        cleaned_data = super().clean()
+        amounts = [
+            cleaned_data.get("rent_charge") or 0,
+            cleaned_data.get("utility_charge") or 0,
+            cleaned_data.get("deposit_to_rent") or 0,
+            cleaned_data.get("deposit_to_utilities") or 0,
+        ]
+        if not any(amount > 0 for amount in amounts):
+            raise forms.ValidationError("Enter at least one charge or deposit credit.")
+        return cleaned_data
+
+
 class CustomReportForm(forms.Form):
     REPORT_TYPE_CHOICES = [
         ("resident_phone_list", "Resident Phone List"),

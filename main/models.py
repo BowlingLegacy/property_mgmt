@@ -687,6 +687,46 @@ class Payment(models.Model):
         return f"{self.application.full_name} - {self.get_payment_type_display()} - ${self.amount} - {self.status}"
 
 
+class ResidentBalanceEntry(models.Model):
+    ENTRY_KIND_CHOICES = [
+        ("charge", "Charge"),
+        ("credit", "Credit"),
+    ]
+
+    BALANCE_TYPE_CHOICES = [
+        ("rent", "Rent"),
+        ("utility", "Utilities"),
+    ]
+
+    application = models.ForeignKey(HousingApplication, on_delete=models.CASCADE, related_name="balance_entries")
+    entry_kind = models.CharField(max_length=20, choices=ENTRY_KIND_CHOICES)
+    balance_type = models.CharField(max_length=20, choices=BALANCE_TYPE_CHOICES)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    service_month = models.DateField(blank=True, null=True)
+    description = models.CharField(max_length=255, blank=True)
+    notes = models.TextField(blank=True)
+    recorded_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="resident_balance_entries",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    @property
+    def service_month_label(self):
+        if self.service_month:
+            return self.service_month.strftime("%B %Y")
+        return ""
+
+    def __str__(self):
+        return f"{self.application.full_name} - {self.get_entry_kind_display()} - {self.get_balance_type_display()} - ${self.amount}"
+
+
 class FinancialUpload(models.Model):
     LEDGER_SCOPE_CHOICES = [
         ("property", "Property Ledger"),

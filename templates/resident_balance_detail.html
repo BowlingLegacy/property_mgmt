@@ -109,6 +109,36 @@
                     <a href="{% url 'pay_by_type' application.id 'total' %}" class="pay-btn">Pay Total Due</a>
                 {% endif %}
             </div>
+
+            {% if balance_entries %}
+                <div class="border-top mt-4 pt-4">
+                    <h2 class="h5 fw-bold">Recent Balance Activity</h2>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Month</th>
+                                    <th>Type</th>
+                                    <th>Balance</th>
+                                    <th class="text-end">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for entry in balance_entries %}
+                                    <tr>
+                                        <td>{{ entry.created_at|date:"M j, Y" }}</td>
+                                        <td>{{ entry.service_month_label|default:"-" }}</td>
+                                        <td>{{ entry.get_entry_kind_display }}</td>
+                                        <td>{{ entry.get_balance_type_display }}</td>
+                                        <td class="text-end">${{ entry.amount }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endif %}
         </div>
     </div>
 </div>
