@@ -4582,6 +4582,51 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "(555) 011-3344")
         self.assertNotContains(response, "Hidden Resident")
 
+    def test_custom_phone_report_canonicalizes_and_sorts_room_labels(self):
+        landlord = User.objects.create_user(
+            username="room-report-landlord",
+            email="room-report-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="The Painted Lady Inn", landlord_email=landlord.email)
+        for full_name, room_label in [
+            ("Room Q Resident", "Room Q"),
+            ("Room B Resident", "Room B"),
+            ("Room I Resident", "Room I"),
+            ("Room C Resident", "Room c"),
+            ("Room D Resident", "D"),
+        ]:
+            HousingApplication.objects.create(
+                property=property_obj,
+                full_name=full_name,
+                phone="5415550100",
+                email=f"{full_name.replace(' ', '').lower()}@example.com",
+                age=45,
+                space_type="Room",
+                space_label=room_label,
+                landlord_reviewed_at=timezone.now(),
+                income_source="Employment",
+                monthly_income=Decimal("2500.00"),
+                housing_need="Current resident.",
+            )
+
+        self.client.login(username="room-report-landlord", password="StrongPass123!")
+        response = self.client.get(reverse("custom_reports"), {
+            "report_type": "resident_phone_list",
+            "property_id": property_obj.id,
+        })
+
+        self.assertEqual([row[1] for row in response.context["report_rows"]], ["B", "C", "D", "I", "Q"])
+        self.assertEqual([row[2] for row in response.context["report_rows"]], [
+            "Room B Resident",
+            "Room C Resident",
+            "Room D Resident",
+            "Room I Resident",
+            "Room Q Resident",
+        ])
+
     def test_custom_reports_scope_to_property_owner_and_block_residents(self):
         owner = User.objects.create_user(
             username="report-owner",

@@ -4701,7 +4701,7 @@ def custom_reports(request):
             .exclude(space_label="")
             .order_by("property__name", "space_label", "full_name")
         )
-        sorted_residents = sorted_resident_list(residents)
+        sorted_residents = visible_resident_files(residents)
 
         if report_type == "resident_phone_list":
             report_title = "Resident Phone List"
@@ -4709,7 +4709,7 @@ def custom_reports(request):
             report_rows = [
                 [
                     resident.property.name if resident.property else "No Property",
-                    resident.space_label or resident.space_type or "",
+                    canonical_room_label(resident.space_label or resident.space_type or ""),
                     resident.full_name,
                     phone_format(resident.phone),
                     resident.email,
@@ -4724,7 +4724,7 @@ def custom_reports(request):
                 deposit_due = max(resident.deposit_required - resident.deposit_paid, Decimal("0.00"))
                 report_rows.append([
                     resident.property.name if resident.property else "No Property",
-                    resident.space_label or resident.space_type or "",
+                    canonical_room_label(resident.space_label or resident.space_type or ""),
                     resident.full_name,
                     phone_format(resident.phone),
                     resident.monthly_rent,
@@ -4732,8 +4732,8 @@ def custom_reports(request):
                     deposit_due,
                 ])
             totals = {
-                "Scheduled Rent": sum((resident.monthly_rent for resident in residents), Decimal("0.00")),
-                "Open Balances": sum((resident.balance for resident in residents), Decimal("0.00")),
+                "Scheduled Rent": sum((resident.monthly_rent for resident in sorted_residents), Decimal("0.00")),
+                "Open Balances": sum((resident.balance for resident in sorted_residents), Decimal("0.00")),
             }
 
         elif report_type == "payment_summary":
