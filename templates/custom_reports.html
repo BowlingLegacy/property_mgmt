@@ -152,7 +152,15 @@ body {
                 <h1 class="report-title mb-1">Report Builder</h1>
                 <p class="text-muted mb-0">Create focused resident, payment, and expense reports from the records already in the system.</p>
             </div>
-            <button type="button" class="message-btn" onclick="window.print()">Print Report</button>
+            <div class="d-flex gap-2 flex-wrap">
+                {% if request.user.is_superuser or request.user.role == "admin" or request.user.role == "assistant" or request.user.role == "property_owner" %}
+                    <a href="{% url 'property_owner_dashboard' %}" class="message-btn">Owner Dashboard</a>
+                {% endif %}
+                {% if request.user.is_superuser or request.user.role == "admin" or request.user.role == "assistant" or request.user.role == "landlord" %}
+                    <a href="{% url 'landlord_dashboard' %}" class="message-btn">Landlord Dashboard</a>
+                {% endif %}
+                <button type="button" class="message-btn" onclick="window.print()">Print Report</button>
+            </div>
         </div>
 
         <form method="get" class="row g-3 align-items-end">

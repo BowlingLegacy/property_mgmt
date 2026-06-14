@@ -4582,6 +4582,26 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "(555) 011-3344")
         self.assertNotContains(response, "Hidden Resident")
 
+    def test_custom_reports_include_dashboard_navigation(self):
+        admin_user = User.objects.create_user(
+            username="report-nav-admin",
+            email="report-nav-admin@example.com",
+            password="StrongPass123!",
+            role="admin",
+            is_staff=True,
+        )
+        Property.objects.create(name="Navigation Report Property")
+
+        self.client.login(username="report-nav-admin", password="StrongPass123!")
+        response = self.client.get(reverse("custom_reports"), {
+            "report_type": "resident_phone_list",
+        })
+
+        self.assertContains(response, reverse("property_owner_dashboard"))
+        self.assertContains(response, "Owner Dashboard")
+        self.assertContains(response, reverse("landlord_dashboard"))
+        self.assertContains(response, "Landlord Dashboard")
+
     def test_custom_phone_report_canonicalizes_and_sorts_room_labels(self):
         landlord = User.objects.create_user(
             username="room-report-landlord",
