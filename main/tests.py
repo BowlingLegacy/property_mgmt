@@ -3261,8 +3261,8 @@ class LiveFlowTests(TestCase):
             2,
             1,
             1,
+            "Room C",
             "50.00%",
-            "C",
         ]])
 
     def test_property_owner_can_add_property_invite_landlord_and_upload_financial_file(self):

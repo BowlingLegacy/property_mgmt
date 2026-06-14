@@ -4931,7 +4931,7 @@ def custom_reports(request):
 
         elif report_type == "occupancy_vacancy":
             report_title = "Occupancy / Vacancy Report"
-            report_columns = ["Property", "Units", "Occupied", "Vacant", "Occupancy %", "Vacant Units"]
+            report_columns = ["Property", "Rentable Units", "Occupied", "Vacant", "Vacant Unit(s)", "Occupancy %"]
             total_units = 0
             total_occupied = 0
             for property_obj in filtered_properties:
@@ -4953,7 +4953,17 @@ def custom_reports(request):
                     for application in resident_files
                     if is_rentable_room_label(application.space_label, property_obj)
                 }
-                vacant_labels = sorted(label.upper() for label in unit_labels if label and label not in occupied_labels)
+                vacant_labels = sorted(
+                    (label for label in unit_labels if label and label not in occupied_labels),
+                    key=rent_roll_room_sort_key,
+                )
+                vacant_unit_display = []
+                for label in vacant_labels:
+                    canonical_label = canonical_room_label(label)
+                    if len(canonical_label) == 1 and canonical_label.isalpha():
+                        vacant_unit_display.append(f"Room {canonical_label}")
+                    else:
+                        vacant_unit_display.append(canonical_label)
                 units = len(unit_labels)
                 occupied = len([label for label in unit_labels if label in occupied_labels])
                 total_units += units
@@ -4963,8 +4973,8 @@ def custom_reports(request):
                     units,
                     occupied,
                     max(units - occupied, 0),
+                    ", ".join(vacant_unit_display) or "None",
                     f"{decimal_percent(occupied, units)}%",
-                    ", ".join(vacant_labels) or "-",
                 ])
             totals = {
                 "Units": Decimal(total_units),
