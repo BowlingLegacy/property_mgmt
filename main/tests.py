@@ -3264,6 +3264,7 @@ class LiveFlowTests(TestCase):
             "Room C",
             "50.00%",
         ]])
+        self.assertContains(occupancy_response, "The Painted Lady Inn vacant unit(s): Room C")
 
     def test_property_owner_can_add_property_invite_landlord_and_upload_financial_file(self):
         owner = User.objects.create_user(

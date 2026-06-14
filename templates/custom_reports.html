@@ -91,6 +91,22 @@ body {
     font-weight: 700;
 }
 
+.report-highlights {
+    display: grid;
+    gap: .75rem;
+    margin-bottom: 1rem;
+}
+
+.report-highlight {
+    background: #fff8e6;
+    border: 1px solid rgba(197,154,50,0.36);
+    border-left: 5px solid #c59a32;
+    border-radius: 10px;
+    padding: .85rem 1rem;
+    font-weight: 800;
+    color: #3a2a08;
+}
+
 @media print {
     @page {
         size: landscape;
@@ -222,6 +238,14 @@ body {
                                 <div class="total-label">{{ label }}</div>
                             <div class="total-value">${{ value|floatformat:2 }}</div>
                         </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            {% if report_highlights %}
+                <div class="report-highlights">
+                    {% for highlight in report_highlights %}
+                        <div class="report-highlight">{{ highlight }}</div>
                     {% endfor %}
                 </div>
             {% endif %}

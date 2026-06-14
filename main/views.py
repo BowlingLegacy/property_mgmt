@@ -4683,6 +4683,7 @@ def custom_reports(request):
     report_title = ""
     report_columns = []
     report_rows = []
+    report_highlights = []
     totals = {}
     generated = bool(request.GET)
 
@@ -4964,6 +4965,8 @@ def custom_reports(request):
                         vacant_unit_display.append(f"Room {canonical_label}")
                     else:
                         vacant_unit_display.append(canonical_label)
+                vacancy_text = ", ".join(vacant_unit_display) or "None"
+                report_highlights.append(f"{property_obj.name} vacant unit(s): {vacancy_text}")
                 units = len(unit_labels)
                 occupied = len([label for label in unit_labels if label in occupied_labels])
                 total_units += units
@@ -4973,7 +4976,7 @@ def custom_reports(request):
                     units,
                     occupied,
                     max(units - occupied, 0),
-                    ", ".join(vacant_unit_display) or "None",
+                    vacancy_text,
                     f"{decimal_percent(occupied, units)}%",
                 ])
             totals = {
@@ -5062,6 +5065,7 @@ def custom_reports(request):
         "report_title": report_title,
         "report_columns": report_columns,
         "report_rows": report_rows,
+        "report_highlights": report_highlights,
         "totals": totals,
         "row_count": len(report_rows),
         "generated_at": timezone.localtime(),
