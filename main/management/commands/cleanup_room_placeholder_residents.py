@@ -21,6 +21,10 @@ def normalized_room_label(room_unit_label):
                 label = label[len(prefix_value):].strip()
                 changed = True
                 break
+            if label.startswith(prefix) and len(label) > len(prefix):
+                label = label[len(prefix):].lstrip(" -#").strip()
+                changed = True
+                break
     return label
 
 

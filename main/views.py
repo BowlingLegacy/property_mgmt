@@ -2312,6 +2312,10 @@ def normalized_room_label(room_unit_label):
                 label = label[len(prefix_value):].strip()
                 changed = True
                 break
+            if label.startswith(prefix) and len(label) > len(prefix):
+                label = label[len(prefix):].lstrip(" -#").strip()
+                changed = True
+                break
     return label
 
 
@@ -2325,7 +2329,7 @@ def canonical_room_label(room_unit_label):
     return clean_label.upper() if clean_label.isalpha() else clean_label
 
 
-GLOBAL_NON_RENTABLE_ROOM_LABELS = {"shop", "office", "storage", "manager"}
+GLOBAL_NON_RENTABLE_ROOM_LABELS = {"cleaning", "shop", "office", "storage", "manager"}
 PROPERTY_NON_RENTABLE_ROOM_LABELS = {
     "the painted lady inn": {"a", "shop"},
 }
@@ -4701,7 +4705,10 @@ def custom_reports(request):
             .exclude(space_label="")
             .order_by("property__name", "space_label", "full_name")
         )
-        sorted_residents = visible_resident_files(residents)
+        sorted_residents = [
+            resident for resident in visible_resident_files(residents)
+            if is_rentable_room_label(resident.space_label, resident.property)
+        ]
 
         if report_type == "resident_phone_list":
             report_title = "Resident Phone List"

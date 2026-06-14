@@ -4593,10 +4593,11 @@ class LiveFlowTests(TestCase):
         property_obj = Property.objects.create(name="The Painted Lady Inn", landlord_email=landlord.email)
         for full_name, room_label in [
             ("Room Q Resident", "Room Q"),
-            ("Room B Resident", "Room B"),
+            ("Room B Resident", "RoomB"),
             ("Room I Resident", "Room I"),
             ("Room C Resident", "Room c"),
             ("Room D Resident", "D"),
+            ("Cleaning Staff", "Cleaning"),
         ]:
             HousingApplication.objects.create(
                 property=property_obj,
@@ -4626,6 +4627,7 @@ class LiveFlowTests(TestCase):
             "Room I Resident",
             "Room Q Resident",
         ])
+        self.assertNotContains(response, "Cleaning Staff")
 
     def test_custom_reports_scope_to_property_owner_and_block_residents(self):
         owner = User.objects.create_user(
