@@ -16,7 +16,7 @@ from .forms import (
 from .invite_utils import create_pending_portal_user, send_portal_access_invite_email
 from .models import FinancialEntry, FinancialUpload, Property, PropertyImage, PropertyRoomRent, HousingApplication, Payment, ResidentMessage
 from .permissions import can_access_owner_dashboard, is_super_admin, is_assistant_admin
-from .views import normalized_room_label, payment_amount_for_month
+from .views import is_rentable_room_label, normalized_room_label, payment_amount_for_month, visible_resident_files
 
 
 def owner_dashboard_report_url(report_type, property_obj, extra_params=None):
@@ -30,7 +30,7 @@ def owner_dashboard_report_url(report_type, property_obj, extra_params=None):
 
 
 def owner_dashboard_active_residents(property_obj):
-    return (
+    residents = (
         HousingApplication.objects
         .filter(property=property_obj, application_folder="active", tenancy_status="active")
         .filter(Q(user__isnull=False) | Q(landlord_reviewed_at__isnull=False))
@@ -38,6 +38,10 @@ def owner_dashboard_active_residents(property_obj):
         .select_related("property")
         .order_by("space_label", "full_name")
     )
+    return [
+        resident for resident in visible_resident_files(residents)
+        if is_rentable_room_label(resident.space_label, property_obj)
+    ]
 
 
 def financial_entry_total(property_obj, year, entry_types):
@@ -70,15 +74,19 @@ def property_owner_dashboard(request):
 
     for property_obj in properties:
         residents = owner_dashboard_active_residents(property_obj)
-        resident_count = residents.count()
+        resident_count = len(residents)
         open_messages = ResidentMessage.objects.filter(application__property=property_obj, status="submitted").count()
         completed_payments = Payment.objects.filter(application__property=property_obj, status="completed")
         completed_rent_payments = completed_payments.filter(payment_type="rent")
 
-        active_room_settings = PropertyRoomRent.objects.filter(property=property_obj, is_active=True)
-        scheduled_rent = active_room_settings.aggregate(total=Sum("monthly_rent"))["total"] or Decimal("0.00")
+        active_room_settings = [
+            room_setting
+            for room_setting in PropertyRoomRent.objects.filter(property=property_obj, is_active=True)
+            if is_rentable_room_label(room_setting.room_unit_label, property_obj)
+        ]
+        scheduled_rent = sum((room_setting.monthly_rent for room_setting in active_room_settings), Decimal("0.00"))
         if scheduled_rent <= 0:
-            scheduled_rent = residents.aggregate(total=Sum("monthly_rent"))["total"] or Decimal("0.00")
+            scheduled_rent = sum((resident.monthly_rent for resident in residents), Decimal("0.00"))
 
         occupied_unit_labels = {
             normalized_room_label(resident.space_label)
@@ -87,9 +95,9 @@ def property_owner_dashboard(request):
         }
         occupied_unit_count = len(occupied_unit_labels)
 
-        balances_due = residents.aggregate(total=Sum("balance"))["total"] or Decimal("0.00")
-        utilities_due = residents.aggregate(total=Sum("utility_balance"))["total"] or Decimal("0.00")
-        deposits_held = residents.aggregate(total=Sum("deposit_paid"))["total"] or Decimal("0.00")
+        balances_due = sum((resident.balance for resident in residents), Decimal("0.00"))
+        utilities_due = sum((resident.utility_balance for resident in residents), Decimal("0.00"))
+        deposits_held = sum((resident.deposit_paid for resident in residents), Decimal("0.00"))
         rent_collected_month = payment_amount_for_month(completed_rent_payments, selected_month.year, selected_month.month, ["rent"])
         rent_collected_ytd = sum(
             payment_amount_for_month(completed_rent_payments, current_year, month_number, ["rent"])

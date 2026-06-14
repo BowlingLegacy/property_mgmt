@@ -2325,6 +2325,27 @@ def canonical_room_label(room_unit_label):
     return clean_label.upper() if clean_label.isalpha() else clean_label
 
 
+GLOBAL_NON_RENTABLE_ROOM_LABELS = {"shop", "office", "storage", "manager"}
+PROPERTY_NON_RENTABLE_ROOM_LABELS = {
+    "the painted lady inn": {"a", "shop"},
+}
+
+
+def is_rentable_room_label(room_unit_label, property_obj=None):
+    clean_label = normalized_room_label(room_unit_label)
+    if not clean_label:
+        return False
+
+    if clean_label in GLOBAL_NON_RENTABLE_ROOM_LABELS:
+        return False
+
+    property_name = clean_match_value(property_obj.name if property_obj else "")
+    if clean_label in PROPERTY_NON_RENTABLE_ROOM_LABELS.get(property_name, set()):
+        return False
+
+    return True
+
+
 def find_room_rent_setting(property_obj, room_unit_label):
     if not property_obj or not room_unit_label:
         return None
@@ -4908,12 +4929,22 @@ def custom_reports(request):
             total_occupied = 0
             for property_obj in filtered_properties:
                 room_settings = PropertyRoomRent.objects.filter(property=property_obj, is_active=True)
-                unit_labels = {normalized_room_label(room.room_unit_label) for room in room_settings}
+                unit_labels = {
+                    normalized_room_label(room.room_unit_label)
+                    for room in room_settings
+                    if is_rentable_room_label(room.room_unit_label, property_obj)
+                }
+                resident_files = visible_resident_files(
+                    HousingApplication.objects
+                    .filter(property=property_obj, application_folder="active", tenancy_status="active")
+                    .filter(Q(user__isnull=False) | Q(payments__status="completed") | Q(landlord_reviewed_at__isnull=False))
+                    .exclude(space_label="")
+                    .distinct()
+                )
                 occupied_labels = {
                     normalized_room_label(application.space_label)
-                    for application in HousingApplication.objects.filter(property=property_obj)
-                    .filter(Q(user__isnull=False) | Q(payments__status="completed"))
-                    .exclude(space_label="")
+                    for application in resident_files
+                    if is_rentable_room_label(application.space_label, property_obj)
                 }
                 vacant_labels = sorted(label.upper() for label in unit_labels if label and label not in occupied_labels)
                 units = len(unit_labels)

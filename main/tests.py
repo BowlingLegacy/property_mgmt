@@ -3181,6 +3181,90 @@ class LiveFlowTests(TestCase):
         self.assertEqual(dashboard_response.status_code, 200)
         self.assertContains(dashboard_response, "No properties are connected to this owner yet.")
 
+    def test_property_owner_dashboard_excludes_non_rentable_painted_lady_spaces(self):
+        owner = User.objects.create_user(
+            username="painted-owner",
+            email="painted-owner@example.com",
+            password="StrongPass123!",
+            role="property_owner",
+        )
+        property_obj = Property.objects.create(
+            name="The Painted Lady Inn",
+            owner_email=owner.email,
+            address="1005 W Main St",
+        )
+        PropertyRoomRent.objects.create(property=property_obj, room_unit_label="A", monthly_rent=Decimal("1000.00"))
+        PropertyRoomRent.objects.create(property=property_obj, room_unit_label="B", monthly_rent=Decimal("600.00"))
+        PropertyRoomRent.objects.create(property=property_obj, room_unit_label="C", monthly_rent=Decimal("700.00"))
+        PropertyRoomRent.objects.create(property=property_obj, room_unit_label="Shop", monthly_rent=Decimal("500.00"))
+
+        resident_user = User.objects.create_user(username="room-b-resident", password="StrongPass123!", role="tenant")
+        HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Room B Resident",
+            phone="541-555-0100",
+            email="room-b@example.com",
+            age=40,
+            space_type="Room",
+            space_label="B",
+            monthly_rent=Decimal("600.00"),
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+        )
+        HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Room B",
+            phone="",
+            email="",
+            age=1,
+            space_type="Room",
+            space_label="B",
+            monthly_rent=Decimal("600.00"),
+            landlord_reviewed_at=timezone.now(),
+            income_source="Placeholder",
+            monthly_income=Decimal("0.00"),
+            housing_need="Duplicate placeholder.",
+        )
+        HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Shop",
+            phone="",
+            email="",
+            age=1,
+            space_type="Room",
+            space_label="Shop",
+            monthly_rent=Decimal("500.00"),
+            landlord_reviewed_at=timezone.now(),
+            income_source="Placeholder",
+            monthly_income=Decimal("0.00"),
+            housing_need="Non-rentable space.",
+        )
+
+        self.client.login(username="painted-owner", password="StrongPass123!")
+        dashboard_response = self.client.get(reverse("property_owner_dashboard"))
+        card = dashboard_response.context["property_cards"][0]
+
+        self.assertEqual(card["monthly_rent"], Decimal("1300.00"))
+        self.assertEqual(card["occupied_unit_count"], 1)
+        self.assertEqual(card["resident_count"], 1)
+        self.assertEqual(dashboard_response.context["total_occupied_units"], 1)
+        self.assertEqual(dashboard_response.context["total_residents"], 1)
+
+        occupancy_response = self.client.get(reverse("custom_reports"), {
+            "report_type": "occupancy_vacancy",
+            "property_id": property_obj.id,
+        })
+        self.assertEqual(occupancy_response.context["report_rows"], [[
+            "The Painted Lady Inn",
+            2,
+            1,
+            1,
+            "50.00%",
+            "C",
+        ]])
+
     def test_property_owner_can_add_property_invite_landlord_and_upload_financial_file(self):
         owner = User.objects.create_user(
             username="workflow-owner",
