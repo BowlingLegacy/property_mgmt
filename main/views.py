@@ -2329,7 +2329,16 @@ def canonical_room_label(room_unit_label):
     return clean_label.upper() if clean_label.isalpha() else clean_label
 
 
-GLOBAL_NON_RENTABLE_ROOM_LABELS = {"cleaning", "shop", "office", "storage", "manager"}
+GLOBAL_NON_RENTABLE_ROOM_LABELS = {
+    "cleaning",
+    "shop",
+    "office",
+    "storage",
+    "manager",
+    "owner",
+    "ownerroom",
+    "ownerunit",
+}
 PROPERTY_NON_RENTABLE_ROOM_LABELS = {
     "the painted lady inn": {"a", "shop"},
 }

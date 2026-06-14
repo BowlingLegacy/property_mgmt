@@ -3197,6 +3197,7 @@ class LiveFlowTests(TestCase):
         PropertyRoomRent.objects.create(property=property_obj, room_unit_label="B", monthly_rent=Decimal("600.00"))
         PropertyRoomRent.objects.create(property=property_obj, room_unit_label="C", monthly_rent=Decimal("700.00"))
         PropertyRoomRent.objects.create(property=property_obj, room_unit_label="Shop", monthly_rent=Decimal("500.00"))
+        PropertyRoomRent.objects.create(property=property_obj, room_unit_label="Owner", monthly_rent=Decimal("500.00"))
 
         resident_user = User.objects.create_user(username="room-b-resident", password="StrongPass123!", role="tenant")
         HousingApplication.objects.create(
