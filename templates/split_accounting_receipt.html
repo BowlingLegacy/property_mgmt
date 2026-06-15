@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+.split-card {
+    background: rgba(255,255,255,.94);
+    border: 1px solid rgba(188,150,45,.16);
+    border-radius: 16px;
+    box-shadow: 0 8px 20px rgba(0,0,0,.06);
+}
+.split-title {
+    font-family: Georgia, serif;
+    font-size: 2.2rem;
+    font-weight: 800;
+}
+.gold-btn {
+    background: linear-gradient(135deg, #c48f22, #d8ab3b);
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    font-weight: 800;
+    padding: .7rem 1rem;
+}
+.message-btn {
+    background: transparent;
+    border: 1px solid #c59a32;
+    border-radius: 10px;
+    color: #a57c18;
+    font-weight: 800;
+    padding: .65rem .9rem;
+    text-decoration: none;
+}
+.summary-box {
+    background: #fff8e6;
+    border: 1px solid rgba(197,154,50,.28);
+    border-radius: 12px;
+    padding: .85rem 1rem;
+}
+.summary-label {
+    color: #7d5c0b;
+    font-size: .72rem;
+    font-weight: 900;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+.summary-value {
+    font-size: 1.25rem;
+    font-weight: 900;
+}
+</style>
+
+<div class="container my-4">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+        <div>
+            <div class="text-uppercase small fw-bold text-muted">Receipt Split</div>
+            <h1 class="split-title mb-1">Split One Invoice Into Categories</h1>
+            <p class="text-muted mb-0">
+                {{ receipt.vendor|default:"Receipt" }} | {{ receipt.property.name }} | {{ receipt.receipt_date|date:"M j, Y"|default:"Needs date" }}
+            </p>
+        </div>
+        <a href="{% url 'accounting_receipts' %}" class="message-btn">Back To Receipts</a>
+    </div>
+
+    <section class="split-card p-4 mb-4">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="summary-box">
+                    <div class="summary-label">Invoice Total</div>
+                    <div class="summary-value">${{ receipt.amount|floatformat:2 }}</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="summary-box">
+                    <div class="summary-label">Split Total</div>
+                    <div class="summary-value">${{ split_total|floatformat:2 }}</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="summary-box">
+                    <div class="summary-label">Remaining Difference</div>
+                    <div class="summary-value">${{ split_difference|floatformat:2 }}</div>
+                </div>
+            </div>
+        </div>
+        <p class="text-muted mt-3 mb-0">
+            Approval is allowed only when the split total exactly matches the invoice total.
+        </p>
+    </section>
+
+    <section class="split-card p-4">
+        <form method="post">
+            {% csrf_token %}
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width: 20%;">Accounting Type</th>
+                            <th style="width: 24%;">Category</th>
+                            <th>Description</th>
+                            <th style="width: 16%;">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for split in existing_splits %}
+                            <tr>
+                                <td>
+                                    <select name="entry_type" class="form-select">
+                                        {% for value, label in entry_type_choices %}
+                                            <option value="{{ value }}" {% if split.entry_type == value %}selected{% endif %}>{{ label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="category" class="form-select">
+                                        {% for category in categories %}
+                                            <option value="{{ category.id }}" {% if split.category_id == category.id %}selected{% endif %}>{{ category.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td><input type="text" name="description" class="form-control" value="{{ split.description }}"></td>
+                                <td><input type="number" name="amount" class="form-control" step="0.01" min="0" value="{{ split.amount }}"></td>
+                            </tr>
+                        {% endfor %}
+                        {% for _ in blank_rows %}
+                            <tr>
+                                <td>
+                                    <select name="entry_type" class="form-select">
+                                        {% for value, label in entry_type_choices %}
+                                            <option value="{{ value }}">{{ label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="category" class="form-select">
+                                        <option value="">Choose category</option>
+                                        {% for category in categories %}
+                                            <option value="{{ category.id }}">{{ category.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td><input type="text" name="description" class="form-control" placeholder="Example: internet, cable, phone, account fees"></td>
+                                <td><input type="number" name="amount" class="form-control" step="0.01" min="0"></td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="d-flex justify-content-end gap-2">
+                <a href="{% url 'accounting_receipts' %}" class="message-btn">Cancel</a>
+                <button type="submit" class="gold-btn">Save Split Lines</button>
+            </div>
+        </form>
+    </section>
+</div>
+
+{% endblock %}

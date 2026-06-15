@@ -134,7 +134,15 @@ body {
                                 <td>{{ receipt.property.name }}</td>
                                 <td>{{ receipt.vendor|default:"-" }}</td>
                                 <td>
-                                    {% if receipt.category %}
+                                    {% if receipt.has_splits %}
+                                        Split across categories
+                                        <div class="text-muted small">
+                                            Split: ${{ receipt.split_total|floatformat:2 }}
+                                            {% if receipt.split_difference != 0 %}
+                                                | Difference: ${{ receipt.split_difference|floatformat:2 }}
+                                            {% endif %}
+                                        </div>
+                                    {% elif receipt.category %}
                                         {{ receipt.category.name }}
                                     {% else %}
                                         Needs category
@@ -149,6 +157,7 @@ body {
                                 </td>
                                 <td>
                                     {% if receipt.status == "needs_review" %}
+                                        <a href="{% url 'split_accounting_receipt' receipt.id %}" class="message-btn d-inline-flex text-decoration-none mb-2">Split</a>
                                         <form method="post" action="{% url 'approve_accounting_receipt' receipt.id %}">
                                             {% csrf_token %}
                                             <button type="submit" class="message-btn">Approve</button>
@@ -163,7 +172,7 @@ body {
                                                 <button type="submit" class="message-btn">Remember Vendor</button>
                                             </form>
                                         {% endif %}
-                                    {% elif receipt.financial_entry %}
+                                    {% elif receipt.financial_entry or receipt.is_split_ledgered %}
                                         Ledgered
                                     {% else %}
                                         -

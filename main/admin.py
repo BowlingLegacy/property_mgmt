@@ -21,6 +21,7 @@ from .models import (
     VendorCategoryRule,
     AccountingPeriod,
     AccountingReceipt,
+    AccountingReceiptSplit,
     ResidentMessage,
     ResidentMessageReply,
     ResidentUtilitySetup,
@@ -908,3 +909,11 @@ class AccountingReceiptAdmin(admin.ModelAdmin):
     list_filter = ("status", "entry_type", "property", "category")
     search_fields = ("vendor", "description", "notes", "property__name")
     readonly_fields = ("uploaded_at", "reviewed_at", "financial_upload", "financial_entry")
+
+
+@admin.register(AccountingReceiptSplit)
+class AccountingReceiptSplitAdmin(admin.ModelAdmin):
+    list_display = ("receipt", "category", "entry_type", "amount", "financial_entry")
+    list_filter = ("entry_type", "category", "receipt__property")
+    search_fields = ("receipt__vendor", "category__name", "description")
+    readonly_fields = ("created_at", "financial_entry")

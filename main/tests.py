@@ -15,7 +15,7 @@ from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import AccountingReceipt, ApplicantDocument, BlogComment, BlogPost, CompanyMailboxConnection, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, PropertyRoomRent, RentHistory, ResidentBalanceEntry, ResidentMessage, ResidentMessageReply, SignedDocument, SmsMessageLog, User
+from .models import AccountingReceipt, AccountingReceiptSplit, ApplicantDocument, BlogComment, BlogPost, CompanyMailboxConnection, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, PropertyRoomRent, RentHistory, ResidentBalanceEntry, ResidentMessage, ResidentMessageReply, SignedDocument, SmsMessageLog, User
 from .views import apply_completed_payment_to_balance, current_month_bounds, ensure_existing_resident_portal_application, payment_amount_for_month, prorated_monthly_charge, rent_roll_rows_for_properties, send_sms_message, t12_report_rows
 
 
@@ -5578,6 +5578,84 @@ class LiveFlowTests(TestCase):
         self.assertEqual(receipt.financial_entry.property_name, property_obj.name)
         self.assertEqual(receipt.financial_entry.category, "Repairs")
         self.assertEqual(receipt.financial_entry.amount, Decimal("225.00"))
+
+    def test_accounting_receipt_split_must_match_invoice_total_before_approval(self):
+        landlord = User.objects.create_user(
+            username="split-mismatch-landlord",
+            email="split-mismatch@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Split Mismatch Property", landlord_email=landlord.email)
+        internet = ExpenseCategory.objects.create(name="Internet Split Mismatch", entry_type="operating_expense")
+        receipt = AccountingReceipt.objects.create(
+            property=property_obj,
+            receipt_file="accounting_receipts/spectrum.pdf",
+            vendor="Spectrum",
+            receipt_date=date(2026, 6, 5),
+            amount=Decimal("300.00"),
+            payment_method="check",
+        )
+
+        self.client.login(username="split-mismatch-landlord", password="StrongPass123!")
+        self.client.post(reverse("split_accounting_receipt", args=[receipt.id]), {
+            "entry_type": ["operating_expense"],
+            "category": [str(internet.id)],
+            "description": ["Internet"],
+            "amount": ["200.00"],
+        })
+        response = self.client.post(reverse("approve_accounting_receipt", args=[receipt.id]))
+
+        self.assertRedirects(response, reverse("split_accounting_receipt", args=[receipt.id]))
+        receipt.refresh_from_db()
+        self.assertEqual(receipt.status, "needs_review")
+        self.assertFalse(FinancialEntry.objects.filter(property_name=property_obj.name).exists())
+
+    def test_accounting_receipt_split_approval_creates_multiple_ledger_entries(self):
+        landlord = User.objects.create_user(
+            username="split-receipt-landlord",
+            email="split-receipt@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Split Receipt Property", landlord_email=landlord.email)
+        internet = ExpenseCategory.objects.create(name="Internet Split", entry_type="operating_expense")
+        cable = ExpenseCategory.objects.create(name="Cable Split", entry_type="operating_expense")
+        phone = ExpenseCategory.objects.create(name="Communications Split", entry_type="operating_expense")
+        receipt = AccountingReceipt.objects.create(
+            property=property_obj,
+            receipt_file="accounting_receipts/spectrum-split.pdf",
+            vendor="Spectrum",
+            receipt_date=date(2026, 6, 5),
+            amount=Decimal("300.00"),
+            payment_method="check",
+        )
+
+        self.client.login(username="split-receipt-landlord", password="StrongPass123!")
+        split_response = self.client.post(reverse("split_accounting_receipt", args=[receipt.id]), {
+            "entry_type": ["operating_expense", "operating_expense", "operating_expense"],
+            "category": [str(internet.id), str(cable.id), str(phone.id)],
+            "description": ["Internet service", "Cable service", "House phone"],
+            "amount": ["104.00", "176.00", "20.00"],
+        })
+        self.assertRedirects(split_response, reverse("split_accounting_receipt", args=[receipt.id]))
+        self.assertEqual(AccountingReceiptSplit.objects.filter(receipt=receipt).count(), 3)
+
+        response = self.client.post(reverse("approve_accounting_receipt", args=[receipt.id]))
+
+        self.assertRedirects(response, reverse("accounting_receipts"))
+        receipt.refresh_from_db()
+        self.assertEqual(receipt.status, "approved")
+        self.assertIsNone(receipt.financial_entry)
+        entries = FinancialEntry.objects.filter(property_name=property_obj.name).order_by("category")
+        self.assertEqual(entries.count(), 3)
+        self.assertEqual(entries.aggregate(total=Sum("amount"))["total"], Decimal("300.00"))
+        self.assertTrue(entries.filter(category="Internet Split", amount=Decimal("104.00")).exists())
+        self.assertTrue(entries.filter(category="Cable Split", amount=Decimal("176.00")).exists())
+        self.assertTrue(entries.filter(category="Communications Split", amount=Decimal("20.00")).exists())
+        self.assertEqual(receipt.splits.filter(financial_entry__isnull=False).count(), 3)
 
     def test_duplicate_receipt_approval_does_not_create_second_ledger_entry(self):
         landlord = User.objects.create_user(

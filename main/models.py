@@ -925,6 +925,43 @@ class AccountingReceipt(models.Model):
         return f"{self.property.name} - {self.vendor or 'Receipt'} - ${self.amount}"
 
 
+class AccountingReceiptSplit(models.Model):
+    receipt = models.ForeignKey(AccountingReceipt, on_delete=models.CASCADE, related_name="splits")
+    category = models.ForeignKey(
+        ExpenseCategory,
+        on_delete=models.PROTECT,
+        related_name="receipt_splits",
+    )
+    entry_type = models.CharField(
+        max_length=50,
+        choices=ExpenseCategory.ENTRY_TYPE_CHOICES,
+        default="operating_expense",
+    )
+    description = models.TextField(blank=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    financial_entry = models.OneToOneField(
+        "FinancialEntry",
+        on_delete=models.SET_NULL,
+        related_name="source_receipt_split",
+        blank=True,
+        null=True,
+    )
+    created_by = models.ForeignKey(
+        "User",
+        on_delete=models.SET_NULL,
+        related_name="created_receipt_splits",
+        blank=True,
+        null=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return f"{self.receipt.vendor or 'Receipt'} - {self.category.name} - ${self.amount}"
+
+
 class PropertyOwnerIntake(models.Model):
     STATUS_CHOICES = [
         ("submitted", "Submitted"),
