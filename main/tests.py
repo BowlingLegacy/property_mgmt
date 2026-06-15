@@ -15,7 +15,7 @@ from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import AccountingReceipt, ApplicantDocument, BlogComment, BlogPost, CompanyMailboxConnection, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, PropertyRoomRent, RentHistory, ResidentMessage, ResidentMessageReply, SignedDocument, SmsMessageLog, User
+from .models import AccountingReceipt, ApplicantDocument, BlogComment, BlogPost, CompanyMailboxConnection, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, PropertyRoomRent, RentHistory, ResidentBalanceEntry, ResidentMessage, ResidentMessageReply, SignedDocument, SmsMessageLog, User
 from .views import apply_completed_payment_to_balance, current_month_bounds, ensure_existing_resident_portal_application, payment_amount_for_month, prorated_monthly_charge, rent_roll_rows_for_properties, send_sms_message, t12_report_rows
 
 
@@ -3681,6 +3681,87 @@ class LiveFlowTests(TestCase):
         self.assertEqual(resident.balance, Decimal("325.00"))
         self.assertEqual(resident.utility_balance, Decimal("0.00"))
         self.assertEqual(resident.deposit_paid, Decimal("450.00"))
+
+    def test_move_out_statement_shows_gross_charges_before_ledger_deposit(self):
+        landlord = User.objects.create_user(
+            username="move-out-statement-landlord",
+            email="move-out-statement@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Move Out Statement Property", landlord_email=landlord.email)
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=User.objects.create_user(username="move-out-tenant", password="StrongPass123!", role="tenant"),
+            full_name="Hero Statement Resident",
+            phone="555-0660",
+            email="hero-statement@example.com",
+            age=42,
+            space_label="N",
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            monthly_rent=Decimal("550.00"),
+            utility_monthly=Decimal("55.00"),
+            deposit_required=Decimal("450.00"),
+            deposit_paid=Decimal("450.00"),
+        )
+        service_month = date(2026, 6, 1)
+        ResidentBalanceEntry.objects.create(
+            application=resident,
+            entry_kind="charge",
+            balance_type="rent",
+            amount=Decimal("550.00"),
+            service_month=date(2026, 5, 1),
+            description="May unpaid rent",
+        )
+        ResidentBalanceEntry.objects.create(
+            application=resident,
+            entry_kind="charge",
+            balance_type="rent",
+            amount=Decimal("256.00"),
+            service_month=service_month,
+            description="June prorated rent",
+        )
+        ResidentBalanceEntry.objects.create(
+            application=resident,
+            entry_kind="charge",
+            balance_type="utility",
+            amount=Decimal("25.00"),
+            service_month=service_month,
+            description="June prorated utilities",
+        )
+        ResidentBalanceEntry.objects.create(
+            application=resident,
+            entry_kind="charge",
+            balance_type="rent",
+            amount=Decimal("25.00"),
+            service_month=service_month,
+            description="Late fee charge",
+        )
+        ResidentBalanceEntry.objects.create(
+            application=resident,
+            entry_kind="credit",
+            balance_type="rent",
+            amount=Decimal("450.00"),
+            service_month=service_month,
+            description="Security deposit applied to balance",
+        )
+
+        self.client.login(username="move-out-statement-landlord", password="StrongPass123!")
+        response = self.client.get(reverse("move_out_statement", args=[resident.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["adjustment_charges"], Decimal("856.00"))
+        self.assertEqual(response.context["deposit_applied_total"], Decimal("450.00"))
+        self.assertEqual(response.context["deposit_available_to_apply"], Decimal("0.00"))
+        self.assertEqual(response.context["move_out_balance_before_deposit"], Decimal("856.00"))
+        self.assertEqual(response.context["move_out_balance_after_ledger_deposit"], Decimal("406.00"))
+        self.assertEqual(response.context["statement_deposit_credit"], Decimal("0.00"))
+        self.assertEqual(response.context["final_balance"], Decimal("406.00"))
+        self.assertContains(response, "Balance After Ledger Deposit")
+        self.assertContains(response, "$406.00")
 
     def test_staff_cannot_edit_unconverted_applicant_balances(self):
         landlord = User.objects.create_user(
