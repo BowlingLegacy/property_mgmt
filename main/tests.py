@@ -15,7 +15,7 @@ from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import AccountingReceipt, AccountingReceiptSplit, ApplicantDocument, BlogComment, BlogPost, CompanyMailboxConnection, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, PropertyRoomRent, RentHistory, ResidentBalanceEntry, ResidentMessage, ResidentMessageReply, SignedDocument, SmsMessageLog, User
+from .models import AccountingReceipt, AccountingReceiptSplit, ApplicantDocument, BlogComment, BlogPost, CompanyMailboxConnection, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, PropertyRoomRent, RentHistory, ResidentBalanceEntry, ResidentMessage, ResidentMessageReply, SignedDocument, SmsMessageLog, User, VendorCategoryRule
 from .views import apply_completed_payment_to_balance, current_month_bounds, ensure_existing_resident_portal_application, payment_amount_for_month, prorated_monthly_charge, rent_roll_rows_for_properties, send_sms_message, t12_report_rows
 
 
@@ -5744,6 +5744,106 @@ class LiveFlowTests(TestCase):
                 amount=Decimal("150.00"),
             ).exists()
         )
+
+    def test_vendor_rule_page_can_update_bad_vendor_category(self):
+        landlord = User.objects.create_user(
+            username="vendor-rule-landlord",
+            email="vendor-rule@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Vendor Rule Property", landlord_email=landlord.email)
+        room_furnishings = ExpenseCategory.objects.create(name="Vendor Rule Room Furnishings", entry_type="operating_expense")
+        power = ExpenseCategory.objects.create(name="Vendor Rule Power", entry_type="operating_expense")
+        rule = VendorCategoryRule.objects.create(
+            property=property_obj,
+            vendor_contains="Pacific Power",
+            category=room_furnishings,
+            entry_type="operating_expense",
+        )
+
+        self.client.login(username="vendor-rule-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("vendor_category_rules"), {
+            "rule_id": str(rule.id),
+            "property": str(property_obj.id),
+            "vendor_contains": "Pacific Power",
+            "entry_type": "operating_expense",
+            "category": str(power.id),
+            "description_template": "Power service",
+            "is_active": "on",
+        })
+
+        self.assertRedirects(response, reverse("vendor_category_rules"))
+        rule.refresh_from_db()
+        self.assertEqual(rule.category, power)
+        self.assertEqual(rule.description_template, "Power service")
+
+    def test_edit_approved_receipt_updates_linked_ledger_entry(self):
+        landlord = User.objects.create_user(
+            username="receipt-correction-landlord",
+            email="receipt-correction@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Receipt Correction Property", landlord_email=landlord.email)
+        room_furnishings = ExpenseCategory.objects.create(name="Correction Room Furnishings", entry_type="operating_expense")
+        power = ExpenseCategory.objects.create(name="Correction Power", entry_type="operating_expense")
+        upload = FinancialUpload.objects.create(
+            property=property_obj,
+            file="accounting_receipts/pacific-power.pdf",
+            name="Receipt - Pacific Power",
+            parsed_at=timezone.now(),
+        )
+        entry = FinancialEntry.objects.create(
+            upload=upload,
+            ledger_scope="property",
+            property_name=property_obj.name,
+            sheet_name="Receipt Upload",
+            row_number=1,
+            entry_date=date(2026, 6, 1),
+            month=6,
+            year=2026,
+            entry_type="operating_expense",
+            category=room_furnishings.name,
+            description="Pacific Power",
+            amount=Decimal("150.00"),
+        )
+        receipt = AccountingReceipt.objects.create(
+            property=property_obj,
+            receipt_file="accounting_receipts/pacific-power.pdf",
+            vendor="Pacific Power",
+            receipt_date=date(2026, 6, 1),
+            category=room_furnishings,
+            entry_type="operating_expense",
+            description="Pacific Power",
+            amount=Decimal("150.00"),
+            status="approved",
+            financial_upload=upload,
+            financial_entry=entry,
+        )
+
+        self.client.login(username="receipt-correction-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("edit_accounting_receipt", args=[receipt.id]), {
+            "vendor": "Pacific Power",
+            "receipt_date": "2026-06-01",
+            "entry_type": "operating_expense",
+            "category": str(power.id),
+            "description": "Power service",
+            "amount": "150.00",
+            "payment_method": "other",
+            "notes": "Corrected category.",
+        })
+
+        self.assertRedirects(response, reverse("accounting_receipts"))
+        receipt.refresh_from_db()
+        entry.refresh_from_db()
+        self.assertEqual(receipt.category, power)
+        self.assertEqual(receipt.description, "Power service")
+        self.assertEqual(entry.category, power.name)
+        self.assertEqual(entry.description, "Power service")
+        self.assertEqual(entry.amount, Decimal("150.00"))
 
     def test_accounting_import_maps_csv_to_property_scoped_ledger_entries(self):
         landlord = User.objects.create_user(

@@ -40,6 +40,8 @@ from .forms import (
     HousingApplicationForm,
     FinancialUploadForm,
     AccountingReceiptForm,
+    AccountingReceiptEditForm,
+    VendorCategoryRuleForm,
     SignUpForm,
     ManualPaymentForm,
     ResidentBalanceCorrectionForm,
@@ -5497,6 +5499,92 @@ def accounting_receipts(request):
     return render(request, "accounting_receipts.html", {
         "form": form,
         "receipts": receipts,
+    })
+
+
+@login_required
+@user_passes_test(reporting_required)
+def vendor_category_rules(request):
+    properties = staff_managed_properties(request.user).order_by("name")
+    editable_rules = VendorCategoryRule.objects.filter(Q(property__in=properties) | Q(property__isnull=True)).select_related("property", "category")
+    editing_rule = None
+    rule_id = request.GET.get("rule")
+    if rule_id:
+        editing_rule = get_object_or_404(editable_rules, id=rule_id)
+
+    if request.method == "POST":
+        if request.POST.get("delete_rule"):
+            editing_rule = get_object_or_404(editable_rules, id=request.POST.get("delete_rule"))
+            label = editing_rule.vendor_contains
+            editing_rule.delete()
+            messages.success(request, f"Vendor rule deleted: {label}.")
+            return redirect("vendor_category_rules")
+
+        instance = get_object_or_404(editable_rules, id=request.POST.get("rule_id")) if request.POST.get("rule_id") else None
+        form = VendorCategoryRuleForm(request.POST, instance=instance, properties=properties)
+        if form.is_valid():
+            rule = form.save(commit=False)
+            if rule.property and rule.property not in properties:
+                raise Http404
+            if not rule.created_by_id:
+                rule.created_by = request.user
+            rule.save()
+            messages.success(request, f"Vendor rule saved: {rule.vendor_contains}.")
+            return redirect("vendor_category_rules")
+    else:
+        form = VendorCategoryRuleForm(instance=editing_rule, properties=properties)
+
+    return render(request, "vendor_category_rules.html", {
+        "form": form,
+        "rules": editable_rules.order_by("property__name", "vendor_contains"),
+        "editing_rule": editing_rule,
+    })
+
+
+@login_required
+@user_passes_test(reporting_required)
+def edit_accounting_receipt(request, receipt_id):
+    receipt = get_object_or_404(
+        AccountingReceipt.objects
+        .select_related("property", "category", "financial_entry")
+        .prefetch_related("splits__financial_entry"),
+        id=receipt_id,
+        property__in=staff_managed_properties(request.user),
+    )
+
+    if receipt.splits.exists():
+        messages.error(request, "Split receipts must be corrected from the split page or by editing the split ledger lines.")
+        return redirect("accounting_receipts")
+
+    if request.method == "POST":
+        form = AccountingReceiptEditForm(request.POST, instance=receipt)
+        if form.is_valid():
+            receipt = form.save()
+            if receipt.financial_entry:
+                receipt.financial_entry.entry_date = receipt.receipt_date
+                receipt.financial_entry.month = receipt.receipt_date.month if receipt.receipt_date else None
+                receipt.financial_entry.year = receipt.receipt_date.year if receipt.receipt_date else None
+                receipt.financial_entry.entry_type = receipt.entry_type
+                receipt.financial_entry.category = receipt.category.name if receipt.category else ""
+                receipt.financial_entry.description = receipt.description or receipt.vendor
+                receipt.financial_entry.amount = receipt.amount
+                receipt.financial_entry.save(update_fields=[
+                    "entry_date",
+                    "month",
+                    "year",
+                    "entry_type",
+                    "category",
+                    "description",
+                    "amount",
+                ])
+            messages.success(request, "Receipt accounting details updated.")
+            return redirect("accounting_receipts")
+    else:
+        form = AccountingReceiptEditForm(instance=receipt)
+
+    return render(request, "edit_accounting_receipt.html", {
+        "form": form,
+        "receipt": receipt,
     })
 
 

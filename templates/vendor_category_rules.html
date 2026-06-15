@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container my-4">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+        <div>
+            <h1 class="fw-bold mb-1">Vendor Rules</h1>
+            <p class="text-muted mb-0">Control how recurring vendors fill in accounting type and category on new receipts.</p>
+        </div>
+        <a href="{% url 'accounting_receipts' %}" class="btn btn-outline-dark">Back To Receipts</a>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h2 class="h5 fw-bold">{% if editing_rule %}Edit Rule{% else %}Add Rule{% endif %}</h2>
+                    <form method="post">
+                        {% csrf_token %}
+                        {% if editing_rule %}<input type="hidden" name="rule_id" value="{{ editing_rule.id }}">{% endif %}
+                        {% for field in form %}
+                            {% if field.name == "is_active" %}
+                                <div class="form-check mb-3">
+                                    {{ field }}
+                                    <label class="form-check-label fw-bold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                </div>
+                            {% else %}
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                    {{ field }}
+                                    {{ field.errors }}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                        <button type="submit" class="btn btn-primary w-100">Save Rule</button>
+                        {% if editing_rule %}
+                            <a href="{% url 'vendor_category_rules' %}" class="btn btn-outline-secondary w-100 mt-2">Cancel Edit</a>
+                        {% endif %}
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h2 class="h5 fw-bold">Saved Rules</h2>
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Vendor Contains</th>
+                                    <th>Property</th>
+                                    <th>Type</th>
+                                    <th>Category</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for rule in rules %}
+                                    <tr>
+                                        <td>{{ rule.vendor_contains }}</td>
+                                        <td>{{ rule.property.name|default:"All properties" }}</td>
+                                        <td>{{ rule.get_entry_type_display }}</td>
+                                        <td>{{ rule.category.name|default:"-" }}</td>
+                                        <td>{% if rule.is_active %}Active{% else %}Inactive{% endif %}</td>
+                                        <td class="d-flex gap-2 flex-wrap">
+                                            <a href="{% url 'vendor_category_rules' %}?rule={{ rule.id }}" class="btn btn-outline-primary btn-sm">Edit</a>
+                                            <form method="post">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="delete_rule" value="{{ rule.id }}">
+                                                <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr><td colspan="6" class="text-muted">No vendor rules yet.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

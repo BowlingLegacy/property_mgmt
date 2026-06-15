@@ -16,6 +16,7 @@ from .models import (
     Payment,
     AccountingReceipt,
     ExpenseCategory,
+    VendorCategoryRule,
     PropertyOwnerIntake,
     ExistingResidentIntake,
     LandlordIntake,
@@ -180,6 +181,53 @@ class AccountingReceiptForm(forms.ModelForm):
             receipt.save()
 
         return receipt
+
+
+class VendorCategoryRuleForm(forms.ModelForm):
+    class Meta:
+        model = VendorCategoryRule
+        fields = ["property", "vendor_contains", "entry_type", "category", "description_template", "is_active"]
+        labels = {
+            "vendor_contains": "Vendor name contains",
+            "description_template": "Default description",
+            "is_active": "Rule is active",
+        }
+        widgets = {
+            "property": forms.Select(attrs={"class": "form-select"}),
+            "vendor_contains": forms.TextInput(attrs={"class": "form-control", "placeholder": "Example: Pacific Power"}),
+            "entry_type": forms.Select(attrs={"class": "form-select"}),
+            "category": forms.Select(attrs={"class": "form-select"}),
+            "description_template": forms.TextInput(attrs={"class": "form-control", "placeholder": "Optional"}),
+            "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+
+    def __init__(self, *args, properties=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["category"].queryset = ExpenseCategory.objects.filter(is_active=True).order_by("entry_type", "name")
+        property_queryset = properties if properties is not None else Property.objects.none()
+        self.fields["property"].queryset = property_queryset
+        self.fields["property"].required = False
+        self.fields["property"].empty_label = "All properties"
+
+
+class AccountingReceiptEditForm(forms.ModelForm):
+    class Meta:
+        model = AccountingReceipt
+        fields = ["vendor", "receipt_date", "entry_type", "category", "description", "amount", "payment_method", "notes"]
+        widgets = {
+            "vendor": forms.TextInput(attrs={"class": "form-control"}),
+            "receipt_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "entry_type": forms.Select(attrs={"class": "form-select"}),
+            "category": forms.Select(attrs={"class": "form-select"}),
+            "description": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+            "amount": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+            "payment_method": forms.Select(attrs={"class": "form-select"}),
+            "notes": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["category"].queryset = ExpenseCategory.objects.filter(is_active=True).order_by("entry_type", "name")
 
 
 class MultipleImageInput(forms.ClearableFileInput):

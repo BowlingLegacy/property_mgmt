@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container my-4">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+        <div>
+            <h1 class="fw-bold mb-1">Edit Receipt Accounting</h1>
+            <p class="text-muted mb-0">
+                {{ receipt.vendor|default:"Receipt" }} | {{ receipt.property.name }} |
+                {{ receipt.receipt_date|date:"M j, Y"|default:"Needs date" }}
+            </p>
+        </div>
+        <a href="{% url 'accounting_receipts' %}" class="btn btn-outline-dark">Back To Receipts</a>
+    </div>
+
+    {% if receipt.financial_entry %}
+        <div class="alert alert-info">
+            This receipt is already approved. Saving this form will also update the linked ledger entry.
+        </div>
+    {% else %}
+        <div class="alert alert-warning">
+            This receipt is not ledgered yet. Saving this form updates the review record only.
+        </div>
+    {% endif %}
+
+    <div class="card shadow-sm">
+        <div class="card-body p-4">
+            <form method="post">
+                {% csrf_token %}
+                <div class="row g-3">
+                    {% for field in form %}
+                        <div class="col-md-6 {% if field.name == 'description' or field.name == 'notes' %}col-md-12{% endif %}">
+                            <label class="form-label fw-bold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {{ field.errors }}
+                        </div>
+                    {% endfor %}
+                </div>
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <a href="{% url 'accounting_receipts' %}" class="btn btn-outline-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary">Save Accounting Details</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

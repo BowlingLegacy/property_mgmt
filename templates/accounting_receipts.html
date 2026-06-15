@@ -106,9 +106,12 @@ body {
         <section class="soft-card p-4">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                 <h2 class="section-title mb-0">Receipt Review Queue</h2>
-                <a href="{% url 'custom_reports' %}?report_type=financial_entries" class="message-btn text-decoration-none">
-                    View Expense Reports
-                </a>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="{% url 'vendor_category_rules' %}" class="message-btn text-decoration-none">Vendor Rules</a>
+                    <a href="{% url 'custom_reports' %}?report_type=financial_entries" class="message-btn text-decoration-none">
+                        View Expense Reports
+                    </a>
+                </div>
             </div>
 
             <div class="table-responsive">
@@ -157,6 +160,7 @@ body {
                                 </td>
                                 <td>
                                     {% if receipt.status == "needs_review" %}
+                                        <a href="{% url 'edit_accounting_receipt' receipt.id %}" class="message-btn d-inline-flex text-decoration-none mb-2">Edit</a>
                                         <a href="{% url 'split_accounting_receipt' receipt.id %}" class="message-btn d-inline-flex text-decoration-none mb-2">Split</a>
                                         <form method="post" action="{% url 'approve_accounting_receipt' receipt.id %}">
                                             {% csrf_token %}
@@ -173,7 +177,8 @@ body {
                                             </form>
                                         {% endif %}
                                     {% elif receipt.financial_entry or receipt.is_split_ledgered %}
-                                        Ledgered
+                                        <a href="{% url 'edit_accounting_receipt' receipt.id %}" class="message-btn d-inline-flex text-decoration-none mb-2">Edit</a>
+                                        <div>Ledgered</div>
                                     {% else %}
                                         -
                                     {% endif %}
