@@ -3788,6 +3788,57 @@ class LiveFlowTests(TestCase):
 
         self.assertEqual(response.status_code, 404)
 
+    def test_staff_can_edit_move_out_reason_for_former_tenant(self):
+        landlord = User.objects.create_user(
+            username="former-edit-landlord",
+            email="former-edit@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Former Edit Property", landlord_email=landlord.email)
+        former = HousingApplication.objects.create(
+            property=property_obj,
+            user=User.objects.create_user(username="former-edit-tenant", password="StrongPass123!", role="tenant"),
+            full_name="Former Edit Resident",
+            phone="555-0661",
+            email="former-edit@example.com",
+            age=42,
+            space_label="N",
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Former resident.",
+            tenancy_status="former",
+            move_out_date=date(2026, 6, 14),
+            former_tenant_archived_at=timezone.now(),
+            tenancy_end_reason="",
+            balance=Decimal("406.00"),
+            utility_balance=Decimal("0.00"),
+        )
+
+        self.client.login(username="former-edit-landlord", password="StrongPass123!")
+        list_response = self.client.get(reverse("former_tenant_files"))
+        self.assertContains(list_response, "Edit Move-Out")
+
+        edit_response = self.client.get(reverse("end_resident_tenancy", args=[former.id]))
+        self.assertContains(edit_response, "Edit Move-Out Details")
+
+        response = self.client.post(reverse("end_resident_tenancy", args=[former.id]), {
+            "move_out_date": "2026-06-15",
+            "tenancy_end_reason": "Moved out with unpaid balance",
+            "final_balance": "406.00",
+            "final_utility_balance": "0.00",
+            "notes": "Forwarding address requested.",
+        })
+
+        self.assertRedirects(response, reverse("former_tenant_files"))
+        former.refresh_from_db()
+        self.assertEqual(former.tenancy_status, "former")
+        self.assertEqual(former.move_out_date, date(2026, 6, 15))
+        self.assertEqual(former.tenancy_end_reason, "Moved out with unpaid balance")
+        self.assertEqual(former.tenancy_archive_notes, "Forwarding address requested.")
+        self.assertEqual(former.balance, Decimal("406.00"))
+
     def test_landlord_dashboard_lists_current_month_rent_and_utility_exceptions(self):
         landlord = User.objects.create_user(
             username="collection-landlord",

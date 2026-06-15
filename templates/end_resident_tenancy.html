@@ -4,16 +4,26 @@
 <div class="container my-4">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
         <div>
-            <h1 class="fw-bold mb-1">End Tenancy</h1>
+            <h1 class="fw-bold mb-1">{% if editing_former_tenant %}Edit Move-Out Details{% else %}End Tenancy{% endif %}</h1>
             <p class="text-muted mb-0">{{ application.full_name }} | {{ application.property.name|default:"No Property" }} | {{ application.space_type }} {{ application.space_label }}</p>
         </div>
-        <a href="{% url 'landlord_resident_files' %}" class="btn btn-outline-dark">Back to Resident Files</a>
+        {% if editing_former_tenant %}
+            <a href="{% url 'former_tenant_files' %}" class="btn btn-outline-dark">Back to Former Tenants</a>
+        {% else %}
+            <a href="{% url 'landlord_resident_files' %}" class="btn btn-outline-dark">Back to Resident Files</a>
+        {% endif %}
     </div>
 
-    <div class="alert alert-warning">
-        This moves the resident file to <strong>Former Tenants</strong>. It does not delete payments, documents, messages, or history.
-        The applicant archive is not used.
-    </div>
+    {% if editing_former_tenant %}
+        <div class="alert alert-info">
+            Update the move-out date, reason, notes, or final balance fields for this former tenant file.
+        </div>
+    {% else %}
+        <div class="alert alert-warning">
+            This moves the resident file to <strong>Former Tenants</strong>. It does not delete payments, documents, messages, or history.
+            The applicant archive is not used.
+        </div>
+    {% endif %}
 
     <div class="card shadow-sm">
         <div class="card-body p-4">
@@ -37,8 +47,13 @@
                 </div>
 
                 <div class="d-flex justify-content-end gap-2 mt-4">
-                    <a href="{% url 'application_detail' application.id %}" class="btn btn-outline-secondary">Cancel</a>
-                    <button type="submit" class="btn btn-danger">End Tenancy & Archive</button>
+                    {% if editing_former_tenant %}
+                        <a href="{% url 'former_tenant_files' %}" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">Save Move-Out Details</button>
+                    {% else %}
+                        <a href="{% url 'application_detail' application.id %}" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-danger">End Tenancy & Archive</button>
+                    {% endif %}
                 </div>
             </form>
         </div>

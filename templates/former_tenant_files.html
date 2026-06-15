@@ -40,6 +40,7 @@
                             <td class="d-flex gap-2 flex-wrap">
                                 <a href="{% url 'application_detail' resident.id %}" class="btn btn-outline-secondary btn-sm">Open File</a>
                                 <a href="{% url 'move_out_statement' resident.id %}" class="btn btn-outline-dark btn-sm">Statement</a>
+                                <a href="{% url 'end_resident_tenancy' resident.id %}" class="btn btn-outline-primary btn-sm">Edit Move-Out</a>
                                 <a href="{% url 'printable_application' resident.id %}" class="btn btn-outline-secondary btn-sm">Print</a>
                                 <a href="{% url 'begin_new_tenancy' %}?property={{ resident.property.id }}&unit={{ resident.space_label|urlencode }}" class="btn btn-primary btn-sm">New Tenant In Unit</a>
                             </td>

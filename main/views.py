@@ -2002,24 +2002,30 @@ def end_resident_tenancy(request, application_id):
         HousingApplication.objects.select_related("property", "user"),
         id=application_id,
         property__in=staff_managed_properties(request.user),
-        tenancy_status="active",
     )
+    editing_former_tenant = application.tenancy_status == "former"
 
     if request.method == "POST":
         form = EndTenancyForm(request.POST)
         if form.is_valid():
-            application.tenancy_status = "former"
+            if not editing_former_tenant:
+                application.tenancy_status = "former"
+                application.former_tenant_archived_at = timezone.now()
             application.move_out_date = form.cleaned_data["move_out_date"]
-            application.former_tenant_archived_at = timezone.now()
             application.tenancy_end_reason = form.cleaned_data.get("tenancy_end_reason", "").strip()
             application.tenancy_archive_notes = form.cleaned_data.get("notes", "").strip()
             application.balance = form.cleaned_data.get("final_balance") or Decimal("0.00")
             application.utility_balance = form.cleaned_data.get("final_utility_balance") or Decimal("0.00")
 
             note_line = (
-                f"{timezone.localdate()}: Tenancy ended. Move-out date {application.move_out_date}. "
+                f"{timezone.localdate()}: Move-out details updated. Move-out date {application.move_out_date}. "
                 f"Reason: {application.tenancy_end_reason or 'Not entered'}."
             )
+            if not editing_former_tenant:
+                note_line = (
+                    f"{timezone.localdate()}: Tenancy ended. Move-out date {application.move_out_date}. "
+                    f"Reason: {application.tenancy_end_reason or 'Not entered'}."
+                )
             if application.tenancy_archive_notes:
                 note_line += f" Notes: {application.tenancy_archive_notes}"
             application.additional_notes = f"{application.additional_notes}\n\n{note_line}".strip()
@@ -2038,19 +2044,26 @@ def end_resident_tenancy(request, application_id):
                 application.user.is_active = False
                 application.user.save(update_fields=["is_active"])
 
+            if editing_former_tenant:
+                messages.success(request, f"Move-out details updated for {application.full_name}.")
+                return redirect("former_tenant_files")
+
             messages.success(request, f"{application.full_name} moved to Former Tenants. Unit {canonical_room_label(application.space_label)} is ready for a new tenancy.")
             return redirect("begin_new_tenancy")
     else:
         form = EndTenancyForm(initial={
-            "move_out_date": timezone.localdate(),
+            "move_out_date": application.move_out_date or timezone.localdate(),
+            "tenancy_end_reason": application.tenancy_end_reason,
             "final_balance": application.balance,
             "final_utility_balance": application.utility_balance,
-            "disable_portal_login": True,
+            "disable_portal_login": False if editing_former_tenant else True,
+            "notes": application.tenancy_archive_notes,
         })
 
     return render(request, "end_resident_tenancy.html", {
         "application": application,
         "form": form,
+        "editing_former_tenant": editing_former_tenant,
     })
 
 
