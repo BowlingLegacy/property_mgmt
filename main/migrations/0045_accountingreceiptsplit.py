@@ -6,7 +6,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("main", "0044_applicantdocument_packet_ocr"),
+        ("main", "0044_residentbalanceentry"),
     ]
 
     operations = [
