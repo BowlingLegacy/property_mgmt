@@ -55,12 +55,12 @@
         }
         @media print {
             @page {
-                size: landscape;
-                margin: .35in;
+                size: portrait;
+                margin: .4in;
             }
             body {
                 background: #fff !important;
-                font-size: 9px !important;
+                font-size: 8px !important;
             }
             .statement {
                 border: 0;
@@ -75,16 +75,39 @@
             .footer {
                 display: none !important;
             }
+            .statement-title {
+                font-size: 1.25rem;
+            }
+            .summary-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: .35rem;
+            }
+            .table-responsive {
+                overflow: visible !important;
+            }
+            table {
+                table-layout: fixed;
+                width: 100% !important;
+            }
             th,
             td {
-                font-size: 8px !important;
-                padding: 3px 4px !important;
+                font-size: 6.5px !important;
+                line-height: 1.15;
+                padding: 2px 3px !important;
+                white-space: normal !important;
+                word-break: break-word;
+            }
+            .money {
+                white-space: nowrap !important;
             }
             .summary-box {
-                padding: .45rem;
+                padding: .3rem .4rem;
+            }
+            .summary-label {
+                font-size: .55rem;
             }
             .summary-value {
-                font-size: .95rem;
+                font-size: .82rem;
             }
         }
     </style>
