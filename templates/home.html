@@ -123,20 +123,6 @@
     </div>
 </header>
 
-{% if painted_lady_profile_open %}
-<section class="resident-start">
-    <div class="container">
-        <div>
-            <div class="resident-start-title">Already live at The Painted Lady Inn?</div>
-            <p class="resident-start-copy">Start here first. Set up your resident profile so we can prepare your Rental Ledger Pro access.</p>
-        </div>
-        <a href="{% url 'existing_resident_intake' painted_lady_profile_property.pk %}" class="resident-start-btn">
-            Set Up My Profile
-        </a>
-    </div>
-</section>
-{% endif %}
-
 <section class="hero-section">
     <div class="container">
         <div class="row align-items-center g-5">
@@ -147,9 +133,6 @@
                 <div class="hero-tagline">Building More Than Properties.<br>Building a Legacy.</div>
                 <p class="hero-copy">Bowling Legacy provides long-term, dignified housing for adults 55+ at risk of homelessness, creating safe, stable environments built on respect, structure, accountability, and community.</p>
                 <div class="d-flex gap-3 flex-wrap mt-4">
-                    {% if painted_lady_profile_open %}
-                        <a href="{% url 'existing_resident_intake' painted_lady_profile_property.pk %}" class="gold-btn">Resident Profile Setup</a>
-                    {% endif %}
                     <a href="{% url 'properties_list' %}" class="dark-btn">View Properties</a>
                     {% if demo_public_url %}
                         <a href="{{ demo_public_url }}" class="gold-btn">Try Demo</a>

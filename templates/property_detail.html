@@ -379,19 +379,6 @@
 
             <a href="{% url 'apply' %}?property={{ property.pk }}" class="gold-btn w-100 mb-3">Apply / Join Waitlist</a>
 
-            {% if existing_resident_intake_open %}
-                <div class="existing-resident-callout mb-3">
-                    <div class="eyebrow">Current Residents</div>
-                    <h3 class="card-title mb-2">Set Up Your Profile</h3>
-                    <p class="text-muted">
-                        Already live at {{ property.name }}? Send your resident profile information here.
-                    </p>
-                    <a href="{% url 'existing_resident_intake' property.pk %}" class="gold-btn">
-                        Existing Resident Profile
-                    </a>
-                </div>
-            {% endif %}
-
             <div class="soft-card p-4">
                 <h3 class="card-title mb-3">Property Details</h3>
                 <div class="info-row"><span class="info-label">Address</span><span>{{ property.address|default:"N/A" }}</span></div>
