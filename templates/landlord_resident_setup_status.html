@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container my-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+        <div>
+            <h1 class="fw-bold mb-1">Resident Setup Status</h1>
+            <p class="text-muted mb-0">Track portal setup progress from the approved current resident list.</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'current_resident_roster_upload' %}" class="btn btn-outline-primary">Approved Resident List</a>
+            <a href="{% url 'landlord_attention' %}" class="btn btn-outline-secondary">Needs Attention</a>
+            <a href="{% url 'landlord_dashboard' %}" class="btn btn-outline-dark">Back to Landlord Menu</a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase">Completed Setups</div>
+                    <div class="display-6 fw-bold">{{ completed_count }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase">Still Need Setup</div>
+                    <div class="display-6 fw-bold">{{ not_completed_count }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Unit</th>
+                            <th>Resident</th>
+                            <th>Contact</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in rows %}
+                        <tr>
+                            <td>{{ row.room|default:"-" }}</td>
+                            <td>
+                                <strong>{{ row.resident_name }}</strong><br>
+                                <span class="text-muted small">{{ row.property.name }}</span>
+                            </td>
+                            <td>
+                                {{ row.email|default:"No email" }}<br>
+                                <span class="text-muted small">{{ row.phone|default:"No phone" }}</span>
+                            </td>
+                            <td>
+                                {% if row.setup_status == "completed" %}
+                                    <span class="badge text-bg-success">{{ row.setup_label }}</span>
+                                {% elif row.setup_status == "invite_sent" %}
+                                    <span class="badge text-bg-primary">{{ row.setup_label }}</span>
+                                {% elif row.setup_status == "intake_pending" %}
+                                    <span class="badge text-bg-warning">{{ row.setup_label }}</span>
+                                {% else %}
+                                    <span class="badge text-bg-secondary">{{ row.setup_label }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.application %}
+                                    <a href="{% url 'application_detail' row.application.id %}" class="btn btn-outline-secondary btn-sm">Open Resident File</a>
+                                {% elif row.intake %}
+                                    <a href="{% url 'landlord_existing_resident_intake_detail' row.intake.id %}" class="btn btn-outline-primary btn-sm">Open Setup</a>
+                                {% else %}
+                                    <span class="text-muted small">Waiting for resident setup</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="5" class="text-muted">No approved current resident list has been uploaded yet.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

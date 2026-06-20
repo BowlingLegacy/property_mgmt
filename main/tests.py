@@ -4024,6 +4024,65 @@ class LiveFlowTests(TestCase):
         response = self.client.get(reverse("landlord_dashboard"))
         self.assertEqual(response.context["attention_count"], 0)
 
+    def test_completed_resident_setup_is_hidden_from_needs_attention(self):
+        landlord = User.objects.create_user(
+            username="completed-setup-attention-landlord",
+            email="completed-setup-attention@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Completed Setup Property", landlord_email=landlord.email)
+        resident_user = User.objects.create_user(
+            username="completed-setup-resident",
+            email="setup-complete@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Completed Setup Resident",
+            phone="555-0400",
+            email="setup-complete@example.com",
+            age=44,
+            space_label="B",
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        CurrentResidentRosterEntry.objects.create(
+            property=property_obj,
+            first_name="Completed",
+            last_name="Resident",
+            email="setup-complete@example.com",
+            phone="555-0400",
+            room_unit_label="B",
+        )
+        ExistingResidentIntake.objects.create(
+            property=property_obj,
+            application=application,
+            first_name="Completed",
+            last_name="Setup Resident",
+            email="setup-complete@example.com",
+            phone="555-0400",
+            room_unit_label="B",
+        )
+
+        self.client.login(username="completed-setup-attention-landlord", password="StrongPass123!")
+        attention_response = self.client.get(reverse("landlord_attention"))
+        self.assertEqual(attention_response.status_code, 200)
+        self.assertEqual(attention_response.context["existing_resident_intake_count"], 0)
+        self.assertEqual(attention_response.context["attention_count"], 0)
+        self.assertNotContains(attention_response, "Completed Setup Resident")
+
+        status_response = self.client.get(reverse("landlord_resident_setup_status"))
+        self.assertEqual(status_response.status_code, 200)
+        self.assertEqual(status_response.context["completed_count"], 1)
+        self.assertEqual(status_response.context["not_completed_count"], 0)
+        self.assertContains(status_response, "Completed Resident")
+        self.assertContains(status_response, "Completed")
+
     def test_rent_roll_is_resident_only_month_labeled_and_room_sorted(self):
         landlord = User.objects.create_user(
             username="rent-roll-landlord",

@@ -8,6 +8,7 @@
             <p class="text-muted mb-0">New applications, resident messages, and uploaded documents.</p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'landlord_resident_setup_status' %}" class="btn btn-outline-success">Setup Status</a>
             <a href="{% url 'current_resident_roster_upload' %}" class="btn btn-outline-primary">Approved Resident List</a>
             <a href="{% url 'landlord_dashboard' %}" class="btn btn-outline-dark">Back to Landlord Menu</a>
         </div>
@@ -15,7 +16,8 @@
 
     <div class="card shadow-sm mb-4">
         <div class="card-body">
-            <h2 class="fw-bold h4">Current Resident Profile Setups</h2>
+            <h2 class="fw-bold h4">Current Resident Setup Action Items</h2>
+            <p class="text-muted mb-3">Completed resident setup files are hidden here. Use Setup Status to see who is finished and who still needs setup.</p>
             <div class="table-responsive">
                 <table class="table align-middle">
                     <thead><tr><th>Resident</th><th>Property</th><th>Submitted</th><th>Contact</th><th>Actions</th></tr></thead>
@@ -54,7 +56,7 @@
                         </tr>
                         {% endwith %}
                     {% empty %}
-                        <tr><td colspan="5" class="text-muted">No current resident profile setups.</td></tr>
+                        <tr><td colspan="5" class="text-muted">No current resident setup action items.</td></tr>
                     {% endfor %}
                     </tbody>
                 </table>

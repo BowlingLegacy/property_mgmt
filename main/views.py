@@ -1856,12 +1856,7 @@ def get_landlord_workspace_context(user):
             existing_resident_seen[intake_key]["duplicate_count"] += 1
             continue
 
-        application = (
-            HousingApplication.objects
-            .select_related("user")
-            .filter(property=intake.property, email__iexact=intake.email)
-            .first()
-        )
+        application = existing_application_for_current_resident_intake(intake)
         pending_user = application.user if application and application.user else None
 
         if pending_user and pending_user.has_usable_password():
@@ -1870,6 +1865,9 @@ def get_landlord_workspace_context(user):
             setup_status = "invite_sent"
         else:
             setup_status = "ready"
+
+        if setup_status == "completed":
+            continue
 
         row = {
             "intake": intake,
@@ -1895,6 +1893,11 @@ def get_landlord_workspace_context(user):
     applications = visible_resident_files(resident_files)
     collection_watch_rows = monthly_collection_watch_rows(applications)
     month_start, _next_month = current_month_bounds()
+    setup_status_rows = current_resident_setup_status_rows(properties)
+    setup_status_counts = {
+        "completed": sum(1 for row in setup_status_rows if row["setup_status"] == "completed"),
+        "not_completed": sum(1 for row in setup_status_rows if row["setup_status"] != "completed"),
+    }
 
     return {
         "applications": applications,
@@ -1911,6 +1914,7 @@ def get_landlord_workspace_context(user):
         "new_document_count": new_documents.count(),
         "existing_resident_intakes": existing_resident_rows,
         "existing_resident_intake_count": len(existing_resident_rows),
+        "setup_status_counts": setup_status_counts,
         "collection_watch_month": month_start,
         "collection_watch_rows": collection_watch_rows,
         "collection_watch_count": len(collection_watch_rows),
@@ -1933,6 +1937,19 @@ def landlord_dashboard(request):
 @user_passes_test(staff_required)
 def landlord_attention(request):
     return render(request, "landlord_attention.html", get_landlord_workspace_context(request.user))
+
+
+@login_required
+@user_passes_test(staff_required)
+def landlord_resident_setup_status(request):
+    properties = staff_managed_properties(request.user).order_by("name")
+    rows = current_resident_setup_status_rows(properties)
+
+    return render(request, "landlord_resident_setup_status.html", {
+        "rows": rows,
+        "completed_count": sum(1 for row in rows if row["setup_status"] == "completed"),
+        "not_completed_count": sum(1 for row in rows if row["setup_status"] != "completed"),
+    })
 
 
 @login_required
@@ -6232,6 +6249,93 @@ def existing_application_for_current_resident_intake(intake):
             return candidate
 
     return None
+
+
+def housing_application_matches_roster_entry(application, roster_entry):
+    entry_unit = normalized_room_label(roster_entry.room_unit_label)
+    application_unit = normalized_room_label(application.space_label)
+    entry_email = str(roster_entry.email or "").strip().lower()
+    application_email = str(application.email or "").strip().lower()
+    entry_phone = normalize_phone_digits(roster_entry.phone)
+    application_phone = normalize_phone_digits(application.phone)
+
+    if entry_email and application_email and entry_email == application_email:
+        return True
+
+    if entry_phone and application_phone and entry_phone == application_phone:
+        return True
+
+    if entry_unit and application_unit and entry_unit == application_unit:
+        return resident_names_compatible(roster_entry.full_name(), application.full_name)
+
+    return resident_names_compatible(roster_entry.full_name(), application.full_name)
+
+
+def intake_matches_roster_entry(intake, roster_entry):
+    match = find_current_roster_match(intake)
+    return bool(match and match.id == roster_entry.id)
+
+
+def current_resident_setup_status_rows(properties):
+    roster_entries = list(
+        CurrentResidentRosterEntry.objects
+        .filter(property__in=properties, is_active=True)
+        .select_related("property")
+        .order_by("property__name", "room_unit_label", "last_name", "first_name")
+    )
+    applications = list(
+        HousingApplication.objects
+        .select_related("property", "user")
+        .filter(property__in=properties, tenancy_status="active")
+        .order_by("-user_id", "-lease_start_date", "-id")
+    )
+    intakes = list(
+        ExistingResidentIntake.objects
+        .select_related("property", "application", "application__user")
+        .filter(property__in=properties)
+        .order_by("-created_at")
+    )
+
+    rows = []
+    for entry in roster_entries:
+        application = next(
+            (candidate for candidate in applications if housing_application_matches_roster_entry(candidate, entry)),
+            None,
+        )
+        intake = next((candidate for candidate in intakes if intake_matches_roster_entry(candidate, entry)), None)
+        pending_user = application.user if application and application.user else None
+
+        if pending_user and pending_user.has_usable_password():
+            setup_status = "completed"
+            setup_label = "Completed"
+        elif pending_user:
+            setup_status = "invite_sent"
+            setup_label = "Invite Sent"
+        elif intake:
+            setup_status = "intake_pending"
+            setup_label = "Review Needed"
+        else:
+            setup_status = "not_started"
+            setup_label = "Not Started"
+
+        rows.append({
+            "property": entry.property,
+            "room": canonical_room_label(entry.room_unit_label),
+            "room_sort": rent_roll_room_sort_key(entry.room_unit_label),
+            "resident_name": entry.full_name(),
+            "phone": entry.phone,
+            "email": entry.email,
+            "application": application,
+            "intake": intake,
+            "setup_status": setup_status,
+            "setup_label": setup_label,
+        })
+
+    return sorted(rows, key=lambda row: (
+        row["property"].name.lower(),
+        row["room_sort"],
+        row["resident_name"].lower(),
+    ))
 
 
 def ensure_existing_resident_portal_application(intake):

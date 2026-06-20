@@ -59,6 +59,7 @@ urlpatterns = [
     path("tenant-dashboard/utility-setup/<int:setup_id>/open/", views.resident_utility_setup_open, name="resident_utility_setup_open"),
     path("landlord-dashboard/", views.landlord_dashboard, name="landlord_dashboard"),
     path("landlord-dashboard/attention/", views.landlord_attention, name="landlord_attention"),
+    path("landlord-dashboard/resident-setup-status/", views.landlord_resident_setup_status, name="landlord_resident_setup_status"),
     path("landlord-dashboard/applications/<str:folder>/", views.landlord_application_folder, name="landlord_application_folder"),
     path("landlord-dashboard/applications/<int:application_id>/move-folder/", views.move_application_folder, name="move_application_folder"),
     path("landlord-dashboard/residents/", views.landlord_resident_files, name="landlord_resident_files"),
