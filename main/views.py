@@ -6272,8 +6272,34 @@ def housing_application_matches_roster_entry(application, roster_entry):
 
 
 def intake_matches_roster_entry(intake, roster_entry):
-    match = find_current_roster_match(intake)
-    return bool(match and match.id == roster_entry.id)
+    if intake.property_id != roster_entry.property_id:
+        return False
+
+    intake_email = str(intake.email or "").strip().lower()
+    entry_email = str(roster_entry.email or "").strip().lower()
+    intake_phone = normalize_phone_digits(intake.phone)
+    entry_phone = normalize_phone_digits(roster_entry.phone)
+    intake_unit = clean_match_value(intake.room_unit_label)
+    entry_unit = clean_match_value(roster_entry.room_unit_label)
+    name_matches = (
+        clean_match_value(intake.first_name) == clean_match_value(roster_entry.first_name)
+        and clean_match_value(intake.last_name) == clean_match_value(roster_entry.last_name)
+    )
+    name_only_roster_entry = not roster_entry.email and not roster_entry.phone and not roster_entry.room_unit_label
+
+    if intake_email and entry_email and intake_email == entry_email:
+        return True
+
+    if name_matches and name_only_roster_entry:
+        return True
+
+    if name_matches and intake_unit and entry_unit and intake_unit == entry_unit:
+        return True
+
+    if name_matches and intake_phone and entry_phone and intake_phone == entry_phone:
+        return True
+
+    return False
 
 
 def current_resident_setup_status_rows(properties):
