@@ -4083,6 +4083,50 @@ class LiveFlowTests(TestCase):
         self.assertContains(status_response, "Completed Resident")
         self.assertContains(status_response, "Completed")
 
+    def test_resident_setup_status_prefers_active_resident_over_old_roster_entry(self):
+        landlord = User.objects.create_user(
+            username="clean-setup-status-landlord",
+            email="clean-setup-status@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Clean Setup Property", landlord_email=landlord.email)
+        CurrentResidentRosterEntry.objects.create(
+            property=property_obj,
+            first_name="Old",
+            last_name="Resident",
+            email="old-resident@example.com",
+            phone="555-0500",
+            room_unit_label="Room H",
+        )
+        current_user = User.objects.create_user(
+            username="current-room-h-resident",
+            email="current-h@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        HousingApplication.objects.create(
+            property=property_obj,
+            user=current_user,
+            full_name="Current Room H Resident",
+            phone="555-0501",
+            email="current-h@example.com",
+            age=44,
+            space_label="H",
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+
+        self.client.login(username="clean-setup-status-landlord", password="StrongPass123!")
+        response = self.client.get(reverse("landlord_resident_setup_status"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Current Room H Resident")
+        self.assertNotContains(response, "Old Resident")
+        self.assertEqual(len(response.context["rows"]), 1)
+
     def test_rent_roll_is_resident_only_month_labeled_and_room_sorted(self):
         landlord = User.objects.create_user(
             username="rent-roll-landlord",

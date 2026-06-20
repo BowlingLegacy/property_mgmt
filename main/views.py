@@ -6302,6 +6302,32 @@ def intake_matches_roster_entry(intake, roster_entry):
     return False
 
 
+def resident_setup_status(application=None, intake=None):
+    pending_user = application.user if application and application.user else None
+
+    if pending_user and pending_user.has_usable_password():
+        return "completed", "Completed"
+
+    if pending_user:
+        return "invite_sent", "Invite Sent"
+
+    if intake:
+        return "intake_pending", "Review Needed"
+
+    return "not_started", "Not Started"
+
+
+def resident_setup_application_rank(application):
+    pending_user = application.user if application and application.user else None
+    return (
+        1 if pending_user and pending_user.has_usable_password() else 0,
+        1 if pending_user else 0,
+        1 if application.email or application.phone else 0,
+        application.lease_start_date or date.min,
+        application.id or 0,
+    )
+
+
 def current_resident_setup_status_rows(properties):
     roster_entries = list(
         CurrentResidentRosterEntry.objects
@@ -6322,27 +6348,59 @@ def current_resident_setup_status_rows(properties):
         .order_by("-created_at")
     )
 
+    applications_by_room = {}
+    for application in applications:
+        room_key = normalized_room_label(application.space_label)
+        if not is_rentable_room_label(room_key, application.property):
+            continue
+
+        key = (application.property_id, room_key)
+        current = applications_by_room.get(key)
+        if current is None or resident_setup_application_rank(application) > resident_setup_application_rank(current):
+            applications_by_room[key] = application
+
     rows = []
-    for entry in roster_entries:
-        application = next(
-            (candidate for candidate in applications if housing_application_matches_roster_entry(candidate, entry)),
+    used_room_keys = set()
+
+    for application in applications_by_room.values():
+        room_key = normalized_room_label(application.space_label)
+        key = (application.property_id, room_key)
+        roster_entry = next(
+            (candidate for candidate in roster_entries if housing_application_matches_roster_entry(application, candidate)),
             None,
         )
-        intake = next((candidate for candidate in intakes if intake_matches_roster_entry(candidate, entry)), None)
-        pending_user = application.user if application and application.user else None
+        intake = next(
+            (
+                candidate for candidate in intakes
+                if candidate.application_id == application.id
+                or (roster_entry and intake_matches_roster_entry(candidate, roster_entry))
+            ),
+            None,
+        )
+        setup_status, setup_label = resident_setup_status(application=application, intake=intake)
 
-        if pending_user and pending_user.has_usable_password():
-            setup_status = "completed"
-            setup_label = "Completed"
-        elif pending_user:
-            setup_status = "invite_sent"
-            setup_label = "Invite Sent"
-        elif intake:
-            setup_status = "intake_pending"
-            setup_label = "Review Needed"
-        else:
-            setup_status = "not_started"
-            setup_label = "Not Started"
+        rows.append({
+            "property": application.property,
+            "room": canonical_room_label(application.space_label),
+            "room_sort": rent_roll_room_sort_key(application.space_label),
+            "resident_name": application.full_name,
+            "phone": application.phone or (roster_entry.phone if roster_entry else ""),
+            "email": application.email or (roster_entry.email if roster_entry else ""),
+            "application": application,
+            "intake": intake,
+            "setup_status": setup_status,
+            "setup_label": setup_label,
+        })
+        used_room_keys.add(key)
+
+    for entry in roster_entries:
+        room_key = normalized_room_label(entry.room_unit_label)
+        key = (entry.property_id, room_key)
+        if key in used_room_keys or not is_rentable_room_label(room_key, entry.property):
+            continue
+
+        intake = next((candidate for candidate in intakes if intake_matches_roster_entry(candidate, entry)), None)
+        setup_status, setup_label = resident_setup_status(intake=intake)
 
         rows.append({
             "property": entry.property,
@@ -6351,7 +6409,7 @@ def current_resident_setup_status_rows(properties):
             "resident_name": entry.full_name(),
             "phone": entry.phone,
             "email": entry.email,
-            "application": application,
+            "application": None,
             "intake": intake,
             "setup_status": setup_status,
             "setup_label": setup_label,
