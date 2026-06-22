@@ -296,8 +296,8 @@ body {
             <div class="field-grid">
                 <div class="field-item"><div class="field-label">On Parole / Probation / Pending Case</div><div class="field-value">{% if application.on_parole %}Yes{% else %}No{% endif %}</div></div>
                 <div class="field-item"><div class="field-label">Served Time with ODOC</div><div class="field-value">{% if application.odoc_time_served %}Yes{% else %}No{% endif %}</div></div>
-                <div class="field-item"><div class="field-label">Officer / Contact Name</div><div class="field-value">{{ application.parole_officer_name|default:"Not provided" }}</div></div>
-                <div class="field-item"><div class="field-label">Officer / Contact Phone</div><div class="field-value">{{ application.parole_officer_phone|default:"Not provided" }}</div></div>
+                <div class="field-item"><div class="field-label">Parole / Probation Officer</div><div class="field-value">{{ application.parole_officer_name|default:"Not provided" }}</div></div>
+                <div class="field-item"><div class="field-label">Parole / Probation Officer Phone</div><div class="field-value">{{ application.parole_officer_phone|default:"Not provided" }}</div></div>
                 <div class="field-item field-wide"><div class="field-label">Felony / Court / Context Notes</div><div class="field-value">{{ application.felony_history|default:"Not provided" }}</div></div>
             </div>
         </div>
