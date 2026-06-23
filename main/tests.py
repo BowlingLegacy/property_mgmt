@@ -2883,6 +2883,74 @@ class LiveFlowTests(TestCase):
         self.assertFalse(original_lease.locked)
         self.assertTrue(platform_lease.locked)
 
+    def test_resident_sees_signed_documents_on_compatible_duplicate_file(self):
+        property_obj = Property.objects.create(name="The Painted Lady Inn")
+        user = User.objects.create_user(
+            username="mark-visible-lease",
+            email="mark@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        login_application = HousingApplication.objects.create(
+            user=user,
+            property=property_obj,
+            full_name="Mark William Moore",
+            phone="5419002408",
+            email="mark@example.com",
+            age=51,
+            space_label="Room I",
+            tenancy_status="active",
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+        )
+        duplicate_application = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Mark Moore",
+            phone="5419002408",
+            email="mark@example.com",
+            age=51,
+            space_label="I",
+            tenancy_status="active",
+            income_source="Duplicate resident file",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Duplicate current resident file.",
+        )
+        duplicate_lease = SignedDocument.objects.create(
+            application=duplicate_application,
+            document_type="lease",
+            title="Resident Lease Agreement",
+        )
+
+        self.client.login(username="mark-visible-lease", password="StrongPass123!")
+
+        inbox_response = self.client.get(reverse("resident_inbox"))
+
+        self.assertEqual(inbox_response.status_code, 200)
+        self.assertContains(inbox_response, "Resident Lease Agreement")
+
+        open_response = self.client.get(reverse("onboarding_document", args=[duplicate_lease.id]))
+
+        self.assertEqual(open_response.status_code, 200)
+        self.assertEqual(open_response.context["signed_document"].id, duplicate_lease.id)
+
+        sign_response = self.client.post(reverse("submit_onboarding_document", args=[duplicate_lease.id]), {
+            "rent_initials": "MM",
+            "sobriety_initials": "MM",
+            "testing_initials": "MM",
+            "guest_policy_initials": "MM",
+            "cleanliness_initials": "MM",
+            "disclosure_initials": "MM",
+            "resident_signature": "Mark William Moore",
+            "signature_agreement": "on",
+        })
+
+        self.assertRedirects(sign_response, reverse("tenant_dashboard"))
+        duplicate_lease.refresh_from_db()
+        login_application.refresh_from_db()
+        self.assertTrue(duplicate_lease.locked)
+        self.assertEqual(login_application.user, user)
+
     def test_resident_can_upload_profile_photo(self):
         user = User.objects.create_user(
             username="photo-resident",

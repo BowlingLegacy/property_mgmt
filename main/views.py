@@ -3831,8 +3831,8 @@ def resident_portal_url(view_name, is_superadmin_inspecting, application):
 
 
 def resident_inbox_counts(application):
-    signed_document_count = application.signed_documents.count()
-    uploaded_document_count = application.documents.count()
+    signed_document_count = resident_visible_signed_documents(application).count()
+    uploaded_document_count = resident_visible_uploaded_documents(application).count()
     message_count = resident_visible_messages(application).count()
     return {
         "signed_documents": signed_document_count,
@@ -3841,6 +3841,93 @@ def resident_inbox_counts(application):
         "messages": message_count,
         "total": signed_document_count + uploaded_document_count + message_count,
     }
+
+
+def resident_name_tokens(value):
+    return {
+        token.lower()
+        for token in str(value or "").replace("/", " ").split()
+        if token.strip()
+    }
+
+
+def resident_names_are_compatible(left, right):
+    left_tokens = resident_name_tokens(left)
+    right_tokens = resident_name_tokens(right)
+
+    if not left_tokens or not right_tokens:
+        return False
+
+    if left_tokens.issubset(right_tokens) or right_tokens.issubset(left_tokens):
+        return True
+
+    left_parts = str(left or "").strip().split()
+    right_parts = str(right or "").strip().split()
+    if len(left_parts) >= 2 and len(right_parts) >= 2:
+        left_first, left_last = left_parts[0].lower(), left_parts[-1].lower()
+        right_first, right_last = right_parts[0].lower(), right_parts[-1].lower()
+        return left_last == right_last and (
+            left_first.startswith(right_first[:3]) or right_first.startswith(left_first[:3])
+        )
+
+    return False
+
+
+def resident_related_application_ids(application):
+    if not application:
+        return []
+
+    related_ids = [application.id]
+    if not application.property_id or not normalized_room_label(application.space_label):
+        return related_ids
+
+    candidates = (
+        HousingApplication.objects
+        .filter(
+            property_id=application.property_id,
+            tenancy_status="active",
+        )
+        .exclude(id=application.id)
+    )
+
+    target_room = normalized_room_label(application.space_label)
+    target_phone = normalize_phone_digits(application.phone)
+    target_email = (application.email or "").strip().lower()
+
+    for candidate in candidates:
+        if normalized_room_label(candidate.space_label) != target_room:
+            continue
+
+        candidate_phone = normalize_phone_digits(candidate.phone)
+        candidate_email = (candidate.email or "").strip().lower()
+
+        if (
+            (application.user_id and candidate.user_id == application.user_id)
+            or (target_email and candidate_email == target_email)
+            or (target_phone and candidate_phone == target_phone)
+            or resident_names_are_compatible(application.full_name, candidate.full_name)
+        ):
+            related_ids.append(candidate.id)
+
+    return related_ids
+
+
+def resident_visible_signed_documents(application):
+    return (
+        SignedDocument.objects
+        .filter(application_id__in=resident_related_application_ids(application))
+        .select_related("application")
+        .order_by("document_type", "-locked", "-signed_at", "-id")
+    )
+
+
+def resident_visible_uploaded_documents(application):
+    return (
+        ApplicantDocument.objects
+        .filter(application_id__in=resident_related_application_ids(application))
+        .select_related("application")
+        .order_by("document_type", "-signed_at", "-created_at", "-id")
+    )
 
 
 def resident_visible_messages(application):
@@ -4075,8 +4162,8 @@ def resident_inbox(request):
 
     return render(request, "resident_inbox.html", {
         "application": application,
-        "signed_documents": application.signed_documents.all(),
-        "uploaded_documents": application.documents.all(),
+        "signed_documents": resident_visible_signed_documents(application),
+        "uploaded_documents": resident_visible_uploaded_documents(application),
         "resident_messages": resident_visible_messages(application).prefetch_related("replies", "replies__sender"),
         "inbox_counts": resident_inbox_counts(application),
         "dashboard_url": resident_portal_url("tenant_dashboard", is_superadmin_inspecting, application),
@@ -6938,7 +7025,7 @@ def printable_application(request, pk):
 
 
 def get_resident_signed_document(request, document_id):
-    application = getattr(request.user, "resident_profile", None)
+    application, _is_superadmin_inspecting = get_resident_portal_application(request)
 
     if not application:
         messages.error(request, "No resident file connected.")
@@ -6947,7 +7034,7 @@ def get_resident_signed_document(request, document_id):
     return get_object_or_404(
         SignedDocument,
         id=document_id,
-        application=application,
+        application_id__in=resident_related_application_ids(application),
     )
 
 
@@ -7010,12 +7097,12 @@ def submit_lease_signature(request, document_id=None):
         return redirect("tenant_dashboard")
 
     if document_id:
-        signed_document = get_object_or_404(
-            SignedDocument,
-            id=document_id,
-            application=application,
-            document_type="lease",
-        )
+        signed_document = get_resident_signed_document(request, document_id)
+        if not signed_document:
+            return redirect("tenant_dashboard")
+        if signed_document.document_type != "lease":
+            messages.error(request, "Lease document not found.")
+            return redirect("tenant_dashboard")
     else:
         signed_document = SignedDocument.objects.filter(
             application=application,
