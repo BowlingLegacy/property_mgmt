@@ -16,7 +16,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .models import AccountingReceipt, AccountingReceiptSplit, ApplicantDocument, BlogComment, BlogPost, CompanyMailboxConnection, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, PropertyRoomRent, RentHistory, ResidentBalanceEntry, ResidentMessage, ResidentMessageReply, SignedDocument, SmsMessageLog, User, VendorCategoryRule
-from .views import apply_completed_payment_to_balance, current_month_bounds, ensure_existing_resident_portal_application, payment_amount_for_month, prorated_monthly_charge, rent_roll_rows_for_properties, send_sms_message, t12_report_rows
+from .views import applicant_review_summary, apply_completed_payment_to_balance, current_month_bounds, ensure_existing_resident_portal_application, payment_amount_for_month, prorated_monthly_charge, rent_roll_rows_for_properties, send_sms_message, t12_report_rows
 
 
 @override_settings(
@@ -89,6 +89,61 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "$55")
         self.assertContains(response, "phone-input")
         self.assertContains(response, "formatPhoneInput")
+
+    def test_applicant_review_summary_identifies_strong_candidate(self):
+        application = HousingApplication.objects.create(
+            full_name="Strong Applicant",
+            phone="(541) 326-8047",
+            email="strong@example.com",
+            age=42,
+            monthly_income=Decimal("3200.00"),
+            monthly_rent=Decimal("650.00"),
+            utility_monthly=Decimal("55.00"),
+            income_source="Employment",
+            employment_length="3 years",
+            current_address="Current housing",
+            current_address_length="2 years",
+            previous_address_1="Previous housing",
+            previous_evictions="None",
+            has_valid_odl=True,
+            reference_1_name="Reference One",
+            reference_1_phone="(541) 200-4018",
+            reference_2_name="Reference Two",
+            reference_2_phone="(541) 200-4019",
+            housing_need="Needs stable housing.",
+            sobriety_acknowledgment=True,
+            unconditional_regard_acknowledgment=True,
+        )
+
+        summary = applicant_review_summary(application)
+
+        self.assertEqual(summary["rating"], "Strong Candidate")
+        self.assertGreaterEqual(summary["score"], 80)
+        self.assertIn("Good candidate", summary["recommendation"])
+
+    def test_applicant_review_summary_flags_incomplete_candidate(self):
+        application = HousingApplication.objects.create(
+            full_name="Incomplete Applicant",
+            phone="(541) 326-8047",
+            email="incomplete@example.com",
+            age=19,
+            monthly_income=Decimal("900.00"),
+            monthly_rent=Decimal("650.00"),
+            utility_monthly=Decimal("55.00"),
+            income_source="",
+            current_address="",
+            current_address_length="",
+            previous_evictions="Prior eviction pending review",
+            housing_need="Needs housing.",
+            sobriety_acknowledgment=False,
+            unconditional_regard_acknowledgment=False,
+        )
+
+        summary = applicant_review_summary(application)
+
+        self.assertIn(summary["rating"], {"Needs More Info", "Incomplete / High Review"})
+        self.assertTrue(summary["missing_items"])
+        self.assertTrue(summary["review_flags"])
 
     def test_public_privacy_and_terms_pages_render(self):
         privacy_response = self.client.get(reverse("privacy_policy"))

@@ -1986,11 +1986,12 @@ def landlord_application_folder(request, folder):
         )
         .order_by("-created_at")
     )
+    application_rows = attach_applicant_review_summaries(list(applications))
 
     return render(request, "landlord_application_folder.html", {
         "folder": folder,
         "folder_title": folder_labels[folder],
-        "applications": applications,
+        "applications": application_rows,
     })
 
 
@@ -2456,6 +2457,154 @@ def attention_identity_key(property_id, email, full_name, room_unit_label=""):
     )
 
 
+def applicant_review_summary(application):
+    rent_amount = application.monthly_rent or Decimal("0.00")
+    utility_amount = application.utility_monthly or Decimal("0.00")
+    monthly_housing_cost = rent_amount + utility_amount
+    monthly_income = application.monthly_income or Decimal("0.00")
+    score = 0
+    strengths = []
+    review_flags = []
+    missing_items = []
+
+    if application.age >= 18:
+        score += 5
+    else:
+        review_flags.append("Applicant is under 18; confirm legal ability to sign.")
+
+    if monthly_housing_cost > 0 and monthly_income > 0:
+        rent_ratio = (monthly_housing_cost / monthly_income) * Decimal("100")
+        if rent_ratio <= Decimal("35"):
+            score += 35
+            strengths.append("Income appears strong against rent and utilities.")
+        elif rent_ratio <= Decimal("45"):
+            score += 27
+            strengths.append("Income appears workable against rent and utilities.")
+        elif rent_ratio <= Decimal("55"):
+            score += 17
+            review_flags.append("Income is tight compared with rent and utilities.")
+        else:
+            score += 7
+            review_flags.append("Income may be too tight for rent and utilities.")
+    else:
+        missing_items.append("Monthly income or rent amount is missing.")
+
+    if application.income_source:
+        score += 8
+    else:
+        missing_items.append("Income source is missing.")
+
+    if application.employment_length:
+        score += 5
+        strengths.append("Income stability length provided.")
+
+    if application.current_address or application.current_address_length:
+        score += 8
+    else:
+        missing_items.append("Current housing history is missing.")
+
+    if application.previous_address_1 or application.previous_evictions:
+        score += 7
+    else:
+        missing_items.append("Prior housing history or housing barriers are missing.")
+
+    evictions_text = (application.previous_evictions or "").strip().lower()
+    if evictions_text and evictions_text not in {"none", "n/a", "na", "no"}:
+        review_flags.append("Housing barrier or eviction notes need review.")
+
+    if application.reference_1_name and application.reference_1_phone:
+        score += 8
+        strengths.append("Primary reference provided.")
+    elif application.reference_1_name or application.reference_1_phone:
+        score += 3
+        review_flags.append("Primary reference is incomplete.")
+    else:
+        missing_items.append("No reference provided.")
+
+    if application.reference_2_name and application.reference_2_phone:
+        score += 4
+
+    if application.has_valid_odl or application.oregon_id_number or application.id_upload:
+        score += 6
+        strengths.append("Identity information provided.")
+    else:
+        review_flags.append("Identity still needs verification.")
+
+    if application.sobriety_acknowledgment:
+        score += 7
+    else:
+        review_flags.append("Drug- and alcohol-free rules not acknowledged.")
+
+    if application.unconditional_regard_acknowledgment:
+        score += 7
+    else:
+        review_flags.append("Community conduct rule not acknowledged.")
+
+    if application.in_recovery:
+        if application.drug_of_choice or application.additional_notes:
+            score += 3
+            strengths.append("Recovery/support context provided.")
+        else:
+            review_flags.append("Recovery/support context needs follow-up.")
+
+    if application.on_parole:
+        if application.parole_officer_name and application.parole_officer_phone:
+            score += 3
+            strengths.append("Parole/probation contact provided.")
+        else:
+            review_flags.append("Parole/probation contact needs follow-up.")
+
+    if application.felony_history:
+        review_flags.append("Justice-system notes need individualized review.")
+
+    if application.background_check_status == "cleared":
+        score += 5
+        strengths.append("Background check cleared.")
+    elif application.background_check_status in {"pending", "ordered", "needs_review"}:
+        review_flags.append(f"Background check status: {application.get_background_check_status_display()}.")
+
+    score = max(0, min(100, int(score)))
+
+    if score >= 80 and not missing_items:
+        rating = "Strong Candidate"
+        badge_class = "success"
+        recommendation = "Good candidate for next-step review."
+    elif score >= 60:
+        rating = "Review Candidate"
+        badge_class = "primary"
+        recommendation = "Likely workable; verify the flagged items before approval."
+    elif score >= 40:
+        rating = "Needs More Info"
+        badge_class = "warning"
+        recommendation = "Do not decide yet; follow up on missing or flagged items."
+    else:
+        rating = "Incomplete / High Review"
+        badge_class = "danger"
+        recommendation = "Application is not ready for approval without more information."
+
+    return {
+        "score": score,
+        "rating": rating,
+        "badge_class": badge_class,
+        "recommendation": recommendation,
+        "monthly_housing_cost": monthly_housing_cost,
+        "income_ratio": (
+            ((monthly_housing_cost / monthly_income) * Decimal("100")).quantize(Decimal("0.1"))
+            if monthly_housing_cost > 0 and monthly_income > 0
+            else None
+        ),
+        "strengths": strengths[:5],
+        "review_flags": review_flags[:6],
+        "missing_items": missing_items[:6],
+    }
+
+
+def attach_applicant_review_summaries(applications):
+    for application in applications:
+        application.review_summary = applicant_review_summary(application)
+    return applications
+
+
 def dedupe_attention_applications(applications):
     deduped = []
     seen = {}
@@ -2476,7 +2625,7 @@ def dedupe_attention_applications(applications):
         seen[key] = application
         deduped.append(application)
 
-    return sorted_resident_list(deduped)
+    return attach_applicant_review_summaries(sorted_resident_list(deduped))
 
 
 def choose_primary_resident_application(applications):
@@ -7035,7 +7184,10 @@ def printable_application(request, pk):
     ):
         application.landlord_reviewed_at = timezone.now()
         application.save(update_fields=["landlord_reviewed_at"])
-    return render(request, "printable_application.html", {"application": application})
+    return render(request, "printable_application.html", {
+        "application": application,
+        "review_summary": applicant_review_summary(application),
+    })
 
 
 def get_resident_signed_document(request, document_id):

@@ -75,6 +75,47 @@ body {
     margin-bottom: 1rem;
 }
 
+.review-grid {
+    display: grid;
+    grid-template-columns: minmax(180px, 260px) 1fr;
+    gap: 1rem;
+}
+
+.review-score-card {
+    background: #161616;
+    border-radius: 16px;
+    color: #f6ead1;
+    padding: 1.2rem;
+}
+
+.review-score {
+    color: #d8ab3b;
+    font-size: 2.6rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.review-rating {
+    font-size: 1.05rem;
+    font-weight: 800;
+    margin-top: .45rem;
+}
+
+.review-note {
+    color: rgba(246,234,209,.74);
+    font-size: .9rem;
+    margin-top: .65rem;
+}
+
+.review-list {
+    margin: .35rem 0 0;
+    padding-left: 1.1rem;
+}
+
+.review-list li {
+    margin-bottom: .25rem;
+}
+
 .field-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -177,6 +218,12 @@ body {
         break-inside: avoid;
     }
 }
+
+@media (max-width: 760px) {
+    .review-grid {
+        grid-template-columns: 1fr;
+    }
+}
 </style>
 
 <div class="application-shell">
@@ -215,6 +262,67 @@ body {
     </div>
 
     <div class="application-body">
+
+        <div class="section-card">
+            <h2 class="section-title">Applicant Review Rating</h2>
+            <div class="review-grid">
+                <div class="review-score-card">
+                    <div class="review-score">{{ review_summary.score }}</div>
+                    <div class="review-rating">{{ review_summary.rating }}</div>
+                    <div class="review-note">{{ review_summary.recommendation }}</div>
+                    {% if review_summary.income_ratio %}
+                        <div class="review-note">Housing cost is {{ review_summary.income_ratio }}% of stated monthly income.</div>
+                    {% endif %}
+                </div>
+                <div class="field-grid">
+                    <div class="field-item">
+                        <div class="field-label">Strengths</div>
+                        <div class="field-value">
+                            {% if review_summary.strengths %}
+                                <ul class="review-list">
+                                    {% for item in review_summary.strengths %}
+                                        <li>{{ item }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                No major strengths identified yet.
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="field-item">
+                        <div class="field-label">Needs Follow-Up</div>
+                        <div class="field-value">
+                            {% if review_summary.review_flags %}
+                                <ul class="review-list">
+                                    {% for item in review_summary.review_flags %}
+                                        <li>{{ item }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                No major review flags identified.
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="field-item field-wide">
+                        <div class="field-label">Missing Items</div>
+                        <div class="field-value">
+                            {% if review_summary.missing_items %}
+                                <ul class="review-list">
+                                    {% for item in review_summary.missing_items %}
+                                        <li>{{ item }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                Application includes the core review information.
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <p class="text-muted small mt-3 mb-0">
+                This rating is a review aid only. Final approval should be based on verified information, property criteria, fair housing rules, and individualized review.
+            </p>
+        </div>
 
         <div class="section-card">
             <h2 class="section-title">Applicant Information</h2>
