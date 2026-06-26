@@ -1830,6 +1830,12 @@ def get_landlord_workspace_context(user):
         user__isnull=True,
         application_folder="waiting",
     ).count()
+    reviewed_application_count = HousingApplication.objects.filter(
+        property__in=properties,
+        user__isnull=True,
+        landlord_reviewed_at__isnull=False,
+        application_folder="active",
+    ).count()
     archived_application_count = HousingApplication.objects.filter(
         property__in=properties,
         user__isnull=True,
@@ -1921,6 +1927,7 @@ def get_landlord_workspace_context(user):
         "new_message_count": new_message_count,
         "new_applications": new_applications,
         "new_application_count": len(new_applications),
+        "reviewed_application_count": reviewed_application_count,
         "waiting_application_count": waiting_application_count,
         "archived_application_count": archived_application_count,
         "new_messages": new_messages,
@@ -1970,22 +1977,25 @@ def landlord_resident_setup_status(request):
 @user_passes_test(staff_required)
 def landlord_application_folder(request, folder):
     folder_labels = {
+        "reviewed": "Reviewed Applications",
         "waiting": "Waiting List",
         "archived": "Archived Applications",
     }
     if folder not in folder_labels:
         raise Http404("Application folder not found.")
 
-    applications = (
-        HousingApplication.objects
-        .select_related("property", "user")
-        .filter(
-            property__in=staff_managed_properties(request.user),
-            user__isnull=True,
-            application_folder=folder,
-        )
-        .order_by("-created_at")
+    applications = HousingApplication.objects.select_related("property", "user").filter(
+        property__in=staff_managed_properties(request.user),
+        user__isnull=True,
     )
+    if folder == "reviewed":
+        applications = applications.filter(
+            application_folder="active",
+            landlord_reviewed_at__isnull=False,
+        )
+    else:
+        applications = applications.filter(application_folder=folder)
+    applications = applications.order_by("-created_at")
     application_rows = attach_applicant_review_summaries(list(applications))
 
     return render(request, "landlord_application_folder.html", {

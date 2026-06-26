@@ -1328,6 +1328,50 @@ class LiveFlowTests(TestCase):
         self.assertEqual(folder_response.status_code, 200)
         self.assertContains(folder_response, "Waiting Applicant")
 
+    def test_opened_application_moves_to_reviewed_folder(self):
+        staff_user = User.objects.create_user(
+            username="reviewed-staff",
+            email="reviewed-staff@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Reviewed Property", landlord_email=staff_user.email)
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Reviewed Applicant",
+            phone="555-0119",
+            email="reviewed@example.com",
+            age=41,
+            income_source="Employment",
+            monthly_income=Decimal("3200.00"),
+            housing_need="Needs review.",
+        )
+
+        self.client.login(username="reviewed-staff", password="StrongPass123!")
+
+        detail_response = self.client.get(reverse("application_detail", args=[application.id]))
+        self.assertEqual(detail_response.status_code, 200)
+        application.refresh_from_db()
+        self.assertIsNotNone(application.landlord_reviewed_at)
+
+        attention_response = self.client.get(reverse("landlord_attention"))
+        self.assertEqual(attention_response.context["new_application_count"], 0)
+        self.assertEqual(attention_response.context["reviewed_application_count"], 1)
+        self.assertNotContains(attention_response, "Reviewed Applicant")
+
+        reviewed_response = self.client.get(reverse("landlord_application_folder", args=["reviewed"]))
+        self.assertEqual(reviewed_response.status_code, 200)
+        self.assertContains(reviewed_response, "Reviewed Applicant")
+        self.assertContains(reviewed_response, "Return to Needs Attention")
+
+        restore_response = self.client.post(reverse("move_application_folder", args=[application.id]), {
+            "target_folder": "active",
+        })
+        self.assertRedirects(restore_response, reverse("landlord_attention"))
+        application.refresh_from_db()
+        self.assertIsNone(application.landlord_reviewed_at)
+
     def test_landlord_attention_collapses_duplicate_profile_setups_and_applications(self):
         staff_user = User.objects.create_user(
             username="dedupe-staff",

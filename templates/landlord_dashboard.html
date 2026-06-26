@@ -322,6 +322,12 @@ body {
                     <p class="text-muted mb-0">Applicants to keep available without leaving them in the new application pile.</p>
                 </a>
 
+                <a href="{% url 'landlord_application_folder' 'reviewed' %}" class="workspace-card">
+                    <div class="badge-count">{{ reviewed_application_count }}</div>
+                    <h2>Reviewed Applications</h2>
+                    <p class="text-muted mb-0">Opened applications that are still active so you can compare candidates before choosing.</p>
+                </a>
+
                 <a href="{% url 'landlord_application_folder' 'archived' %}" class="workspace-card">
                     <div class="badge-count">{{ archived_application_count }}</div>
                     <h2>Archived Applications</h2>

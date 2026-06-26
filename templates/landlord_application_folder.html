@@ -59,7 +59,9 @@
                                     {% csrf_token %}
                                     <input type="hidden" name="target_folder" value="active">
                                     <input type="hidden" name="next" value="{% url 'landlord_application_folder' folder %}">
-                                    <button type="submit" class="btn btn-outline-success btn-sm">Restore Active</button>
+                                    <button type="submit" class="btn btn-outline-success btn-sm">
+                                        {% if folder == "reviewed" %}Return to Needs Attention{% else %}Restore Active{% endif %}
+                                    </button>
                                 </form>
 
                                 {% if folder != "waiting" %}
