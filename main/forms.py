@@ -1280,6 +1280,8 @@ class ResidentMessageForm(forms.ModelForm):
 
 
 class HousingApplicationForm(forms.ModelForm):
+    PHONE_FIELDS = ["phone", "parole_officer_phone", "reference_1_phone", "reference_2_phone"]
+
     class Meta:
         model = HousingApplication
         fields = [
@@ -1327,52 +1329,52 @@ class HousingApplicationForm(forms.ModelForm):
         ]
 
         widgets = {
-            "full_name": forms.TextInput(attrs={"class": "form-control"}),
-            "phone": forms.TextInput(attrs={"class": "form-control"}),
-            "email": forms.EmailInput(attrs={"class": "form-control"}),
-            "age": forms.NumberInput(attrs={"class": "form-control"}),
+            "full_name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Legal first and last name"}),
+            "phone": forms.TextInput(attrs={"class": "form-control phone-input", "placeholder": "(541) 326-8047", "inputmode": "tel", "autocomplete": "tel"}),
+            "email": forms.EmailInput(attrs={"class": "form-control", "placeholder": "name@example.com", "autocomplete": "email"}),
+            "age": forms.NumberInput(attrs={"class": "form-control", "min": "18", "placeholder": "Age"}),
             "sms_opted_in": forms.CheckboxInput(attrs={"class": "form-check-input"}),
 
-            "current_address": forms.TextInput(attrs={"class": "form-control"}),
-            "current_address_length": forms.TextInput(attrs={"class": "form-control"}),
-            "previous_address_1": forms.TextInput(attrs={"class": "form-control"}),
-            "previous_address_1_length": forms.TextInput(attrs={"class": "form-control"}),
-            "previous_address_2": forms.TextInput(attrs={"class": "form-control"}),
-            "previous_address_2_length": forms.TextInput(attrs={"class": "form-control"}),
-            "previous_address_3": forms.TextInput(attrs={"class": "form-control"}),
-            "previous_address_3_length": forms.TextInput(attrs={"class": "form-control"}),
+            "current_address": forms.TextInput(attrs={"class": "form-control", "placeholder": "Where are you staying now?"}),
+            "current_address_length": forms.TextInput(attrs={"class": "form-control", "placeholder": "Example: 6 months, 2 years, currently unhoused"}),
+            "previous_address_1": forms.TextInput(attrs={"class": "form-control", "placeholder": "Previous address, program, shelter, or shared housing"}),
+            "previous_address_1_length": forms.TextInput(attrs={"class": "form-control", "placeholder": "Why did you leave or why are you leaving?"}),
+            "previous_address_2": forms.TextInput(attrs={"class": "form-control", "placeholder": "Optional additional prior housing"}),
+            "previous_address_2_length": forms.TextInput(attrs={"class": "form-control", "placeholder": "How long / reason for leaving"}),
+            "previous_address_3": forms.TextInput(attrs={"class": "form-control", "placeholder": "Optional additional prior housing"}),
+            "previous_address_3_length": forms.TextInput(attrs={"class": "form-control", "placeholder": "How long / reason for leaving"}),
 
-            "drivers_license_number": forms.TextInput(attrs={"class": "form-control"}),
+            "drivers_license_number": forms.TextInput(attrs={"class": "form-control", "placeholder": "Driver license number, if available"}),
             "has_valid_odl": forms.CheckboxInput(attrs={"class": "form-check-input"}),
-            "oregon_id_number": forms.TextInput(attrs={"class": "form-control"}),
+            "oregon_id_number": forms.TextInput(attrs={"class": "form-control", "placeholder": "Oregon ID number, if available"}),
             "id_upload": forms.ClearableFileInput(attrs={"class": "form-control"}),
 
-            "income_source": forms.TextInput(attrs={"class": "form-control"}),
-            "monthly_income": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
-            "employer_name": forms.TextInput(attrs={"class": "form-control"}),
-            "employment_length": forms.TextInput(attrs={"class": "form-control"}),
+            "income_source": forms.TextInput(attrs={"class": "form-control", "placeholder": "Job, SSI/SSDI, retirement, program, other"}),
+            "monthly_income": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0", "placeholder": "Monthly income before expenses"}),
+            "employer_name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Employer, agency, benefit source, or program"}),
+            "employment_length": forms.TextInput(attrs={"class": "form-control", "placeholder": "How long has this income been stable?"}),
 
-            "previous_evictions": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "previous_evictions": forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Evictions, unpaid rent, housing barriers, or write none"}),
             "in_recovery": forms.CheckboxInput(attrs={"class": "form-check-input"}),
-            "drug_of_choice": forms.TextInput(attrs={"class": "form-control"}),
+            "drug_of_choice": forms.TextInput(attrs={"class": "form-control", "placeholder": "Support needs, recovery plan, or stability notes"}),
             "on_parole": forms.CheckboxInput(attrs={"class": "form-check-input"}),
-            "parole_officer_name": forms.TextInput(attrs={"class": "form-control"}),
-            "parole_officer_phone": forms.TextInput(attrs={"class": "form-control"}),
-            "felony_history": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "parole_officer_name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Parole / probation officer name"}),
+            "parole_officer_phone": forms.TextInput(attrs={"class": "form-control phone-input", "placeholder": "(541) 326-8047", "inputmode": "tel"}),
+            "felony_history": forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Court, felony, pending case, or supervision details we should understand"}),
             "odoc_time_served": forms.CheckboxInput(attrs={"class": "form-check-input"}),
 
-            "reference_1_name": forms.TextInput(attrs={"class": "form-control"}),
-            "reference_1_phone": forms.TextInput(attrs={"class": "form-control"}),
-            "reference_1_relationship": forms.TextInput(attrs={"class": "form-control"}),
-            "reference_1_type": forms.TextInput(attrs={"class": "form-control"}),
+            "reference_1_name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Case manager, employer, landlord, family, friend"}),
+            "reference_1_phone": forms.TextInput(attrs={"class": "form-control phone-input", "placeholder": "(541) 326-8047", "inputmode": "tel"}),
+            "reference_1_relationship": forms.TextInput(attrs={"class": "form-control", "placeholder": "Relationship"}),
+            "reference_1_type": forms.TextInput(attrs={"class": "form-control", "placeholder": "Landlord, employer, support worker, personal"}),
 
-            "reference_2_name": forms.TextInput(attrs={"class": "form-control"}),
-            "reference_2_phone": forms.TextInput(attrs={"class": "form-control"}),
-            "reference_2_relationship": forms.TextInput(attrs={"class": "form-control"}),
-            "reference_2_type": forms.TextInput(attrs={"class": "form-control"}),
+            "reference_2_name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Second reference"}),
+            "reference_2_phone": forms.TextInput(attrs={"class": "form-control phone-input", "placeholder": "(541) 326-8047", "inputmode": "tel"}),
+            "reference_2_relationship": forms.TextInput(attrs={"class": "form-control", "placeholder": "Relationship"}),
+            "reference_2_type": forms.TextInput(attrs={"class": "form-control", "placeholder": "Landlord, employer, support worker, personal"}),
 
-            "housing_need": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
-            "additional_notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "housing_need": forms.Textarea(attrs={"class": "form-control", "rows": 4, "placeholder": "When do you need housing, why this home, accessibility needs, pets/service animals, and any move-in concerns"}),
+            "additional_notes": forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Anything else we should know before contacting you"}),
             "sobriety_acknowledgment": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "unconditional_regard_acknowledgment": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
@@ -1382,6 +1384,25 @@ class HousingApplicationForm(forms.ModelForm):
         help_texts = {
             "sms_opted_in": "Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help. Consent is not required to rent from Bowling Legacy.",
         }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        for field_name in self.PHONE_FIELDS:
+            cleaned_data[field_name] = self.format_phone(cleaned_data.get(field_name))
+        return cleaned_data
+
+    @staticmethod
+    def format_phone(value):
+        if not value:
+            return ""
+
+        raw_value = str(value).strip()
+        digits = "".join(character for character in raw_value if character.isdigit())
+        if len(digits) == 10:
+            return f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
+        if len(digits) == 11 and digits.startswith("1"):
+            return f"+1 ({digits[1:4]}) {digits[4:7]}-{digits[7:]}"
+        return raw_value
 
 
 class InviteCodeForm(forms.Form):

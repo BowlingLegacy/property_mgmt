@@ -1398,6 +1398,13 @@ def apply(request):
 
     if property_id:
         property_obj = get_object_or_404(Property, pk=property_id)
+    else:
+        property_obj = (
+            Property.objects
+            .filter(name__iexact="The Painted Lady Inn")
+            .first()
+            or Property.objects.filter(name__icontains="Painted Lady").first()
+        )
 
     if request.method == "POST":
         form = HousingApplicationForm(request.POST, request.FILES)
@@ -1405,6 +1412,13 @@ def apply(request):
             application = form.save(commit=False)
             if property_obj:
                 application.property = property_obj
+                if "painted lady" in property_obj.name.lower():
+                    application.space_type = application.space_type or "Room"
+                    application.monthly_rent = Decimal("650.00")
+                    application.deposit_required = Decimal("450.00")
+                    application.utility_monthly = Decimal("55.00")
+                    application.balance = Decimal("0.00")
+                    application.utility_balance = Decimal("0.00")
                 if property_obj.charges_application_fee:
                     application.application_fee_amount = property_obj.application_fee_amount
                 if property_obj.requires_background_check:

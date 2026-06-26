@@ -57,6 +57,39 @@ class LiveFlowTests(TestCase):
         application = HousingApplication.objects.get(email="applicant@example.com")
         self.assertEqual(application.property, property_obj)
 
+    def test_application_defaults_to_painted_lady_terms_without_property_query(self):
+        property_obj = Property.objects.create(name="The Painted Lady Inn")
+        payload = self.application_payload()
+        payload["phone"] = "5413268047"
+        payload["parole_officer_phone"] = "15412278913"
+        payload["reference_1_phone"] = "5412004018"
+
+        response = self.client.post(reverse("apply"), payload)
+
+        self.assertEqual(response.status_code, 302)
+        application = HousingApplication.objects.get(email="applicant@example.com")
+        self.assertEqual(application.property, property_obj)
+        self.assertEqual(application.phone, "(541) 326-8047")
+        self.assertEqual(application.parole_officer_phone, "+1 (541) 227-8913")
+        self.assertEqual(application.reference_1_phone, "(541) 200-4018")
+        self.assertEqual(application.monthly_rent, Decimal("650.00"))
+        self.assertEqual(application.deposit_required, Decimal("450.00"))
+        self.assertEqual(application.utility_monthly, Decimal("55.00"))
+        self.assertEqual(application.balance, Decimal("0.00"))
+        self.assertEqual(application.utility_balance, Decimal("0.00"))
+
+    def test_application_page_displays_painted_lady_terms_and_phone_formatter(self):
+        Property.objects.create(name="The Painted Lady Inn")
+
+        response = self.client.get(reverse("apply"))
+
+        self.assertContains(response, "$650")
+        self.assertContains(response, "Monthly room rent")
+        self.assertContains(response, "$450")
+        self.assertContains(response, "$55")
+        self.assertContains(response, "phone-input")
+        self.assertContains(response, "formatPhoneInput")
+
     def test_public_privacy_and_terms_pages_render(self):
         privacy_response = self.client.get(reverse("privacy_policy"))
         terms_response = self.client.get(reverse("terms_of_service"))

@@ -99,6 +99,44 @@
         color: #fff4dc;
         margin-top: 1.25rem;
     }
+
+    .terms-grid {
+        display: grid;
+        gap: .85rem;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        margin: 1rem 0 0;
+    }
+
+    .term-card {
+        background: #111;
+        border: 1px solid rgba(197,154,50,.45);
+        border-radius: 14px;
+        color: #fff4dc;
+        padding: .95rem;
+        text-align: center;
+    }
+
+    .term-card strong {
+        color: #f0c15b;
+        display: block;
+        font-size: 1.45rem;
+        line-height: 1.1;
+    }
+
+    .term-card span {
+        color: #e8dcc5;
+        display: block;
+        font-size: .85rem;
+        font-weight: 800;
+        margin-top: .25rem;
+        text-transform: uppercase;
+    }
+
+    @media (max-width: 760px) {
+        .terms-grid {
+            grid-template-columns: 1fr;
+        }
+    }
 </style>
 
 <div class="application-frame">
@@ -120,6 +158,11 @@
                 <strong>Unconditional Positive Regard for others</strong>. These questions help us understand housing needs,
                 support needs, and whether this community is a good fit.
             </p>
+            <div class="terms-grid" aria-label="Current Painted Lady room terms">
+                <div class="term-card"><strong>$650</strong><span>Monthly room rent</span></div>
+                <div class="term-card"><strong>$450</strong><span>Security deposit</span></div>
+                <div class="term-card"><strong>$55</strong><span>Shared utilities</span></div>
+            </div>
         </div>
 
         {% if property %}
@@ -372,5 +415,29 @@
         </form>
     </div>
 </div>
+
+<script>
+    function formatPhoneInput(value) {
+        const digits = value.replace(/\D/g, "").slice(0, 11);
+        const local = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+
+        if (local.length <= 3) {
+            return local ? `(${local}` : "";
+        }
+        if (local.length <= 6) {
+            return `(${local.slice(0, 3)}) ${local.slice(3)}`;
+        }
+        return `(${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6, 10)}`;
+    }
+
+    document.querySelectorAll(".phone-input").forEach((input) => {
+        input.addEventListener("input", () => {
+            input.value = formatPhoneInput(input.value);
+        });
+        input.addEventListener("blur", () => {
+            input.value = formatPhoneInput(input.value);
+        });
+    });
+</script>
 
 {% endblock %}
