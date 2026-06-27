@@ -273,15 +273,28 @@
                         {{ form.employer_name }}
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">How long has this income been stable?</label>
+                        <label class="form-label">Length of Job / Fixed Income</label>
                         {{ form.employment_length }}
+                    </div>
+                    <div class="col-md-6">
+                        <div class="check-card">
+                            {{ form.has_vehicle }}
+                            <label for="{{ form.has_vehicle.id_for_label }}">Do you drive or own a car/truck?</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Vehicle / Parking Notes</label>
+                        {{ form.vehicle_description }}
                     </div>
                 </div>
             </section>
 
             <section class="app-section">
                 <h2 class="app-section-title">Identification</h2>
-                <p class="app-section-note">Identification may be uploaded now or collected later during onboarding.</p>
+                <p class="app-section-note">
+                    Upload a state-issued ID or driver license. Also upload a selfie holding a note with today's date,
+                    close enough to compare the selfie to the picture ID.
+                </p>
 
                 <div class="row g-3">
                     <div class="col-md-6">
@@ -293,8 +306,12 @@
                         {{ form.oregon_id_number }}
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Upload ID Optional</label>
+                        <label class="form-label">Upload State ID / Driver License</label>
                         {{ form.id_upload }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Selfie With Today's Date</label>
+                        {{ form.identity_selfie_upload }}
                     </div>
                     <div class="col-md-6 d-flex align-items-end">
                         <div class="check-card w-100">

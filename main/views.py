@@ -2534,9 +2534,12 @@ def applicant_review_summary(application):
     if application.reference_2_name and application.reference_2_phone:
         score += 4
 
-    if application.has_valid_odl or application.oregon_id_number or application.id_upload:
-        score += 6
-        strengths.append("Identity information provided.")
+    if application.id_upload and application.identity_selfie_upload:
+        score += 8
+        strengths.append("Photo ID and date-selfie proof uploaded.")
+    elif application.has_valid_odl or application.oregon_id_number or application.id_upload:
+        score += 4
+        review_flags.append("Identity is partly documented; compare ID/selfie before approval.")
     else:
         review_flags.append("Identity still needs verification.")
 

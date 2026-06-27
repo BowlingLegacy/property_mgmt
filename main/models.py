@@ -326,11 +326,14 @@ class HousingApplication(models.Model):
     has_valid_odl = models.BooleanField(default=False)
     oregon_id_number = models.CharField(max_length=100, blank=True)
     id_upload = models.FileField(upload_to="application_ids/", blank=True, null=True)
+    identity_selfie_upload = models.FileField(upload_to="application_identity_selfies/", blank=True, null=True)
 
     income_source = models.CharField(max_length=255)
     monthly_income = models.DecimalField(max_digits=10, decimal_places=2)
     employer_name = models.CharField(max_length=255, blank=True)
     employment_length = models.CharField(max_length=100, blank=True)
+    has_vehicle = models.BooleanField(default=False)
+    vehicle_description = models.CharField(max_length=255, blank=True)
 
     previous_evictions = models.TextField(blank=True)
     in_recovery = models.BooleanField(default=False)

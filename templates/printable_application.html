@@ -376,7 +376,9 @@ body {
                 <div class="field-item"><div class="field-label">Monthly Income</div><div class="field-value">${{ application.monthly_income }}</div></div>
                 <div class="field-item"><div class="field-label">Income Source</div><div class="field-value">{{ application.income_source|default:"Not provided" }}</div></div>
                 <div class="field-item"><div class="field-label">Employer / Program / Benefit Source</div><div class="field-value">{{ application.employer_name|default:"Not provided" }}</div></div>
-                <div class="field-item"><div class="field-label">Income Stability Length</div><div class="field-value">{{ application.employment_length|default:"Not provided" }}</div></div>
+                <div class="field-item"><div class="field-label">Length of Job / Fixed Income</div><div class="field-value">{{ application.employment_length|default:"Not provided" }}</div></div>
+                <div class="field-item"><div class="field-label">Drives / Owns Vehicle</div><div class="field-value">{% if application.has_vehicle %}Yes{% else %}No{% endif %}</div></div>
+                <div class="field-item"><div class="field-label">Vehicle / Parking Notes</div><div class="field-value">{{ application.vehicle_description|default:"Not provided" }}</div></div>
             </div>
         </div>
 
@@ -387,6 +389,7 @@ body {
                 <div class="field-item"><div class="field-label">Valid Oregon ID / License</div><div class="field-value">{% if application.has_valid_odl %}Yes{% else %}No{% endif %}</div></div>
                 <div class="field-item"><div class="field-label">Oregon ID Number</div><div class="field-value">{{ application.oregon_id_number|default:"Not provided" }}</div></div>
                 <div class="field-item"><div class="field-label">Uploaded ID</div><div class="field-value">{% if application.id_upload %}<a href="{{ application.id_upload.url }}" target="_blank">Open uploaded ID</a>{% else %}Not uploaded{% endif %}</div></div>
+                <div class="field-item"><div class="field-label">Selfie With Date</div><div class="field-value">{% if application.identity_selfie_upload %}<a href="{{ application.identity_selfie_upload.url }}" target="_blank">Open selfie proof</a>{% else %}Not uploaded{% endif %}</div></div>
             </div>
         </div>
 

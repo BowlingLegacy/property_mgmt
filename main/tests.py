@@ -89,6 +89,8 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "$55")
         self.assertContains(response, "phone-input")
         self.assertContains(response, "formatPhoneInput")
+        self.assertContains(response, "Selfie With Today&#x27;s Date")
+        self.assertContains(response, "Do you drive or own a car/truck?")
 
     def test_applicant_review_summary_identifies_strong_candidate(self):
         application = HousingApplication.objects.create(
@@ -120,6 +122,29 @@ class LiveFlowTests(TestCase):
         self.assertEqual(summary["rating"], "Strong Candidate")
         self.assertGreaterEqual(summary["score"], 80)
         self.assertIn("Good candidate", summary["recommendation"])
+
+    def test_applicant_review_summary_rewards_id_and_selfie_uploads(self):
+        application = HousingApplication.objects.create(
+            full_name="Identity Applicant",
+            phone="(541) 326-8047",
+            email="identity@example.com",
+            age=42,
+            monthly_income=Decimal("3200.00"),
+            monthly_rent=Decimal("650.00"),
+            utility_monthly=Decimal("55.00"),
+            income_source="Employment",
+            current_address="Current housing",
+            previous_address_1="Previous housing",
+            id_upload="application_ids/id.jpg",
+            identity_selfie_upload="application_identity_selfies/selfie.jpg",
+            housing_need="Needs stable housing.",
+            sobriety_acknowledgment=True,
+            unconditional_regard_acknowledgment=True,
+        )
+
+        summary = applicant_review_summary(application)
+
+        self.assertIn("Photo ID and date-selfie proof uploaded.", summary["strengths"])
 
     def test_applicant_review_summary_flags_incomplete_candidate(self):
         application = HousingApplication.objects.create(
@@ -7278,6 +7303,18 @@ class LiveFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Try Demo")
         self.assertContains(response, "https://bowlinglegacy-demo.onrender.com/demo/")
+
+    @override_settings(
+        ALLOWED_HOSTS=["bowlinglegacy.com", "bowlinglegacy-demo.onrender.com"],
+        DEMO_MODE=True,
+        DEMO_PUBLIC_URL="https://bowlinglegacy-demo.onrender.com/demo/",
+    )
+    def test_demo_banner_does_not_show_on_live_host(self):
+        live_response = self.client.get(reverse("home"), HTTP_HOST="bowlinglegacy.com")
+        demo_response = self.client.get(reverse("home"), HTTP_HOST="bowlinglegacy-demo.onrender.com")
+
+        self.assertNotContains(live_response, "Demo Mode: sample data resets automatically")
+        self.assertContains(demo_response, "Demo Mode: sample data resets automatically")
 
     def test_admin_can_issue_property_owner_invite_from_intake(self):
         invite_admin = User.objects.create_superuser(
