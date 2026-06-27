@@ -1342,14 +1342,14 @@ class HousingApplicationForm(forms.ModelForm):
             "current_address_length": forms.TextInput(attrs={"class": "form-control", "placeholder": "Example: 6 months, 2 years, currently unhoused"}),
             "previous_address_1": forms.TextInput(attrs={"class": "form-control", "placeholder": "Previous address, program, shelter, or shared housing"}),
             "previous_address_1_length": forms.TextInput(attrs={"class": "form-control", "placeholder": "Why did you leave or why are you leaving?"}),
-            "previous_address_2": forms.TextInput(attrs={"class": "form-control", "placeholder": "Optional additional prior housing"}),
+            "previous_address_2": forms.TextInput(attrs={"class": "form-control", "placeholder": "Additional prior housing, shelter, program, or write none"}),
             "previous_address_2_length": forms.TextInput(attrs={"class": "form-control", "placeholder": "How long / reason for leaving"}),
-            "previous_address_3": forms.TextInput(attrs={"class": "form-control", "placeholder": "Optional additional prior housing"}),
+            "previous_address_3": forms.TextInput(attrs={"class": "form-control", "placeholder": "Additional prior housing, shelter, program, or write none"}),
             "previous_address_3_length": forms.TextInput(attrs={"class": "form-control", "placeholder": "How long / reason for leaving"}),
 
-            "drivers_license_number": forms.TextInput(attrs={"class": "form-control", "placeholder": "Driver license number, if available"}),
+            "drivers_license_number": forms.TextInput(attrs={"class": "form-control", "placeholder": "Driver license number or write none"}),
             "has_valid_odl": forms.CheckboxInput(attrs={"class": "form-check-input"}),
-            "oregon_id_number": forms.TextInput(attrs={"class": "form-control", "placeholder": "Oregon ID number, if available"}),
+            "oregon_id_number": forms.TextInput(attrs={"class": "form-control", "placeholder": "Oregon ID number or write none"}),
             "id_upload": forms.ClearableFileInput(attrs={"class": "form-control", "accept": "image/*,.pdf"}),
             "identity_selfie_upload": forms.ClearableFileInput(attrs={"class": "form-control", "accept": "image/*"}),
 
