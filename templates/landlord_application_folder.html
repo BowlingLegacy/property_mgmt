@@ -34,6 +34,10 @@
                                 <strong>{{ application.full_name }}</strong><br>
                                 <span class="text-muted small">{{ application.email|default:"No email" }}</span><br>
                                 <span class="text-muted small">{{ application.phone|default:"No phone" }}</span>
+                                {% if folder == "invited" and application.user %}
+                                    <br><span class="badge text-bg-success mt-1">Invite sent</span>
+                                    <br><span class="text-muted small">Username: {{ application.user.username }}</span>
+                                {% endif %}
                             </td>
                             <td>
                                 <span class="badge text-bg-{{ application.review_summary.badge_class }}">
@@ -50,21 +54,33 @@
                             </td>
                             <td>{{ application.property.name|default:"No Property" }}</td>
                             <td>{{ application.created_at|date:"M j, Y, g:i A" }}</td>
-                            <td>{{ application.application_folder_updated_at|date:"M j, Y, g:i A"|default:"-" }}</td>
+                            <td>
+                                {% if folder == "invited" and application.user.invite_code_created_at %}
+                                    {{ application.user.invite_code_created_at|date:"M j, Y, g:i A" }}
+                                {% else %}
+                                    {{ application.application_folder_updated_at|date:"M j, Y, g:i A"|default:"-" }}
+                                {% endif %}
+                            </td>
                             <td class="d-flex gap-2 flex-wrap">
                                 <a href="{% url 'application_detail' application.id %}" class="btn btn-outline-secondary btn-sm">Open</a>
-                                <a href="{% url 'landlord_create_tenant' %}?application={{ application.id }}" class="btn btn-primary btn-sm">Create File</a>
+                                {% if folder == "invited" %}
+                                    <a href="{% url 'landlord_create_tenant' %}?application={{ application.id }}" class="btn btn-primary btn-sm">Open Invite</a>
+                                {% else %}
+                                    <a href="{% url 'landlord_create_tenant' %}?application={{ application.id }}" class="btn btn-primary btn-sm">Create File</a>
+                                {% endif %}
 
-                                <form method="post" action="{% url 'move_application_folder' application.id %}" class="d-inline">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="target_folder" value="active">
-                                    <input type="hidden" name="next" value="{% url 'landlord_application_folder' folder %}">
-                                    <button type="submit" class="btn btn-outline-success btn-sm">
-                                        {% if folder == "reviewed" %}Return to Needs Attention{% else %}Restore Active{% endif %}
-                                    </button>
-                                </form>
+                                {% if folder != "invited" %}
+                                    <form method="post" action="{% url 'move_application_folder' application.id %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="target_folder" value="active">
+                                        <input type="hidden" name="next" value="{% url 'landlord_application_folder' folder %}">
+                                        <button type="submit" class="btn btn-outline-success btn-sm">
+                                            {% if folder == "reviewed" %}Return to Needs Attention{% else %}Restore Active{% endif %}
+                                        </button>
+                                    </form>
+                                {% endif %}
 
-                                {% if folder != "waiting" %}
+                                {% if folder != "waiting" and folder != "invited" %}
                                     <form method="post" action="{% url 'move_application_folder' application.id %}" class="d-inline">
                                         {% csrf_token %}
                                         <input type="hidden" name="target_folder" value="waiting">
@@ -73,7 +89,7 @@
                                     </form>
                                 {% endif %}
 
-                                {% if folder != "archived" %}
+                                {% if folder != "archived" and folder != "invited" %}
                                     <form method="post" action="{% url 'move_application_folder' application.id %}" class="d-inline">
                                         {% csrf_token %}
                                         <input type="hidden" name="target_folder" value="archived">

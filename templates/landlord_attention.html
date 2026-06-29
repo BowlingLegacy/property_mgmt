@@ -9,6 +9,7 @@
         </div>
         <div class="d-flex gap-2 flex-wrap">
             <a href="{% url 'landlord_application_folder' 'reviewed' %}" class="btn btn-outline-secondary">Reviewed Applications</a>
+            <a href="{% url 'landlord_application_folder' 'invited' %}" class="btn btn-outline-success">Invited / Pending Setup</a>
             <a href="{% url 'landlord_application_folder' 'waiting' %}" class="btn btn-outline-primary">Waiting List</a>
             <a href="{% url 'landlord_resident_setup_status' %}" class="btn btn-outline-success">Setup Status</a>
             <a href="{% url 'current_resident_roster_upload' %}" class="btn btn-outline-primary">Approved Resident List</a>

@@ -1836,6 +1836,16 @@ def get_landlord_workspace_context(user):
         landlord_reviewed_at__isnull=False,
         application_folder="active",
     ).count()
+    invited_pending_applications = [
+        application for application in HousingApplication.objects
+        .select_related("property", "user")
+        .filter(
+            property__in=properties,
+            user__isnull=False,
+            application_folder="active",
+        )
+        if application.user and not application.user.has_usable_password()
+    ]
     archived_application_count = HousingApplication.objects.filter(
         property__in=properties,
         user__isnull=True,
@@ -1928,6 +1938,7 @@ def get_landlord_workspace_context(user):
         "new_applications": new_applications,
         "new_application_count": len(new_applications),
         "reviewed_application_count": reviewed_application_count,
+        "invited_pending_count": len(invited_pending_applications),
         "waiting_application_count": waiting_application_count,
         "archived_application_count": archived_application_count,
         "new_messages": new_messages,
@@ -1978,6 +1989,7 @@ def landlord_resident_setup_status(request):
 def landlord_application_folder(request, folder):
     folder_labels = {
         "reviewed": "Reviewed Applications",
+        "invited": "Invited / Pending Setup",
         "waiting": "Waiting List",
         "archived": "Archived Applications",
     }
@@ -1990,12 +2002,20 @@ def landlord_application_folder(request, folder):
     )
     if folder == "reviewed":
         applications = applications.filter(
+            user__isnull=True,
             application_folder="active",
             landlord_reviewed_at__isnull=False,
         )
+    elif folder == "invited":
+        applications = [
+            application for application in applications.filter(
+                user__isnull=False,
+                application_folder="active",
+            ).order_by("-created_at")
+            if application.user and not application.user.has_usable_password()
+        ]
     else:
-        applications = applications.filter(application_folder=folder)
-    applications = applications.order_by("-created_at")
+        applications = applications.filter(user__isnull=True, application_folder=folder).order_by("-created_at")
     application_rows = attach_applicant_review_summaries(list(applications))
 
     return render(request, "landlord_application_folder.html", {

@@ -1397,6 +1397,47 @@ class LiveFlowTests(TestCase):
         application.refresh_from_db()
         self.assertIsNone(application.landlord_reviewed_at)
 
+    def test_pending_invited_application_has_folder(self):
+        staff_user = User.objects.create_user(
+            username="invite-folder-staff",
+            email="invite-folder-staff@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        pending_user = User.objects.create_user(
+            username="mike-mcguffey-pending",
+            email="mike@example.com",
+            role="tenant",
+        )
+        pending_user.set_unusable_password()
+        pending_user.refresh_invite_code()
+        pending_user.save()
+        property_obj = Property.objects.create(name="Invite Folder Property", landlord_email=staff_user.email)
+        HousingApplication.objects.create(
+            property=property_obj,
+            user=pending_user,
+            full_name="Mike McGuffey",
+            phone="555-0120",
+            email="mike@example.com",
+            age=48,
+            income_source="Employment",
+            monthly_income=Decimal("3200.00"),
+            housing_need="Needs invite tracking.",
+        )
+
+        self.client.login(username="invite-folder-staff", password="StrongPass123!")
+
+        dashboard_response = self.client.get(reverse("landlord_dashboard"))
+        self.assertEqual(dashboard_response.context["invited_pending_count"], 1)
+        self.assertContains(dashboard_response, "Invited / Pending Setup")
+
+        folder_response = self.client.get(reverse("landlord_application_folder", args=["invited"]))
+        self.assertEqual(folder_response.status_code, 200)
+        self.assertContains(folder_response, "Mike McGuffey")
+        self.assertContains(folder_response, "Invite sent")
+        self.assertContains(folder_response, "mike-mcguffey-pending")
+
     def test_landlord_attention_collapses_duplicate_profile_setups_and_applications(self):
         staff_user = User.objects.create_user(
             username="dedupe-staff",

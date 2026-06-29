@@ -328,6 +328,12 @@ body {
                     <p class="text-muted mb-0">Opened applications that are still active so you can compare candidates before choosing.</p>
                 </a>
 
+                <a href="{% url 'landlord_application_folder' 'invited' %}" class="workspace-card">
+                    <div class="badge-count">{{ invited_pending_count }}</div>
+                    <h2>Invited / Pending Setup</h2>
+                    <p class="text-muted mb-0">Applications already linked to a portal invite but not finished by the resident.</p>
+                </a>
+
                 <a href="{% url 'landlord_application_folder' 'archived' %}" class="workspace-card">
                     <div class="badge-count">{{ archived_application_count }}</div>
                     <h2>Archived Applications</h2>
