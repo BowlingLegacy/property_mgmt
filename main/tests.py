@@ -612,6 +612,9 @@ class LiveFlowTests(TestCase):
 
         application.refresh_from_db()
         self.assertIsNotNone(application.user)
+        self.assertIsNotNone(application.landlord_reviewed_at)
+        self.assertEqual(application.application_folder, "active")
+        self.assertEqual(application.tenancy_status, "active")
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn(application.user.invite_code, mail.outbox[0].body)
         self.assertIn("https://bowlinglegacy.com/enter-invite-code/", mail.outbox[0].body)

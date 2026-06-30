@@ -139,6 +139,9 @@ def create_tenant(request):
             application.deposit_payment_plan = form.cleaned_data.get("deposit_payment_plan") or "paid_in_full"
             application.utility_monthly = utility_monthly
             application.utility_balance = move_in_utility_charge
+            application.application_folder = "active"
+            application.tenancy_status = "active"
+            application.landlord_reviewed_at = application.landlord_reviewed_at or timezone.now()
             application.additional_notes = form.cleaned_data.get("additional_notes") or ""
             move_in_note = (
                 f"Move-in charges calculated from lease start date: "
