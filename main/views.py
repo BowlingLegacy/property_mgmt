@@ -3098,7 +3098,8 @@ def get_superadmin_workspace_context():
     applications = (
         HousingApplication.objects
         .select_related("property", "user")
-        .filter(user__isnull=False)
+        .filter(tenancy_status="active")
+        .filter(Q(user__isnull=False) | Q(landlord_reviewed_at__isnull=False))
         .order_by("property__name", "space_label", "full_name")
     )
     completed_payments = Payment.objects.filter(status="completed")

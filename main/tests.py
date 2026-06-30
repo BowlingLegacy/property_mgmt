@@ -4047,6 +4047,63 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "Inspection Resident File")
         self.assertNotContains(response, "Inspection Applicant Only")
 
+    def test_superadmin_resident_inspection_shows_only_active_residents(self):
+        User.objects.create_user(
+            username="active-resident-inspection-admin",
+            email="active-resident-inspection-admin@example.com",
+            password="StrongPass123!",
+            role="admin",
+            is_staff=True,
+        )
+        hero_user = User.objects.create_user(
+            username="hero-former-inspection",
+            email="hero-former-inspection@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        aaron_user = User.objects.create_user(
+            username="aaron-active-inspection",
+            email="aaron-active-inspection@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        property_obj = Property.objects.create(name="Active Resident Inspection Property")
+        HousingApplication.objects.create(
+            property=property_obj,
+            user=hero_user,
+            full_name="HERO LOWE",
+            phone="2092303426",
+            email="hero-former-inspection@example.com",
+            age=42,
+            space_type="Room",
+            space_label="N",
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Former resident.",
+            tenancy_status="former",
+            move_out_date=date(2026, 6, 14),
+        )
+        HousingApplication.objects.create(
+            property=property_obj,
+            user=aaron_user,
+            full_name="Aaron Brian Brown",
+            phone="5412008453",
+            email="aaron-active-inspection@example.com",
+            age=45,
+            space_type="Room",
+            space_label="N",
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            tenancy_status="active",
+        )
+
+        self.client.login(username="active-resident-inspection-admin", password="StrongPass123!")
+        response = self.client.get(reverse("superadmin_residents"))
+
+        self.assertContains(response, "Aaron Brian Brown")
+        self.assertNotContains(response, "HERO LOWE")
+
     def test_staff_can_edit_resident_balances_directly(self):
         landlord = User.objects.create_user(
             username="balance-edit-landlord",
