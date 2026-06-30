@@ -839,8 +839,10 @@ class LiveFlowTests(TestCase):
             is_staff=True,
         )
         property_obj = Property.objects.create(name="Manual Transfer Property", landlord_email=staff_user.email)
+        resident_user = User.objects.create_user(username="manual-pay-resident-user", password="StrongPass123!", role="tenant")
         application = HousingApplication.objects.create(
             property=property_obj,
+            user=resident_user,
             full_name="Manual Pay Resident",
             phone="555-0103",
             email="manual@example.com",
@@ -848,6 +850,7 @@ class LiveFlowTests(TestCase):
             income_source="Employment",
             monthly_income=Decimal("3000.00"),
             housing_need="Current resident.",
+            space_label="A",
             balance=Decimal("900.00"),
         )
 
@@ -900,6 +903,7 @@ class LiveFlowTests(TestCase):
             income_source="Employment",
             monthly_income=Decimal("3000.00"),
             housing_need="Current resident.",
+            space_label="B",
             monthly_rent=Decimal("650.00"),
             balance=Decimal("650.00"),
             utility_monthly=Decimal("55.00"),
@@ -1000,6 +1004,7 @@ class LiveFlowTests(TestCase):
             income_source="Employment",
             monthly_income=Decimal("3000.00"),
             housing_need="Current resident.",
+            space_label="A",
         )
         second_resident = HousingApplication.objects.create(
             property=second_property,
@@ -1011,6 +1016,7 @@ class LiveFlowTests(TestCase):
             income_source="Employment",
             monthly_income=Decimal("3000.00"),
             housing_need="Current resident.",
+            space_label="B",
         )
 
         self.client.login(username="payment-picker-staff", password="StrongPass123!")
@@ -1049,6 +1055,7 @@ class LiveFlowTests(TestCase):
             income_source="Employment",
             monthly_income=Decimal("3000.00"),
             housing_need="Current resident.",
+            space_label="A",
         )
 
         self.client.login(username="single-payment-staff", password="StrongPass123!")
@@ -1059,6 +1066,135 @@ class LiveFlowTests(TestCase):
         self.assertEqual(response.context["selected_property"], property_obj)
         self.assertIn(resident, list(response.context["form"].fields["application"].queryset))
 
+    def test_manual_payment_dropdown_excludes_applicants_former_and_placeholders(self):
+        staff_user = User.objects.create_user(
+            username="payment-clean-list-staff",
+            email="payment-clean-list@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Payment Clean List Property", landlord_email=staff_user.email)
+        active_user = User.objects.create_user(username="payment-clean-active", password="StrongPass123!", role="tenant")
+        active_resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=active_user,
+            full_name="Active Payment Resident",
+            phone="555-0140",
+            email="active-payment@example.com",
+            age=44,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            space_label="A",
+            tenancy_status="active",
+        )
+        applicant = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Applicant Payment Choice",
+            phone="555-0141",
+            email="applicant-payment@example.com",
+            age=34,
+            income_source="Employment",
+            monthly_income=Decimal("2800.00"),
+            housing_need="Needs housing.",
+            application_folder="active",
+        )
+        former_user = User.objects.create_user(username="payment-clean-former", password="StrongPass123!", role="tenant")
+        former = HousingApplication.objects.create(
+            property=property_obj,
+            user=former_user,
+            full_name="Former Payment Resident",
+            phone="555-0142",
+            email="former-payment@example.com",
+            age=45,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Former resident.",
+            space_label="B",
+            tenancy_status="former",
+            move_out_date=date(2026, 6, 1),
+        )
+        placeholder = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Room C",
+            phone="",
+            email="",
+            age=0,
+            income_source="Placeholder",
+            monthly_income=Decimal("0.00"),
+            housing_need="Duplicate placeholder.",
+            space_label="C",
+            landlord_reviewed_at=timezone.now(),
+            tenancy_status="active",
+        )
+
+        self.client.login(username="payment-clean-list-staff", password="StrongPass123!")
+        response = self.client.get(reverse("record_manual_payment"))
+        choices = list(response.context["form"].fields["application"].queryset)
+
+        self.assertIn(active_resident, choices)
+        self.assertNotIn(applicant, choices)
+        self.assertNotIn(former, choices)
+        self.assertNotIn(placeholder, choices)
+
+    def test_payment_log_excludes_applicant_and_placeholder_payments(self):
+        staff_user = User.objects.create_user(
+            username="payment-log-clean-staff",
+            email="payment-log-clean@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Payment Log Clean Property", landlord_email=staff_user.email)
+        active_user = User.objects.create_user(username="payment-log-active", password="StrongPass123!", role="tenant")
+        active_resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=active_user,
+            full_name="Active Log Resident",
+            phone="555-0143",
+            email="active-log@example.com",
+            age=44,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            space_label="A",
+            tenancy_status="active",
+        )
+        applicant = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Applicant Log Record",
+            phone="555-0144",
+            email="applicant-log@example.com",
+            age=34,
+            income_source="Employment",
+            monthly_income=Decimal("2800.00"),
+            housing_need="Needs housing.",
+        )
+        placeholder = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Room B",
+            phone="",
+            email="",
+            age=0,
+            income_source="Placeholder",
+            monthly_income=Decimal("0.00"),
+            housing_need="Duplicate placeholder.",
+            space_label="B",
+            landlord_reviewed_at=timezone.now(),
+            tenancy_status="active",
+        )
+        Payment.objects.create(application=active_resident, payment_type="rent", amount=Decimal("500.00"), status="completed")
+        Payment.objects.create(application=applicant, payment_type="rent", amount=Decimal("500.00"), status="completed")
+        Payment.objects.create(application=placeholder, payment_type="rent", amount=Decimal("500.00"), status="completed")
+
+        self.client.login(username="payment-log-clean-staff", password="StrongPass123!")
+        response = self.client.get(reverse("payment_log"))
+
+        self.assertContains(response, "Active Log Resident")
+        self.assertNotContains(response, "Applicant Log Record")
+        self.assertNotContains(response, "Room B")
+
     def test_manual_payment_can_apply_to_future_rent_month(self):
         staff_user = User.objects.create_user(
             username="future-rent-staff",
@@ -1068,8 +1204,10 @@ class LiveFlowTests(TestCase):
             is_staff=True,
         )
         property_obj = Property.objects.create(name="Future Rent Property", landlord_email=staff_user.email)
+        resident_user = User.objects.create_user(username="future-rent-resident-user", password="StrongPass123!", role="tenant")
         application = HousingApplication.objects.create(
             property=property_obj,
+            user=resident_user,
             full_name="Future Rent Resident",
             phone="555-0201",
             email="future-rent@example.com",
@@ -1077,6 +1215,7 @@ class LiveFlowTests(TestCase):
             income_source="Employment",
             monthly_income=Decimal("3000.00"),
             housing_need="Current resident.",
+            space_label="A",
             balance=Decimal("650.00"),
         )
 
@@ -1145,8 +1284,10 @@ class LiveFlowTests(TestCase):
             is_staff=True,
         )
         property_obj = Property.objects.create(name="Blank Type Property", landlord_email=staff_user.email)
+        resident_user = User.objects.create_user(username="blank-type-resident-user", password="StrongPass123!", role="tenant")
         application = HousingApplication.objects.create(
             property=property_obj,
+            user=resident_user,
             full_name="Blank Type Resident",
             phone="555-0119",
             email="blank-type@example.com",
@@ -1154,6 +1295,7 @@ class LiveFlowTests(TestCase):
             income_source="Employment",
             monthly_income=Decimal("3000.00"),
             housing_need="Current resident.",
+            space_label="A",
             balance=Decimal("100.00"),
         )
 
@@ -1178,8 +1320,10 @@ class LiveFlowTests(TestCase):
             is_staff=True,
         )
         property_obj = Property.objects.create(name="Correct Payment Property", landlord_email=staff_user.email)
+        resident_user = User.objects.create_user(username="correct-payment-resident-user", password="StrongPass123!", role="tenant")
         application = HousingApplication.objects.create(
             property=property_obj,
+            user=resident_user,
             full_name="Correct Payment Resident",
             phone="555-0120",
             email="correct-payment@example.com",
@@ -1187,6 +1331,7 @@ class LiveFlowTests(TestCase):
             income_source="Employment",
             monthly_income=Decimal("3000.00"),
             housing_need="Current resident.",
+            space_label="A",
             monthly_rent=Decimal("104.84"),
             balance=Decimal("104.84"),
             utility_monthly=Decimal("8.87"),
@@ -1237,8 +1382,10 @@ class LiveFlowTests(TestCase):
             is_staff=True,
         )
         property_obj = Property.objects.create(name="Cash App Property", landlord_email=staff_user.email)
+        resident_user = User.objects.create_user(username="cashapp-resident-user", password="StrongPass123!", role="tenant")
         application = HousingApplication.objects.create(
             property=property_obj,
+            user=resident_user,
             full_name="Cash App Resident",
             phone="555-0104",
             email="cashapp@example.com",
@@ -1246,6 +1393,7 @@ class LiveFlowTests(TestCase):
             income_source="Employment",
             monthly_income=Decimal("3000.00"),
             housing_need="Current resident.",
+            space_label="A",
             deposit_required=Decimal("450.00"),
             deposit_paid=Decimal("100.00"),
         )

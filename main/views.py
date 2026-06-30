@@ -1659,6 +1659,23 @@ def active_staff_managed_applications(user):
     return staff_managed_applications(user).filter(tenancy_status="active")
 
 
+def active_staff_managed_resident_files(user):
+    residents = (
+        active_staff_managed_applications(user)
+        .select_related("property", "user")
+        .filter(Q(user__isnull=False) | Q(landlord_reviewed_at__isnull=False) | Q(payments__status="completed"))
+        .exclude(space_label="")
+        .distinct()
+        .order_by("property__name", "space_label", "full_name")
+    )
+    visible_ids = [
+        resident.id
+        for resident in visible_resident_files(residents)
+        if not is_room_placeholder_application(resident)
+    ]
+    return HousingApplication.objects.filter(id__in=visible_ids).select_related("property", "user")
+
+
 def custom_report_accessible_properties(user):
     return staff_managed_properties(user).order_by("name")
 
@@ -4627,9 +4644,17 @@ def payment_log(request):
     selected_month = selected_report_month(request) if month_filter_active else None
     previous_month = add_months(selected_month, -1) if selected_month else None
     next_month = add_months(selected_month, 1) if selected_month else None
+    active_resident_ids = set(active_staff_managed_resident_files(request.user).values_list("id", flat=True))
+    real_former_resident_ids = set(
+        staff_managed_applications(request.user)
+        .filter(tenancy_status="former", move_out_date__isnull=False)
+        .exclude(space_label="")
+        .values_list("id", flat=True)
+    )
+    payment_application_ids = active_resident_ids | real_former_resident_ids
     completed_payments = (
         Payment.objects
-        .filter(application__in=staff_managed_applications(request.user), status="completed")
+        .filter(application_id__in=payment_application_ids, status="completed")
         .select_related("application", "application__property")
         .order_by("application__property__name", "-created_at", "application__space_label", "application__full_name")
     )
@@ -4694,7 +4719,7 @@ def record_manual_payment(request, property_id=None):
 
     if application_id:
         selected_application = get_object_or_404(
-            staff_managed_applications(request.user).select_related("property"),
+            active_staff_managed_resident_files(request.user).select_related("property"),
             id=application_id,
         )
         selected_property = selected_application.property
@@ -4703,11 +4728,7 @@ def record_manual_payment(request, property_id=None):
     elif accessible_properties.count() == 1:
         selected_property = accessible_properties.first()
 
-    application_queryset = (
-        staff_managed_applications(request.user)
-        .select_related("property")
-        .order_by("space_label", "full_name")
-    )
+    application_queryset = active_staff_managed_resident_files(request.user).order_by("space_label", "full_name")
     if selected_property:
         application_queryset = application_queryset.filter(property=selected_property)
 
@@ -4761,7 +4782,7 @@ def record_manual_payment(request, property_id=None):
         if application_id:
             initial["application"] = application_id
             selected_application = get_object_or_404(
-                staff_managed_applications(request.user).select_related("property"),
+                active_staff_managed_resident_files(request.user).select_related("property"),
                 id=application_id,
             )
             month_start, _next_month = current_month_bounds()
@@ -4800,11 +4821,7 @@ def edit_manual_payment(request, payment_id):
 
     if request.method == "POST":
         form = ManualPaymentForm(request.POST, instance=payment)
-        form.fields["application"].queryset = (
-            staff_managed_applications(request.user)
-            .select_related("property")
-            .order_by("property__name", "space_label", "full_name")
-        )
+        form.fields["application"].queryset = active_staff_managed_resident_files(request.user).order_by("property__name", "space_label", "full_name")
 
         if form.is_valid():
             payment = form.save()
@@ -4814,11 +4831,7 @@ def edit_manual_payment(request, payment_id):
             return redirect("payment_receipt", payment_id=payment.id)
     else:
         form = ManualPaymentForm(instance=payment)
-        form.fields["application"].queryset = (
-            staff_managed_applications(request.user)
-            .select_related("property")
-            .order_by("property__name", "space_label", "full_name")
-        )
+        form.fields["application"].queryset = active_staff_managed_resident_files(request.user).order_by("property__name", "space_label", "full_name")
 
     return render(request, "record_manual_payment.html", {
         "form": form,
