@@ -92,6 +92,44 @@
                         <label class="form-label fw-bold">Medical / Emergency Notes</label>
                         <textarea name="emergency_medical_notes" class="form-control" rows="4">{{ signed_document.emergency_medical_notes }}</textarea>
                     </div>
+                {% elif signed_document.title == "Minor Occupancy / Responsible Adult Guarantor Addendum" %}
+                    <h3 class="fw-bold mb-3">Minor Occupancy / Responsible Adult Guarantor Addendum</h3>
+                    <p>
+                        The occupant is 17 years of age and will reside in the rented room as an authorized minor
+                        occupant. Because the occupant is under 18, the parent, legal guardian, or approved responsible
+                        adult signing this addendum agrees to be fully responsible for all rent, utilities, deposits,
+                        fees, damages, house rule compliance, notices, and all other obligations connected to the
+                        resident file and occupancy.
+                    </p>
+                    <p>
+                        The minor occupant is authorized to reside at the property but is not released from following all
+                        property rules, quiet enjoyment requirements, safety rules, guest rules, shared-space rules, and
+                        resident conduct requirements. The responsible adult agrees that any violation by the minor
+                        occupant is treated as a violation of the rental agreement and house rules.
+                    </p>
+                    <p>
+                        The responsible adult must provide current contact information, emergency contact information,
+                        and school or employment contact information if applicable. The responsible adult must remain
+                        reachable for urgent notices, emergencies, rent issues, conduct concerns, maintenance access, and
+                        tenancy matters.
+                    </p>
+                    <p>
+                        The minor occupant may not assign the room, sublease the room, move another person into the room,
+                        or allow overnight guests except as allowed by the written house rules. When the occupant turns
+                        18, landlord may require the occupant to sign an updated rental agreement or adult resident
+                        acknowledgment.
+                    </p>
+
+                    <div class="row g-3 my-3">
+                        <div class="col-md-6">
+                            <strong>Minor Occupant:</strong><br>
+                            {{ signed_document.resident_name }}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Unit:</strong><br>
+                            {{ signed_document.room_space }}
+                        </div>
+                    </div>
                 {% else %}
                     <h3 class="fw-bold mb-3">Who We Are</h3>
                     <p>
@@ -110,9 +148,21 @@
 
                 <div class="signature-panel mt-4">
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Resident Signature</label>
+                        <label class="form-label fw-bold">
+                            {% if signed_document.title == "Minor Occupancy / Responsible Adult Guarantor Addendum" %}
+                                Responsible Adult / Guardian Signature
+                            {% else %}
+                                Resident Signature
+                            {% endif %}
+                        </label>
                         <input type="text" name="resident_signature" class="form-control"
                                value="{{ signed_document.resident_signature }}" required>
+                        {% if signed_document.title == "Minor Occupancy / Responsible Adult Guarantor Addendum" %}
+                            <div class="form-text">
+                                Type the responsible adult's full legal name. This addendum is intended for the adult
+                                financially responsible for the minor occupant.
+                            </div>
+                        {% endif %}
                     </div>
 
                     <div class="mb-3">

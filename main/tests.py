@@ -3331,6 +3331,48 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "viewable but no longer editable")
         self.assertContains(response, "Emergency Person")
 
+    def test_minor_occupancy_addendum_is_one_off_document(self):
+        property_obj = Property.objects.create(name="The Painted Lady Inn")
+        user = User.objects.create_user(
+            username="minor-occupancy-resident",
+            email="minor-occupancy@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            user=user,
+            full_name="Minor Occupant",
+            phone="555-0117",
+            email="minor-occupancy@example.com",
+            age=17,
+            space_label="R",
+            income_source="Student",
+            monthly_income=Decimal("0.00"),
+            housing_need="Student housing.",
+        )
+        output = StringIO()
+
+        call_command(
+            "issue_minor_occupancy_addendum",
+            "--resident-name",
+            "Minor Occupant",
+            "--confirm",
+            stdout=output,
+        )
+
+        signed_document = SignedDocument.objects.get(
+            application=application,
+            title="Minor Occupancy / Responsible Adult Guarantor Addendum",
+        )
+
+        self.client.login(username="minor-occupancy-resident", password="StrongPass123!")
+        response = self.client.get(reverse("onboarding_document", args=[signed_document.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "authorized minor occupant")
+        self.assertContains(response, "Responsible Adult / Guardian Signature")
+
     def test_resident_signs_selected_lease_document(self):
         user = User.objects.create_user(
             username="resident-selected-lease",
