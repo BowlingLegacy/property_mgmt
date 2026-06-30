@@ -950,6 +950,14 @@ def recalculated_utility_due(application):
 
 
 def expected_rent_for_month(application, month_start):
+    month_end = date(month_start.year, month_start.month, calendar.monthrange(month_start.year, month_start.month)[1])
+
+    if application.lease_start_date and application.lease_start_date > month_end:
+        return Decimal("0.00")
+
+    if application.move_out_date and application.move_out_date <= month_end:
+        return application.balance or Decimal("0.00")
+
     if (
         application.lease_start_date
         and application.move_in_rent_charge > 0
@@ -961,6 +969,14 @@ def expected_rent_for_month(application, month_start):
 
 
 def expected_utility_for_month(application, month_start):
+    month_end = date(month_start.year, month_start.month, calendar.monthrange(month_start.year, month_start.month)[1])
+
+    if application.lease_start_date and application.lease_start_date > month_end:
+        return Decimal("0.00")
+
+    if application.move_out_date and application.move_out_date <= month_end:
+        return application.utility_balance or Decimal("0.00")
+
     if (
         application.lease_start_date
         and application.move_in_utility_charge > 0

@@ -4960,6 +4960,78 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "size: landscape")
         self.assertContains(response, "table-layout: fixed")
 
+    def test_rent_roll_does_not_charge_resident_before_lease_start_month(self):
+        landlord = User.objects.create_user(
+            username="future-rent-roll-landlord",
+            email="future-rent-roll-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Future Rent Roll Property", landlord_email=landlord.email)
+        future_user = User.objects.create_user(username="future-rent-roll-tenant", password="StrongPass123!", role="tenant")
+        HousingApplication.objects.create(
+            property=property_obj,
+            user=future_user,
+            full_name="Future Move In",
+            phone="555-0620",
+            email="future-roll@example.com",
+            age=40,
+            space_label="R",
+            monthly_rent=Decimal("650.00"),
+            utility_monthly=Decimal("55.00"),
+            lease_start_date=date(2026, 7, 1),
+            deposit_required=Decimal("450.00"),
+            deposit_paid=Decimal("450.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Future resident.",
+        )
+
+        self.client.login(username="future-rent-roll-landlord", password="StrongPass123!")
+        response = self.client.get(f"{reverse('rent_roll')}?month=2026-06")
+
+        self.assertEqual(response.status_code, 200)
+        row = next(row for row in response.context["rows"] if row["resident"] == "Future Move In")
+        self.assertEqual(row["rent_balance"], Decimal("0.00"))
+        self.assertEqual(row["utility_balance"], Decimal("0.00"))
+
+    def test_rent_roll_uses_final_balance_for_move_out_month(self):
+        landlord = User.objects.create_user(
+            username="move-out-rent-roll-landlord",
+            email="move-out-rent-roll-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Move Out Rent Roll Property", landlord_email=landlord.email)
+        former_user = User.objects.create_user(username="move-out-rent-roll-tenant", password="StrongPass123!", role="tenant")
+        HousingApplication.objects.create(
+            property=property_obj,
+            user=former_user,
+            full_name="Zero Balance Move Out",
+            phone="555-0621",
+            email="move-out-roll@example.com",
+            age=41,
+            space_label="H",
+            monthly_rent=Decimal("650.00"),
+            balance=Decimal("0.00"),
+            utility_monthly=Decimal("55.00"),
+            utility_balance=Decimal("0.00"),
+            move_out_date=date(2026, 6, 21),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Former resident.",
+        )
+
+        self.client.login(username="move-out-rent-roll-landlord", password="StrongPass123!")
+        response = self.client.get(f"{reverse('rent_roll')}?month=2026-06")
+
+        self.assertEqual(response.status_code, 200)
+        row = next(row for row in response.context["rows"] if row["resident"] == "Zero Balance Move Out")
+        self.assertEqual(row["rent_balance"], Decimal("0.00"))
+        self.assertEqual(row["utility_balance"], Decimal("0.00"))
+
     def test_rent_roll_prompts_for_property_when_multiple_properties_exist(self):
         superuser = User.objects.create_user(
             username="rent-roll-super",
