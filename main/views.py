@@ -3100,6 +3100,7 @@ def get_superadmin_workspace_context():
         .select_related("property", "user")
         .filter(tenancy_status="active")
         .filter(Q(user__isnull=False) | Q(landlord_reviewed_at__isnull=False))
+        .exclude(space_label="")
         .order_by("property__name", "space_label", "full_name")
     )
     completed_payments = Payment.objects.filter(status="completed")
@@ -3133,7 +3134,7 @@ def get_superadmin_workspace_context():
     context = {
         "properties": properties,
         "users": users,
-        "applications": dedupe_resident_inspection_applications(applications),
+        "applications": dedupe_resident_inspection_applications(visible_resident_files(applications)),
         "recent_messages": recent_messages,
         "owner_groups": owner_groups,
         "site_payment_total": site_payment_total,

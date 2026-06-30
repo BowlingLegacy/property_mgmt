@@ -4031,6 +4031,17 @@ class LiveFlowTests(TestCase):
         )
         HousingApplication.objects.create(
             property=property_obj,
+            full_name="Reviewed Applicant Only",
+            phone="555-0554",
+            email="reviewed-applicant@example.com",
+            age=34,
+            income_source="Employment",
+            monthly_income=Decimal("2800.00"),
+            housing_need="Reviewed but not converted.",
+            landlord_reviewed_at=timezone.now(),
+        )
+        HousingApplication.objects.create(
+            property=property_obj,
             user=resident_user,
             full_name="Inspection Resident File",
             phone="555-0553",
@@ -4039,6 +4050,8 @@ class LiveFlowTests(TestCase):
             income_source="Employment",
             monthly_income=Decimal("3000.00"),
             housing_need="Current resident.",
+            space_type="Room",
+            space_label="A",
         )
 
         self.client.login(username="resident-inspection-superadmin", password="StrongPass123!")
@@ -4046,6 +4059,7 @@ class LiveFlowTests(TestCase):
 
         self.assertContains(response, "Inspection Resident File")
         self.assertNotContains(response, "Inspection Applicant Only")
+        self.assertNotContains(response, "Reviewed Applicant Only")
 
     def test_superadmin_resident_inspection_shows_only_active_residents(self):
         User.objects.create_user(
