@@ -2135,6 +2135,9 @@ def end_resident_tenancy(request, application_id):
                 application.user.is_active = False
                 application.user.save(update_fields=["is_active"])
 
+            if not editing_former_tenant:
+                deactivate_current_roster_entries_for_application(application)
+
             if editing_former_tenant:
                 messages.success(request, f"Move-out details updated for {application.full_name}.")
                 return redirect("former_tenant_files")
@@ -2302,6 +2305,7 @@ def transfer_resident_room(request, application_id):
                 updated_fields.append("additional_notes")
 
             application.save(update_fields=updated_fields)
+            sync_current_roster_room_for_application(application)
             messages.success(request, f"{application.full_name} moved from {old_room} to {new_space_type} {new_space_label}.")
             return redirect("application_detail", pk=application.id)
     else:
@@ -2325,6 +2329,14 @@ def room_rent_setup_rows(user, property_obj=None):
         properties = properties.filter(id=property_obj.id)
     room_map = OrderedDict()
 
+    existing_files = list(sorted_resident_list(
+        active_staff_managed_applications(user)
+        .select_related("property")
+        .filter(Q(user__isnull=False) | Q(landlord_reviewed_at__isnull=False))
+        .exclude(space_label="")
+        .order_by("property__name", "space_label", "full_name")
+    ))
+
     roster_entries = (
         CurrentResidentRosterEntry.objects
         .select_related("property")
@@ -2335,6 +2347,12 @@ def room_rent_setup_rows(user, property_obj=None):
         label = (entry.room_unit_label or "").strip()
         if not label:
             continue
+        if any(
+            application.property_id == entry.property_id
+            and housing_application_matches_roster_entry(application, entry)
+            for application in existing_files
+        ):
+            continue
         key = (entry.property_id, normalized_room_label(label))
         room_map.setdefault(key, {
             "property": entry.property,
@@ -2344,14 +2362,7 @@ def room_rent_setup_rows(user, property_obj=None):
         })
         room_map[key]["residents"].append(entry.full_name())
 
-    existing_files = (
-        active_staff_managed_applications(user)
-        .select_related("property")
-        .filter(Q(user__isnull=False) | Q(landlord_reviewed_at__isnull=False))
-        .exclude(space_label="")
-        .order_by("property__name", "space_label", "full_name")
-    )
-    for application in sorted_resident_list(existing_files):
+    for application in existing_files:
         if is_orphan_existing_resident_setup_file(application):
             continue
         if not application.property_id:
@@ -6574,6 +6585,48 @@ def housing_application_matches_roster_entry(application, roster_entry):
         return resident_names_compatible(roster_entry.full_name(), application.full_name)
 
     return resident_names_compatible(roster_entry.full_name(), application.full_name)
+
+
+def current_roster_entries_for_application(application):
+    if not application.property_id:
+        return []
+
+    return [
+        entry for entry in CurrentResidentRosterEntry.objects.filter(
+            property=application.property,
+            is_active=True,
+        )
+        if housing_application_matches_roster_entry(application, entry)
+    ]
+
+
+def deactivate_current_roster_entries_for_application(application):
+    entries = current_roster_entries_for_application(application)
+    entry_ids = [entry.id for entry in entries]
+    if entry_ids:
+        CurrentResidentRosterEntry.objects.filter(id__in=entry_ids).update(is_active=False)
+    return len(entry_ids)
+
+
+def sync_current_roster_room_for_application(application):
+    entries = current_roster_entries_for_application(application)
+    clean_room = canonical_room_label(application.space_label)
+    updated = 0
+    for entry in entries:
+        update_fields = []
+        if entry.room_unit_label != clean_room:
+            entry.room_unit_label = clean_room
+            update_fields.append("room_unit_label")
+        if application.phone and entry.phone != application.phone:
+            entry.phone = application.phone
+            update_fields.append("phone")
+        if application.email and entry.email != application.email:
+            entry.email = application.email
+            update_fields.append("email")
+        if update_fields:
+            entry.save(update_fields=update_fields)
+            updated += 1
+    return updated
 
 
 def intake_matches_roster_entry(intake, roster_entry):

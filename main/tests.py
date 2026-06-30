@@ -1889,6 +1889,104 @@ class LiveFlowTests(TestCase):
         self.assertIn("larger room", resident.additional_notes)
         self.assertTrue(RentHistory.objects.filter(application=resident, rent_amount=Decimal("650.00")).exists())
 
+    def test_room_transfer_updates_matching_roster_entry(self):
+        landlord = User.objects.create_user(
+            username="room-transfer-roster-landlord",
+            email="room-transfer-roster@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Room Transfer Roster Property", landlord_email=landlord.email)
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Aaron Brown",
+            phone="5412008453",
+            email="aaron@example.com",
+            age=45,
+            space_type="Room",
+            space_label="R",
+            monthly_rent=Decimal("650.00"),
+            balance=Decimal("0.00"),
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            tenancy_status="active",
+            landlord_reviewed_at=timezone.now(),
+        )
+        roster = CurrentResidentRosterEntry.objects.create(
+            property=property_obj,
+            first_name="Aaron",
+            last_name="Brown",
+            email="aaron@example.com",
+            phone="5412008453",
+            room_unit_label="R",
+            uploaded_by=landlord,
+        )
+        PropertyRoomRent.objects.create(
+            property=property_obj,
+            room_unit_label="N",
+            monthly_rent=Decimal("550.00"),
+            utility_monthly=Decimal("55.00"),
+            deposit_required=Decimal("450.00"),
+        )
+
+        self.client.login(username="room-transfer-roster-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("transfer_resident_room", args=[resident.id]), {
+            "space_type": "Room",
+            "space_label": "N",
+            "apply_room_rent": "on",
+        })
+
+        self.assertRedirects(response, reverse("application_detail", args=[resident.id]))
+        roster.refresh_from_db()
+        resident.refresh_from_db()
+        self.assertEqual(resident.space_label, "N")
+        self.assertEqual(roster.room_unit_label, "N")
+
+    def test_rent_setup_ignores_stale_roster_room_when_active_file_moved(self):
+        landlord = User.objects.create_user(
+            username="stale-roster-rent-setup",
+            email="stale-roster-rent-setup@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Stale Roster Rent Setup Property", landlord_email=landlord.email)
+        HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Aaron Brown",
+            phone="5412008453",
+            email="aaron@example.com",
+            age=45,
+            space_type="Room",
+            space_label="N",
+            monthly_rent=Decimal("550.00"),
+            balance=Decimal("0.00"),
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            tenancy_status="active",
+            landlord_reviewed_at=timezone.now(),
+        )
+        CurrentResidentRosterEntry.objects.create(
+            property=property_obj,
+            first_name="Aaron",
+            last_name="Brown",
+            email="aaron@example.com",
+            phone="5412008453",
+            room_unit_label="R",
+            uploaded_by=landlord,
+        )
+
+        self.client.login(username="stale-roster-rent-setup", password="StrongPass123!")
+        response = self.client.get(reverse("landlord_rent_setup"))
+
+        room_rows = response.context["room_rows"]
+        aaron_rows = [row for row in room_rows if "Aaron Brown" in row["residents"]]
+        self.assertEqual(len(aaron_rows), 1)
+        self.assertEqual(aaron_rows[0]["room_unit_label"], "N")
+
     def test_begin_new_tenancy_applies_room_terms_on_post(self):
         landlord = User.objects.create_user(
             username="begin-tenancy-landlord",
@@ -4101,6 +4199,54 @@ class LiveFlowTests(TestCase):
         response = self.client.get(reverse("edit_resident_balances", args=[applicant.id]))
 
         self.assertEqual(response.status_code, 404)
+
+    def test_ending_tenancy_deactivates_matching_roster_entry(self):
+        landlord = User.objects.create_user(
+            username="end-tenancy-roster-landlord",
+            email="end-tenancy-roster@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="End Tenancy Roster Property", landlord_email=landlord.email)
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=User.objects.create_user(username="hero-roster-tenant", password="StrongPass123!", role="tenant"),
+            full_name="Hero Lowe",
+            phone="2092303426",
+            email="hero@example.com",
+            age=42,
+            space_type="Room",
+            space_label="N",
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            tenancy_status="active",
+        )
+        roster = CurrentResidentRosterEntry.objects.create(
+            property=property_obj,
+            first_name="Hero",
+            last_name="Lowe",
+            email="hero@example.com",
+            phone="2092303426",
+            room_unit_label="N",
+            uploaded_by=landlord,
+        )
+
+        self.client.login(username="end-tenancy-roster-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("end_resident_tenancy", args=[resident.id]), {
+            "move_out_date": "2026-06-14",
+            "tenancy_end_reason": "Moved out",
+            "final_balance": "0.00",
+            "final_utility_balance": "0.00",
+            "disable_portal_login": "on",
+        })
+
+        self.assertRedirects(response, reverse("begin_new_tenancy"))
+        resident.refresh_from_db()
+        roster.refresh_from_db()
+        self.assertEqual(resident.tenancy_status, "former")
+        self.assertFalse(roster.is_active)
 
     def test_staff_can_edit_move_out_reason_for_former_tenant(self):
         landlord = User.objects.create_user(
