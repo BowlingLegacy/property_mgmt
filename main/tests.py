@@ -3420,6 +3420,52 @@ class LiveFlowTests(TestCase):
         self.assertFalse(original_lease.locked)
         self.assertTrue(platform_lease.locked)
 
+    def test_lease_sms_opt_in_updates_resident_sms_consent(self):
+        user = User.objects.create_user(
+            username="lease-sms-opt-in",
+            email="lease-sms@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        application = HousingApplication.objects.create(
+            user=user,
+            full_name="Lease SMS Resident",
+            phone="555-0127",
+            email="lease-sms@example.com",
+            age=51,
+            sms_opted_in=False,
+            sms_opted_out_at=timezone.now(),
+            communication_preference="portal",
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+        )
+        lease = SignedDocument.objects.create(
+            application=application,
+            document_type="lease",
+            title="Resident Lease Agreement",
+        )
+
+        self.client.login(username="lease-sms-opt-in", password="StrongPass123!")
+        response = self.client.post(reverse("submit_onboarding_document", args=[lease.id]), {
+            "rent_initials": "LS",
+            "sobriety_initials": "LS",
+            "testing_initials": "LS",
+            "guest_policy_initials": "LS",
+            "cleanliness_initials": "LS",
+            "disclosure_initials": "LS",
+            "resident_signature": "Lease SMS Resident",
+            "signature_agreement": "on",
+            "sms_opted_in": "on",
+        })
+
+        self.assertRedirects(response, reverse("tenant_dashboard"))
+        application.refresh_from_db()
+        self.assertTrue(application.sms_opted_in)
+        self.assertIsNotNone(application.sms_opted_in_at)
+        self.assertIsNone(application.sms_opted_out_at)
+        self.assertEqual(application.communication_preference, "sms")
+
     def test_resident_sees_signed_documents_on_compatible_duplicate_file(self):
         property_obj = Property.objects.create(name="The Painted Lady Inn")
         user = User.objects.create_user(

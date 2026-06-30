@@ -7438,6 +7438,7 @@ def submit_lease_signature(request, document_id=None):
     signed_document.signature_agreement = bool(
         request.POST.get("signature_agreement")
     )
+    sms_opted_in = bool(request.POST.get("sms_opted_in"))
 
     if not signed_document.resident_signature:
         messages.error(request, "Signature is required.")
@@ -7451,6 +7452,18 @@ def submit_lease_signature(request, document_id=None):
     signed_document.locked = True
 
     signed_document.save()
+
+    if sms_opted_in and not application.sms_opted_in:
+        application.sms_opted_in = True
+        application.sms_opted_in_at = timezone.now()
+        application.sms_opted_out_at = None
+        application.communication_preference = "sms"
+        application.save(update_fields=[
+            "sms_opted_in",
+            "sms_opted_in_at",
+            "sms_opted_out_at",
+            "communication_preference",
+        ])
 
     messages.success(
         request,

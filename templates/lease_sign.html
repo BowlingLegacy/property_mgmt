@@ -461,6 +461,20 @@
                         portal easier to use or more helpful for daily house communication.
                     </p>
 
+                    <div class="form-check border rounded p-3 my-3 bg-light">
+                        <input class="form-check-input"
+                               type="checkbox"
+                               name="sms_opted_in"
+                               id="smsOptedIn"
+                               {% if application.sms_opted_in %}checked{% endif %}>
+                        <label class="form-check-label" for="smsOptedIn">
+                            Yes, I agree to receive text messages from Bowling Legacy about resident portal notices,
+                            rent and utility reminders, maintenance notices, building notices, and urgent property
+                            updates. Message frequency varies. Message and data rates may apply. Reply STOP to opt out
+                            or HELP for help. Consent is not required to rent from Bowling Legacy.
+                        </label>
+                    </div>
+
                     <p>
                         For the June 2026 platform transition, residents are asked to review this updated lease and
                         platform acknowledgment by June 1, 2026. Any questions, concerns, or requested corrections
