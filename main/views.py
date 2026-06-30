@@ -2077,7 +2077,11 @@ def former_tenant_files(request):
     former_residents = (
         HousingApplication.objects
         .select_related("property", "user")
-        .filter(property__in=staff_managed_properties(request.user), tenancy_status="former")
+        .filter(
+            property__in=staff_managed_properties(request.user),
+            tenancy_status="former",
+            move_out_date__isnull=False,
+        )
         .order_by("-move_out_date", "-former_tenant_archived_at", "property__name", "space_label", "full_name")
     )
 

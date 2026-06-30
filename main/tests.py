@@ -4302,6 +4302,52 @@ class LiveFlowTests(TestCase):
         self.assertEqual(former.tenancy_archive_notes, "Forwarding address requested.")
         self.assertEqual(former.balance, Decimal("406.00"))
 
+    def test_former_tenant_list_hides_cleanup_archives_without_move_out_date(self):
+        landlord = User.objects.create_user(
+            username="former-cleanup-landlord",
+            email="former-cleanup@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Former Cleanup Property", landlord_email=landlord.email)
+        HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Room Q",
+            phone="",
+            email="",
+            age=0,
+            space_label="Q",
+            income_source="Cleanup",
+            monthly_income=Decimal("0.00"),
+            housing_need="Archived duplicate placeholder.",
+            tenancy_status="former",
+            former_tenant_archived_at=timezone.now(),
+            tenancy_end_reason="Duplicate room placeholder",
+        )
+        real_former = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Real Former Resident",
+            phone="555-0101",
+            email="real-former@example.com",
+            age=42,
+            space_label="R",
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Former resident.",
+            tenancy_status="former",
+            move_out_date=date(2026, 6, 14),
+            former_tenant_archived_at=timezone.now(),
+            tenancy_end_reason="Moved out",
+        )
+
+        self.client.login(username="former-cleanup-landlord", password="StrongPass123!")
+        response = self.client.get(reverse("former_tenant_files"))
+
+        self.assertContains(response, real_former.full_name)
+        self.assertNotContains(response, "Room Q")
+        self.assertNotContains(response, "Duplicate room placeholder")
+
     def test_landlord_dashboard_lists_current_month_rent_and_utility_exceptions(self):
         landlord = User.objects.create_user(
             username="collection-landlord",
