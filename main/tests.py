@@ -644,7 +644,7 @@ class LiveFlowTests(TestCase):
             rent_due_day=1,
             utility_monthly=Decimal("55.00"),
             deposit_required=Decimal("450.00"),
-            deposit_paid=Decimal("0.00"),
+            deposit_paid=Decimal("450.00"),
         )
         application = HousingApplication.objects.create(
             property=property_obj,
@@ -1888,6 +1888,54 @@ class LiveFlowTests(TestCase):
         self.assertEqual(resident.utility_monthly, Decimal("75.00"))
         self.assertIn("larger room", resident.additional_notes)
         self.assertTrue(RentHistory.objects.filter(application=resident, rent_amount=Decimal("650.00")).exists())
+
+    def test_begin_new_tenancy_applies_room_terms_on_post(self):
+        landlord = User.objects.create_user(
+            username="begin-tenancy-landlord",
+            email="begin-tenancy-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Begin Tenancy Property", landlord_email=landlord.email)
+        PropertyRoomRent.objects.create(
+            property=property_obj,
+            room_unit_label="Room R",
+            monthly_rent=Decimal("650.00"),
+            rent_due_day=1,
+            utility_monthly=Decimal("55.00"),
+            deposit_required=Decimal("450.00"),
+            deposit_paid=Decimal("450.00"),
+        )
+
+        self.client.login(username="begin-tenancy-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("begin_new_tenancy"), {
+            "property": str(property_obj.id),
+            "full_name": "Michael McGuffey",
+            "email": "mcguffey@example.com",
+            "phone": "5413268047",
+            "age": "45",
+            "space_type": "Room",
+            "space_label": "R",
+            "monthly_rent": "0.00",
+            "balance": "0.00",
+            "rent_due_day": "17",
+            "deposit_required": "0.00",
+            "deposit_paid": "0.00",
+            "utility_monthly": "0.00",
+            "utility_balance": "0.00",
+        })
+
+        self.assertEqual(response.status_code, 200)
+        resident = HousingApplication.objects.get(full_name="Michael McGuffey")
+        self.assertEqual(resident.space_label, "R")
+        self.assertEqual(resident.monthly_rent, Decimal("650.00"))
+        self.assertEqual(resident.balance, Decimal("650.00"))
+        self.assertEqual(resident.rent_due_day, 1)
+        self.assertEqual(resident.utility_monthly, Decimal("55.00"))
+        self.assertEqual(resident.utility_balance, Decimal("55.00"))
+        self.assertEqual(resident.deposit_required, Decimal("450.00"))
+        self.assertEqual(resident.deposit_paid, Decimal("0.00"))
 
     def test_landlord_can_add_room_rent_without_roster_entry(self):
         landlord = User.objects.create_user(

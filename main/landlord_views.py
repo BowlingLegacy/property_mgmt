@@ -8,7 +8,7 @@ from django.utils.text import slugify
 
 from .forms import LandlordCreateTenantForm
 from .models import HousingApplication, SignedDocument, User
-from .views import find_room_rent_setting, prorated_monthly_charge, staff_managed_properties, staff_required
+from .views import canonical_room_label, room_financial_terms, prorated_monthly_charge, staff_managed_properties, staff_required
 
 
 def send_resident_invite_email(application):
@@ -71,8 +71,8 @@ def ensure_onboarding_documents(application):
 
 
 def apply_room_rent_setting_to_application(application, form_data):
-    space_label = form_data.get("space_label", "")
-    room_setting = find_room_rent_setting(application.property, space_label)
+    space_label = canonical_room_label(form_data.get("space_label", ""))
+    terms = room_financial_terms(application.property, space_label)
 
     monthly_rent = form_data.get("monthly_rent") or 0
     utility_monthly = form_data.get("utility_monthly") or 0
@@ -80,15 +80,15 @@ def apply_room_rent_setting_to_application(application, form_data):
     deposit_paid = form_data.get("deposit_paid") or 0
     rent_due_day = form_data.get("rent_due_day") or 1
 
-    if room_setting:
-        monthly_rent = room_setting.monthly_rent
-        utility_monthly = room_setting.utility_monthly
-        deposit_required = room_setting.deposit_required
-        deposit_paid = room_setting.deposit_paid
-        rent_due_day = room_setting.rent_due_day
+    if terms:
+        monthly_rent = terms["monthly_rent"]
+        utility_monthly = terms["utility_monthly"]
+        deposit_required = terms["deposit_required"]
+        rent_due_day = terms["rent_due_day"]
 
     return {
-        "room_setting": room_setting,
+        "room_setting": terms["room_setting"] if terms else None,
+        "space_label": space_label,
         "monthly_rent": monthly_rent,
         "utility_monthly": utility_monthly,
         "deposit_required": deposit_required,
@@ -127,7 +127,7 @@ def create_tenant(request):
             move_in_utility_charge = prorated_monthly_charge(utility_monthly, lease_start_date)
 
             application.space_type = form.cleaned_data.get("space_type", "")
-            application.space_label = form.cleaned_data.get("space_label", "")
+            application.space_label = room_values["space_label"]
             application.monthly_rent = monthly_rent
             application.balance = move_in_rent_charge
             application.rent_due_day = room_values["rent_due_day"]
@@ -206,18 +206,18 @@ def create_tenant(request):
             })
 
     else:
-        room_setting = find_room_rent_setting(application.property, application.space_label)
+        terms = room_financial_terms(application.property, application.space_label)
         form = LandlordCreateTenantForm(initial={
-            "monthly_rent": room_setting.monthly_rent if room_setting else application.monthly_rent,
+            "monthly_rent": terms["monthly_rent"] if terms else application.monthly_rent,
             "balance": application.balance,
-            "deposit_required": room_setting.deposit_required if room_setting else application.deposit_required,
-            "deposit_paid": room_setting.deposit_paid if room_setting else application.deposit_paid,
+            "deposit_required": terms["deposit_required"] if terms else application.deposit_required,
+            "deposit_paid": application.deposit_paid,
             "deposit_payment_plan": application.deposit_payment_plan,
-            "utility_monthly": room_setting.utility_monthly if room_setting else application.utility_monthly,
+            "utility_monthly": terms["utility_monthly"] if terms else application.utility_monthly,
             "utility_balance": application.utility_balance,
             "space_type": application.space_type,
-            "space_label": application.space_label,
-            "rent_due_day": room_setting.rent_due_day if room_setting else application.rent_due_day,
+            "space_label": canonical_room_label(application.space_label),
+            "rent_due_day": terms["rent_due_day"] if terms else application.rent_due_day,
         })
 
     return render(request, "landlord_create_tenant.html", {

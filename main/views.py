@@ -2171,23 +2171,30 @@ def begin_new_tenancy(request):
         initial["property"] = property_obj.id
         if unit_label:
             initial["space_label"] = canonical_room_label(unit_label)
-            room_setting = find_room_rent_setting(property_obj, unit_label)
-            if room_setting:
+            terms = room_financial_terms(property_obj, unit_label)
+            if terms:
                 initial.update({
                     "space_type": "Room",
-                    "monthly_rent": room_setting.monthly_rent,
-                    "rent_due_day": room_setting.rent_due_day,
-                    "deposit_required": room_setting.deposit_required,
-                    "deposit_paid": room_setting.deposit_paid,
-                    "utility_monthly": room_setting.utility_monthly,
-                    "balance": room_setting.monthly_rent,
-                    "utility_balance": room_setting.utility_monthly,
+                    "monthly_rent": terms["monthly_rent"],
+                    "rent_due_day": terms["rent_due_day"],
+                    "deposit_required": terms["deposit_required"],
+                    "deposit_paid": Decimal("0.00"),
+                    "utility_monthly": terms["utility_monthly"],
+                    "balance": terms["monthly_rent"],
+                    "utility_balance": terms["utility_monthly"],
                 })
 
     form = BeginNewTenancyForm(request.POST or None, properties=properties, initial=initial)
 
     if request.method == "POST" and form.is_valid():
         property_obj = form.cleaned_data["property"]
+        terms = room_financial_terms(property_obj, form.cleaned_data["space_label"])
+        monthly_rent = terms["monthly_rent"] if terms else form.cleaned_data["monthly_rent"]
+        utility_monthly = terms["utility_monthly"] if terms else form.cleaned_data["utility_monthly"]
+        deposit_required = terms["deposit_required"] if terms else form.cleaned_data["deposit_required"]
+        rent_due_day = terms["rent_due_day"] if terms else form.cleaned_data["rent_due_day"]
+        rent_balance = form.cleaned_data["balance"] or monthly_rent
+        utility_balance = form.cleaned_data["utility_balance"] or utility_monthly
         application = HousingApplication.objects.create(
             property=property_obj,
             full_name=form.cleaned_data["full_name"],
@@ -2196,14 +2203,14 @@ def begin_new_tenancy(request):
             age=form.cleaned_data.get("age") or 0,
             space_type=form.cleaned_data.get("space_type") or "Room",
             space_label=canonical_room_label(form.cleaned_data["space_label"]),
-            monthly_rent=form.cleaned_data["monthly_rent"],
-            balance=form.cleaned_data["balance"],
-            rent_due_day=form.cleaned_data["rent_due_day"],
+            monthly_rent=monthly_rent,
+            balance=rent_balance,
+            rent_due_day=rent_due_day,
             lease_start_date=form.cleaned_data.get("lease_start_date"),
-            deposit_required=form.cleaned_data["deposit_required"],
+            deposit_required=deposit_required,
             deposit_paid=form.cleaned_data["deposit_paid"],
-            utility_monthly=form.cleaned_data["utility_monthly"],
-            utility_balance=form.cleaned_data["utility_balance"],
+            utility_monthly=utility_monthly,
+            utility_balance=utility_balance,
             income_source="New tenancy created by landlord",
             monthly_income=Decimal("0.00"),
             housing_need="Resident tenancy file created directly from landlord dashboard.",
@@ -2253,29 +2260,29 @@ def transfer_resident_room(request, application_id):
         if form.is_valid():
             old_room = f"{application.space_type} {application.space_label}".strip() or "Unassigned"
             new_space_type = form.cleaned_data["space_type"].strip()
-            new_space_label = form.cleaned_data["space_label"].strip()
+            new_space_label = canonical_room_label(form.cleaned_data["space_label"].strip())
             application.space_type = new_space_type
             application.space_label = new_space_label
 
             updated_fields = ["space_type", "space_label"]
-            room_setting = None
+            terms = None
             if form.cleaned_data["apply_room_rent"]:
-                room_setting = find_room_rent_setting(application.property, new_space_label)
+                terms = room_financial_terms(application.property, new_space_label)
 
-            if room_setting:
-                if application.monthly_rent != room_setting.monthly_rent:
+            if terms:
+                if application.monthly_rent != terms["monthly_rent"]:
                     RentHistory.objects.create(
                         application=application,
-                        rent_amount=room_setting.monthly_rent,
+                        rent_amount=terms["monthly_rent"],
                         effective_date=timezone.localdate(),
                     )
-                application.monthly_rent = room_setting.monthly_rent
-                application.balance = room_setting.monthly_rent
-                application.rent_due_day = room_setting.rent_due_day
-                application.utility_monthly = room_setting.utility_monthly
-                application.utility_balance = room_setting.utility_monthly
-                application.deposit_required = room_setting.deposit_required
-                application.deposit_paid = min(application.deposit_paid, room_setting.deposit_required)
+                application.monthly_rent = terms["monthly_rent"]
+                application.balance = terms["monthly_rent"]
+                application.rent_due_day = terms["rent_due_day"]
+                application.utility_monthly = terms["utility_monthly"]
+                application.utility_balance = terms["utility_monthly"]
+                application.deposit_required = terms["deposit_required"]
+                application.deposit_paid = min(application.deposit_paid, terms["deposit_required"])
                 updated_fields.extend([
                     "monthly_rent",
                     "balance",
@@ -2472,6 +2479,21 @@ def find_room_rent_setting(property_obj, room_unit_label):
         if normalized_room_label(setting.room_unit_label) == target_label:
             return setting
     return None
+
+
+def room_financial_terms(property_obj, room_unit_label):
+    room_setting = find_room_rent_setting(property_obj, room_unit_label)
+    if not room_setting:
+        return None
+
+    return {
+        "room_setting": room_setting,
+        "space_label": canonical_room_label(room_unit_label),
+        "monthly_rent": room_setting.monthly_rent,
+        "rent_due_day": room_setting.rent_due_day,
+        "utility_monthly": room_setting.utility_monthly,
+        "deposit_required": room_setting.deposit_required,
+    }
 
 
 def attention_identity_key(property_id, email, full_name, room_unit_label=""):
