@@ -3371,6 +3371,8 @@ class LiveFlowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "authorized minor occupant")
+        self.assertContains(response, "single-occupancy approval")
+        self.assertContains(response, "No parent, guardian, family member")
         self.assertContains(response, "Responsible Adult / Guardian Signature")
 
     def test_resident_signs_selected_lease_document(self):
