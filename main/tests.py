@@ -982,6 +982,79 @@ class LiveFlowTests(TestCase):
         self.assertEqual(unit_g_rows[0]["rent_due"], Decimal("560.00"))
         self.assertEqual(unit_g_rows[0]["utility_due"], Decimal("55.00"))
 
+    @patch("main.views.timezone.localdate", return_value=date(2026, 7, 3))
+    def test_landlord_collection_watch_includes_prior_open_balance(self, _mocked_localdate):
+        staff_user = User.objects.create_user(
+            username="watch-carryforward-staff",
+            email="watch-carryforward@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Watch Carry Property", landlord_email=staff_user.email)
+        resident_user = User.objects.create_user(username="watch-carry-resident", password="StrongPass123!", role="tenant")
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Carry Forward Resident",
+            phone="555-0149",
+            email="watch-carry@example.com",
+            age=44,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            space_label="R",
+            monthly_rent=Decimal("650.00"),
+            utility_monthly=Decimal("55.00"),
+            balance=Decimal("450.00"),
+        )
+
+        self.client.login(username="watch-carryforward-staff", password="StrongPass123!")
+        response = self.client.get(reverse("landlord_dashboard"))
+
+        rows = [
+            row
+            for row in response.context["collection_watch_rows"]
+            if row["application"].id == application.id
+        ]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["rent_expected"], Decimal("650.00"))
+        self.assertEqual(rows[0]["prior_rent_balance"], Decimal("450.00"))
+        self.assertEqual(rows[0]["rent_due"], Decimal("1100.00"))
+
+    @patch("main.views.timezone.localdate", return_value=date(2026, 7, 3))
+    def test_manual_payment_prefill_includes_prior_open_balance(self, _mocked_localdate):
+        staff_user = User.objects.create_user(
+            username="manual-carryforward-staff",
+            email="manual-carryforward@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Manual Carry Property", landlord_email=staff_user.email)
+        resident_user = User.objects.create_user(username="manual-carry-resident", password="StrongPass123!", role="tenant")
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Manual Carry Resident",
+            phone="555-0150",
+            email="manual-carry@example.com",
+            age=44,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            space_label="R",
+            monthly_rent=Decimal("650.00"),
+            utility_monthly=Decimal("55.00"),
+            balance=Decimal("450.00"),
+        )
+
+        self.client.login(username="manual-carryforward-staff", password="StrongPass123!")
+        response = self.client.get(f"{reverse('record_manual_payment')}?application={application.id}")
+
+        self.assertEqual(response.context["form"].initial["amount"], Decimal("1100.00"))
+        self.assertEqual(response.context["form"].initial["service_month"], date(2026, 7, 1))
+
     def test_record_payment_prompts_for_property_when_multiple_properties_exist(self):
         staff_user = User.objects.create_user(
             username="payment-picker-staff",

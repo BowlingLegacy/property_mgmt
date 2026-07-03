@@ -1036,6 +1036,20 @@ def payment_amount_for_month(payments, year, month, payment_types=None):
     return total
 
 
+def current_rent_due_with_carryforward(application, month_start, payments):
+    rent_paid = payment_amount_for_month(payments, month_start.year, month_start.month, ["rent"])
+    current_month_due = max(expected_rent_for_month(application, month_start) - rent_paid, Decimal("0.00"))
+    open_balance = max(application.balance or Decimal("0.00"), Decimal("0.00"))
+    return open_balance + current_month_due
+
+
+def current_utility_due_with_carryforward(application, month_start, payments):
+    utility_paid = payment_amount_for_month(payments, month_start.year, month_start.month, ["utility"])
+    current_month_due = max(expected_utility_for_month(application, month_start) - utility_paid, Decimal("0.00"))
+    open_balance = max(application.utility_balance or Decimal("0.00"), Decimal("0.00"))
+    return open_balance + current_month_due
+
+
 def selected_report_month(request):
     raw_month = (request.GET.get("month") or "").strip()
     if raw_month:
@@ -1759,13 +1773,15 @@ def monthly_collection_watch_rows(applications):
             utility_paid += combined_to_utility
 
         missing_items = []
-        rent_due = max(rent_expected - rent_paid, Decimal("0.00"))
-        utility_due = max(utility_expected - utility_paid, Decimal("0.00"))
+        prior_rent_balance = max(application.balance or Decimal("0.00"), Decimal("0.00"))
+        prior_utility_balance = max(application.utility_balance or Decimal("0.00"), Decimal("0.00"))
+        rent_due = prior_rent_balance + max(rent_expected - rent_paid, Decimal("0.00"))
+        utility_due = prior_utility_balance + max(utility_expected - utility_paid, Decimal("0.00"))
 
-        if rent_expected > 0 and rent_due > 0:
+        if (rent_expected > 0 or prior_rent_balance > 0) and rent_due > 0:
             missing_items.append("Rent")
 
-        if utility_expected > 0 and utility_due > 0:
+        if (utility_expected > 0 or prior_utility_balance > 0) and utility_due > 0:
             missing_items.append("Utilities")
 
         if missing_items:
@@ -1778,9 +1794,11 @@ def monthly_collection_watch_rows(applications):
                 "rent_paid": rent_paid,
                 "rent_expected": rent_expected,
                 "rent_due": rent_due,
+                "prior_rent_balance": prior_rent_balance,
                 "utility_paid": utility_paid,
                 "utility_expected": utility_expected,
                 "utility_due": utility_due,
+                "prior_utility_balance": prior_utility_balance,
             })
 
     return sorted(
@@ -4803,10 +4821,8 @@ def record_manual_payment(request, property_id=None):
             )
             month_start, _next_month = current_month_bounds()
             monthly_payments = list(selected_application.payments.filter(status="completed"))
-            rent_paid = payment_amount_for_month(monthly_payments, month_start.year, month_start.month, ["rent"])
-            utility_paid = payment_amount_for_month(monthly_payments, month_start.year, month_start.month, ["utility"])
-            rent_due = max(expected_rent_for_month(selected_application, month_start) - rent_paid, Decimal("0.00"))
-            utility_due = max(expected_utility_for_month(selected_application, month_start) - utility_paid, Decimal("0.00"))
+            rent_due = current_rent_due_with_carryforward(selected_application, month_start, monthly_payments)
+            utility_due = current_utility_due_with_carryforward(selected_application, month_start, monthly_payments)
             if rent_due > 0:
                 initial["payment_type"] = "rent"
                 initial["amount"] = rent_due
