@@ -4767,6 +4767,9 @@ class LiveFlowTests(TestCase):
             space_label="B",
             monthly_rent=Decimal("500.00"),
             utility_monthly=Decimal("66.00"),
+            lease_start_date=date(2026, 7, 3),
+            move_in_rent_charge=Decimal("456.06"),
+            move_in_utility_charge=Decimal("50.45"),
             income_source="Employment",
             monthly_income=Decimal("2500.00"),
             housing_need="Current resident.",
@@ -4805,6 +4808,8 @@ class LiveFlowTests(TestCase):
         self.assertEqual(response.context["collection_summary"]["utility_due"], Decimal("132.00"))
         self.assertEqual(response.context["collection_summary"]["rent_collected"], Decimal("1000.00"))
         self.assertEqual(response.context["collection_summary"]["utility_collected"], Decimal("66.00"))
+        self.assertEqual(response.context["collection_summary"]["rent_due_display"], "1,000")
+        self.assertEqual(response.context["collection_summary"]["utility_due_display"], "132")
 
     def test_landlord_collection_watch_cleans_room_prefix(self):
         landlord = User.objects.create_user(

@@ -1,7 +1,7 @@
 from collections import OrderedDict
 import calendar
 from datetime import date, timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import csv
 import html
 from html.parser import HTMLParser
@@ -180,6 +180,10 @@ def money(value):
 
 def csv_money(value):
     return f"{money(value):.2f}"
+
+
+def whole_money_display(value):
+    return f"{money(value).quantize(Decimal('1'), rounding=ROUND_HALF_UP):,.0f}"
 
 
 FINANCIAL_COLUMN_ALIASES = {
@@ -987,6 +991,24 @@ def expected_utility_for_month(application, month_start):
     return application.utility_monthly or Decimal("0.00")
 
 
+def scheduled_rent_for_month_summary(application, month_start):
+    month_end = date(month_start.year, month_start.month, calendar.monthrange(month_start.year, month_start.month)[1])
+    if application.lease_start_date and application.lease_start_date > month_end:
+        return Decimal("0.00")
+    if application.move_out_date and application.move_out_date < month_start:
+        return Decimal("0.00")
+    return application.monthly_rent or Decimal("0.00")
+
+
+def scheduled_utility_for_month_summary(application, month_start):
+    month_end = date(month_start.year, month_start.month, calendar.monthrange(month_start.year, month_start.month)[1])
+    if application.lease_start_date and application.lease_start_date > month_end:
+        return Decimal("0.00")
+    if application.move_out_date and application.move_out_date < month_start:
+        return Decimal("0.00")
+    return application.utility_monthly or Decimal("0.00")
+
+
 def first_day_of_month(value):
     return date(value.year, value.month, 1)
 
@@ -1761,6 +1783,8 @@ def monthly_collection_status_rows(applications):
 
         rent_expected = max((expected_rent_for_month(grouped_application, month_start) for grouped_application in duplicate_group), default=Decimal("0.00"))
         utility_expected = max((expected_utility_for_month(grouped_application, month_start) for grouped_application in duplicate_group), default=Decimal("0.00"))
+        scheduled_rent = max((scheduled_rent_for_month_summary(grouped_application, month_start) for grouped_application in duplicate_group), default=Decimal("0.00"))
+        scheduled_utility = max((scheduled_utility_for_month_summary(grouped_application, month_start) for grouped_application in duplicate_group), default=Decimal("0.00"))
 
         if combined_paid > 0:
             rent_shortfall = max(rent_expected - rent_paid, Decimal("0.00"))
@@ -1792,10 +1816,12 @@ def monthly_collection_status_rows(applications):
             "missing": " + ".join(missing_items),
             "rent_paid": rent_paid,
             "rent_expected": rent_expected,
+            "scheduled_rent": scheduled_rent,
             "rent_due": rent_due,
             "prior_rent_balance": prior_rent_balance,
             "utility_paid": utility_paid,
             "utility_expected": utility_expected,
+            "scheduled_utility": scheduled_utility,
             "utility_due": utility_due,
             "prior_utility_balance": prior_utility_balance,
             "has_missing": bool(missing_items),
@@ -1812,8 +1838,8 @@ def monthly_collection_watch_rows(applications):
 
 
 def monthly_collection_summary(status_rows):
-    rent_due = sum((row["rent_expected"] for row in status_rows), Decimal("0.00"))
-    utility_due = sum((row["utility_expected"] for row in status_rows), Decimal("0.00"))
+    rent_due = sum((row["scheduled_rent"] for row in status_rows), Decimal("0.00"))
+    utility_due = sum((row["scheduled_utility"] for row in status_rows), Decimal("0.00"))
     rent_collected = sum((row["rent_paid"] for row in status_rows), Decimal("0.00"))
     utility_collected = sum((row["utility_paid"] for row in status_rows), Decimal("0.00"))
     return {
@@ -1823,6 +1849,10 @@ def monthly_collection_summary(status_rows):
         "rent_collected": rent_collected,
         "utility_collected": utility_collected,
         "total_collected": rent_collected + utility_collected,
+        "rent_due_display": whole_money_display(rent_due),
+        "utility_due_display": whole_money_display(utility_due),
+        "rent_collected_display": whole_money_display(rent_collected),
+        "utility_collected_display": whole_money_display(utility_collected),
     }
 
 
