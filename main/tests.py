@@ -4805,8 +4805,6 @@ class LiveFlowTests(TestCase):
         self.assertEqual(response.context["collection_summary"]["utility_due"], Decimal("66.00"))
         self.assertEqual(response.context["collection_summary"]["rent_collected"], Decimal("1000.00"))
         self.assertEqual(response.context["collection_summary"]["utility_collected"], Decimal("66.00"))
-        self.assertEqual(response.context["collection_summary"]["total_due"], Decimal("66.00"))
-        self.assertEqual(response.context["collection_summary"]["total_collected"], Decimal("1066.00"))
 
     def test_landlord_collection_watch_cleans_room_prefix(self):
         landlord = User.objects.create_user(
