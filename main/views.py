@@ -1722,7 +1722,7 @@ def current_month_bounds():
     return month_start, next_month
 
 
-def monthly_collection_watch_rows(applications):
+def monthly_collection_status_rows(applications):
     month_start, next_month = current_month_bounds()
     rows = []
     grouped_applications = OrderedDict()
@@ -1772,11 +1772,11 @@ def monthly_collection_watch_rows(applications):
             combined_to_utility = min(combined_paid, utility_shortfall)
             utility_paid += combined_to_utility
 
-        missing_items = []
         prior_rent_balance = max(application.balance or Decimal("0.00"), Decimal("0.00"))
         prior_utility_balance = max(application.utility_balance or Decimal("0.00"), Decimal("0.00"))
         rent_due = prior_rent_balance + max(rent_expected - rent_paid, Decimal("0.00"))
         utility_due = prior_utility_balance + max(utility_expected - utility_paid, Decimal("0.00"))
+        missing_items = []
 
         if (rent_expected > 0 or prior_rent_balance > 0) and rent_due > 0:
             missing_items.append("Rent")
@@ -1784,27 +1784,46 @@ def monthly_collection_watch_rows(applications):
         if (utility_expected > 0 or prior_utility_balance > 0) and utility_due > 0:
             missing_items.append("Utilities")
 
-        if missing_items:
-            unit_label = canonical_room_label(application.space_label)
-            rows.append({
-                "application": application,
-                "property": application.property.name if application.property else "No Property",
-                "unit": unit_label,
-                "missing": " + ".join(missing_items),
-                "rent_paid": rent_paid,
-                "rent_expected": rent_expected,
-                "rent_due": rent_due,
-                "prior_rent_balance": prior_rent_balance,
-                "utility_paid": utility_paid,
-                "utility_expected": utility_expected,
-                "utility_due": utility_due,
-                "prior_utility_balance": prior_utility_balance,
-            })
+        unit_label = canonical_room_label(application.space_label)
+        rows.append({
+            "application": application,
+            "property": application.property.name if application.property else "No Property",
+            "unit": unit_label,
+            "missing": " + ".join(missing_items),
+            "rent_paid": rent_paid,
+            "rent_expected": rent_expected,
+            "rent_due": rent_due,
+            "prior_rent_balance": prior_rent_balance,
+            "utility_paid": utility_paid,
+            "utility_expected": utility_expected,
+            "utility_due": utility_due,
+            "prior_utility_balance": prior_utility_balance,
+            "has_missing": bool(missing_items),
+        })
 
     return sorted(
         rows,
         key=lambda row: resident_sort_key(row["application"]),
     )
+
+
+def monthly_collection_watch_rows(applications):
+    return [row for row in monthly_collection_status_rows(applications) if row["has_missing"]]
+
+
+def monthly_collection_summary(status_rows):
+    rent_due = sum((row["rent_due"] for row in status_rows), Decimal("0.00"))
+    utility_due = sum((row["utility_due"] for row in status_rows), Decimal("0.00"))
+    rent_collected = sum((row["rent_paid"] for row in status_rows), Decimal("0.00"))
+    utility_collected = sum((row["utility_paid"] for row in status_rows), Decimal("0.00"))
+    return {
+        "rent_due": rent_due,
+        "utility_due": utility_due,
+        "total_due": rent_due + utility_due,
+        "rent_collected": rent_collected,
+        "utility_collected": utility_collected,
+        "total_collected": rent_collected + utility_collected,
+    }
 
 
 def is_room_placeholder_application(application):
@@ -1972,7 +1991,9 @@ def get_landlord_workspace_context(user):
 
     new_message_count = new_messages.count()
     applications = visible_resident_files(resident_files)
-    collection_watch_rows = monthly_collection_watch_rows(applications)
+    collection_status_rows = monthly_collection_status_rows(applications)
+    collection_watch_rows = [row for row in collection_status_rows if row["has_missing"]]
+    collection_summary = monthly_collection_summary(collection_status_rows)
     month_start, _next_month = current_month_bounds()
     setup_status_rows = current_resident_setup_status_rows(properties)
     setup_status_counts = {
@@ -2001,6 +2022,7 @@ def get_landlord_workspace_context(user):
         "collection_watch_month": month_start,
         "collection_watch_rows": collection_watch_rows,
         "collection_watch_count": len(collection_watch_rows),
+        "collection_summary": collection_summary,
         "attention_count": (
             len(new_applications)
             + new_message_count

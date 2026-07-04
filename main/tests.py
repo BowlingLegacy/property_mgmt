@@ -4795,10 +4795,18 @@ class LiveFlowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Monthly Collection Watch")
+        self.assertContains(response, "Rent Due")
+        self.assertContains(response, "Utilities Collected")
         self.assertContains(response, "Missing Utility Resident")
         self.assertContains(response, "Utilities")
         self.assertNotContains(response, "Paid Resident</td>")
         self.assertNotContains(response, "Other Missing Resident")
+        self.assertEqual(response.context["collection_summary"]["rent_due"], Decimal("0.00"))
+        self.assertEqual(response.context["collection_summary"]["utility_due"], Decimal("66.00"))
+        self.assertEqual(response.context["collection_summary"]["rent_collected"], Decimal("1000.00"))
+        self.assertEqual(response.context["collection_summary"]["utility_collected"], Decimal("66.00"))
+        self.assertEqual(response.context["collection_summary"]["total_due"], Decimal("66.00"))
+        self.assertEqual(response.context["collection_summary"]["total_collected"], Decimal("1066.00"))
 
     def test_landlord_collection_watch_cleans_room_prefix(self):
         landlord = User.objects.create_user(
