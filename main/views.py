@@ -1341,7 +1341,7 @@ def prorated_monthly_charge(monthly_amount, start_date):
         return monthly_amount.quantize(Decimal("0.01"))
 
     prorated = monthly_amount * Decimal(charge_days) / Decimal(days_in_month)
-    return prorated.quantize(Decimal("0.01"))
+    return prorated.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
 
 
 def home(request):

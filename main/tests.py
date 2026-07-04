@@ -741,16 +741,18 @@ class LiveFlowTests(TestCase):
         application.refresh_from_db()
         self.assertEqual(application.monthly_rent, Decimal("650.00"))
         self.assertEqual(application.utility_monthly, Decimal("55.00"))
-        self.assertEqual(application.move_in_rent_charge, Decimal("104.84"))
-        self.assertEqual(application.balance, Decimal("104.84"))
-        self.assertEqual(application.move_in_utility_charge, Decimal("8.87"))
-        self.assertEqual(application.utility_balance, Decimal("8.87"))
+        self.assertEqual(application.move_in_rent_charge, Decimal("105"))
+        self.assertEqual(application.balance, Decimal("105"))
+        self.assertEqual(application.move_in_utility_charge, Decimal("9"))
+        self.assertEqual(application.utility_balance, Decimal("9"))
         self.assertEqual(application.deposit_required, Decimal("450.00"))
         self.assertEqual(application.deposit_paid, Decimal("450.00"))
 
     def test_prorated_monthly_charge_uses_remaining_calendar_days(self):
-        self.assertEqual(prorated_monthly_charge(Decimal("650.00"), date(2026, 5, 27)), Decimal("104.84"))
-        self.assertEqual(prorated_monthly_charge(Decimal("55.00"), date(2026, 5, 27)), Decimal("8.87"))
+        self.assertEqual(prorated_monthly_charge(Decimal("650.00"), date(2026, 5, 27)), Decimal("105"))
+        self.assertEqual(prorated_monthly_charge(Decimal("55.00"), date(2026, 5, 27)), Decimal("9"))
+        self.assertEqual(prorated_monthly_charge(Decimal("650.00"), date(2026, 7, 3)), Decimal("608"))
+        self.assertEqual(prorated_monthly_charge(Decimal("55.00"), date(2026, 7, 3)), Decimal("51"))
 
     @patch("main.views.stripe.checkout.Session.create")
     def test_resident_can_start_own_rent_payment(self, create_session):
