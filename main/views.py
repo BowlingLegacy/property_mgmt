@@ -1812,8 +1812,8 @@ def monthly_collection_watch_rows(applications):
 
 
 def monthly_collection_summary(status_rows):
-    rent_due = sum((row["rent_due"] for row in status_rows), Decimal("0.00"))
-    utility_due = sum((row["utility_due"] for row in status_rows), Decimal("0.00"))
+    rent_due = sum((row["rent_expected"] for row in status_rows), Decimal("0.00"))
+    utility_due = sum((row["utility_expected"] for row in status_rows), Decimal("0.00"))
     rent_collected = sum((row["rent_paid"] for row in status_rows), Decimal("0.00"))
     utility_collected = sum((row["utility_paid"] for row in status_rows), Decimal("0.00"))
     return {

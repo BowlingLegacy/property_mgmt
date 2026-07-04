@@ -4801,8 +4801,8 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "Utilities")
         self.assertNotContains(response, "Paid Resident</td>")
         self.assertNotContains(response, "Other Missing Resident")
-        self.assertEqual(response.context["collection_summary"]["rent_due"], Decimal("0.00"))
-        self.assertEqual(response.context["collection_summary"]["utility_due"], Decimal("66.00"))
+        self.assertEqual(response.context["collection_summary"]["rent_due"], Decimal("1000.00"))
+        self.assertEqual(response.context["collection_summary"]["utility_due"], Decimal("132.00"))
         self.assertEqual(response.context["collection_summary"]["rent_collected"], Decimal("1000.00"))
         self.assertEqual(response.context["collection_summary"]["utility_collected"], Decimal("66.00"))
 
