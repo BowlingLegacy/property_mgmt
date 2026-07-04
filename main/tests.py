@@ -790,6 +790,43 @@ class LiveFlowTests(TestCase):
         )
         self.assertEqual(Payment.objects.filter(application=application, status="pending").count(), 1)
 
+    @patch("main.views.stripe.checkout.Session.create")
+    def test_resident_can_pay_current_month_rent_when_stored_balance_is_zero(self, create_session):
+        create_session.return_value.id = "cs_test_current_rent"
+        create_session.return_value.url = "https://checkout.stripe.test/current-rent"
+        user = User.objects.create_user(
+            username="current-rent-resident",
+            email="current-rent-resident@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        application = HousingApplication.objects.create(
+            user=user,
+            full_name="Current Rent Resident",
+            phone="555-0103",
+            email="current-rent-resident@example.com",
+            age=50,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            monthly_rent=Decimal("605.00"),
+            balance=Decimal("0.00"),
+        )
+
+        self.client.login(username="current-rent-resident", password="StrongPass123!")
+        dashboard_response = self.client.get(reverse("tenant_dashboard"))
+        checkout_response = self.client.get(reverse("pay_by_type", args=[application.id, "rent"]))
+
+        self.assertContains(dashboard_response, "Pay Rent")
+        self.assertEqual(dashboard_response.context["rent_due"], Decimal("605.00"))
+        self.assertEqual(checkout_response.status_code, 302)
+        payment = Payment.objects.get(application=application, status="pending")
+        self.assertEqual(payment.amount, Decimal("605.00"))
+        self.assertEqual(
+            create_session.call_args.kwargs["line_items"][0]["price_data"]["unit_amount"],
+            60500,
+        )
+
     def test_resident_cannot_pay_another_resident_account(self):
         user = User.objects.create_user(
             username="resident",

@@ -4108,9 +4108,9 @@ def tenant_dashboard(request):
         if not is_superadmin_inspecting:
             profile_photo_form = ResidentProfilePhotoForm(instance=application)
 
-        rent_due = max(application.balance, Decimal("0.00"))
+        rent_due = resident_portal_rent_due(application)
         deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
-        utility_due = max(application.utility_balance, Decimal("0.00"))
+        utility_due = resident_portal_utility_due(application)
         show_utilities = resident_has_portal_utility_charge(application)
         utility_setup_items = resident_utility_setup_items(application)
         utility_setup_complete = bool(utility_setup_items) and all(item.completed_at for item in utility_setup_items)
@@ -4299,6 +4299,32 @@ def resident_visible_payments(application):
     ]
 
 
+def resident_portal_completed_payments(application):
+    return [payment for payment in resident_visible_payments(application) if payment.status == "completed"]
+
+
+def resident_portal_rent_due(application):
+    if not application:
+        return Decimal("0.00")
+    month_start, _next_month = current_month_bounds()
+    completed_payments = resident_portal_completed_payments(application)
+    rent_paid = payment_amount_for_month(completed_payments, month_start.year, month_start.month, ["rent"])
+    scheduled_due = max(expected_rent_for_month(application, month_start) - rent_paid, Decimal("0.00"))
+    stored_balance = max(application.balance or Decimal("0.00"), Decimal("0.00"))
+    return max(stored_balance, scheduled_due)
+
+
+def resident_portal_utility_due(application):
+    if not application:
+        return Decimal("0.00")
+    month_start, _next_month = current_month_bounds()
+    completed_payments = resident_portal_completed_payments(application)
+    utility_paid = payment_amount_for_month(completed_payments, month_start.year, month_start.month, ["utility"])
+    scheduled_due = max(expected_utility_for_month(application, month_start) - utility_paid, Decimal("0.00"))
+    stored_balance = max(application.utility_balance or Decimal("0.00"), Decimal("0.00"))
+    return max(stored_balance, scheduled_due)
+
+
 def resident_name_parts(value):
     return [clean_match_value(part) for part in str(value or "").split() if clean_match_value(part)]
 
@@ -4472,9 +4498,9 @@ def resident_balance_detail(request):
         messages.error(request, "No resident file connected.")
         return redirect("tenant_dashboard")
 
-    rent_due = max(application.balance, Decimal("0.00"))
+    rent_due = resident_portal_rent_due(application)
     deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
-    utility_due = max(application.utility_balance, Decimal("0.00"))
+    utility_due = resident_portal_utility_due(application)
     show_utilities = resident_has_portal_utility_charge(application)
 
     return render(request, "resident_balance_detail.html", {
@@ -7619,7 +7645,10 @@ def create_checkout_session(request, application_id, payment_type="rent"):
             "error": "A payment is already pending. Please wait before trying again."
         })
 
-    if payment_type == "rent" and application.balance <= 0:
+    rent_portal_due = resident_portal_rent_due(application)
+    utility_portal_due = resident_portal_utility_due(application)
+
+    if payment_type == "rent" and rent_portal_due <= 0:
         return JsonResponse({
             "error": "No rent balance due."
         })
@@ -7628,7 +7657,7 @@ def create_checkout_session(request, application_id, payment_type="rent"):
     description = ""
 
     if payment_type == "rent":
-        amount = application.balance if application.balance > 0 else application.monthly_rent
+        amount = rent_portal_due
         description = "Rent Payment"
 
     elif payment_type == "deposit":
@@ -7636,7 +7665,7 @@ def create_checkout_session(request, application_id, payment_type="rent"):
         description = "Deposit Payment"
 
     elif payment_type == "utility":
-        amount = application.utility_balance if application.utility_balance > 0 else application.utility_monthly
+        amount = utility_portal_due
         description = "Utility Payment"
 
     elif payment_type == "application_fee":
@@ -7648,9 +7677,9 @@ def create_checkout_session(request, application_id, payment_type="rent"):
         description = "Background Check Fee"
 
     elif payment_type == "total":
-        rent_due = application.balance if application.balance > 0 else Decimal("0.00")
+        rent_due = rent_portal_due
         deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
-        utility_due = application.utility_balance if application.utility_balance > 0 else Decimal("0.00")
+        utility_due = utility_portal_due
 
         amount = rent_due + deposit_due + utility_due
         description = "Combined Payment - Total Due"

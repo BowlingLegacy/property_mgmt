@@ -383,7 +383,13 @@ body {
                         </p>
 
                         <div class="card-actions">
-                            {% if total_due > 0 %}
+                            {% if rent_due > 0 %}
+                                <a href="{% url 'pay_by_type' application.id 'rent' %}"
+                                   class="gold-btn d-block text-center text-decoration-none mt-3">
+                                    Pay Rent
+                                </a>
+                            {% endif %}
+                            {% if total_due > rent_due %}
                                 <a href="{% url 'pay_by_type' application.id 'total' %}"
                                    class="gold-btn d-block text-center text-decoration-none mt-3">
                                     Pay Total Due
