@@ -4108,6 +4108,8 @@ def tenant_dashboard(request):
     property_blog_posts = []
     total_due = Decimal("0.00")
     rent_due = Decimal("0.00")
+    next_month_rent_due = Decimal("0.00")
+    next_month_start = None
     deposit_due = Decimal("0.00")
     utility_due = Decimal("0.00")
     inbox_counts = {"signed_documents": 0, "uploaded_documents": 0, "messages": 0, "total": 0}
@@ -4123,6 +4125,8 @@ def tenant_dashboard(request):
             profile_photo_form = ResidentProfilePhotoForm(instance=application)
 
         rent_due = resident_portal_rent_due(application)
+        _month_start, next_month_start = current_month_bounds()
+        next_month_rent_due = resident_portal_next_month_rent_due(application)
         deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
         utility_due = resident_portal_utility_due(application)
         show_utilities = resident_has_portal_utility_charge(application)
@@ -4148,6 +4152,8 @@ def tenant_dashboard(request):
         "is_superadmin_inspecting": is_superadmin_inspecting,
         "total_due": total_due,
         "rent_due": rent_due,
+        "next_month_rent_due": next_month_rent_due,
+        "next_month_start": next_month_start,
         "deposit_due": deposit_due,
         "utility_due": utility_due,
         "show_utilities": show_utilities,
@@ -4326,6 +4332,15 @@ def resident_portal_rent_due(application):
     scheduled_due = max(expected_rent_for_month(application, month_start) - rent_paid, Decimal("0.00"))
     stored_balance = max(application.balance or Decimal("0.00"), Decimal("0.00"))
     return max(stored_balance, scheduled_due)
+
+
+def resident_portal_next_month_rent_due(application):
+    if not application:
+        return Decimal("0.00")
+    _month_start, next_month = current_month_bounds()
+    completed_payments = resident_portal_completed_payments(application)
+    rent_paid = payment_amount_for_month(completed_payments, next_month.year, next_month.month, ["rent"])
+    return max(expected_rent_for_month(application, next_month) - rent_paid, Decimal("0.00"))
 
 
 def resident_portal_utility_due(application):
@@ -7625,6 +7640,7 @@ def submit_onboarding_document(request, document_id):
 
 def create_checkout_session(request, application_id, payment_type="rent"):
     application = get_object_or_404(HousingApplication, id=application_id)
+    checkout_payment_type = "rent" if payment_type == "next_rent" else "other" if payment_type == "total" else payment_type
 
     if not staff_required(request.user):
         user_application = getattr(request.user, "resident_profile", None)
@@ -7640,14 +7656,14 @@ def create_checkout_session(request, application_id, payment_type="rent"):
     stale_before = timezone.now() - timedelta(minutes=30)
     Payment.objects.filter(
         application=application,
-        payment_type=payment_type,
+        payment_type=checkout_payment_type,
         status="pending",
         created_at__lt=stale_before,
     ).update(status="failed")
 
     existing_pending = Payment.objects.filter(
         application=application,
-        payment_type=payment_type,
+        payment_type=checkout_payment_type,
         status="pending",
     ).exists()
 
@@ -7657,6 +7673,7 @@ def create_checkout_session(request, application_id, payment_type="rent"):
         })
 
     rent_portal_due = resident_portal_rent_due(application)
+    next_month_rent_due = resident_portal_next_month_rent_due(application)
     utility_portal_due = resident_portal_utility_due(application)
 
     if payment_type == "rent" and rent_portal_due <= 0:
@@ -7666,10 +7683,16 @@ def create_checkout_session(request, application_id, payment_type="rent"):
 
     amount = Decimal("0.00")
     description = ""
+    service_month = None
 
     if payment_type == "rent":
         amount = rent_portal_due
         description = "Rent Payment"
+
+    elif payment_type == "next_rent":
+        _month_start, service_month = current_month_bounds()
+        amount = next_month_rent_due
+        description = f"Early Rent Payment - {service_month.strftime('%B %Y')}"
 
     elif payment_type == "deposit":
         amount = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
@@ -7694,7 +7717,6 @@ def create_checkout_session(request, application_id, payment_type="rent"):
 
         amount = rent_due + deposit_due + utility_due
         description = "Combined Payment - Total Due"
-        payment_type = "other"
 
     else:
         return JsonResponse({"error": "Invalid payment type"})
@@ -7704,11 +7726,12 @@ def create_checkout_session(request, application_id, payment_type="rent"):
 
     payment = Payment.objects.create(
         application=application,
-        payment_type=payment_type,
+        payment_type=checkout_payment_type,
         payment_method="stripe_card",
         description=description,
         amount=amount,
         status="pending",
+        service_month=service_month,
     )
 
     if getattr(settings, "DEMO_MODE", False):
@@ -7716,7 +7739,8 @@ def create_checkout_session(request, application_id, payment_type="rent"):
         payment.status = "completed"
         payment.description = f"Demo payment - {description}"
         payment.received_at = timezone.now()
-        payment.service_month = timezone.localdate().replace(day=1)
+        if not payment.service_month:
+            payment.service_month = timezone.localdate().replace(day=1)
         payment.save(update_fields=["payment_method", "status", "description", "received_at", "service_month"])
         apply_completed_payment_to_balance(payment)
         messages.success(request, "Demo payment recorded. No real card or bank transaction was processed.")

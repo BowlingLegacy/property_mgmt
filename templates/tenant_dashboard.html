@@ -389,6 +389,12 @@ body {
                                     Pay Rent
                                 </a>
                             {% endif %}
+                            {% if next_month_rent_due > 0 %}
+                                <a href="{% url 'pay_by_type' application.id 'next_rent' %}"
+                                   class="gold-btn d-block text-center text-decoration-none mt-3">
+                                    Pay {{ next_month_start|date:"F" }} Rent Early
+                                </a>
+                            {% endif %}
                             {% if total_due > rent_due %}
                                 <a href="{% url 'pay_by_type' application.id 'total' %}"
                                    class="gold-btn d-block text-center text-decoration-none mt-3">

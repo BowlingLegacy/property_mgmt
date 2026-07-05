@@ -827,6 +827,58 @@ class LiveFlowTests(TestCase):
             60500,
         )
 
+    @patch("main.views.timezone.localdate", return_value=date(2026, 7, 5))
+    @patch("main.views.stripe.checkout.Session.create")
+    def test_resident_can_pay_next_month_rent_early(self, create_session, _mocked_localdate):
+        create_session.return_value.id = "cs_test_next_rent"
+        create_session.return_value.url = "https://checkout.stripe.test/next-rent"
+        user = User.objects.create_user(
+            username="next-rent-resident",
+            email="next-rent-resident@example.com",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        application = HousingApplication.objects.create(
+            user=user,
+            full_name="Next Rent Resident",
+            phone="555-0104",
+            email="next-rent-resident@example.com",
+            age=50,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            monthly_rent=Decimal("561.00"),
+            balance=Decimal("0.00"),
+        )
+        Payment.objects.create(
+            application=application,
+            payment_type="rent",
+            payment_method="cash",
+            amount=Decimal("561.00"),
+            status="completed",
+            service_month=date(2026, 7, 1),
+        )
+
+        self.client.login(username="next-rent-resident", password="StrongPass123!")
+        dashboard_response = self.client.get(reverse("tenant_dashboard"))
+        checkout_response = self.client.get(reverse("pay_by_type", args=[application.id, "next_rent"]))
+
+        self.assertNotContains(dashboard_response, ">Pay Rent<")
+        self.assertContains(dashboard_response, "Pay August Rent Early")
+        self.assertEqual(dashboard_response.context["rent_due"], Decimal("0.00"))
+        self.assertEqual(dashboard_response.context["next_month_rent_due"], Decimal("561.00"))
+        self.assertEqual(checkout_response.status_code, 302)
+        self.assertEqual(checkout_response["Location"], "https://checkout.stripe.test/next-rent")
+        payment = Payment.objects.get(application=application, status="pending")
+        self.assertEqual(payment.payment_type, "rent")
+        self.assertEqual(payment.amount, Decimal("561.00"))
+        self.assertEqual(payment.service_month, date(2026, 8, 1))
+        self.assertEqual(payment.description, "Early Rent Payment - August 2026")
+        self.assertEqual(
+            create_session.call_args.kwargs["line_items"][0]["price_data"]["unit_amount"],
+            56100,
+        )
+
     def test_resident_cannot_pay_another_resident_account(self):
         user = User.objects.create_user(
             username="resident",
