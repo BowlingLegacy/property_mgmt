@@ -1029,6 +1029,40 @@ class LiveFlowTests(TestCase):
         self.assertTrue(Payment.objects.filter(application=application, payment_type="rent").exists())
         self.assertFalse(Payment.objects.filter(application=application, payment_type="utility").exists())
 
+    @patch("main.views.timezone.localdate", return_value=date(2026, 7, 5))
+    def test_manual_payment_prefills_rent_but_leaves_utilities_blank(self, _mocked_localdate):
+        staff_user = User.objects.create_user(
+            username="rent-prefill-staff",
+            email="rent-prefill@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Rent Prefill Property", landlord_email=staff_user.email)
+        resident_user = User.objects.create_user(username="rent-prefill-resident", password="StrongPass123!", role="tenant")
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Rent Prefill Resident",
+            phone="555-0135",
+            email="rent-prefill-resident@example.com",
+            age=44,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            space_label="O",
+            monthly_rent=Decimal("506.00"),
+            utility_monthly=Decimal("55.00"),
+        )
+
+        self.client.login(username="rent-prefill-staff", password="StrongPass123!")
+        response = self.client.get(f"{reverse('record_manual_payment')}?application={application.id}")
+
+        form = response.context["form"]
+        self.assertEqual(form.initial["payment_type"], "rent")
+        self.assertEqual(form.initial["amount"], Decimal("506.00"))
+        self.assertNotIn("utility_amount", form.initial)
+
     def test_landlord_collection_watch_collapses_duplicate_resident_records_by_unit(self):
         staff_user = User.objects.create_user(
             username="watch-dedupe-staff",

@@ -4914,12 +4914,9 @@ def record_manual_payment(request, property_id=None):
             month_start, _next_month = current_month_bounds()
             monthly_payments = list(selected_application.payments.filter(status="completed"))
             rent_due = current_rent_due_with_carryforward(selected_application, month_start, monthly_payments)
-            utility_due = current_utility_due_with_carryforward(selected_application, month_start, monthly_payments)
             if rent_due > 0:
                 initial["payment_type"] = "rent"
                 initial["amount"] = rent_due
-            if utility_due > 0:
-                initial["utility_amount"] = utility_due
             initial["service_month"] = month_start
 
         form = ManualPaymentForm(initial=initial)
