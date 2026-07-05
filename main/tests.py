@@ -1061,6 +1061,59 @@ class LiveFlowTests(TestCase):
         self.assertEqual(rows[0]["prior_rent_balance"], Decimal("450.00"))
         self.assertEqual(rows[0]["rent_due"], Decimal("1100.00"))
 
+    @patch("main.views.timezone.localdate", return_value=date(2026, 7, 5))
+    def test_landlord_collection_watch_uses_room_utility_when_resident_file_is_blank(self, _mocked_localdate):
+        staff_user = User.objects.create_user(
+            username="watch-room-utility-staff",
+            email="watch-room-utility@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Watch Utility Property", landlord_email=staff_user.email)
+        PropertyRoomRent.objects.create(
+            property=property_obj,
+            room_unit_label="O",
+            monthly_rent=Decimal("506.00"),
+            utility_monthly=Decimal("55.00"),
+        )
+        resident_user = User.objects.create_user(username="ray-watch-resident", password="StrongPass123!", role="tenant")
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Ray Ferro",
+            email="ray-watch@example.com",
+            age=64,
+            income_source="Fixed income",
+            monthly_income=Decimal("2400.00"),
+            housing_need="Current resident.",
+            space_label="Room O",
+            monthly_rent=Decimal("506.00"),
+            utility_monthly=Decimal("0.00"),
+        )
+        Payment.objects.create(
+            application=application,
+            payment_type="rent",
+            payment_method="cash",
+            amount=Decimal("506.00"),
+            status="completed",
+            service_month=date(2026, 7, 1),
+        )
+
+        self.client.login(username="watch-room-utility-staff", password="StrongPass123!")
+        response = self.client.get(reverse("landlord_dashboard"))
+
+        rows = [
+            row
+            for row in response.context["collection_watch_rows"]
+            if row["application"].id == application.id
+        ]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["missing"], "Utilities")
+        self.assertEqual(rows[0]["rent_due"], Decimal("0.00"))
+        self.assertEqual(rows[0]["utility_expected"], Decimal("55.00"))
+        self.assertEqual(rows[0]["utility_due"], Decimal("55.00"))
+
     @patch("main.views.timezone.localdate", return_value=date(2026, 7, 3))
     def test_manual_payment_prefill_includes_prior_open_balance(self, _mocked_localdate):
         staff_user = User.objects.create_user(

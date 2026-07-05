@@ -953,6 +953,20 @@ def recalculated_utility_due(application):
     return application.move_in_utility_charge if application.move_in_utility_charge > 0 else application.utility_monthly
 
 
+def configured_monthly_rent(application):
+    if application.monthly_rent and application.monthly_rent > 0:
+        return application.monthly_rent
+    room_setting = find_room_rent_setting(application.property, application.space_label)
+    return room_setting.monthly_rent if room_setting else Decimal("0.00")
+
+
+def configured_monthly_utility(application):
+    if application.utility_monthly and application.utility_monthly > 0:
+        return application.utility_monthly
+    room_setting = find_room_rent_setting(application.property, application.space_label)
+    return room_setting.utility_monthly if room_setting else Decimal("0.00")
+
+
 def expected_rent_for_month(application, month_start):
     month_end = date(month_start.year, month_start.month, calendar.monthrange(month_start.year, month_start.month)[1])
 
@@ -969,7 +983,7 @@ def expected_rent_for_month(application, month_start):
         and application.lease_start_date.month == month_start.month
     ):
         return application.move_in_rent_charge
-    return application.monthly_rent or Decimal("0.00")
+    return configured_monthly_rent(application)
 
 
 def expected_utility_for_month(application, month_start):
@@ -988,7 +1002,7 @@ def expected_utility_for_month(application, month_start):
         and application.lease_start_date.month == month_start.month
     ):
         return application.move_in_utility_charge
-    return application.utility_monthly or Decimal("0.00")
+    return configured_monthly_utility(application)
 
 
 def scheduled_rent_for_month_summary(application, month_start):
@@ -997,7 +1011,7 @@ def scheduled_rent_for_month_summary(application, month_start):
         return Decimal("0.00")
     if application.move_out_date and application.move_out_date < month_start:
         return Decimal("0.00")
-    return application.monthly_rent or Decimal("0.00")
+    return configured_monthly_rent(application)
 
 
 def scheduled_utility_for_month_summary(application, month_start):
@@ -1006,7 +1020,7 @@ def scheduled_utility_for_month_summary(application, month_start):
         return Decimal("0.00")
     if application.move_out_date and application.move_out_date < month_start:
         return Decimal("0.00")
-    return application.utility_monthly or Decimal("0.00")
+    return configured_monthly_utility(application)
 
 
 def first_day_of_month(value):
