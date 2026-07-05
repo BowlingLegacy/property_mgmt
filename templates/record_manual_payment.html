@@ -136,7 +136,18 @@
 
                 <div class="col-md-12">
                     <div class="alert alert-info mb-0">
-                        To settle rent and utilities together, enter the rent amount above and the utilities amount below. Leave utilities blank if only rent is being paid.
+                        To settle rent and utilities together, enter the rent amount above, check Record utilities too, and enter the utilities amount below. Leave the box unchecked if only rent is being paid.
+                    </div>
+                </div>
+
+                <div class="col-md-12">
+                    <div class="form-check">
+                        {{ form.record_utilities }}
+                        <label class="form-check-label fw-bold" for="{{ form.record_utilities.id_for_label }}">
+                            {{ form.record_utilities.label }}
+                        </label>
+                        {{ form.record_utilities.errors }}
+                        <div class="form-text">{{ form.record_utilities.help_text }}</div>
                     </div>
                 </div>
 

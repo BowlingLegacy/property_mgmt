@@ -4878,7 +4878,7 @@ def record_manual_payment(request, property_id=None):
 
             utility_amount = form.cleaned_data.get("utility_amount")
             utility_payment = None
-            if utility_amount and utility_amount > 0:
+            if form.cleaned_data.get("record_utilities") and utility_amount and utility_amount > 0:
                 utility_payment = Payment.objects.create(
                     application=payment.application,
                     payment_type="utility",

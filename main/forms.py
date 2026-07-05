@@ -855,6 +855,12 @@ def parse_phone_copy_numbers(raw_value):
 
 
 class ManualPaymentForm(forms.ModelForm):
+    record_utilities = forms.BooleanField(
+        label="Record utilities too",
+        required=False,
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        help_text="Check this only when utilities were actually paid. Utilities should have their own method/reference when paid separately.",
+    )
     utility_amount = forms.DecimalField(
         label="Utilities Amount",
         required=False,

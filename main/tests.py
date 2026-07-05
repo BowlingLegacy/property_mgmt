@@ -955,6 +955,7 @@ class LiveFlowTests(TestCase):
             "payment_type": "rent",
             "payment_method": "check",
             "amount": "650.00",
+            "record_utilities": "on",
             "utility_amount": "55.00",
             "utility_payment_method": "cash",
             "utility_reference_number": "UTILITY-CASH",
@@ -977,6 +978,56 @@ class LiveFlowTests(TestCase):
         self.assertEqual(utility_payment.payment_method, "cash")
         self.assertEqual(utility_payment.reference_number, "UTILITY-CASH")
         self.assertEqual(utility_payment.service_month, date(2026, 6, 1))
+
+    def test_manual_payment_does_not_record_prefilled_utilities_unless_checked(self):
+        staff_user = User.objects.create_user(
+            username="rent-only-payment-staff",
+            email="rent-only-payment@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Rent Only Payment Property", landlord_email=staff_user.email)
+        resident_user = User.objects.create_user(username="rent-only-payment-resident", password="StrongPass123!", role="tenant")
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Rent Only Resident",
+            phone="555-0134",
+            email="rent-only-payment-resident@example.com",
+            age=44,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            space_label="O",
+            monthly_rent=Decimal("506.00"),
+            balance=Decimal("506.00"),
+            utility_monthly=Decimal("55.00"),
+            utility_balance=Decimal("55.00"),
+        )
+
+        self.client.login(username="rent-only-payment-staff", password="StrongPass123!")
+        response = self.client.post(reverse("record_manual_payment"), {
+            "application": application.id,
+            "payment_type": "rent",
+            "payment_method": "check",
+            "amount": "506.00",
+            "utility_amount": "55.00",
+            "utility_payment_method": "check",
+            "utility_reference_number": "UTILITY-CHECK-SHOULD-NOT-POST",
+            "service_month": "2026-07",
+            "months_covered": "1",
+            "reference_number": "RENT-CHECK",
+            "description": "July rent",
+            "return_to": "dashboard",
+        })
+
+        self.assertRedirects(response, reverse("landlord_dashboard"))
+        application.refresh_from_db()
+        self.assertEqual(application.balance, Decimal("0.00"))
+        self.assertEqual(application.utility_balance, Decimal("55.00"))
+        self.assertTrue(Payment.objects.filter(application=application, payment_type="rent").exists())
+        self.assertFalse(Payment.objects.filter(application=application, payment_type="utility").exists())
 
     def test_landlord_collection_watch_collapses_duplicate_resident_records_by_unit(self):
         staff_user = User.objects.create_user(
