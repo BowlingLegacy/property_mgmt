@@ -5978,6 +5978,52 @@ class LiveFlowTests(TestCase):
         self.assertIn("rent already paid", out.getvalue())
         self.assertNotIn("CREATE | Room H | Move In Resident | rent", out.getvalue())
 
+    def test_combined_payment_splits_move_in_rent_and_deposit(self):
+        property_obj = Property.objects.create(name="Combined Move In Property")
+        tenant_user = User.objects.create_user(username="combined-move-in-user", password="StrongPass123!", role="tenant")
+        month_start, _next_month = current_month_bounds()
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=tenant_user,
+            full_name="Combined Move In Resident",
+            phone="555-0623",
+            email="combined-move-in@example.com",
+            age=53,
+            space_label="H",
+            monthly_rent=Decimal("650.00"),
+            balance=Decimal("0.00"),
+            lease_start_date=month_start,
+            move_in_rent_charge=Decimal("608.00"),
+            deposit_required=Decimal("450.00"),
+            deposit_paid=Decimal("0.00"),
+            utility_monthly=Decimal("55.00"),
+            utility_balance=Decimal("0.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        payment = Payment.objects.create(
+            application=resident,
+            payment_type="other",
+            payment_method="stripe_card",
+            amount=Decimal("1058.00"),
+            status="completed",
+            description="Combined Payment - Total Due",
+        )
+
+        apply_completed_payment_to_balance(payment)
+
+        resident.refresh_from_db()
+        payment.refresh_from_db()
+        self.assertEqual(resident.balance, Decimal("0.00"))
+        self.assertEqual(resident.deposit_paid, Decimal("450.00"))
+        self.assertEqual(payment.payment_type, "rent")
+        self.assertEqual(payment.amount, Decimal("608.00"))
+        self.assertEqual(payment.service_month, month_start)
+        deposit_payment = Payment.objects.get(application=resident, payment_type="deposit")
+        self.assertEqual(deposit_payment.amount, Decimal("450.00"))
+        self.assertEqual(Payment.objects.filter(application=resident).count(), 2)
+
     def test_custom_phone_report_scopes_to_landlord_property(self):
         landlord = User.objects.create_user(
             username="report-landlord",

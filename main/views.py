@@ -832,6 +832,10 @@ def reporting_required(user):
 def apply_completed_payment_to_balance(payment):
     application = payment.application
 
+    if payment.payment_type == "other" and "combined" in payment.description.lower():
+        if split_combined_payment(payment):
+            return
+
     if payment.payment_type == "rent":
         application.balance = max(Decimal("0.00"), application.balance - payment.amount)
 
@@ -849,24 +853,73 @@ def apply_completed_payment_to_balance(payment):
         if application.background_check_required and application.background_check_status == "pending":
             application.background_check_status = "ordered"
 
-    elif payment.payment_type == "other" and "combined" in payment.description.lower():
-        remaining = payment.amount
+    application.save()
 
-        rent_due = application.balance if application.balance > 0 else Decimal("0.00")
-        rent_paid = min(rent_due, remaining)
-        application.balance = max(Decimal("0.00"), application.balance - rent_paid)
+
+def split_combined_payment(payment):
+    application = payment.application
+    remaining = payment.amount
+    month_start, _next_month = current_month_bounds()
+    allocations = []
+
+    rent_due = resident_portal_rent_due(application)
+    rent_paid = min(rent_due, remaining)
+    if rent_paid > 0:
+        allocations.append(("rent", rent_paid, "Rent Payment", month_start))
         remaining -= rent_paid
 
-        deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
-        deposit_paid = min(deposit_due, remaining)
-        application.deposit_paid = min(application.deposit_required, application.deposit_paid + deposit_paid)
+    deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
+    deposit_paid = min(deposit_due, remaining)
+    if deposit_paid > 0:
+        allocations.append(("deposit", deposit_paid, "Deposit Payment", None))
         remaining -= deposit_paid
 
-        utility_due = application.utility_balance if application.utility_balance > 0 else Decimal("0.00")
-        utility_paid = min(utility_due, remaining)
-        application.utility_balance = max(Decimal("0.00"), application.utility_balance - utility_paid)
+    utility_due = resident_portal_utility_due(application)
+    utility_paid = min(utility_due, remaining)
+    if utility_paid > 0:
+        allocations.append(("utility", utility_paid, "Utility Payment", month_start))
+        remaining -= utility_paid
 
-    application.save()
+    if remaining > 0:
+        allocations.append(("other", remaining, "Unallocated Payment Remainder", month_start))
+
+    if not allocations:
+        return False
+
+    original_description = payment.description
+    created_payments = []
+    for index, (payment_type, amount, description, service_month) in enumerate(allocations):
+        if index == 0:
+            component = payment
+            component.payment_type = payment_type
+            component.amount = amount
+            component.description = description
+            component.service_month = service_month
+            component.notes = (component.notes + "\n\n" if component.notes else "") + f"Split from combined payment: {original_description}"
+            component.save(update_fields=["payment_type", "amount", "description", "service_month", "notes"])
+        else:
+            component = Payment.objects.create(
+                application=application,
+                payment_type=payment_type,
+                payment_method=payment.payment_method,
+                description=description,
+                reference_number=payment.reference_number,
+                notes=f"Split from combined payment {payment.id}: {original_description}",
+                recorded_by=payment.recorded_by,
+                received_at=payment.received_at,
+                service_month=service_month,
+                months_covered=payment.months_covered,
+                amount=amount,
+                status=payment.status,
+                stripe_session_id=payment.stripe_session_id,
+                stripe_payment_intent=payment.stripe_payment_intent,
+            )
+        created_payments.append(component)
+
+    for component in created_payments:
+        apply_completed_payment_to_balance(component)
+
+    return True
 
 
 def post_resident_balance_entry(application, *, entry_kind, balance_type, amount, service_month=None, description="", notes="", recorded_by=None):
