@@ -6046,8 +6046,7 @@ def bank_upload_review(request, upload_id):
     credit_column = request.POST.get("credit_column") or request.GET.get("credit_column") or ""
 
     if request.method == "POST":
-        upload.entries.all().delete()
-        created = 0
+        planned_entries = []
         ignored = 0
         skipped = 0
         split_errors = 0
@@ -6081,26 +6080,19 @@ def bank_upload_review(request, upload_id):
                         continue
                     ledger_scope = "property"
 
-                entry = create_financial_entry_from_import(
-                    upload,
-                    property_obj,
-                    sheet_name,
-                    row,
-                    entry_date,
-                    entry_type,
-                    category,
-                    detail,
-                    transaction_amount,
-                    ledger_scope=ledger_scope,
-                )
-                if entry:
-                    created += 1
-                else:
-                    skipped += 1
+                planned_entries.append({
+                    "property_obj": property_obj,
+                    "row": row,
+                    "entry_date": entry_date,
+                    "entry_type": entry_type,
+                    "category": category,
+                    "description": detail,
+                    "amount": transaction_amount,
+                    "ledger_scope": ledger_scope,
+                })
                 continue
 
             if action == "split":
-                created_for_row = 0
                 split_total = Decimal("0.00")
                 split_specs = []
                 for index in range(1, 5):
@@ -6125,23 +6117,46 @@ def bank_upload_review(request, upload_id):
                     continue
 
                 for split_scope, split_property_obj, split_entry_type, split_category, split_description, split_amount in split_specs:
-                    entry = create_financial_entry_from_import(
-                        upload,
-                        split_property_obj,
-                        sheet_name,
-                        row,
-                        entry_date,
-                        split_entry_type,
-                        split_category,
-                        split_description,
-                        split_amount,
-                        ledger_scope=split_scope,
-                    )
-                    if entry:
-                        created += 1
-                        created_for_row += 1
-                if created_for_row == 0:
+                    planned_entries.append({
+                        "property_obj": split_property_obj,
+                        "row": row,
+                        "entry_date": entry_date,
+                        "entry_type": split_entry_type,
+                        "category": split_category,
+                        "description": split_description,
+                        "amount": split_amount,
+                        "ledger_scope": split_scope,
+                    })
+                if not split_specs:
                     skipped += 1
+
+        if not planned_entries:
+            messages.error(
+                request,
+                "No reviewed bank rows were ready to post. Existing entries were left unchanged. "
+                "Check the amount/debit/credit mapping and make sure at least one row is marked Property, Company, or Split.",
+            )
+            return redirect("bank_upload_review", upload_id=upload.id)
+
+        upload.entries.all().delete()
+        created = 0
+        for entry_data in planned_entries:
+            entry = create_financial_entry_from_import(
+                upload,
+                entry_data["property_obj"],
+                sheet_name,
+                entry_data["row"],
+                entry_data["entry_date"],
+                entry_data["entry_type"],
+                entry_data["category"],
+                entry_data["description"],
+                entry_data["amount"],
+                ledger_scope=entry_data["ledger_scope"],
+            )
+            if entry:
+                created += 1
+            else:
+                skipped += 1
 
         upload.parsed_at = timezone.now()
         upload.save(update_fields=["parsed_at"])
