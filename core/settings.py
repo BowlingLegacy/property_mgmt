@@ -21,6 +21,7 @@ DEMO_MODE = env_bool("DEMO_MODE")
 DEMO_SESSION_SECONDS = int(os.environ.get("DEMO_SESSION_SECONDS", "7200"))
 DEMO_ADMIN_USERNAME = os.environ.get("DEMO_ADMIN_USERNAME", "demo-admin")
 DEMO_PUBLIC_URL = os.environ.get("DEMO_PUBLIC_URL", "").strip()
+DATA_UPLOAD_MAX_NUMBER_FIELDS = int(os.environ.get("DATA_UPLOAD_MAX_NUMBER_FIELDS", "20000"))
 
 ALLOWED_HOSTS = [
     "localhost",
