@@ -286,7 +286,7 @@ def read_financial_upload_rows(upload, limit=None, selected_sheet_name=None):
     return sheet_name, headers, rows
 
 
-def create_financial_entry_from_import(upload, property_obj, sheet_name, row, entry_date, entry_type, category, description, amount):
+def create_financial_entry_from_import(upload, property_obj, sheet_name, row, entry_date, entry_type, category, description, amount, ledger_scope=None):
     if amount == Decimal("0.00"):
         return None
 
@@ -300,9 +300,10 @@ def create_financial_entry_from_import(upload, property_obj, sheet_name, row, en
         )
 
     property_name = property_obj.name if property_obj else ""
+    entry_ledger_scope = ledger_scope or upload.ledger_scope
     normalized_amount = normalized_import_amount(amount, entry_type)
     duplicate = FinancialEntry.objects.filter(
-        ledger_scope=upload.ledger_scope,
+        ledger_scope=entry_ledger_scope,
         property_name=property_name,
         entry_date=entry_date,
         month=entry_date.month if entry_date else None,
@@ -317,7 +318,7 @@ def create_financial_entry_from_import(upload, property_obj, sheet_name, row, en
 
     return FinancialEntry.objects.create(
         upload=upload,
-        ledger_scope=upload.ledger_scope,
+        ledger_scope=entry_ledger_scope,
         property_name=property_name,
         sheet_name=sheet_name,
         row_number=row["row_number"],
@@ -632,6 +633,19 @@ def normalized_import_amount(amount, entry_type):
     if entry_type == "income":
         return abs(amount)
     return abs(amount)
+
+
+def bank_transaction_amount(row_data, amount_column="", debit_column="", credit_column=""):
+    if amount_column:
+        return money(row_data.get(amount_column))
+
+    debit = money(row_data.get(debit_column)) if debit_column else Decimal("0.00")
+    credit = money(row_data.get(credit_column)) if credit_column else Decimal("0.00")
+    if credit != Decimal("0.00"):
+        return abs(credit)
+    if debit != Decimal("0.00"):
+        return -abs(debit)
+    return Decimal("0.00")
 
 
 def sms_provider_name():
@@ -5989,6 +6003,8 @@ def financial_upload(request):
 
         if form.is_valid():
             upload = form.save()
+            if upload.ledger_scope == "bank":
+                return redirect("bank_upload_review", upload_id=upload.id)
             return redirect("parse_financial_upload", upload_id=upload.id)
     else:
         form = FinancialUploadForm(properties=properties)
@@ -6000,6 +6016,169 @@ def financial_upload(request):
         .order_by("-uploaded_at")
     )
     return render(request, "financial_upload.html", {"form": form, "uploads": uploads})
+
+
+@login_required
+@user_passes_test(reporting_required)
+def bank_upload_review(request, upload_id):
+    properties = staff_managed_properties(request.user).order_by("name")
+    upload = get_object_or_404(
+        FinancialUpload.objects.select_related("property"),
+        id=upload_id,
+        property__in=properties,
+        ledger_scope="bank",
+    )
+
+    sheet_names = financial_upload_sheet_names(upload)
+    selected_sheet_name = request.POST.get("sheet_name") or request.GET.get("sheet_name") or (sheet_names[0] if sheet_names else None)
+
+    try:
+        sheet_name, headers, rows = read_financial_upload_rows(upload, selected_sheet_name=selected_sheet_name)
+    except Exception as exc:
+        messages.error(request, f"Rental Ledger Pro could not read that bank file yet: {exc}")
+        return redirect("financial_upload")
+
+    guesses = guess_financial_columns(headers)
+    date_column = request.POST.get("date_column") or request.GET.get("date_column") or guesses.get("entry_date", "")
+    description_column = request.POST.get("description_column") or request.GET.get("description_column") or guesses.get("description", "")
+    amount_column = request.POST.get("amount_column") or request.GET.get("amount_column") or guesses.get("amount", "")
+    debit_column = request.POST.get("debit_column") or request.GET.get("debit_column") or ""
+    credit_column = request.POST.get("credit_column") or request.GET.get("credit_column") or ""
+
+    if request.method == "POST":
+        upload.entries.all().delete()
+        created = 0
+        ignored = 0
+        skipped = 0
+        split_errors = 0
+
+        for row in rows:
+            row_id = str(row["row_number"])
+            row_data = row["data"]
+            action = request.POST.get(f"row_action_{row_id}", "ignore")
+            if action == "ignore":
+                ignored += 1
+                continue
+
+            entry_date = parse_import_date(row_data.get(date_column))
+            description = str(row_data.get(description_column, "") or "").strip()
+            transaction_amount = bank_transaction_amount(row_data, amount_column, debit_column, credit_column)
+            if transaction_amount == Decimal("0.00"):
+                skipped += 1
+                continue
+
+            if action in {"property", "company"}:
+                entry_type = request.POST.get(f"entry_type_{row_id}", "operating_expense")
+                category = request.POST.get(f"category_{row_id}", "").strip() or "Uncategorized"
+                detail = request.POST.get(f"description_{row_id}", "").strip() or description
+                property_obj = None
+                ledger_scope = "company"
+                if action == "property":
+                    property_id = request.POST.get(f"property_{row_id}") or upload.property_id
+                    property_obj = properties.filter(id=property_id).first()
+                    if not property_obj:
+                        skipped += 1
+                        continue
+                    ledger_scope = "property"
+
+                entry = create_financial_entry_from_import(
+                    upload,
+                    property_obj,
+                    sheet_name,
+                    row,
+                    entry_date,
+                    entry_type,
+                    category,
+                    detail,
+                    transaction_amount,
+                    ledger_scope=ledger_scope,
+                )
+                if entry:
+                    created += 1
+                else:
+                    skipped += 1
+                continue
+
+            if action == "split":
+                created_for_row = 0
+                split_total = Decimal("0.00")
+                split_specs = []
+                for index in range(1, 5):
+                    split_amount = money(request.POST.get(f"split_amount_{row_id}_{index}"))
+                    if split_amount == Decimal("0.00"):
+                        continue
+                    split_scope = request.POST.get(f"split_scope_{row_id}_{index}", "property")
+                    split_property_obj = None
+                    if split_scope == "property":
+                        split_property_obj = properties.filter(id=request.POST.get(f"split_property_{row_id}_{index}")).first()
+                        if not split_property_obj:
+                            continue
+                    split_entry_type = request.POST.get(f"split_entry_type_{row_id}_{index}", "operating_expense")
+                    split_category = request.POST.get(f"split_category_{row_id}_{index}", "").strip() or "Uncategorized"
+                    split_description = request.POST.get(f"split_description_{row_id}_{index}", "").strip() or description
+                    split_total += abs(split_amount)
+                    split_specs.append((split_scope, split_property_obj, split_entry_type, split_category, split_description, split_amount))
+
+                if split_specs and split_total != abs(transaction_amount):
+                    split_errors += 1
+                    skipped += 1
+                    continue
+
+                for split_scope, split_property_obj, split_entry_type, split_category, split_description, split_amount in split_specs:
+                    entry = create_financial_entry_from_import(
+                        upload,
+                        split_property_obj,
+                        sheet_name,
+                        row,
+                        entry_date,
+                        split_entry_type,
+                        split_category,
+                        split_description,
+                        split_amount,
+                        ledger_scope=split_scope,
+                    )
+                    if entry:
+                        created += 1
+                        created_for_row += 1
+                if created_for_row == 0:
+                    skipped += 1
+
+        upload.parsed_at = timezone.now()
+        upload.save(update_fields=["parsed_at"])
+        if split_errors:
+            messages.warning(request, f"{split_errors} split transaction(s) were skipped because the split total did not match the bank amount.")
+        messages.success(request, f"Bank review posted {created} ledger line(s). Ignored {ignored} row(s). Skipped {skipped} row(s).")
+        return redirect("financial_upload")
+
+    review_rows = []
+    for row in rows[:100]:
+        row_data = row["data"]
+        amount = bank_transaction_amount(row_data, amount_column, debit_column, credit_column)
+        description = str(row_data.get(description_column, "") or "").strip()
+        review_rows.append({
+            "row": row,
+            "amount": amount,
+            "absolute_amount": abs(amount),
+            "description": description,
+            "entry_date": parse_import_date(row_data.get(date_column)),
+            "default_entry_type": normalize_entry_type("", "", description, amount, "operating_expense"),
+        })
+
+    return render(request, "bank_upload_review.html", {
+        "upload": upload,
+        "sheet_names": sheet_names,
+        "selected_sheet_name": sheet_name,
+        "headers": headers,
+        "review_rows": review_rows,
+        "date_column": date_column,
+        "description_column": description_column,
+        "amount_column": amount_column,
+        "debit_column": debit_column,
+        "credit_column": credit_column,
+        "entry_type_choices": FinancialEntry.ENTRY_TYPE_CHOICES,
+        "properties": list(properties),
+        "existing_entries": upload.entries.count(),
+    })
 
 
 @login_required
@@ -6426,6 +6605,8 @@ def parse_financial_upload(request, upload_id):
         id=upload_id,
         property__in=properties,
     )
+    if upload.ledger_scope == "bank":
+        return redirect("bank_upload_review", upload_id=upload.id)
 
     sheet_names = financial_upload_sheet_names(upload)
     selected_sheet_name = request.POST.get("sheet_name") or request.GET.get("sheet_name") or (sheet_names[0] if sheet_names else None)

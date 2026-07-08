@@ -109,6 +109,7 @@ urlpatterns = [
     path("custom-reports/", views.custom_reports, name="custom_reports"),
     path("t12-report/", views.t12_report, name="t12_report"),
     path("financial-upload/", views.financial_upload, name="financial_upload"),
+    path("financial-upload/<int:upload_id>/bank-review/", views.bank_upload_review, name="bank_upload_review"),
     path("financial-upload/<int:upload_id>/parse/", views.parse_financial_upload, name="parse_financial_upload"),
     path("accounting/receipts/", views.accounting_receipts, name="accounting_receipts"),
     path("accounting/vendor-rules/", views.vendor_category_rules, name="vendor_category_rules"),

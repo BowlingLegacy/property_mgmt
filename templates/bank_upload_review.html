@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% load formatting %}
+{% block content %}
+
+<style>
+.bank-panel {
+    background: rgba(255,255,255,.95);
+    border: 1px solid rgba(188,150,45,.22);
+    border-radius: 18px;
+    box-shadow: 0 8px 20px rgba(0,0,0,.06);
+    padding: 1rem;
+}
+.bank-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+.bank-table th {
+    background: #f3ead7;
+    color: #6f5411;
+    white-space: nowrap;
+}
+.bank-table td {
+    vertical-align: top;
+}
+.gold-btn {
+    background: linear-gradient(135deg, #c48f22, #d8ab3b);
+    border: 0;
+    border-radius: 12px;
+    color: #fff;
+    font-weight: 900;
+    padding: .85rem 1.2rem;
+}
+.split-box {
+    background: #fffaf0;
+    border: 1px solid rgba(197,154,50,.25);
+    border-radius: 12px;
+    padding: .75rem;
+    min-width: 560px;
+}
+.small-control {
+    min-width: 130px;
+}
+</style>
+
+<div class="bank-panel mb-4">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <div class="text-uppercase small fw-bold text-muted">Bank Activity Review</div>
+            <h1 class="fw-bold mb-1">{{ upload.name }}</h1>
+            <p class="text-muted mb-0">
+                Source: <strong>{{ upload.get_ledger_scope_display }}</strong>
+                {% if upload.parsed_at %} · Last posted {{ upload.parsed_at|date:"M j, Y g:i A" }}{% endif %}
+                · Ledger entries from this upload: {{ existing_entries }}
+            </p>
+        </div>
+        <a href="{% url 'financial_upload' %}" class="btn btn-outline-secondary">Back to Imports</a>
+    </div>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
+    {% endfor %}
+{% endif %}
+
+{% if headers %}
+    <form method="get" class="bank-panel mb-4">
+        <h2 class="h4 fw-bold mb-3">Map Bank Columns</h2>
+        <p class="text-muted">
+            Choose the bank columns first. Then review each row below. Ignored rows never affect reports.
+        </p>
+        <div class="bank-grid">
+            <div>
+                <label class="form-label fw-bold">Worksheet / Tab</label>
+                <select name="sheet_name" class="form-select">
+                    {% for name in sheet_names %}
+                        <option value="{{ name }}" {% if selected_sheet_name == name %}selected{% endif %}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="form-label fw-bold">Date Column</label>
+                <select name="date_column" class="form-select">
+                    <option value="">No date column</option>
+                    {% for header in headers %}
+                        <option value="{{ header }}" {% if date_column == header %}selected{% endif %}>{{ header }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="form-label fw-bold">Description Column</label>
+                <select name="description_column" class="form-select">
+                    <option value="">No description column</option>
+                    {% for header in headers %}
+                        <option value="{{ header }}" {% if description_column == header %}selected{% endif %}>{{ header }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="form-label fw-bold">Single Amount Column</label>
+                <select name="amount_column" class="form-select">
+                    <option value="">Use debit / credit columns instead</option>
+                    {% for header in headers %}
+                        <option value="{{ header }}" {% if amount_column == header %}selected{% endif %}>{{ header }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="form-label fw-bold">Debit / Withdrawal Column</label>
+                <select name="debit_column" class="form-select">
+                    <option value="">No debit column</option>
+                    {% for header in headers %}
+                        <option value="{{ header }}" {% if debit_column == header %}selected{% endif %}>{{ header }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="form-label fw-bold">Credit / Deposit Column</label>
+                <select name="credit_column" class="form-select">
+                    <option value="">No credit column</option>
+                    {% for header in headers %}
+                        <option value="{{ header }}" {% if credit_column == header %}selected{% endif %}>{{ header }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="d-flex justify-content-end mt-3">
+            <button class="btn btn-primary" type="submit">Refresh Review</button>
+        </div>
+    </form>
+
+    <form method="post" class="bank-panel">
+        {% csrf_token %}
+        <input type="hidden" name="sheet_name" value="{{ selected_sheet_name }}">
+        <input type="hidden" name="date_column" value="{{ date_column }}">
+        <input type="hidden" name="description_column" value="{{ description_column }}">
+        <input type="hidden" name="amount_column" value="{{ amount_column }}">
+        <input type="hidden" name="debit_column" value="{{ debit_column }}">
+        <input type="hidden" name="credit_column" value="{{ credit_column }}">
+
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+            <div>
+                <h2 class="h4 fw-bold mb-1">Review Rows</h2>
+                <p class="text-muted mb-0">Rows default to Ignore. Only rows you mark as Property, Company, or Split are posted.</p>
+            </div>
+            <button type="submit" class="gold-btn">Post Reviewed Rows</button>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-bordered bank-table">
+                <thead>
+                    <tr>
+                        <th>Row</th>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th>Amount</th>
+                        <th>Action</th>
+                        <th>Property / Category</th>
+                        <th>Split Lines</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in review_rows %}
+                        {% with row=item.row row_id=item.row.row_number %}
+                        <tr>
+                            <td>{{ row.row_number }}</td>
+                            <td>{{ item.entry_date|default:"-" }}</td>
+                            <td>
+                                <div class="fw-bold">{{ item.description|default:"-" }}</div>
+                                <details class="small text-muted mt-2">
+                                    <summary>Raw row</summary>
+                                    {% for header in headers %}
+                                        <div><strong>{{ header }}:</strong> {{ row.data|get_item:header }}</div>
+                                    {% endfor %}
+                                </details>
+                            </td>
+                            <td class="fw-bold">${{ item.absolute_amount|floatformat:2 }}</td>
+                            <td>
+                                <select name="row_action_{{ row_id }}" class="form-select small-control">
+                                    <option value="ignore" selected>Ignore / personal</option>
+                                    <option value="property">Painted Lady / property</option>
+                                    <option value="company">Bowling Legacy company</option>
+                                    <option value="split">Split transaction</option>
+                                </select>
+                            </td>
+                            <td>
+                                <div class="mb-2">
+                                    <label class="form-label small fw-bold">Property</label>
+                                    <select name="property_{{ row_id }}" class="form-select small-control">
+                                        {% for property in properties %}
+                                            <option value="{{ property.id }}" {% if upload.property_id == property.id %}selected{% endif %}>{{ property.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label small fw-bold">Type</label>
+                                    <select name="entry_type_{{ row_id }}" class="form-select small-control">
+                                        {% for value,label in entry_type_choices %}
+                                            <option value="{{ value }}" {% if value == item.default_entry_type %}selected{% endif %}>{{ label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label small fw-bold">Category</label>
+                                    <input type="text" name="category_{{ row_id }}" class="form-control" placeholder="Power, Gas, Debt Service">
+                                </div>
+                                <div>
+                                    <label class="form-label small fw-bold">Description</label>
+                                    <input type="text" name="description_{{ row_id }}" class="form-control" value="{{ item.description }}">
+                                </div>
+                            </td>
+                            <td>
+                                <div class="split-box">
+                                    {% for index in "1234" %}
+                                        <div class="row g-2 align-items-end mb-2">
+                                            <div class="col-2">
+                                                <label class="form-label small fw-bold">Amount</label>
+                                                <input type="number" name="split_amount_{{ row_id }}_{{ index }}" class="form-control" step="0.01" min="0">
+                                            </div>
+                                            <div class="col-2">
+                                                <label class="form-label small fw-bold">Ledger</label>
+                                                <select name="split_scope_{{ row_id }}_{{ index }}" class="form-select">
+                                                    <option value="property">Property</option>
+                                                    <option value="company">Company</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-3">
+                                                <label class="form-label small fw-bold">Property</label>
+                                                <select name="split_property_{{ row_id }}_{{ index }}" class="form-select">
+                                                    {% for property in properties %}
+                                                        <option value="{{ property.id }}" {% if upload.property_id == property.id %}selected{% endif %}>{{ property.name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div class="col-2">
+                                                <label class="form-label small fw-bold">Type</label>
+                                                <select name="split_entry_type_{{ row_id }}_{{ index }}" class="form-select">
+                                                    {% for value,label in entry_type_choices %}
+                                                        <option value="{{ value }}" {% if value == "operating_expense" %}selected{% endif %}>{{ label }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div class="col-3">
+                                                <label class="form-label small fw-bold">Category</label>
+                                                <input type="text" name="split_category_{{ row_id }}_{{ index }}" class="form-control" placeholder="Internet">
+                                            </div>
+                                            <div class="col-12">
+                                                <input type="text" name="split_description_{{ row_id }}_{{ index }}" class="form-control" placeholder="Optional split description">
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                    <div class="small text-muted">For split rows, split amounts must add up to ${{ item.absolute_amount|floatformat:2 }}.</div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endwith %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="d-flex justify-content-end mt-3">
+            <button type="submit" class="gold-btn">Post Reviewed Rows</button>
+        </div>
+    </form>
+{% else %}
+    <div class="alert alert-warning">No rows were found in this bank file.</div>
+{% endif %}
+
+{% endblock %}

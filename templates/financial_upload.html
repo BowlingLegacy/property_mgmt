@@ -78,6 +78,7 @@
                                 <th>Uploaded</th>
                                 <th>Reviewed</th>
                                 <th>Entries</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -88,6 +89,13 @@
                                     <td>{{ upload.uploaded_at }}</td>
                                     <td>{{ upload.parsed_at|default:"Not parsed" }}</td>
                                     <td>{{ upload.entries.count }}</td>
+                                    <td>
+                                        {% if upload.ledger_scope == "bank" %}
+                                            <a href="{% url 'bank_upload_review' upload.id %}" class="btn btn-sm btn-primary">Review Bank Rows</a>
+                                        {% else %}
+                                            <a href="{% url 'parse_financial_upload' upload.id %}" class="btn btn-sm btn-outline-primary">Review Import</a>
+                                        {% endif %}
+                                    </td>
                                 </tr>
                             {% endfor %}
                         </tbody>
