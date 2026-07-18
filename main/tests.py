@@ -5363,6 +5363,39 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "size: landscape")
         self.assertContains(response, "table-layout: fixed")
 
+    @patch("main.views.timezone.localdate", return_value=date(2026, 7, 17))
+    def test_rent_roll_carries_prior_unpaid_balance_into_current_month(self, _mocked_localdate):
+        landlord = User.objects.create_user(
+            username="rent-roll-carry-landlord",
+            email="rent-roll-carry@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Carry Rent Roll Property", landlord_email=landlord.email)
+        resident_user = User.objects.create_user(username="aaron-brown", password="StrongPass123!", role="tenant")
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Aaron Brown",
+            email="aaron@example.com",
+            age=40,
+            space_label="A",
+            monthly_rent=Decimal("650.00"),
+            balance=Decimal("650.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+
+        self.client.login(username="rent-roll-carry-landlord", password="StrongPass123!")
+        response = self.client.get(f"{reverse('rent_roll')}?month=2026-07")
+
+        row = next(row for row in response.context["rows"] if row["resident"] == "Aaron Brown")
+        self.assertEqual(row["monthly_rent"], Decimal("650.00"))
+        self.assertEqual(row["rent_balance"], Decimal("1300.00"))
+        self.assertContains(response, f"{reverse('record_manual_payment')}?application={resident.id}")
+        self.assertContains(response, reverse("edit_resident_balances", args=[resident.id]))
     def test_rent_roll_does_not_charge_resident_before_lease_start_month(self):
         landlord = User.objects.create_user(
             username="future-rent-roll-landlord",

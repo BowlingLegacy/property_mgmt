@@ -1193,6 +1193,7 @@ def rent_roll_base_row(property_obj, room_label, resident_name="No profile yet")
         "room": clean_room_label or "-",
         "room_sort": rent_roll_room_sort_key(clean_room_label),
         "resident": resident_name or "No profile yet",
+        "application_id": None,
         "monthly_rent": Decimal("0.00"),
         "rent_paid": Decimal("0.00"),
         "rent_due_for_month": Decimal("0.00"),
@@ -1230,6 +1231,7 @@ def apply_resident_to_rent_roll_row(row, resident, selected_month):
     utility_expected = expected_utility_for_month(resident, selected_month)
 
     row["resident"] = resident.full_name
+    row["application_id"] = resident.id
     row["monthly_rent"] = resident.monthly_rent
     row["rent_paid"] = rent_paid
     row["rent_due_for_month"] = max(rent_expected - rent_paid, Decimal("0.00"))
@@ -1310,9 +1312,16 @@ def rent_roll_rows_for_properties(user, selected_month, properties):
         apply_resident_to_rent_roll_row(row, resident, selected_month)
 
     rows = sorted(rows_by_room.values(), key=lambda row: (row["property"].lower(), row["room_sort"], row["resident"].lower()))
+    current_month = timezone.localdate().replace(day=1)
     for row in rows:
         row["rent_balance"] = row["rent_due_for_month"]
         row["utility_balance"] = row["utility_due_for_month"]
+        # Carry an existing open balance into the current/future month's total.
+        # Historical reports remain month-specific and are not rewritten by a
+        # resident's present-day balance.
+        if row["has_profile"] and selected_month >= current_month:
+            row["rent_balance"] += max(row["current_rent_balance"], Decimal("0.00"))
+            row["utility_balance"] += max(row["current_utility_balance"], Decimal("0.00"))
         row["deposit_balance"] = row["deposit_due"]
     return rows
 

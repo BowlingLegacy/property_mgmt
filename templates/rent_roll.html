@@ -162,6 +162,7 @@
                         <th class="money-col">Deposit</th>
                         <th class="money-col">Deposit Paid</th>
                         <th class="money-col">Deposit Balance</th>
+                        <th class="no-print">Actions</th>
                     </tr>
                 </thead>
 
@@ -179,10 +180,16 @@
                             <td class="money-col">${{ row.deposit_required }}</td>
                             <td class="money-col">${{ row.deposit_paid }}</td>
                             <td class="money-col">${{ row.deposit_balance }}</td>
+                            <td class="no-print text-nowrap">
+                                {% if row.application_id %}
+                                    <a href="{% url 'record_manual_payment' %}?application={{ row.application_id }}" class="btn btn-primary btn-sm">Payment</a>
+                                    <a href="{% url 'edit_resident_balances' row.application_id %}" class="btn btn-outline-secondary btn-sm">Correct</a>
+                                {% endif %}
+                            </td>
                         </tr>
                     {% empty %}
                         <tr>
-                            <td colspan="11" class="text-muted">No residents found.</td>
+                            <td colspan="12" class="text-muted">No residents found.</td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -201,6 +208,7 @@
                             <td class="money-col">${{ totals.deposit_required }}</td>
                             <td class="money-col">${{ totals.deposit_paid }}</td>
                             <td class="money-col">${{ totals.deposit_balance }}</td>
+                            <td class="no-print"></td>
                         </tr>
                     </tfoot>
                 {% endif %}
