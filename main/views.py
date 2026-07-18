@@ -1273,6 +1273,22 @@ def selected_property_scope(request):
     return properties, selected_property, True
 
 
+def resident_occupied_during_month(resident, selected_month):
+    month_end = date(selected_month.year, selected_month.month, calendar.monthrange(selected_month.year, selected_month.month)[1])
+    if resident.lease_start_date:
+        occupancy_start = resident.lease_start_date
+    else:
+        payment_dates = [payment_service_month(payment) for payment in resident.payments.all()]
+        first_history = resident.rent_history.order_by("effective_date", "id").first()
+        fallback_dates = payment_dates + ([first_history.effective_date] if first_history else [])
+        occupancy_start = min(fallback_dates) if fallback_dates else resident.created_at.date()
+
+    if occupancy_start > month_end:
+        return False
+    if resident.move_out_date and resident.move_out_date < selected_month:
+        return False
+    return True
+
 def rent_roll_rows_for_properties(user, selected_month, properties):
     residents = (
         active_staff_managed_applications(user)
@@ -1287,6 +1303,8 @@ def rent_roll_rows_for_properties(user, selected_month, properties):
     )
 
     rows_by_room = OrderedDict()
+    current_month = timezone.localdate().replace(day=1)
+    historical_month = selected_month < current_month
 
     room_settings = (
         PropertyRoomRent.objects
@@ -1295,6 +1313,8 @@ def rent_roll_rows_for_properties(user, selected_month, properties):
         .order_by("property__name", "room_unit_label")
     )
     for setting in room_settings:
+        if historical_month:
+            continue
         key = rent_roll_room_key(setting.property, setting.room_unit_label)
         row = rows_by_room.setdefault(key, rent_roll_base_row(setting.property, setting.room_unit_label))
         apply_room_setting_to_rent_roll_row(row, setting)
@@ -1307,12 +1327,16 @@ def rent_roll_rows_for_properties(user, selected_month, properties):
         .order_by("property__name", "room_unit_label", "last_name", "first_name")
     )
     for entry in roster_entries:
+        if historical_month:
+            continue
         key = rent_roll_room_key(entry.property, entry.room_unit_label)
         row = rows_by_room.setdefault(key, rent_roll_base_row(entry.property, entry.room_unit_label))
         if not row["has_profile"] and row["resident"] == "No profile yet":
             row["resident"] = entry.full_name()
 
     for resident in residents:
+        if historical_month and not resident_occupied_during_month(resident, selected_month):
+            continue
         room_label = canonical_room_label(resident.space_label or "")
         if room_label:
             key = rent_roll_room_key(resident.property, room_label)
@@ -1323,7 +1347,7 @@ def rent_roll_rows_for_properties(user, selected_month, properties):
         apply_resident_to_rent_roll_row(row, resident, selected_month)
 
     rows = sorted(rows_by_room.values(), key=lambda row: (row["property"].lower(), row["room_sort"], row["resident"].lower()))
-    current_month = timezone.localdate().replace(day=1)
+
     for row in rows:
         row["rent_balance"] = row["rent_due_for_month"]
         row["utility_balance"] = row["utility_due_for_month"]

@@ -5283,6 +5283,7 @@ class LiveFlowTests(TestCase):
             email="room-b@example.com",
             age=41,
             space_label="Room B",
+            lease_start_date=date(2026, 6, 1),
             monthly_rent=Decimal("600.00"),
             balance=Decimal("600.00"),
             utility_monthly=Decimal("55.00"),
@@ -5301,6 +5302,7 @@ class LiveFlowTests(TestCase):
             email="room-a@example.com",
             age=42,
             space_label="A",
+            lease_start_date=date(2026, 6, 1),
             monthly_rent=Decimal("650.00"),
             income_source="Employment",
             monthly_income=Decimal("2500.00"),
@@ -5314,6 +5316,7 @@ class LiveFlowTests(TestCase):
             email="room-c@example.com",
             age=43,
             space_label="C",
+            lease_start_date=date(2026, 6, 1),
             monthly_rent=Decimal("625.00"),
             income_source="Employment",
             monthly_income=Decimal("2500.00"),
@@ -5537,9 +5540,7 @@ class LiveFlowTests(TestCase):
         response = self.client.get(f"{reverse('rent_roll')}?month=2026-06")
 
         self.assertEqual(response.status_code, 200)
-        row = next(row for row in response.context["rows"] if row["resident"] == "Future Move In")
-        self.assertEqual(row["rent_balance"], Decimal("0.00"))
-        self.assertEqual(row["utility_balance"], Decimal("0.00"))
+        self.assertFalse(any(row["resident"] == "Future Move In" for row in response.context["rows"]))
 
     def test_rent_roll_uses_final_balance_for_move_out_month(self):
         landlord = User.objects.create_user(
