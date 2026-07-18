@@ -5381,11 +5381,16 @@ class LiveFlowTests(TestCase):
             email="aaron@example.com",
             age=40,
             space_label="A",
-            monthly_rent=Decimal("650.00"),
+            monthly_rent=Decimal("550.00"),
             balance=Decimal("650.00"),
             income_source="Employment",
             monthly_income=Decimal("2500.00"),
             housing_need="Current resident.",
+        )
+        RentHistory.objects.create(
+            application=resident,
+            rent_amount=Decimal("650.00"),
+            effective_date=date(2026, 6, 1),
         )
 
         self.client.login(username="rent-roll-carry-landlord", password="StrongPass123!")

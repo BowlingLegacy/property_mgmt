@@ -1034,6 +1034,17 @@ def configured_monthly_utility(application):
     return room_setting.utility_monthly if room_setting else Decimal("0.00")
 
 
+def historical_rent_for_month(application, month_start):
+    month_end = date(month_start.year, month_start.month, calendar.monthrange(month_start.year, month_start.month)[1])
+    history = (
+        application.rent_history
+        .filter(effective_date__lte=month_end)
+        .order_by("-effective_date", "-id")
+        .first()
+    )
+    return history.rent_amount if history else configured_monthly_rent(application)
+
+
 def expected_rent_for_month(application, month_start):
     month_end = date(month_start.year, month_start.month, calendar.monthrange(month_start.year, month_start.month)[1])
 
@@ -1050,7 +1061,7 @@ def expected_rent_for_month(application, month_start):
         and application.lease_start_date.month == month_start.month
     ):
         return application.move_in_rent_charge
-    return configured_monthly_rent(application)
+    return historical_rent_for_month(application, month_start)
 
 
 def expected_utility_for_month(application, month_start):
@@ -1232,7 +1243,7 @@ def apply_resident_to_rent_roll_row(row, resident, selected_month):
 
     row["resident"] = resident.full_name
     row["application_id"] = resident.id
-    row["monthly_rent"] = resident.monthly_rent
+    row["monthly_rent"] = historical_rent_for_month(resident, selected_month)
     row["rent_paid"] = rent_paid
     row["rent_due_for_month"] = max(rent_expected - rent_paid, Decimal("0.00"))
     row["current_rent_balance"] = resident.balance
