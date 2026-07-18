@@ -5552,7 +5552,7 @@ class LiveFlowTests(TestCase):
         )
         property_obj = Property.objects.create(name="Move Out Rent Roll Property", landlord_email=landlord.email)
         former_user = User.objects.create_user(username="move-out-rent-roll-tenant", password="StrongPass123!", role="tenant")
-        HousingApplication.objects.create(
+        former = HousingApplication.objects.create(
             property=property_obj,
             user=former_user,
             full_name="Zero Balance Move Out",
@@ -5594,6 +5594,23 @@ class LiveFlowTests(TestCase):
         self.assertEqual(row["rent_balance"], Decimal("0.00"))
         self.assertEqual(row["utility_balance"], Decimal("0.00"))
         self.assertNotContains(response, "Room H Replacement")
+        former.full_name = "Renamed After June"
+        former.space_label = "Z"
+        former.save(update_fields=["full_name", "space_label"])
+        Payment.objects.create(
+            application=former,
+            payment_type="rent",
+            payment_method="cash",
+            amount=Decimal("100.00"),
+            status="completed",
+            service_month=date(2026, 6, 1),
+        )
+        locked_response = self.client.get(f"{reverse('rent_roll')}?month=2026-06")
+        locked_row = next(row for row in locked_response.context["rows"] if row["resident"] == "Zero Balance Move Out")
+        self.assertEqual(locked_row["room"], "H")
+        self.assertEqual(locked_row["monthly_rent"], Decimal("650.00"))
+        self.assertEqual(locked_row["rent_paid"], Decimal("100.00"))
+        self.assertNotContains(locked_response, "Renamed After June")
 
     def test_rent_roll_prompts_for_property_when_multiple_properties_exist(self):
         superuser = User.objects.create_user(

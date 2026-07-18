@@ -67,6 +67,7 @@ from .models import (
     BlogPost,
     HousingApplication,
     RentHistory,
+    RentRollSnapshot,
     Payment,
     ResidentBalanceEntry,
     FinancialUpload,
@@ -1289,9 +1290,60 @@ def resident_occupied_during_month(resident, selected_month):
         return False
     return True
 
+def locked_rent_roll_rows(selected_month, properties):
+    snapshots = list(RentRollSnapshot.objects.filter(property__in=properties, service_month=selected_month).select_related("property", "application").order_by("property__name", "room_unit_label", "resident_name"))
+    if not snapshots:
+        return None
+    rows = []
+    for snapshot in snapshots:
+        row = rent_roll_base_row(snapshot.property, snapshot.room_unit_label, snapshot.resident_name)
+        row["application_id"] = snapshot.application_id
+        row["resident"] = snapshot.resident_name
+        row["monthly_rent"] = snapshot.monthly_rent
+        row["utility_monthly"] = snapshot.utility_monthly
+        row["deposit_required"] = snapshot.deposit_required
+        row["deposit_paid"] = snapshot.deposit_paid
+        row["deposit_balance"] = max(snapshot.deposit_required - snapshot.deposit_paid, Decimal("0.00"))
+        row["has_profile"] = bool(snapshot.application_id)
+        payments = list(snapshot.application.payments.filter(status="completed")) if snapshot.application_id else []
+        row["rent_paid"] = payment_amount_for_month(payments, selected_month.year, selected_month.month, ["rent"])
+        row["utility_paid"] = payment_amount_for_month(payments, selected_month.year, selected_month.month, ["utility"])
+        row["rent_balance"] = max(snapshot.rent_charge - row["rent_paid"], Decimal("0.00"))
+        row["utility_balance"] = max(snapshot.utility_charge - row["utility_paid"], Decimal("0.00"))
+        rows.append(row)
+    return rows
+
+
+def lock_historical_rent_roll(selected_month, rows, properties):
+    properties_by_id = {property_obj.id: property_obj for property_obj in properties}
+    snapshots = []
+    for row in rows:
+        property_obj = properties_by_id.get(row["property_id"])
+        if property_obj:
+            snapshots.append(RentRollSnapshot(
+                property=property_obj,
+                application_id=row["application_id"],
+                service_month=selected_month,
+                room_unit_label=row["room"],
+                resident_name=row["resident"],
+                monthly_rent=row["monthly_rent"],
+                rent_charge=row["rent_due_for_month"] + row["rent_paid"],
+                utility_monthly=row["utility_monthly"],
+                utility_charge=row["utility_due_for_month"] + row["utility_paid"],
+                deposit_required=row["deposit_required"],
+                deposit_paid=row["deposit_paid"],
+            ))
+    RentRollSnapshot.objects.bulk_create(snapshots, ignore_conflicts=True)
+    return locked_rent_roll_rows(selected_month, properties) or rows
+
 def rent_roll_rows_for_properties(user, selected_month, properties):
     current_month = timezone.localdate().replace(day=1)
     historical_month = selected_month < current_month
+
+    if historical_month:
+        locked_rows = locked_rent_roll_rows(selected_month, properties)
+        if locked_rows is not None:
+            return locked_rows
 
     if historical_month:
         resident_source = staff_managed_applications(user).exclude(space_label="")
@@ -1365,6 +1417,8 @@ def rent_roll_rows_for_properties(user, selected_month, properties):
             row["rent_balance"] += max(row["current_rent_balance"], Decimal("0.00"))
             row["utility_balance"] += max(row["current_utility_balance"], Decimal("0.00"))
         row["deposit_balance"] = row["deposit_due"]
+    if historical_month:
+        return lock_historical_rent_roll(selected_month, rows, properties)
     return rows
 
 

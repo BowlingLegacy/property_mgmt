@@ -1308,3 +1308,34 @@ class CompanyMailboxConnection(models.Model):
 
     def __str__(self):
         return self.mailbox_email
+class RentRollSnapshot(models.Model):
+    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name="rent_roll_snapshots")
+    application = models.ForeignKey(
+        HousingApplication,
+        on_delete=models.SET_NULL,
+        related_name="rent_roll_snapshots",
+        blank=True,
+        null=True,
+    )
+    service_month = models.DateField()
+    room_unit_label = models.CharField(max_length=50)
+    resident_name = models.CharField(max_length=255)
+    monthly_rent = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    rent_charge = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    utility_monthly = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    utility_charge = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    deposit_required = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    deposit_paid = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    locked_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["property__name", "room_unit_label", "resident_name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["property", "service_month", "room_unit_label"],
+                name="unique_monthly_rent_roll_room",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.property.name} {self.service_month:%B %Y} {self.room_unit_label} - {self.resident_name}"
