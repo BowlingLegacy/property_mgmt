@@ -265,6 +265,9 @@ body {
                     <div class="metric-card">
                         <div class="metric-label">Utilities Due</div>
                         <div class="metric-value">${{ collection_summary.utility_due_display }}</div>
+                    </div>                    <div class="metric-card">
+                        <div class="metric-label">Outstanding Rent</div>
+                        <div class="metric-value">${{ collection_summary.outstanding_rent_display }}</div>
                     </div>
                     <div class="metric-card">
                         <div class="metric-label">Rent Collected</div>
@@ -285,6 +288,8 @@ body {
                                 <th>Room / Unit</th>
                                 <th>Missing</th>
                                 <th>Rent Paid</th>
+                                <th>Prior Rent Balance</th>
+                                <th>Total Rent Due</th>
                                 <th>Utilities Paid</th>
                                 <th>Action</th>
                             </tr>
@@ -297,6 +302,8 @@ body {
                                     <td>{{ row.unit }}</td>
                                     <td><span class="status-pill">{{ row.missing }}</span></td>
                                     <td>${{ row.rent_paid }} / ${{ row.rent_expected }}</td>
+                                    <td>${{ row.prior_rent_balance }}</td>
+                                    <td><strong>${{ row.rent_due }}</strong></td>
                                     <td>
                                         {% if row.utility_expected > 0 %}
                                             ${{ row.utility_paid }} / ${{ row.utility_expected }}
@@ -312,7 +319,7 @@ body {
                                 </tr>
                             {% empty %}
                                 <tr>
-                                    <td colspan="7" class="text-muted p-3">
+                                    <td colspan="9" class="text-muted p-3">
                                         Everyone visible to this dashboard has paid the current month's rent and applicable utilities.
                                     </td>
                                 </tr>

@@ -1197,6 +1197,11 @@ class LiveFlowTests(TestCase):
         self.assertEqual(rows[0]["rent_expected"], Decimal("650.00"))
         self.assertEqual(rows[0]["prior_rent_balance"], Decimal("450.00"))
         self.assertEqual(rows[0]["rent_due"], Decimal("1100.00"))
+        self.assertEqual(response.context["collection_summary"]["outstanding_rent"], Decimal("1100.00"))
+        self.assertContains(response, "Prior Rent Balance")
+        self.assertContains(response, "Total Rent Due")
+        self.assertContains(response, "$450.00")
+        self.assertContains(response, "$1100.00")
 
     @patch("main.views.timezone.localdate", return_value=date(2026, 7, 5))
     def test_landlord_collection_watch_uses_room_utility_when_resident_file_is_blank(self, _mocked_localdate):

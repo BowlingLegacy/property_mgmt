@@ -1941,16 +1941,23 @@ def monthly_collection_watch_rows(applications):
 def monthly_collection_summary(status_rows):
     rent_due = sum((row["scheduled_rent"] for row in status_rows), Decimal("0.00"))
     utility_due = sum((row["scheduled_utility"] for row in status_rows), Decimal("0.00"))
+    outstanding_rent = sum((row["rent_due"] for row in status_rows), Decimal("0.00"))
+    outstanding_utilities = sum((row["utility_due"] for row in status_rows), Decimal("0.00"))
     rent_collected = sum((row["rent_paid"] for row in status_rows), Decimal("0.00"))
     utility_collected = sum((row["utility_paid"] for row in status_rows), Decimal("0.00"))
     return {
         "rent_due": rent_due,
         "utility_due": utility_due,
         "total_due": rent_due + utility_due,
+        "outstanding_rent": outstanding_rent,
+        "outstanding_utilities": outstanding_utilities,
+        "total_outstanding": outstanding_rent + outstanding_utilities,
         "rent_collected": rent_collected,
         "utility_collected": utility_collected,
         "total_collected": rent_collected + utility_collected,
         "rent_due_display": whole_money_display(rent_due),
+        "outstanding_rent_display": whole_money_display(outstanding_rent),
+        "outstanding_utilities_display": whole_money_display(outstanding_utilities),
         "utility_due_display": whole_money_display(utility_due),
         "rent_collected_display": whole_money_display(rent_collected),
         "utility_collected_display": whole_money_display(utility_collected),
