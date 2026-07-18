@@ -5560,6 +5560,8 @@ class LiveFlowTests(TestCase):
             email="move-out-roll@example.com",
             age=41,
             space_label="H",
+            lease_start_date=date(2026, 1, 1),
+            tenancy_status="former",
             monthly_rent=Decimal("650.00"),
             balance=Decimal("0.00"),
             utility_monthly=Decimal("55.00"),
@@ -5570,6 +5572,20 @@ class LiveFlowTests(TestCase):
             housing_need="Former resident.",
         )
 
+        HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Room H Replacement",
+            phone="555-0622",
+            email="room-h-replacement@example.com",
+            age=42,
+            space_label="H",
+            lease_start_date=date(2026, 7, 1),
+            monthly_rent=Decimal("650.00"),
+            utility_monthly=Decimal("55.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Replacement resident.",
+        )
         self.client.login(username="move-out-rent-roll-landlord", password="StrongPass123!")
         response = self.client.get(f"{reverse('rent_roll')}?month=2026-06")
 
@@ -5577,6 +5593,7 @@ class LiveFlowTests(TestCase):
         row = next(row for row in response.context["rows"] if row["resident"] == "Zero Balance Move Out")
         self.assertEqual(row["rent_balance"], Decimal("0.00"))
         self.assertEqual(row["utility_balance"], Decimal("0.00"))
+        self.assertNotContains(response, "Room H Replacement")
 
     def test_rent_roll_prompts_for_property_when_multiple_properties_exist(self):
         superuser = User.objects.create_user(

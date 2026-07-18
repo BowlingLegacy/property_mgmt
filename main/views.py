@@ -1290,12 +1290,21 @@ def resident_occupied_during_month(resident, selected_month):
     return True
 
 def rent_roll_rows_for_properties(user, selected_month, properties):
+    current_month = timezone.localdate().replace(day=1)
+    historical_month = selected_month < current_month
+
+    if historical_month:
+        resident_source = staff_managed_applications(user).exclude(space_label="")
+    else:
+        resident_source = active_staff_managed_applications(user)
+
     residents = (
-        active_staff_managed_applications(user)
+        resident_source
         .select_related("property")
         .filter(
             Q(user__isnull=False)
-            | Q(payments__status="completed", payments__service_month=selected_month),
+            | Q(payments__status="completed", payments__service_month=selected_month)
+            | Q(tenancy_status="former", move_out_date__isnull=False),
             property__in=properties,
         )
         .distinct()
@@ -1303,8 +1312,6 @@ def rent_roll_rows_for_properties(user, selected_month, properties):
     )
 
     rows_by_room = OrderedDict()
-    current_month = timezone.localdate().replace(day=1)
-    historical_month = selected_month < current_month
 
     room_settings = (
         PropertyRoomRent.objects
