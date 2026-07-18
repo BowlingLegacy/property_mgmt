@@ -5406,6 +5406,52 @@ class LiveFlowTests(TestCase):
         self.assertEqual(row["rent_balance"], Decimal("1300.00"))
         self.assertContains(response, f"{reverse('record_manual_payment')}?application={resident.id}")
         self.assertContains(response, reverse("edit_resident_balances", args=[resident.id]))
+    @patch("main.views.timezone.localdate", return_value=date(2026, 7, 17))
+    def test_aaron_collection_watch_matches_corrected_june_and_july_ledger(self, _mocked_localdate):
+        landlord = User.objects.create_user(
+            username="aaron-ledger-landlord",
+            email="aaron-ledger-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Aaron Ledger Property", landlord_email=landlord.email)
+        resident_user = User.objects.create_user(username="aaron-ledger-user", password="StrongPass123!", role="tenant")
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Aaron Brown",
+            email="aaron-ledger@example.com",
+            age=40,
+            space_label="A",
+            monthly_rent=Decimal("650.00"),
+            balance=Decimal("350.00"),
+            utility_monthly=Decimal("55.00"),
+            utility_balance=Decimal("0.00"),
+            deposit_required=Decimal("0.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        Payment.objects.create(
+            application=resident,
+            payment_type="rent",
+            payment_method="cash",
+            amount=Decimal("300.00"),
+            status="completed",
+            service_month=date(2026, 6, 1),
+        )
+
+        self.client.login(username="aaron-ledger-landlord", password="StrongPass123!")
+        response = self.client.get(reverse("landlord_dashboard"))
+        row = next(row for row in response.context["collection_watch_rows"] if row["application"].id == resident.id)
+
+        self.assertEqual(row["rent_expected"], Decimal("650.00"))
+        self.assertEqual(row["prior_rent_balance"], Decimal("350.00"))
+        self.assertEqual(row["rent_due"], Decimal("1000.00"))
+        self.assertEqual(row["utility_due"], Decimal("55.00"))
+        self.assertEqual(resident.deposit_required, Decimal("0.00"))
+        self.assertEqual(row["rent_due"] + row["utility_due"], Decimal("1055.00"))
     def test_rent_roll_does_not_charge_resident_before_lease_start_month(self):
         landlord = User.objects.create_user(
             username="future-rent-roll-landlord",
