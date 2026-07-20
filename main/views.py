@@ -1350,18 +1350,14 @@ def rent_roll_rows_for_properties(user, selected_month, properties):
     else:
         resident_source = active_staff_managed_applications(user)
 
-    residents = (
-        resident_source
-        .select_related("property")
-        .filter(
+    residents = resident_source.select_related("property").filter(property__in=properties)
+    if not historical_month:
+        residents = residents.filter(
             Q(user__isnull=False)
             | Q(payments__status="completed", payments__service_month=selected_month)
-            | Q(tenancy_status="former", move_out_date__isnull=False),
-            property__in=properties,
+            | Q(tenancy_status="former", move_out_date__isnull=False)
         )
-        .distinct()
-        .order_by("property__name", "space_label", "full_name")
-    )
+    residents = residents.distinct().order_by("property__name", "space_label", "full_name")
 
     rows_by_room = OrderedDict()
 
