@@ -6565,6 +6565,7 @@ class LiveFlowTests(TestCase):
         delinquency = self.client.get(reverse("custom_reports"), {"report_type": "delinquency_report", "property_id": property_obj.id})
         capital = self.client.get(reverse("custom_reports"), {"report_type": "capital_improvement_log", "property_id": property_obj.id})
         insurance = self.client.get(reverse("custom_reports"), {"report_type": "insurance_compliance", "property_id": property_obj.id})
+        lender_package = self.client.get(reverse("custom_reports"), {"report_type": "supportive_housing_lender_package", "property_id": property_obj.id})
 
         self.assertContains(valuation, "Valuation Estimate Report")
         self.assertContains(valuation, "1 months annualized")
@@ -6575,6 +6576,9 @@ class LiveFlowTests(TestCase):
         self.assertContains(delinquency, "Commercial Report Resident")
         self.assertContains(capital, "Windows")
         self.assertContains(insurance, "Insurance / Compliance Report")
+        self.assertContains(lender_package, "Supportive Housing / Lender Package")
+        self.assertContains(lender_package, "recovery-oriented supportive shared-housing")
+        self.assertContains(lender_package, "Eligibility before appraisal")
         self.assertNotContains(utility, "Hidden Expense")
 
     def test_t12_report_includes_uploaded_income_and_expenses(self):

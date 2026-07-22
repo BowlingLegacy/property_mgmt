@@ -1071,6 +1071,7 @@ class CustomReportForm(forms.Form):
         ("capital_improvement_log", "Capital Improvement Log"),
         ("utility_cost_trend", "Utility Usage / Cost Trend"),
         ("insurance_compliance", "Insurance / Compliance Report"),
+        ("supportive_housing_lender_package", "Supportive Housing / Lender Package"),
         ("financial_entries", "Financial Entries / Expenses"),
     ]
 

@@ -5771,6 +5771,150 @@ def custom_reports(request):
                     property_obj.renters_insurance_notes or "",
                 ])
 
+        elif report_type == "supportive_housing_lender_package":
+            report_title = "Supportive Housing / Lender Package"
+            report_columns = ["Section", "Item", "Details"]
+            today = timezone.localdate()
+            five_year_cutoff = today - timedelta(days=365 * 5)
+            for property_obj in filtered_properties:
+                property_residents = [
+                    resident for resident in sorted_residents
+                    if resident.property_id == property_obj.id
+                ]
+                rentable_units = (
+                    PropertyRoomRent.objects
+                    .filter(property=property_obj, is_active=True)
+                )
+                rentable_unit_count = sum(
+                    1
+                    for room in rentable_units
+                    if is_rentable_room_label(room.room_unit_label, property_obj)
+                )
+                long_stay_count = sum(
+                    1
+                    for resident in property_residents
+                    if resident.lease_start_date and resident.lease_start_date <= five_year_cutoff
+                )
+                monthly_scheduled_rent = sum((resident.monthly_rent for resident in property_residents), Decimal("0.00"))
+                monthly_scheduled_utilities = sum((resident.utility_monthly for resident in property_residents), Decimal("0.00"))
+
+                report_highlights.extend([
+                    (
+                        f"{property_obj.name}: describe the operation as recovery-oriented supportive shared housing, "
+                        "not a hotel, inn, assisted living facility, treatment center, or passive rental unless a lender or attorney directs otherwise."
+                    ),
+                    (
+                        "Use aggregate and redacted records. Do not include confidential recovery, medical, or disability details in a lender package."
+                    ),
+                ])
+                report_rows.extend([
+                    [
+                        "Operating Description",
+                        property_obj.name,
+                        (
+                            "Bowling Legacy LLC operates Painted Lady as a recovery-oriented supportive shared-housing "
+                            "community for adults age 55 and older, including individuals in recovery, people with "
+                            "disabilities, people on fixed incomes, and people at risk of homelessness. Residents may "
+                            "remain as long as the housing continues to meet their needs and they comply with the "
+                            "resident agreement. Long-term stability is an intended program outcome."
+                        ),
+                    ],
+                    ["Operating Snapshot", "Rentable rooms / units", rentable_unit_count],
+                    ["Operating Snapshot", "Current active residents", len(property_residents)],
+                    ["Operating Snapshot", "Residents with 5+ year stay", long_stay_count],
+                    ["Operating Snapshot", "Monthly scheduled rent", monthly_scheduled_rent],
+                    ["Operating Snapshot", "Monthly scheduled shared utilities", monthly_scheduled_utilities],
+                    [
+                        "Classification Boundary",
+                        "Important wording",
+                        (
+                            "Claim peer support, referrals, house rules, substance-free housing, on-site management, "
+                            "resident screening, conflict resolution, wellness checks, and supportive housing only to "
+                            "the extent those services are actually provided. Do not claim clinical treatment, "
+                            "medication administration, assisted living, personal care, or licensed residential "
+                            "treatment unless properly licensed."
+                        ),
+                    ],
+                    [
+                        "Lender Question",
+                        "Eligibility before appraisal",
+                        (
+                            "Please determine whether this operation qualifies as an active supportive-housing or "
+                            "residential-services business, or whether it would be considered passive residential "
+                            "rental real estate. If SBA financing is unavailable, please identify the conventional "
+                            "commercial, multifamily, CDFI, or grant-backed loan product appropriate for this property."
+                        ),
+                    ],
+                ])
+
+                service_rows = [
+                    ("On-site management", "Management schedule, house logs, resident notices"),
+                    ("Resident screening and admission", "Applications, screening notes, approval records"),
+                    ("Substance-free rules", "Resident agreement, house rules, violation notices"),
+                    ("Recovery and peer support", "Meeting calendar, community resource list, redacted support logs"),
+                    ("Referral relationships", "Agency/provider contact list, referral records"),
+                    ("Benefits and housing assistance", "Resource notes, redacted resident assistance records"),
+                    ("Wellness and safety monitoring", "General safety logs, incident records, wellness-check log"),
+                    ("Community programming", "House meeting notes, activity calendar"),
+                    ("Conflict resolution", "Policy, message records, resolution notes"),
+                    ("Housekeeping and maintenance", "Receipts, work logs, vendor records"),
+                    ("Transition planning", "Move-out records, referral/resource notes"),
+                ]
+                for service, records_needed in service_rows:
+                    report_rows.append(["Services To Document", service, records_needed])
+
+                buyer_records = [
+                    "Ten-month profit-and-loss statement",
+                    "Current balance sheet",
+                    "Bowling Legacy bank statements",
+                    "Resident payment ledger",
+                    "Monthly occupancy by room",
+                    "Monthly occupancy charge per resident",
+                    "Collection rate and unpaid balances",
+                    "Move-ins and move-outs",
+                    "Resident agreements and house rules",
+                    "Security deposits and resident credits",
+                    "Utility, maintenance, insurance, and repair costs",
+                    "Payments made to seller, including separate ledger of prior payments",
+                    "$20,000 proposed purchase-credit documentation",
+                    "Payroll, contractor, and resident-service expenses",
+                    "Projected 12-24 month cash flow",
+                    "Grant award letters and improvement plan",
+                ]
+                for record in buyer_records:
+                    report_rows.append(["Buyer Records", record, "Prepare or export from system records where available."])
+
+                seller_records = [
+                    "Property tax records",
+                    "Mortgage and lien information",
+                    "Prior tax returns or financial statements actually available",
+                    "Utility history before Bowling Legacy assumed operations",
+                    "Insurance policies and claims",
+                    "Licenses, permits, zoning records, and inspections",
+                    "Resident deposits, prepaid amounts, or credits held by seller",
+                    "Grants or government funds connected with the property",
+                    "Pending claims, lawsuits, code violations, or resident disputes",
+                    "Furniture, fixtures, equipment, and ownership records",
+                    "UCC filings, leases, contracts, and lien releases",
+                ]
+                for record in seller_records:
+                    report_rows.append(["Seller Records To Request", record, "Ask seller to provide or state in writing that it is unavailable."])
+
+                deal_points = [
+                    "Purchase price remains $650,000 unless revised in writing.",
+                    "$20,000 of documented prior payments should be treated as a previously paid contractual purchase deposit, subject to lender approval.",
+                    "Do not describe the $20,000 as cash back.",
+                    "Remove any preset down payment and loan amount if the lender must determine the required buyer contribution.",
+                    "Use a financing contingency covering SBA, conventional commercial, CDFI, or another institutional loan acceptable to buyer.",
+                    "Keep an appraisal contingency at or above the purchase price.",
+                    "Request a 60-day financing period plus one 30-day extension if underwriting remains active.",
+                    "Request a standstill preventing marketing, listing, sale, new liens, or new leases during the contingency period.",
+                    "Coordinate the $200,000 energy-improvement grant with lender, seller, grant administrator, escrow, and contractors before work begins.",
+                    "Do not combine or refinance other real estate unless the acquisition lender confirms it is required and appropriate.",
+                ]
+                for point in deal_points:
+                    report_rows.append(["Purchase / Financing Points", point, "Use for discussion with seller, agent, lender, and professional advisors."])
+
         elif report_type == "financial_entries":
             selected_entry_types = form.cleaned_data.get("financial_entry_types") or ["operating_expense"]
             report_title = "Financial Entries / Expenses"
