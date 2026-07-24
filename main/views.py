@@ -2177,6 +2177,92 @@ def monthly_collection_summary(status_rows):
     }
 
 
+def delinquency_report_rows_for_residents(residents, month_start):
+    rows = []
+    totals = {
+        "Rent Due": Decimal("0.00"),
+        "Utilities Due": Decimal("0.00"),
+        "Deposit Due": Decimal("0.00"),
+        "Total Due": Decimal("0.00"),
+    }
+    grouped_applications = OrderedDict()
+
+    for application in sorted_resident_list(residents):
+        unit_label = canonical_room_label(application.space_label)
+        if unit_label:
+            key = ("property-unit", application.property_id, normalized_room_label(unit_label))
+        else:
+            key = attention_identity_key(
+                application.property_id,
+                application.email,
+                application.full_name,
+                application.space_label,
+            )
+        grouped_applications.setdefault(key, []).append(application)
+
+    for duplicate_group in grouped_applications.values():
+        application = duplicate_group[0]
+        monthly_payments = []
+        for grouped_application in duplicate_group:
+            monthly_payments.extend(grouped_application.payments.filter(status="completed"))
+
+        rent_paid = payment_amount_for_month(monthly_payments, month_start.year, month_start.month, ["rent"])
+        utility_paid = payment_amount_for_month(monthly_payments, month_start.year, month_start.month, ["utility"])
+        rent_expected = max((expected_rent_for_month(grouped_application, month_start) for grouped_application in duplicate_group), default=Decimal("0.00"))
+        utility_expected = max((expected_utility_for_month(grouped_application, month_start) for grouped_application in duplicate_group), default=Decimal("0.00"))
+        current_rent_due = max(rent_expected - rent_paid, Decimal("0.00"))
+        current_utility_due = max(utility_expected - utility_paid, Decimal("0.00"))
+        stored_rent_balance = max(application.balance or Decimal("0.00"), Decimal("0.00"))
+        stored_utility_balance = max(application.utility_balance or Decimal("0.00"), Decimal("0.00"))
+
+        # Stored balances often already represent the current unpaid month. Use the larger
+        # value so the report is complete without double-counting the same delinquency.
+        rent_due = max(stored_rent_balance, current_rent_due)
+        utility_due = max(stored_utility_balance, current_utility_due)
+        deposit_due = Decimal("0.00")
+        if application.tenancy_status == "active":
+            deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
+        total_due = rent_due + utility_due + deposit_due
+        if total_due <= 0:
+            continue
+
+        last_payment = (
+            Payment.objects
+            .filter(application__in=duplicate_group, status="completed")
+            .order_by("-received_at", "-created_at", "-id")
+            .first()
+        )
+        if last_payment:
+            last_payment_date = timezone.localtime(last_payment.received_at or last_payment.created_at).date().strftime("%Y-%m-%d")
+            last_payment_text = f"{last_payment_date} {last_payment.get_payment_type_display()} ${last_payment.amount}"
+        else:
+            last_payment_text = "No completed payment on file"
+
+        totals["Rent Due"] += rent_due
+        totals["Utilities Due"] += utility_due
+        totals["Deposit Due"] += deposit_due
+        totals["Total Due"] += total_due
+
+        rows.append([
+            application.property.name if application.property else "No Property",
+            canonical_room_label(application.space_label or application.space_type or ""),
+            application.full_name,
+            application.get_tenancy_status_display(),
+            month_start.strftime("%B %Y"),
+            rent_expected,
+            rent_paid,
+            rent_due,
+            utility_expected,
+            utility_paid,
+            utility_due,
+            deposit_due,
+            total_due,
+            last_payment_text,
+        ])
+
+    return rows, totals
+
+
 def is_room_placeholder_application(application):
     room_label = canonical_room_label(application.space_label or "")
     if not room_label:
@@ -5627,24 +5713,45 @@ def custom_reports(request):
 
         elif report_type == "delinquency_report":
             report_title = "Delinquency Report"
-            report_columns = ["Property", "Room / Unit", "Resident", "Rent Balance", "Utility Balance", "Deposit Due", "Total Due"]
-            total_due_sum = Decimal("0.00")
-            for resident in sorted_residents:
-                deposit_due = max(resident.deposit_required - resident.deposit_paid, Decimal("0.00"))
-                total_due = resident.balance + resident.utility_balance + deposit_due
-                if total_due <= 0:
-                    continue
-                total_due_sum += total_due
-                report_rows.append([
-                    resident.property.name if resident.property else "No Property",
-                    resident.space_label or resident.space_type or "",
-                    resident.full_name,
-                    resident.balance,
-                    resident.utility_balance,
-                    deposit_due,
-                    total_due,
-                ])
-            totals = {"Total Due": total_due_sum}
+            report_month = occupancy_report_month(start_date, request)
+            report_columns = [
+                "Property",
+                "Room / Unit",
+                "Resident",
+                "Status",
+                "Month",
+                "Rent Expected",
+                "Rent Paid",
+                "Rent Due",
+                "Utilities Expected",
+                "Utilities Paid",
+                "Utilities Due",
+                "Deposit Due",
+                "Total Due",
+                "Last Completed Payment",
+            ]
+            delinquency_residents = (
+                HousingApplication.objects
+                .select_related("property", "user")
+                .filter(property__in=filtered_properties)
+                .filter(Q(user__isnull=False) | Q(payments__status="completed") | Q(landlord_reviewed_at__isnull=False))
+                .filter(
+                    Q(application_folder="active", tenancy_status="active")
+                    | Q(tenancy_status="former", balance__gt=0)
+                    | Q(tenancy_status="former", utility_balance__gt=0)
+                )
+                .exclude(space_label="")
+                .distinct()
+                .order_by("property__name", "space_label", "full_name")
+            )
+            delinquency_residents = [
+                resident for resident in visible_resident_files(delinquency_residents)
+                if is_rentable_room_label(resident.space_label, resident.property)
+            ]
+            report_rows, totals = delinquency_report_rows_for_residents(delinquency_residents, report_month)
+            report_highlights.append(
+                f"Delinquency month: {report_month.strftime('%B %Y')}. Report includes active residents and former residents with remaining rent or utility balances."
+            )
 
         elif report_type == "deposit_liability":
             report_title = "Deposit Liability Report"
