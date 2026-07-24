@@ -1414,6 +1414,14 @@ def occupancy_report_for_properties(properties, report_month):
     return rows, highlights, totals
 
 
+def rentable_room_settings(property_obj):
+    return [
+        room_setting
+        for room_setting in PropertyRoomRent.objects.filter(property=property_obj, is_active=True)
+        if is_rentable_room_label(room_setting.room_unit_label, property_obj)
+    ]
+
+
 def locked_rent_roll_rows(selected_month, properties):
     snapshots = list(RentRollSnapshot.objects.filter(property__in=properties, service_month=selected_month).select_related("property", "application").order_by("property__name", "room_unit_label", "resident_name"))
     if not snapshots:
@@ -5665,33 +5673,89 @@ def custom_reports(request):
 
         elif report_type == "property_performance_summary":
             report_title = "Property Performance Summary"
-            report_columns = ["Property", "Year", "Units", "Occupied", "Occupancy %", "Income", "Operating Expenses", "NOI", "Debt Service", "Cash Flow"]
+            report_columns = [
+                "Property",
+                "Period",
+                "Metric",
+                "Amount / Count",
+                "Notes",
+            ]
             report_year = custom_report_period_year(start_date)
+            performance_totals = {
+                "Income": Decimal("0.00"),
+                "Operating Expenses": Decimal("0.00"),
+                "NOI": Decimal("0.00"),
+                "Debt Service": Decimal("0.00"),
+                "Cash Flow": Decimal("0.00"),
+                "Actual Rent + Utilities": Decimal("0.00"),
+                "Open Resident Balances": Decimal("0.00"),
+                "Lost Rent + Utilities": Decimal("0.00"),
+            }
             for property_obj in filtered_properties:
                 property_qs = Property.objects.filter(id=property_obj.id)
                 months, property_totals = t12_report_rows(request.user, report_year, property_qs)
-                units = PropertyRoomRent.objects.filter(property=property_obj, is_active=True).count()
-                occupied = (
-                    HousingApplication.objects
-                    .filter(property=property_obj)
-                    .filter(Q(user__isnull=False) | Q(payments__status="completed"))
-                    .exclude(space_label="")
-                    .values("space_label")
-                    .distinct()
-                    .count()
+                performance_month = occupancy_report_month(start_date, request)
+                occupancy_rows, occupancy_highlights, occupancy_totals = occupancy_report_for_properties(property_qs, performance_month)
+                occupancy_row = occupancy_rows[0] if occupancy_rows else None
+                property_residents = [
+                    resident for resident in sorted_residents
+                    if resident.property_id == property_obj.id
+                ]
+                room_settings = rentable_room_settings(property_obj)
+                potential_monthly_revenue = sum((occupancy_revenue_amount(room) for room in room_settings), Decimal("0.00"))
+                scheduled_rent = sum((resident.monthly_rent for resident in property_residents), Decimal("0.00"))
+                scheduled_utilities = sum((resident.utility_monthly for resident in property_residents), Decimal("0.00"))
+                open_rent_balances = sum((resident.balance for resident in property_residents), Decimal("0.00"))
+                open_utility_balances = sum((resident.utility_balance for resident in property_residents), Decimal("0.00"))
+                deposit_due = sum((max(resident.deposit_required - resident.deposit_paid, Decimal("0.00")) for resident in property_residents), Decimal("0.00"))
+                completed_payments = Payment.objects.filter(application__property=property_obj, status="completed")
+                actual_rent_utilities = sum(
+                    payment_amount_for_month(completed_payments, report_year, month_number, ["rent", "utility"])
+                    for month_number in range(1, 13)
                 )
-                report_rows.append([
-                    property_obj.name,
-                    report_year,
-                    units,
-                    occupied,
-                    f"{decimal_percent(occupied, units)}%",
-                    property_totals["total_income"],
-                    property_totals["operating_expenses"],
-                    property_totals["net_operating_income"],
-                    property_totals["debt_service"],
-                    property_totals["cash_flow_after_debt"],
+                active_months = sum(1 for month in months if month["total_income"] > 0 or month["operating_expenses"] > 0 or month["debt_service"] > 0)
+                active_months = active_months or 12
+                average_monthly_income = (property_totals["total_income"] / Decimal(active_months)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                average_monthly_expenses = (property_totals["operating_expenses"] / Decimal(active_months)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                expense_ratio = decimal_percent(property_totals["operating_expenses"], property_totals["total_income"])
+                debt_coverage = (
+                    (property_totals["net_operating_income"] / property_totals["debt_service"]).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                    if property_totals["debt_service"] > 0
+                    else Decimal("0.00")
+                )
+
+                report_highlights.extend(occupancy_highlights)
+                if occupancy_row:
+                    report_highlights.append(
+                        f"{property_obj.name} {performance_month.strftime('%B %Y')}: occupancy {occupancy_row[6]}, vacancy {occupancy_row[7]}, lost rent/utilities ${occupancy_row[10]:,.2f}."
+                    )
+
+                performance_totals["Income"] += property_totals["total_income"]
+                performance_totals["Operating Expenses"] += property_totals["operating_expenses"]
+                performance_totals["NOI"] += property_totals["net_operating_income"]
+                performance_totals["Debt Service"] += property_totals["debt_service"]
+                performance_totals["Cash Flow"] += property_totals["cash_flow_after_debt"]
+                performance_totals["Actual Rent + Utilities"] += actual_rent_utilities
+                performance_totals["Open Resident Balances"] += open_rent_balances + open_utility_balances + deposit_due
+                performance_totals["Lost Rent + Utilities"] += occupancy_totals["Lost Rent + Utilities"]
+
+                report_rows.extend([
+                    [property_obj.name, str(report_year), "Rentable units", len(room_settings), "Excludes office, shop, owner, cleaning, storage, and other non-rentable spaces."],
+                    [property_obj.name, performance_month.strftime("%B %Y"), "Occupied unit-days", occupancy_row[3] if occupancy_row else 0, "Counts move-ins and move-outs during the month."],
+                    [property_obj.name, performance_month.strftime("%B %Y"), "Vacant unit-days", occupancy_row[4] if occupancy_row else 0, occupancy_row[5] if occupancy_row else "None"],
+                    [property_obj.name, performance_month.strftime("%B %Y"), "Occupancy / Vacancy", f"{occupancy_row[6]} / {occupancy_row[7]}" if occupancy_row else "0.00% / 0.00%", "Based on rentable unit-days, not a simple head count."],
+                    [property_obj.name, performance_month.strftime("%B %Y"), "Potential monthly rent + utilities", potential_monthly_revenue, "Full-month potential for all rentable rooms."],
+                    [property_obj.name, performance_month.strftime("%B %Y"), "Lost rent + utilities", occupancy_totals["Lost Rent + Utilities"], "Estimated value of vacant unit-days."],
+                    [property_obj.name, str(report_year), "T-12 income", property_totals["total_income"], "Spreadsheet, portal, and receipt-backed income under current T-12 rules."],
+                    [property_obj.name, str(report_year), "Operating expenses", property_totals["operating_expenses"], f"Average monthly operating expenses: ${average_monthly_expenses:,.2f}."],
+                    [property_obj.name, str(report_year), "NOI", property_totals["net_operating_income"], f"Expense ratio: {expense_ratio}%."],
+                    [property_obj.name, str(report_year), "Debt service", property_totals["debt_service"], f"Debt coverage ratio: {debt_coverage}x." if debt_coverage else "No debt service recorded for this period."],
+                    [property_obj.name, str(report_year), "Cash flow after debt", property_totals["cash_flow_after_debt"], f"Average monthly income: ${average_monthly_income:,.2f}."],
+                    [property_obj.name, str(report_year), "Actual rent + utilities received", actual_rent_utilities, "Completed rent and utility payments allocated to this year."],
+                    [property_obj.name, "Current", "Scheduled active rent + utilities", scheduled_rent + scheduled_utilities, f"Rent ${scheduled_rent:,.2f}; utilities ${scheduled_utilities:,.2f}."],
+                    [property_obj.name, "Current", "Open resident balances", open_rent_balances + open_utility_balances + deposit_due, f"Rent ${open_rent_balances:,.2f}; utilities ${open_utility_balances:,.2f}; deposit due ${deposit_due:,.2f}."],
                 ])
+            totals = performance_totals
 
         elif report_type == "valuation_estimate":
             report_title = "Valuation Estimate Report"

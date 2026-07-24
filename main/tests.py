@@ -4233,6 +4233,18 @@ class LiveFlowTests(TestCase):
         ]])
         self.assertContains(occupancy_response, "The Painted Lady Inn vacant unit(s): Room C")
 
+        performance_response = self.client.get(reverse("custom_reports"), {
+            "report_type": "property_performance_summary",
+            "property_id": property_obj.id,
+            "start_date": "2026-05-01",
+        })
+        self.assertContains(performance_response, "Rentable units")
+        self.assertContains(performance_response, "Potential monthly rent + utilities")
+        self.assertIn(
+            ["The Painted Lady Inn", "2026", "Rentable units", 2, "Excludes office, shop, owner, cleaning, storage, and other non-rentable spaces."],
+            performance_response.context["report_rows"],
+        )
+
     def test_property_owner_can_add_property_invite_landlord_and_upload_financial_file(self):
         owner = User.objects.create_user(
             username="workflow-owner",
