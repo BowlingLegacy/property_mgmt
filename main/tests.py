@@ -4216,14 +4216,20 @@ class LiveFlowTests(TestCase):
         occupancy_response = self.client.get(reverse("custom_reports"), {
             "report_type": "occupancy_vacancy",
             "property_id": property_obj.id,
+            "start_date": "2026-05-01",
         })
         self.assertEqual(occupancy_response.context["report_rows"], [[
             "The Painted Lady Inn",
+            "May 2026",
             2,
-            1,
-            1,
+            31,
+            31,
             "Room C",
             "50.00%",
+            "50.00%",
+            Decimal("1300.00"),
+            Decimal("0.00"),
+            Decimal("700.00"),
         ]])
         self.assertContains(occupancy_response, "The Painted Lady Inn vacant unit(s): Room C")
 
@@ -6561,7 +6567,7 @@ class LiveFlowTests(TestCase):
         valuation = self.client.get(reverse("custom_reports"), {"report_type": "valuation_estimate", "property_id": property_obj.id, "start_date": "2026-05-01"})
         utility = self.client.get(reverse("custom_reports"), {"report_type": "utility_cost_trend", "property_id": property_obj.id})
         vendor = self.client.get(reverse("custom_reports"), {"report_type": "vendor_expense", "property_id": property_obj.id})
-        occupancy = self.client.get(reverse("custom_reports"), {"report_type": "occupancy_vacancy", "property_id": property_obj.id})
+        occupancy = self.client.get(reverse("custom_reports"), {"report_type": "occupancy_vacancy", "property_id": property_obj.id, "start_date": "2026-05-01"})
         delinquency = self.client.get(reverse("custom_reports"), {"report_type": "delinquency_report", "property_id": property_obj.id})
         capital = self.client.get(reverse("custom_reports"), {"report_type": "capital_improvement_log", "property_id": property_obj.id})
         insurance = self.client.get(reverse("custom_reports"), {"report_type": "insurance_compliance", "property_id": property_obj.id})
@@ -6573,6 +6579,8 @@ class LiveFlowTests(TestCase):
         self.assertContains(vendor, "Pacific Power")
         self.assertContains(occupancy, "Occupancy / Vacancy Report")
         self.assertContains(occupancy, "50.00%")
+        self.assertContains(occupancy, "Actual Rent + Utilities Received")
+        self.assertContains(occupancy, "$900.00")
         self.assertContains(delinquency, "Commercial Report Resident")
         self.assertContains(capital, "Windows")
         self.assertContains(insurance, "Insurance / Compliance Report")

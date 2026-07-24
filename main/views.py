@@ -1290,6 +1290,130 @@ def resident_occupied_during_month(resident, selected_month):
         return False
     return True
 
+
+def month_end_for(month_start):
+    return date(month_start.year, month_start.month, calendar.monthrange(month_start.year, month_start.month)[1])
+
+
+def resident_occupancy_dates_for_month(resident, month_start, month_end):
+    if resident.lease_start_date:
+        occupancy_start = resident.lease_start_date
+    else:
+        payment_dates = [payment_service_month(payment) for payment in resident.payments.all()]
+        first_history = resident.rent_history.order_by("effective_date", "id").first()
+        fallback_dates = payment_dates + ([first_history.effective_date] if first_history else [])
+        occupancy_start = min(fallback_dates) if fallback_dates else month_start
+
+    occupancy_end = resident.move_out_date or month_end
+    occupancy_start = max(occupancy_start, month_start)
+    occupancy_end = min(occupancy_end, month_end)
+    if occupancy_start > occupancy_end:
+        return []
+
+    occupied_days = (occupancy_end - occupancy_start).days + 1
+    return [occupancy_start + timedelta(days=day_index) for day_index in range(occupied_days)]
+
+
+def occupancy_revenue_amount(room_setting):
+    return (room_setting.monthly_rent or Decimal("0.00")) + (room_setting.utility_monthly or Decimal("0.00"))
+
+
+def occupancy_report_month(start_date, request):
+    if start_date:
+        return start_date.replace(day=1)
+    return selected_report_month(request)
+
+
+def occupancy_report_for_properties(properties, report_month):
+    month_end = month_end_for(report_month)
+    days_in_month = Decimal(calendar.monthrange(report_month.year, report_month.month)[1])
+    rows = []
+    highlights = []
+    totals = {
+        "Potential Rent + Utilities": Decimal("0.00"),
+        "Actual Rent + Utilities Received": Decimal("0.00"),
+        "Lost Rent + Utilities": Decimal("0.00"),
+    }
+
+    for property_obj in properties:
+        room_settings = list(PropertyRoomRent.objects.filter(property=property_obj, is_active=True))
+        rentable_rooms = {
+            normalized_room_label(room.room_unit_label): room
+            for room in room_settings
+            if normalized_room_label(room.room_unit_label)
+            and is_rentable_room_label(room.room_unit_label, property_obj)
+        }
+        occupied_dates_by_unit = {label: set() for label in rentable_rooms}
+
+        resident_files = visible_resident_files(
+            HousingApplication.objects
+            .prefetch_related("payments", "rent_history")
+            .filter(property=property_obj, tenancy_status__in=["active", "former"])
+            .filter(Q(user__isnull=False) | Q(payments__status="completed") | Q(landlord_reviewed_at__isnull=False))
+            .exclude(space_label="")
+            .filter(Q(lease_start_date__isnull=True) | Q(lease_start_date__lte=month_end))
+            .filter(Q(move_out_date__isnull=True) | Q(move_out_date__gte=report_month))
+            .distinct()
+        )
+
+        for resident in resident_files:
+            unit_label = normalized_room_label(resident.space_label)
+            if unit_label not in occupied_dates_by_unit or not is_rentable_room_label(resident.space_label, property_obj):
+                continue
+            occupied_dates_by_unit[unit_label].update(
+                resident_occupancy_dates_for_month(resident, report_month, month_end)
+            )
+
+        unit_count = len(rentable_rooms)
+        total_unit_days = unit_count * int(days_in_month)
+        occupied_unit_days = sum(len(occupied_dates) for occupied_dates in occupied_dates_by_unit.values())
+        vacant_unit_days = max(total_unit_days - occupied_unit_days, 0)
+
+        vacancy_labels = []
+        lost_revenue = Decimal("0.00")
+        potential_revenue = Decimal("0.00")
+        for unit_label, room in sorted(rentable_rooms.items(), key=lambda item: rent_roll_room_sort_key(item[0])):
+            vacant_days = int(days_in_month) - len(occupied_dates_by_unit[unit_label])
+            monthly_revenue = occupancy_revenue_amount(room)
+            potential_revenue += monthly_revenue
+            if vacant_days > 0:
+                lost_revenue += (monthly_revenue / days_in_month * Decimal(vacant_days)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                canonical_label = canonical_room_label(room.room_unit_label)
+                display_label = f"Room {canonical_label}" if len(canonical_label) == 1 and canonical_label.isalpha() else canonical_label
+                vacancy_labels.append(
+                    display_label if vacant_days == int(days_in_month) else f"{display_label} ({vacant_days} vacant days)"
+                )
+
+        actual_received = payment_amount_for_month(
+            Payment.objects.filter(application__property=property_obj, status="completed"),
+            report_month.year,
+            report_month.month,
+            ["rent", "utility"],
+        )
+        vacancy_text = ", ".join(vacancy_labels) or "None"
+        highlights.append(f"{property_obj.name} vacant unit(s): {vacancy_text}")
+
+        totals["Potential Rent + Utilities"] += potential_revenue
+        totals["Actual Rent + Utilities Received"] += actual_received
+        totals["Lost Rent + Utilities"] += lost_revenue
+
+        rows.append([
+            property_obj.name,
+            report_month.strftime("%B %Y"),
+            unit_count,
+            occupied_unit_days,
+            vacant_unit_days,
+            vacancy_text,
+            f"{decimal_percent(occupied_unit_days, total_unit_days)}%",
+            f"{decimal_percent(vacant_unit_days, total_unit_days)}%",
+            potential_revenue,
+            actual_received,
+            lost_revenue,
+        ])
+
+    return rows, highlights, totals
+
+
 def locked_rent_roll_rows(selected_month, properties):
     snapshots = list(RentRollSnapshot.objects.filter(property__in=properties, service_month=selected_month).select_related("property", "application").order_by("property__name", "room_unit_label", "resident_name"))
     if not snapshots:
@@ -2758,7 +2882,7 @@ GLOBAL_NON_RENTABLE_ROOM_LABELS = {
     "ownerunit",
 }
 PROPERTY_NON_RENTABLE_ROOM_LABELS = {
-    "the painted lady inn": {"a", "shop"},
+    "thepaintedladyinn": {"a", "shop"},
 }
 
 
@@ -5666,58 +5790,23 @@ def custom_reports(request):
 
         elif report_type == "occupancy_vacancy":
             report_title = "Occupancy / Vacancy Report"
-            report_columns = ["Property", "Rentable Units", "Occupied", "Vacant", "Vacant Unit(s)", "Occupancy %"]
-            total_units = 0
-            total_occupied = 0
-            for property_obj in filtered_properties:
-                room_settings = PropertyRoomRent.objects.filter(property=property_obj, is_active=True)
-                unit_labels = {
-                    normalized_room_label(room.room_unit_label)
-                    for room in room_settings
-                    if is_rentable_room_label(room.room_unit_label, property_obj)
-                }
-                resident_files = visible_resident_files(
-                    HousingApplication.objects
-                    .filter(property=property_obj, application_folder="active", tenancy_status="active")
-                    .filter(Q(user__isnull=False) | Q(payments__status="completed") | Q(landlord_reviewed_at__isnull=False))
-                    .exclude(space_label="")
-                    .distinct()
-                )
-                occupied_labels = {
-                    normalized_room_label(application.space_label)
-                    for application in resident_files
-                    if is_rentable_room_label(application.space_label, property_obj)
-                }
-                vacant_labels = sorted(
-                    (label for label in unit_labels if label and label not in occupied_labels),
-                    key=rent_roll_room_sort_key,
-                )
-                vacant_unit_display = []
-                for label in vacant_labels:
-                    canonical_label = canonical_room_label(label)
-                    if len(canonical_label) == 1 and canonical_label.isalpha():
-                        vacant_unit_display.append(f"Room {canonical_label}")
-                    else:
-                        vacant_unit_display.append(canonical_label)
-                vacancy_text = ", ".join(vacant_unit_display) or "None"
-                report_highlights.append(f"{property_obj.name} vacant unit(s): {vacancy_text}")
-                units = len(unit_labels)
-                occupied = len([label for label in unit_labels if label in occupied_labels])
-                total_units += units
-                total_occupied += occupied
-                report_rows.append([
-                    property_obj.name,
-                    units,
-                    occupied,
-                    max(units - occupied, 0),
-                    vacancy_text,
-                    f"{decimal_percent(occupied, units)}%",
-                ])
-            totals = {
-                "Units": Decimal(total_units),
-                "Occupied": Decimal(total_occupied),
-                "Vacant": Decimal(max(total_units - total_occupied, 0)),
-            }
+            report_columns = [
+                "Property",
+                "Month",
+                "Rentable Units",
+                "Occupied Unit-Days",
+                "Vacant Unit-Days",
+                "Vacant Unit(s)",
+                "Occupancy %",
+                "Vacancy %",
+                "Potential Rent + Utilities",
+                "Actual Rent + Utilities Received",
+                "Lost Rent + Utilities",
+            ]
+            report_rows, report_highlights, totals = occupancy_report_for_properties(
+                filtered_properties,
+                occupancy_report_month(start_date, request),
+            )
 
         elif report_type == "capital_improvement_log":
             report_title = "Capital Improvement Log"
