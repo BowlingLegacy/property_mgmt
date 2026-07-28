@@ -1151,17 +1151,23 @@ def payment_amount_for_month(payments, year, month, payment_types=None):
     return total
 
 
+def resident_open_balance_for_month(application, month_start, balance_field):
+    if application.lease_start_date and application.lease_start_date > month_end_for(month_start):
+        return Decimal("0.00")
+    return max(getattr(application, balance_field) or Decimal("0.00"), Decimal("0.00"))
+
+
 def current_rent_due_with_carryforward(application, month_start, payments):
     rent_paid = payment_amount_for_month(payments, month_start.year, month_start.month, ["rent"])
     current_month_due = max(expected_rent_for_month(application, month_start) - rent_paid, Decimal("0.00"))
-    open_balance = max(application.balance or Decimal("0.00"), Decimal("0.00"))
+    open_balance = resident_open_balance_for_month(application, month_start, "balance")
     return open_balance + current_month_due
 
 
 def current_utility_due_with_carryforward(application, month_start, payments):
     utility_paid = payment_amount_for_month(payments, month_start.year, month_start.month, ["utility"])
     current_month_due = max(expected_utility_for_month(application, month_start) - utility_paid, Decimal("0.00"))
-    open_balance = max(application.utility_balance or Decimal("0.00"), Decimal("0.00"))
+    open_balance = resident_open_balance_for_month(application, month_start, "utility_balance")
     return open_balance + current_month_due
 
 
@@ -1542,8 +1548,10 @@ def rent_roll_rows_for_properties(user, selected_month, properties):
         # Historical reports remain month-specific and are not rewritten by a
         # resident's present-day balance.
         if row["has_profile"] and selected_month >= current_month:
-            row["rent_balance"] += max(row["current_rent_balance"], Decimal("0.00"))
-            row["utility_balance"] += max(row["current_utility_balance"], Decimal("0.00"))
+            resident = HousingApplication.objects.filter(id=row["application_id"]).first()
+            if resident:
+                row["rent_balance"] += resident_open_balance_for_month(resident, selected_month, "balance")
+                row["utility_balance"] += resident_open_balance_for_month(resident, selected_month, "utility_balance")
         row["deposit_balance"] = row["deposit_due"]
     if historical_month:
         return lock_historical_rent_roll(selected_month, rows, properties)
@@ -2110,8 +2118,8 @@ def monthly_collection_status_rows(applications):
             combined_to_utility = min(combined_paid, utility_shortfall)
             utility_paid += combined_to_utility
 
-        prior_rent_balance = max(application.balance or Decimal("0.00"), Decimal("0.00"))
-        prior_utility_balance = max(application.utility_balance or Decimal("0.00"), Decimal("0.00"))
+        prior_rent_balance = resident_open_balance_for_month(application, month_start, "balance")
+        prior_utility_balance = resident_open_balance_for_month(application, month_start, "utility_balance")
         rent_due = prior_rent_balance + max(rent_expected - rent_paid, Decimal("0.00"))
         utility_due = prior_utility_balance + max(utility_expected - utility_paid, Decimal("0.00"))
         missing_items = []
@@ -2710,8 +2718,15 @@ def begin_new_tenancy(request):
         utility_monthly = terms["utility_monthly"] if terms else form.cleaned_data["utility_monthly"]
         deposit_required = terms["deposit_required"] if terms else form.cleaned_data["deposit_required"]
         rent_due_day = terms["rent_due_day"] if terms else form.cleaned_data["rent_due_day"]
-        rent_balance = form.cleaned_data["balance"] or monthly_rent
-        utility_balance = form.cleaned_data["utility_balance"] or utility_monthly
+        lease_start_date = form.cleaned_data.get("lease_start_date")
+        current_month_start, _ = current_month_bounds()
+        starts_after_current_month = lease_start_date and lease_start_date > month_end_for(current_month_start)
+        if starts_after_current_month:
+            rent_balance = Decimal("0.00")
+            utility_balance = Decimal("0.00")
+        else:
+            rent_balance = form.cleaned_data["balance"] or monthly_rent
+            utility_balance = form.cleaned_data["utility_balance"] or utility_monthly
         application = HousingApplication.objects.create(
             property=property_obj,
             full_name=form.cleaned_data["full_name"],
@@ -2723,7 +2738,7 @@ def begin_new_tenancy(request):
             monthly_rent=monthly_rent,
             balance=rent_balance,
             rent_due_day=rent_due_day,
-            lease_start_date=form.cleaned_data.get("lease_start_date"),
+            lease_start_date=lease_start_date,
             deposit_required=deposit_required,
             deposit_paid=form.cleaned_data["deposit_paid"],
             utility_monthly=utility_monthly,

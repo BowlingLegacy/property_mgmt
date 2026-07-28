@@ -16,7 +16,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .models import AccountingReceipt, AccountingReceiptSplit, ApplicantDocument, BlogComment, BlogPost, CompanyMailboxConnection, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, PropertyRoomRent, RentHistory, ResidentBalanceEntry, ResidentMessage, ResidentMessageReply, SignedDocument, SmsMessageLog, User, VendorCategoryRule
-from .views import applicant_review_summary, apply_completed_payment_to_balance, current_month_bounds, ensure_existing_resident_portal_application, payment_amount_for_month, prorated_monthly_charge, rent_roll_rows_for_properties, send_sms_message, t12_report_rows
+from .views import applicant_review_summary, apply_completed_payment_to_balance, current_month_bounds, ensure_existing_resident_portal_application, monthly_collection_watch_rows, payment_amount_for_month, prorated_monthly_charge, rent_roll_rows_for_properties, send_sms_message, t12_report_rows
 
 
 @override_settings(
@@ -747,6 +747,55 @@ class LiveFlowTests(TestCase):
         self.assertEqual(application.utility_balance, Decimal("9"))
         self.assertEqual(application.deposit_required, Decimal("450.00"))
         self.assertEqual(application.deposit_paid, Decimal("450.00"))
+
+    def test_approving_future_application_does_not_owe_current_month(self):
+        staff_user = User.objects.create_user(
+            username="future-approve-staff",
+            email="future-approve-staff@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Future Approval Property", landlord_email=staff_user.email)
+        application = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Future Resident",
+            phone="555-0132",
+            email="future-resident@example.com",
+            age=61,
+            income_source="Fixed income",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Approved for next month.",
+        )
+        _, next_month = current_month_bounds()
+
+        self.client.login(username="future-approve-staff", password="StrongPass123!")
+
+        response = self.client.post(
+            f"{reverse('landlord_create_tenant')}?application={application.id}",
+            {
+                "monthly_rent": "650.00",
+                "balance": "650.00",
+                "rent_due_day": "1",
+                "lease_start_date": next_month.isoformat(),
+                "deposit_required": "450.00",
+                "deposit_paid": "0.00",
+                "deposit_payment_plan": "paid_in_full",
+                "utility_monthly": "55.00",
+                "utility_balance": "55.00",
+                "space_type": "Room",
+                "space_label": "P",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        application.refresh_from_db()
+        self.assertEqual(application.lease_start_date, next_month)
+        self.assertEqual(application.move_in_rent_charge, Decimal("650.00"))
+        self.assertEqual(application.move_in_utility_charge, Decimal("55.00"))
+        self.assertEqual(application.balance, Decimal("0.00"))
+        self.assertEqual(application.utility_balance, Decimal("0.00"))
+        self.assertEqual(monthly_collection_watch_rows([application]), [])
 
     def test_prorated_monthly_charge_uses_remaining_calendar_days(self):
         self.assertEqual(prorated_monthly_charge(Decimal("650.00"), date(2026, 5, 27)), Decimal("105"))
@@ -2492,6 +2541,55 @@ class LiveFlowTests(TestCase):
         self.assertEqual(resident.utility_balance, Decimal("55.00"))
         self.assertEqual(resident.deposit_required, Decimal("450.00"))
         self.assertEqual(resident.deposit_paid, Decimal("0.00"))
+
+    def test_future_begin_new_tenancy_does_not_owe_current_month(self):
+        landlord = User.objects.create_user(
+            username="future-tenancy-landlord",
+            email="future-tenancy-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Future Tenancy Property", landlord_email=landlord.email)
+        PropertyRoomRent.objects.create(
+            property=property_obj,
+            room_unit_label="Room P",
+            monthly_rent=Decimal("506.00"),
+            rent_due_day=1,
+            utility_monthly=Decimal("55.00"),
+            deposit_required=Decimal("450.00"),
+            deposit_paid=Decimal("0.00"),
+        )
+        _, next_month = current_month_bounds()
+
+        self.client.login(username="future-tenancy-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("begin_new_tenancy"), {
+            "property": str(property_obj.id),
+            "full_name": "Mitchell Brent",
+            "email": "mitchell@example.com",
+            "phone": "5412618306",
+            "age": "58",
+            "space_type": "Room",
+            "space_label": "P",
+            "lease_start_date": next_month.isoformat(),
+            "monthly_rent": "0.00",
+            "balance": "0.00",
+            "rent_due_day": "1",
+            "deposit_required": "0.00",
+            "deposit_paid": "0.00",
+            "utility_monthly": "0.00",
+            "utility_balance": "0.00",
+        })
+
+        self.assertEqual(response.status_code, 200)
+        resident = HousingApplication.objects.get(full_name="Mitchell Brent")
+        self.assertEqual(resident.space_label, "P")
+        self.assertEqual(resident.lease_start_date, next_month)
+        self.assertEqual(resident.monthly_rent, Decimal("506.00"))
+        self.assertEqual(resident.utility_monthly, Decimal("55.00"))
+        self.assertEqual(resident.balance, Decimal("0.00"))
+        self.assertEqual(resident.utility_balance, Decimal("0.00"))
+        self.assertEqual(monthly_collection_watch_rows([resident]), [])
 
     def test_landlord_can_add_room_rent_without_roster_entry(self):
         landlord = User.objects.create_user(

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.conf import settings
@@ -8,7 +10,15 @@ from django.utils.text import slugify
 
 from .forms import LandlordCreateTenantForm
 from .models import HousingApplication, SignedDocument, User
-from .views import canonical_room_label, room_financial_terms, prorated_monthly_charge, staff_managed_properties, staff_required
+from .views import (
+    canonical_room_label,
+    current_month_bounds,
+    month_end_for,
+    prorated_monthly_charge,
+    room_financial_terms,
+    staff_managed_properties,
+    staff_required,
+)
 
 
 def send_resident_invite_email(application):
@@ -125,11 +135,13 @@ def create_tenant(request):
             lease_start_date = form.cleaned_data.get("lease_start_date")
             move_in_rent_charge = prorated_monthly_charge(monthly_rent, lease_start_date)
             move_in_utility_charge = prorated_monthly_charge(utility_monthly, lease_start_date)
+            current_month_start, _ = current_month_bounds()
+            starts_after_current_month = lease_start_date and lease_start_date > month_end_for(current_month_start)
 
             application.space_type = form.cleaned_data.get("space_type", "")
             application.space_label = room_values["space_label"]
             application.monthly_rent = monthly_rent
-            application.balance = move_in_rent_charge
+            application.balance = Decimal("0.00") if starts_after_current_month else move_in_rent_charge
             application.rent_due_day = room_values["rent_due_day"]
             application.lease_start_date = lease_start_date
             application.move_in_rent_charge = move_in_rent_charge
@@ -138,7 +150,7 @@ def create_tenant(request):
             application.deposit_paid = room_values["deposit_paid"]
             application.deposit_payment_plan = form.cleaned_data.get("deposit_payment_plan") or "paid_in_full"
             application.utility_monthly = utility_monthly
-            application.utility_balance = move_in_utility_charge
+            application.utility_balance = Decimal("0.00") if starts_after_current_month else move_in_utility_charge
             application.application_folder = "active"
             application.tenancy_status = "active"
             application.landlord_reviewed_at = application.landlord_reviewed_at or timezone.now()
