@@ -83,6 +83,29 @@ def clear_july_payments(Payment, resident, payment_type):
     ).filter(month_payment_query(JULY)).update(status="failed")
 
 
+def reconcile_roster_room(CurrentResidentRosterEntry, resident, first_name, last_name, room):
+    entries = CurrentResidentRosterEntry.objects.filter(
+        property_id=resident.property_id,
+        first_name__iexact=first_name,
+        last_name__iexact=last_name,
+    )
+    target = entries.filter(
+        Q(room_unit_label__iexact=room) | Q(room_unit_label__iexact=f"Room {room}")
+    ).order_by("-id").first()
+    if target:
+        target.room_unit_label = room
+        target.is_active = True
+        target.save(update_fields=["room_unit_label", "is_active"])
+        entries.exclude(id=target.id).update(is_active=False)
+        return
+
+    source = entries.order_by("-id").first()
+    if source:
+        source.room_unit_label = room
+        source.is_active = True
+        source.save(update_fields=["room_unit_label", "is_active"])
+
+
 def reconcile_july_rent_roll(apps, schema_editor):
     HousingApplication = apps.get_model("main", "HousingApplication")
     Payment = apps.get_model("main", "Payment")
@@ -135,11 +158,13 @@ def reconcile_july_rent_roll(apps, schema_editor):
 
         roster_name = resident.full_name.split()
         if len(roster_name) >= 2 and name != "Robert Cisneros":
-            CurrentResidentRosterEntry.objects.filter(
-                property_id=resident.property_id,
-                first_name__iexact=roster_name[0],
-                last_name__iexact=roster_name[-1],
-            ).update(room_unit_label=room, is_active=True)
+            reconcile_roster_room(
+                CurrentResidentRosterEntry,
+                resident,
+                roster_name[0],
+                roster_name[-1],
+                room,
+            )
 
         if name == "Robert Cisneros":
             resident.tenancy_status = "former"
