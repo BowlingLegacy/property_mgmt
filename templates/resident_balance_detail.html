@@ -61,7 +61,7 @@
             <div class="row g-3">
                 <div class="col-lg-4">
                     <div class="balance-line">
-                        <div class="text-muted fw-bold">Rent Due</div>
+                        <div class="text-muted fw-bold">Rent Due (including past due)</div>
                         <div class="balance-amount">${{ rent_due }}</div>
                         {% if rent_due > 0 %}
                             <a href="{% url 'pay_by_type' application.id 'rent' %}" class="pay-btn mt-3">Pay Rent</a>
@@ -74,7 +74,7 @@
                 {% if show_utilities %}
                 <div class="col-lg-4">
                     <div class="balance-line">
-                        <div class="text-muted fw-bold">Utilities Due</div>
+                        <div class="text-muted fw-bold">Utilities Due (including past due)</div>
                         <div class="balance-amount">${{ utility_due }}</div>
                         <div class="small text-muted">Monthly utility fee: ${{ application.utility_monthly }}</div>
                         {% if utility_due > 0 %}
@@ -104,6 +104,7 @@
                 <div>
                     <div class="text-muted fw-bold">Total Due</div>
                     <div class="balance-amount">${{ total_due }}</div>
+                    <div class="small text-muted">Includes all unpaid current and past-due rent and utilities.</div>
                 </div>
                 {% if total_due > 0 %}
                     <a href="{% url 'pay_by_type' application.id 'total' %}" class="pay-btn">Pay Total Due</a>

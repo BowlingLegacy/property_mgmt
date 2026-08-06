@@ -4736,10 +4736,7 @@ def resident_portal_rent_due(application):
         return Decimal("0.00")
     month_start, _next_month = current_month_bounds()
     completed_payments = resident_portal_completed_payments(application)
-    rent_paid = payment_amount_for_month(completed_payments, month_start.year, month_start.month, ["rent"])
-    scheduled_due = max(expected_rent_for_month(application, month_start) - rent_paid, Decimal("0.00"))
-    stored_balance = max(application.balance or Decimal("0.00"), Decimal("0.00"))
-    return max(stored_balance, scheduled_due)
+    return current_rent_due_with_carryforward(application, month_start, completed_payments)
 
 
 def resident_portal_next_month_rent_due(application):
@@ -4756,10 +4753,7 @@ def resident_portal_utility_due(application):
         return Decimal("0.00")
     month_start, _next_month = current_month_bounds()
     completed_payments = resident_portal_completed_payments(application)
-    utility_paid = payment_amount_for_month(completed_payments, month_start.year, month_start.month, ["utility"])
-    scheduled_due = max(expected_utility_for_month(application, month_start) - utility_paid, Decimal("0.00"))
-    stored_balance = max(application.utility_balance or Decimal("0.00"), Decimal("0.00"))
-    return max(stored_balance, scheduled_due)
+    return current_utility_due_with_carryforward(application, month_start, completed_payments)
 
 
 def resident_name_parts(value):
