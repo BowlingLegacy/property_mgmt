@@ -5228,14 +5228,32 @@ def payment_log(request):
 
         for month_label, month_group in sorted(months.items(), key=lambda item: item[1]["month_date"]):
             payments = month_group["payments"]
-            payments_sorted = sorted(
-                payments,
-                key=lambda p: resident_sort_key(p.application),
-            )
+            payment_groups = []
+            for group_key, group_label in (
+                ("rent", "Rent Payments"),
+                ("utility", "Utility Payments"),
+                ("other", "Other Payments"),
+            ):
+                group_payments = [
+                    payment for payment in payments
+                    if payment.payment_type == group_key
+                    or (group_key == "other" and payment.payment_type not in {"rent", "utility"})
+                ]
+                if not group_payments:
+                    continue
+                group_payments = sorted(
+                    group_payments,
+                    key=lambda payment: (resident_sort_key(payment.application), payment.payment_type, payment.id),
+                )
+                payment_groups.append({
+                    "label": group_label,
+                    "payments": group_payments,
+                    "total": sum((payment.amount for payment in group_payments), Decimal("0.00")),
+                })
 
             month_data.append({
                 "month_label": month_label,
-                "payments": payments_sorted,
+                "payment_groups": payment_groups,
             })
 
         payment_log_data.append({

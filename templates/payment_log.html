@@ -196,7 +196,12 @@
                             {{ month_group.month_label }}
                         </h4>
 
-                        <div class="table-responsive mt-3">
+                        {% for payment_group in month_group.payment_groups %}
+                        <div class="d-flex justify-content-between align-items-center mt-4 mb-2">
+                            <h5 class="fw-bold mb-0">{{ payment_group.label }}</h5>
+                            <div class="fw-bold">Total: ${{ payment_group.total }}</div>
+                        </div>
+                        <div class="table-responsive">
                             <table class="table table-bordered table-striped align-middle payment-table">
                                 <thead>
                                     <tr>
@@ -209,14 +214,15 @@
                                         <th class="money-col">Rent Balance</th>
                                         <th class="money-col">Utility Balance</th>
                                         <th class="money-col">Deposit</th>
-                                        <th class="datetime-col">Date/Time</th>
+                                        <th class="datetime-col">Transaction Date/Time</th>
+                                        <th>Processor Reference</th>
                                         <th class="status-col">Status</th>
                                         <th class="receipt-col">Receipt</th>
                                     </tr>
                                 </thead>
 
                                 <tbody>
-                                    {% for payment in month_group.payments %}
+                                    {% for payment in payment_group.payments %}
                                         <tr>
                                             <td class="unit-col">{{ payment.display_unit_label|default:"-" }}</td>
                                             <td>{{ payment.application.full_name }}</td>
@@ -233,6 +239,17 @@
                                             <td class="money-col">${{ payment.application.utility_balance }}</td>
                                             <td class="money-col">${{ payment.application.deposit_paid }}</td>
                                             <td class="datetime-col">{{ payment.display_paid_at|date:"M j, Y g:i A" }}</td>
+                                            <td>
+                                                {% if payment.stripe_payment_intent %}
+                                                    Stripe: {{ payment.stripe_payment_intent }}
+                                                {% elif payment.stripe_session_id %}
+                                                    Stripe session: {{ payment.stripe_session_id }}
+                                                {% elif payment.reference_number %}
+                                                    {{ payment.reference_number }}
+                                                {% else %}
+                                                    —
+                                                {% endif %}
+                                            </td>
                                             <td class="status-col">
                                                 {% if payment.status == "completed" %}
                                                     <span class="status-check" title="Completed">&check;</span>
@@ -249,21 +266,11 @@
                                                 </a>
                                             </td>
                                         </tr>
-                                        {% if payment.application.move_in_rent_charge or payment.application.move_in_utility_charge %}
-                                            <tr>
-                                                <td colspan="12" class="small text-muted">
-                                                    Move-in charges for this file:
-                                                    rent ${{ payment.application.move_in_rent_charge }},
-                                                    utilities ${{ payment.application.move_in_utility_charge }}.
-                                                    Regular monthly rent is ${{ payment.application.monthly_rent }};
-                                                    regular monthly utilities are ${{ payment.application.utility_monthly }}.
-                                                </td>
-                                            </tr>
-                                        {% endif %}
                                     {% endfor %}
                                 </tbody>
                             </table>
                         </div>
+                        {% endfor %}
                     </div>
                 {% empty %}
                     <p class="text-muted">No payments recorded for this property.</p>

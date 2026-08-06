@@ -671,7 +671,8 @@ body {
                             <table class="table">
                                 <thead>
                                     <tr>
-                                        <th>Date</th>
+                                        <th>Applies To</th>
+                                        <th>Paid</th>
                                         <th>Description</th>
                                         <th>Amount</th>
                                         <th>Status</th>
@@ -681,6 +682,7 @@ body {
                                 <tbody>
                                     {% for payment in payments %}
                                     <tr>
+                                        <td>{{ payment.accounting_month_label }}</td>
                                         <td>{{ payment.received_at|default:payment.created_at|date:"M j, Y" }}</td>
                                         <td>{{ payment.get_payment_type_display }}</td>
                                         <td>${{ payment.amount }}</td>
@@ -688,7 +690,7 @@ body {
                                     </tr>
                                     {% empty %}
                                     <tr>
-                                        <td colspan="4" class="p-4 text-muted">
+                                        <td colspan="5" class="p-4 text-muted">
                                             No payment history yet.
                                         </td>
                                     </tr>
