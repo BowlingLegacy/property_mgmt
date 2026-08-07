@@ -108,6 +108,13 @@
                 </div>
 
                 <div class="col-md-6">
+                    <label class="form-label fw-bold">Service Credit Expense Category</label>
+                    {{ form.service_credit_category }}
+                    {{ form.service_credit_category.errors }}
+                    <div class="form-text">Use this only with Service / Labor Credit. It records an equal operating expense and never changes the deposit.</div>
+                </div>
+
+                <div class="col-md-6">
                     <label class="form-label fw-bold">Amount</label>
                     {{ form.amount }}
                     {{ form.amount.errors }}

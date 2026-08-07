@@ -642,6 +642,7 @@ class Payment(models.Model):
         ("money_order", "Money Order"),
         ("zelle", "Zelle"),
         ("ach", "ACH"),
+        ("service_credit", "Service / Labor Credit"),
         ("other", "Other"),
     ]
 

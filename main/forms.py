@@ -855,6 +855,13 @@ def parse_phone_copy_numbers(raw_value):
 
 
 class ManualPaymentForm(forms.ModelForm):
+    service_credit_category = forms.ModelChoiceField(
+        label="Service Credit Expense Category",
+        required=False,
+        queryset=ExpenseCategory.objects.none(),
+        widget=forms.Select(attrs={"class": "form-select"}),
+        help_text="Required for Service / Labor Credit. The same amount will be recorded as an operating expense.",
+    )
     record_utilities = forms.BooleanField(
         label="Record utilities too",
         required=False,
@@ -932,6 +939,25 @@ class ManualPaymentForm(forms.ModelForm):
             .select_related("property")
             .order_by("property__name", "space_label", "full_name")
         )
+        self.fields["service_credit_category"].queryset = ExpenseCategory.objects.filter(
+            entry_type="operating_expense", is_active=True,
+        ).order_by("name")
+        self.fields["service_credit_category"].initial = ExpenseCategory.objects.filter(
+            name__iexact="Cleaning Labor", entry_type="operating_expense", is_active=True,
+        ).first()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        payment_method = cleaned_data.get("payment_method")
+        utility_method = cleaned_data.get("utility_payment_method") or payment_method
+        uses_service_credit = payment_method == "service_credit" or (
+            cleaned_data.get("record_utilities") and utility_method == "service_credit"
+        )
+        if uses_service_credit and not cleaned_data.get("service_credit_category"):
+            self.add_error("service_credit_category", "Choose the operating-expense category for this service credit.")
+        if payment_method == "service_credit" and cleaned_data.get("payment_type") not in {"rent", "utility"}:
+            self.add_error("payment_type", "Service credits may be applied only to rent or utilities, never deposits.")
+        return cleaned_data
 
     def clean_months_covered(self):
         months_covered = self.cleaned_data.get("months_covered") or 1

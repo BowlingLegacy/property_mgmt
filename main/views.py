@@ -2079,10 +2079,19 @@ def current_month_bounds():
 
 def monthly_collection_status_rows(applications):
     month_start, next_month = current_month_bounds()
+    month_end = next_month - timedelta(days=1)
     rows = []
     grouped_applications = OrderedDict()
 
     for application in sorted_resident_list(applications):
+        if not is_rentable_room_label(application.space_label, application.property):
+            continue
+        # A room may already have both its current resident and an upcoming
+        # resident attached to it. Keep future tenancies out of this month's
+        # grouping so the current resident's charges cannot be displayed under
+        # the upcoming resident's name.
+        if application.lease_start_date and application.lease_start_date > month_end:
+            continue
         unit_label = canonical_room_label(application.space_label)
         if unit_label:
             key = ("property-unit", application.property_id, normalized_room_label(unit_label))
@@ -5281,6 +5290,41 @@ def payment_log(request):
     })
 
 
+def record_service_credit_expense(payment, category):
+    application = payment.application
+    if not application.property_id or payment.payment_type not in {"rent", "utility"}:
+        return None
+
+    service_month = payment_service_month(payment)
+    upload, _created = FinancialUpload.objects.get_or_create(
+        property=application.property,
+        name="Service Credit Ledger",
+        defaults={
+            "ledger_scope": "property",
+            "file": "financial_uploads/service_credit_ledger.csv",
+            "notes": "Operating expenses created from rent and utility service credits.",
+        },
+    )
+    description = f"Service credit payment #{payment.id} for {application.full_name}"
+    entry, _created = FinancialEntry.objects.update_or_create(
+        upload=upload,
+        sheet_name="Service Credits",
+        row_number=payment.id,
+        defaults={
+            "ledger_scope": "property",
+            "property_name": application.property.name,
+            "entry_date": service_month,
+            "month": service_month.month,
+            "year": service_month.year,
+            "entry_type": "operating_expense",
+            "category": category.name,
+            "description": description,
+            "amount": payment.amount,
+        },
+    )
+    return entry
+
+
 @login_required
 @user_passes_test(staff_required)
 def record_manual_payment(request, property_id=None):
@@ -5322,6 +5366,9 @@ def record_manual_payment(request, property_id=None):
             payment.save()
             apply_completed_payment_to_balance(payment)
 
+            if payment.payment_method == "service_credit":
+                record_service_credit_expense(payment, form.cleaned_data["service_credit_category"])
+
             utility_amount = form.cleaned_data.get("utility_amount")
             utility_payment = None
             if form.cleaned_data.get("record_utilities") and utility_amount and utility_amount > 0:
@@ -5340,6 +5387,8 @@ def record_manual_payment(request, property_id=None):
                     notes=payment.notes,
                 )
                 apply_completed_payment_to_balance(utility_payment)
+                if utility_payment.payment_method == "service_credit":
+                    record_service_credit_expense(utility_payment, form.cleaned_data["service_credit_category"])
 
             if utility_payment:
                 messages.success(request, "Manual rent and utilities payments recorded and resident balances updated.")
