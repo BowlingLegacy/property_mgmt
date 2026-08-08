@@ -1445,6 +1445,8 @@ def locked_rent_roll_rows(selected_month, properties):
         return None
     rows = []
     for snapshot in snapshots:
+        if not is_rentable_room_label(snapshot.room_unit_label, snapshot.property):
+            continue
         row = rent_roll_base_row(snapshot.property, snapshot.room_unit_label, snapshot.resident_name)
         row["application_id"] = snapshot.application_id
         row["resident"] = snapshot.resident_name
@@ -1517,6 +1519,8 @@ def rent_roll_rows_for_properties(user, selected_month, properties):
         .order_by("property__name", "room_unit_label")
     )
     for setting in room_settings:
+        if not is_rentable_room_label(setting.room_unit_label, setting.property):
+            continue
         if historical_month:
             continue
         key = rent_roll_room_key(setting.property, setting.room_unit_label)
@@ -1531,6 +1535,8 @@ def rent_roll_rows_for_properties(user, selected_month, properties):
         .order_by("property__name", "room_unit_label", "last_name", "first_name")
     )
     for entry in roster_entries:
+        if not is_rentable_room_label(entry.room_unit_label, entry.property):
+            continue
         if historical_month:
             continue
         key = rent_roll_room_key(entry.property, entry.room_unit_label)
@@ -1539,6 +1545,8 @@ def rent_roll_rows_for_properties(user, selected_month, properties):
             row["resident"] = entry.full_name()
 
     for resident in residents:
+        if not is_rentable_room_label(resident.space_label, resident.property):
+            continue
         if historical_month and not resident_occupied_during_month(resident, selected_month):
             continue
         room_label = canonical_room_label(resident.space_label or "")
