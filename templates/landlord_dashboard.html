@@ -251,7 +251,7 @@ body {
                     <div>
                         <h2 class="mb-1" style="font-family: Georgia, serif; font-size: 1.6rem; font-weight: 800;">Monthly Collection Watch</h2>
                         <p class="text-muted mb-0">
-                            Residents missing rent or utilities for {{ collection_watch_month|date:"F Y" }}.
+                            Residents missing rent, utilities, or deposits for {{ collection_watch_month|date:"F Y" }}.
                         </p>
                     </div>
                     <a href="{% url 'payment_log' %}" class="small-action">Open Payment Log</a>
@@ -265,7 +265,12 @@ body {
                     <div class="metric-card">
                         <div class="metric-label">Utilities Due</div>
                         <div class="metric-value">${{ collection_summary.utility_due_display }}</div>
-                    </div>                    <div class="metric-card">
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Deposits Outstanding</div>
+                        <div class="metric-value">${{ collection_summary.deposit_due_display }}</div>
+                    </div>
+                    <div class="metric-card">
                         <div class="metric-label">Outstanding Rent</div>
                         <div class="metric-value">${{ collection_summary.outstanding_rent_display }}</div>
                     </div>
@@ -291,6 +296,8 @@ body {
                                 <th>Prior Rent Balance</th>
                                 <th>Total Rent Due</th>
                                 <th>Utilities Paid</th>
+                                <th>Deposit Paid</th>
+                                <th>Deposit Due</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
@@ -311,6 +318,8 @@ body {
                                             Not used
                                         {% endif %}
                                     </td>
+                                    <td>${{ row.deposit_paid }} / ${{ row.deposit_required }}</td>
+                                    <td><strong>${{ row.deposit_due }}</strong></td>
                                     <td>
                                         <a href="{% url 'record_manual_payment' %}?application={{ row.application.id }}&return=dashboard" class="small-action">
                                             Record Payment
@@ -319,8 +328,8 @@ body {
                                 </tr>
                             {% empty %}
                                 <tr>
-                                    <td colspan="9" class="text-muted p-3">
-                                        Everyone visible to this dashboard has paid the current month's rent and applicable utilities.
+                                    <td colspan="11" class="text-muted p-3">
+                                        Everyone visible to this dashboard has paid the current month's rent, applicable utilities, and deposits.
                                     </td>
                                 </tr>
                             {% endfor %}

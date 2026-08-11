@@ -211,9 +211,9 @@
                                         <th>Method</th>
                                         <th class="money-col">Paid</th>
                                         <th>Applies To</th>
-                                        <th class="money-col">Rent Balance</th>
-                                        <th class="money-col">Utility Balance</th>
-                                        <th class="money-col">Deposit</th>
+                                        <th class="money-col">Rent Due</th>
+                                        <th class="money-col">Utilities Due</th>
+                                        <th class="money-col">Deposit Due</th>
                                         <th class="datetime-col">Transaction Date/Time</th>
                                         <th>Processor Reference</th>
                                         <th class="status-col">Status</th>
@@ -235,9 +235,9 @@
                                                     <br><span class="text-muted small">{{ payment.months_covered }} months covered</span>
                                                 {% endif %}
                                             </td>
-                                            <td class="money-col">${{ payment.application.balance }}</td>
-                                            <td class="money-col">${{ payment.application.utility_balance }}</td>
-                                            <td class="money-col">${{ payment.application.deposit_paid }}</td>
+                                            <td class="money-col">${{ payment.display_rent_balance }}</td>
+                                            <td class="money-col">${{ payment.display_utility_balance }}</td>
+                                            <td class="money-col">${{ payment.display_deposit_due }}</td>
                                             <td class="datetime-col">{{ payment.display_paid_at|date:"M j, Y g:i A" }}</td>
                                             <td>
                                                 {% if payment.stripe_payment_intent %}

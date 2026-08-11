@@ -2150,6 +2150,9 @@ def monthly_collection_status_rows(applications):
         prior_utility_balance = resident_open_balance_for_month(application, month_start, "utility_balance")
         rent_due = prior_rent_balance + max(rent_expected - rent_paid, Decimal("0.00"))
         utility_due = prior_utility_balance + max(utility_expected - utility_paid, Decimal("0.00"))
+        deposit_required = max((grouped_application.deposit_required for grouped_application in duplicate_group), default=Decimal("0.00"))
+        deposit_paid = max((grouped_application.deposit_paid for grouped_application in duplicate_group), default=Decimal("0.00"))
+        deposit_due = max((max(grouped_application.deposit_required - grouped_application.deposit_paid, Decimal("0.00")) for grouped_application in duplicate_group), default=Decimal("0.00"))
         missing_items = []
 
         if (rent_expected > 0 or prior_rent_balance > 0) and rent_due > 0:
@@ -2157,6 +2160,9 @@ def monthly_collection_status_rows(applications):
 
         if (utility_expected > 0 or prior_utility_balance > 0) and utility_due > 0:
             missing_items.append("Utilities")
+
+        if deposit_due > 0:
+            missing_items.append("Deposit")
 
         unit_label = canonical_room_label(application.space_label)
         rows.append({
@@ -2174,6 +2180,9 @@ def monthly_collection_status_rows(applications):
             "scheduled_utility": scheduled_utility,
             "utility_due": utility_due,
             "prior_utility_balance": prior_utility_balance,
+            "deposit_required": deposit_required,
+            "deposit_paid": deposit_paid,
+            "deposit_due": deposit_due,
             "has_missing": bool(missing_items),
         })
 
@@ -2194,6 +2203,7 @@ def monthly_collection_summary(status_rows):
     outstanding_utilities = sum((row["utility_due"] for row in status_rows), Decimal("0.00"))
     rent_collected = sum((row["rent_paid"] for row in status_rows), Decimal("0.00"))
     utility_collected = sum((row["utility_paid"] for row in status_rows), Decimal("0.00"))
+    deposit_due = sum((row["deposit_due"] for row in status_rows), Decimal("0.00"))
     return {
         "rent_due": rent_due,
         "utility_due": utility_due,
@@ -2204,6 +2214,8 @@ def monthly_collection_summary(status_rows):
         "rent_collected": rent_collected,
         "utility_collected": utility_collected,
         "total_collected": rent_collected + utility_collected,
+        "deposit_due": deposit_due,
+        "deposit_due_display": whole_money_display(deposit_due),
         "rent_due_display": whole_money_display(rent_due),
         "outstanding_rent_display": whole_money_display(outstanding_rent),
         "outstanding_utilities_display": whole_money_display(outstanding_utilities),
@@ -5241,6 +5253,21 @@ def payment_log(request):
         if selected_month and accounting_month != selected_month:
             continue
         month_label = accounting_month.strftime("%B %Y")
+        application_payments = list(application.payments.filter(status="completed"))
+        payment.display_rent_balance = max(
+            expected_rent_for_month(application, accounting_month)
+            - payment_amount_for_month(application_payments, accounting_month.year, accounting_month.month, ["rent"]),
+            Decimal("0.00"),
+        )
+        payment.display_utility_balance = max(
+            expected_utility_for_month(application, accounting_month)
+            - payment_amount_for_month(application_payments, accounting_month.year, accounting_month.month, ["utility"]),
+            Decimal("0.00"),
+        )
+        payment.display_deposit_due = max(
+            application.deposit_required - application.deposit_paid,
+            Decimal("0.00"),
+        )
 
         grouped.setdefault(property_name, OrderedDict())
         grouped[property_name].setdefault(month_label, {
