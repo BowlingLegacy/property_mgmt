@@ -4619,10 +4619,19 @@ def get_resident_portal_application(request):
     application = getattr(request.user, "resident_profile", None)
     is_superadmin_inspecting = False
 
-    if (request.user.is_superuser or getattr(request.user, "role", "") == "admin") and request.GET.get("resident"):
+    resident_id = request.GET.get("resident")
+    if resident_id and (request.user.is_superuser or getattr(request.user, "role", "") == "admin"):
         application = get_object_or_404(
             HousingApplication.objects.select_related("property", "user"),
-            id=request.GET.get("resident"),
+            id=resident_id,
+        )
+        is_superadmin_inspecting = True
+    elif resident_id and staff_required(request.user):
+        application = get_object_or_404(
+            HousingApplication.objects.select_related("property", "user").filter(
+                property__in=staff_managed_properties(request.user),
+            ),
+            id=resident_id,
         )
         is_superadmin_inspecting = True
 
@@ -5002,6 +5011,7 @@ def resident_inbox(request):
         "resident_messages": resident_visible_messages(application).prefetch_related("replies", "replies__sender"),
         "inbox_counts": resident_inbox_counts(application),
         "dashboard_url": resident_portal_url("tenant_dashboard", is_superadmin_inspecting, application),
+        "is_superadmin_inspecting": is_superadmin_inspecting,
     })
 
 
@@ -8393,6 +8403,7 @@ def onboarding_document(request, document_id):
     return render(request, template_name, {
         "application": signed_document.application,
         "signed_document": signed_document,
+        "is_superadmin_inspecting": bool(request.GET.get("resident")),
     })
 
 

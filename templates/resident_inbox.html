@@ -59,12 +59,12 @@ body {
                         <td><strong>{{ signed_document.title }}</strong><br><span class="text-muted small">{{ signed_document.get_document_type_display }}</span></td>
                         <td>{% if signed_document.locked %}Locked Final{% else %}Needs Signature{% endif %}</td>
                         <td>
-                            <a href="{% url 'onboarding_document' signed_document.id %}" class="gold-link">
+                            <a href="{% url 'onboarding_document' signed_document.id %}{% if is_superadmin_inspecting %}?resident={{ application.id }}{% endif %}" class="gold-link">
                                 {% if signed_document.locked %}View{% else %}Sign{% endif %}
                             </a>
                             {% if signed_document.locked %}
                                 |
-                                <a href="{% url 'onboarding_document' signed_document.id %}?print=1" target="_blank" class="gold-link">Print</a>
+                                <a href="{% url 'onboarding_document' signed_document.id %}?print=1{% if is_superadmin_inspecting %}&amp;resident={{ application.id }}{% endif %}" target="_blank" class="gold-link">Print</a>
                             {% endif %}
                         </td>
                     </tr>
