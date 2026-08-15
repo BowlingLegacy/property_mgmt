@@ -39,7 +39,7 @@ Your Bowling Legacy resident portal access code is:
 Portal setup:
 https://bowlinglegacy.com/enter-invite-code/
 
-This code is single-use and expires 30 minutes after it is issued. If it expires, request a new code from the invite-code page.
+This code is single-use and expires {getattr(settings, "INVITE_CODE_TTL_HOURS", 48)} hours after it is issued. If it expires, request a new code from the invite-code page.
 If this email is not in your inbox, check your junk or spam folder.
 
 Thank you,

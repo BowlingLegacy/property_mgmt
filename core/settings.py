@@ -201,6 +201,10 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Single-use portal setup codes remain valid long enough for residents to
+# receive the email and complete onboarding without staff reissuing the code.
+INVITE_CODE_TTL_HOURS = int(os.environ.get("INVITE_CODE_TTL_HOURS", "48"))
 LOGIN_URL = "/login/"
 LOGIN_REDIRECT_URL = "/tenant-dashboard/"
 LOGOUT_REDIRECT_URL = "/"

@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 from decimal import Decimal
@@ -85,7 +86,8 @@ class User(AbstractUser):
         if not self.invite_code or self.invite_code_used_at or not self.invite_code_created_at:
             return False
 
-        return timezone.now() <= self.invite_code_created_at + timezone.timedelta(minutes=30)
+        ttl_hours = getattr(settings, "INVITE_CODE_TTL_HOURS", 48)
+        return timezone.now() <= self.invite_code_created_at + timezone.timedelta(hours=ttl_hours)
 
     def mark_invite_code_used(self):
         self.invite_code_used_at = timezone.now()
