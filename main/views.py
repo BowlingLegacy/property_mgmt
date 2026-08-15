@@ -1988,7 +1988,7 @@ def request_invite_code(request):
         profile = (
             HousingApplication.objects
             .select_related("user")
-            .filter(email__iexact=email, user__isnull=False)
+            .filter(Q(email__iexact=email) | Q(user__email__iexact=email), user__isnull=False)
             .first()
         )
 
