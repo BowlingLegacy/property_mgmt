@@ -1681,7 +1681,7 @@ def report_date_label(value):
 def current_rule_financial_entries_for_period(query_properties, start_date, end_date):
     property_names = list(query_properties.values_list("name", flat=True))
     financial_entries = FinancialEntry.objects.filter(
-        property_name__in=property_names,
+        Q(upload__property__in=query_properties) | Q(property_name__in=property_names),
         entry_type__in=["income", "operating_expense", "debt_service", "capital_expense"],
     ).select_related("upload")
     included_ids = set()
