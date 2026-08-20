@@ -1148,11 +1148,13 @@ def payment_month_allocations(payment):
         yield add_months(start_month, index), amount
 
 
-def payment_amount_for_month(payments, year, month, payment_types=None):
+def payment_amount_for_month(payments, year, month, payment_types=None, include_service_credits=True):
     total = Decimal("0.00")
     payment_types = set(payment_types or [])
 
     for payment in payments:
+        if not include_service_credits and payment.payment_method == "service_credit":
+            continue
         if payment_types and payment.payment_type not in payment_types:
             continue
         for accounting_month, amount in payment_month_allocations(payment):
@@ -1406,6 +1408,7 @@ def occupancy_report_for_properties(properties, report_month):
             report_month.year,
             report_month.month,
             ["rent", "utility"],
+            include_service_credits=False,
         )
         vacancy_text = ", ".join(vacancy_labels) or "None"
         highlights.append(f"{property_obj.name} vacant unit(s): {vacancy_text}")
@@ -1612,13 +1615,16 @@ UTILITY_REPORT_KEYWORDS = [
 
 def custom_report_financial_entries(query_properties, entry_types=None, start_date=None, end_date=None):
     property_names = list(query_properties.values_list("name", flat=True))
-    entries = FinancialEntry.objects.filter(property_name__in=property_names).select_related("upload")
+    entries = FinancialEntry.objects.filter(
+        Q(upload__property__in=query_properties) | Q(property_name__in=property_names)
+    ).select_related("upload")
     if entry_types:
         entries = entries.filter(entry_type__in=entry_types)
     if start_date:
         entries = entries.filter(entry_date__gte=start_date)
     if end_date:
         entries = entries.filter(entry_date__lte=end_date)
+    entries = cash_statement_entries(entries)
     return entries.order_by("property_name", "year", "month", "category", "description")
 
 
@@ -6200,7 +6206,13 @@ def custom_reports(request):
                 deposit_due = sum((max(resident.deposit_required - resident.deposit_paid, Decimal("0.00")) for resident in property_residents), Decimal("0.00"))
                 completed_payments = Payment.objects.filter(application__property=property_obj, status="completed")
                 actual_rent_utilities = sum(
-                    payment_amount_for_month(completed_payments, report_year, month_number, ["rent", "utility"])
+                    payment_amount_for_month(
+                        completed_payments,
+                        report_year,
+                        month_number,
+                        ["rent", "utility"],
+                        include_service_credits=False,
+                    )
                     for month_number in range(1, 13)
                 )
                 active_months = sum(1 for month in months if month["total_income"] > 0 or month["operating_expenses"] > 0 or month["debt_service"] > 0)
@@ -6824,12 +6836,18 @@ def t12_report_rows(user, year, report_properties=None):
     }
 
     for month_number in range(1, 13):
-        portal_income = payment_amount_for_month(completed_payments, year, month_number, T12_INCOME_PAYMENT_TYPES)
+        portal_income = payment_amount_for_month(
+            completed_payments,
+            year,
+            month_number,
+            T12_INCOME_PAYMENT_TYPES,
+            include_service_credits=False,
+        )
         month_filter = Q(month=month_number) | Q(entry_date__month=month_number)
-        month_entries = financial_entries.filter(month_filter)
+        month_entries = cash_statement_entries(financial_entries.filter(month_filter))
         summary_entries = month_entries.filter(source_receipt__isnull=True, source_receipt_split__isnull=True)
         receipt_entries = month_entries.filter(Q(source_receipt__isnull=False) | Q(source_receipt_split__isnull=False))
-        baseline_time = latest_summary_baseline_time(financial_entries, month_filter)
+        baseline_time = latest_summary_baseline_time(cash_statement_entries(financial_entries), month_filter)
         if baseline_time:
             receipt_entries = receipt_entries.filter(created_at__gt=baseline_time)
 
