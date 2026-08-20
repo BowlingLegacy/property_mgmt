@@ -1720,12 +1720,73 @@ def grouped_statement_totals(entries, entry_type):
     return [(row["category"] or "Uncategorized", row["total"] or Decimal("0.00")) for row in grouped]
 
 
-def build_income_statement_rows(query_properties, start_date=None, end_date=None):
+def add_statement_category_total(category_totals, category, amount):
+    category = (category or "Uncategorized").strip() or "Uncategorized"
+    category_totals[category] = category_totals.get(category, Decimal("0.00")) + Decimal(amount or "0.00")
+
+
+def payment_statement_category(payment):
+    if payment.payment_type == "rent":
+        return "Rent"
+    if payment.payment_type == "utility":
+        return "Shared Utilities"
+    if payment.payment_type == "late_fee":
+        return "Late Fees"
+    if payment.payment_type == "application_fee":
+        return "Application Fees"
+    if payment.payment_type == "background_check_fee":
+        return "Background Check Fees"
+    return payment.get_payment_type_display() or "Other Income"
+
+
+def payment_statement_category_totals(payments, year, month_number, payment_types=None):
+    payment_types = set(payment_types or [])
+    category_totals = OrderedDict()
+    for payment in payments:
+        if payment.service_month:
+            if payment.service_month.year != year or payment.service_month.month != month_number:
+                continue
+        else:
+            received_at = payment.received_at or payment.created_at
+            if not received_at or received_at.year != year or received_at.month != month_number:
+                continue
+        if payment_types and payment.payment_type not in payment_types:
+            continue
+        add_statement_category_total(category_totals, payment_statement_category(payment), payment.amount)
+    return category_totals
+
+
+def build_income_statement_rows(user, query_properties, start_date=None, end_date=None):
     period_start, period_end = custom_report_period_dates(start_date, end_date)
     entries = current_rule_financial_entries_for_period(query_properties, period_start, period_end)
+    completed_payments = list(
+        Payment.objects
+        .filter(application__in=staff_managed_applications(user), status="completed")
+        .filter(application__property__in=query_properties)
+    )
     rows = []
 
-    income_total = entries_total(entries.filter(entry_type="income").exclude(category__icontains="deposit"))
+    income_category_totals = OrderedDict()
+    for month_start in month_starts_between(period_start, period_end):
+        month_entries = entries.filter(
+            Q(year=month_start.year, month=month_start.month) |
+            Q(entry_date__year=month_start.year, entry_date__month=month_start.month)
+        )
+        month_income_entries = month_entries.filter(entry_type="income").exclude(category__icontains="deposit")
+        month_income_total = entries_total(month_income_entries)
+        if month_income_total > 0:
+            for category, amount in grouped_statement_totals(month_income_entries, "income"):
+                add_statement_category_total(income_category_totals, category, amount)
+        else:
+            for category, amount in payment_statement_category_totals(
+                completed_payments,
+                month_start.year,
+                month_start.month,
+                T12_INCOME_PAYMENT_TYPES,
+            ).items():
+                add_statement_category_total(income_category_totals, category, amount)
+
+    income_total = sum(income_category_totals.values(), Decimal("0.00"))
     operating_expense_total = entries_total(entries.filter(entry_type="operating_expense"))
     debt_service_total = entries_total(entries.filter(entry_type="debt_service"))
     capital_expense_total = entries_total(entries.filter(entry_type="capital_expense"))
@@ -1734,7 +1795,7 @@ def build_income_statement_rows(query_properties, start_date=None, end_date=None
     net_cash_flow = cash_flow_after_debt - capital_expense_total
 
     rows.append(statement_section("Income", "Gross operating income. Security deposits are excluded from income."))
-    for category, amount in grouped_statement_totals(entries.exclude(category__icontains="deposit"), "income"):
+    for category, amount in income_category_totals.items():
         rows.append(statement_row(f"  {category}", amount))
     rows.append(statement_total("Total Income", income_total))
 
@@ -6185,6 +6246,7 @@ def custom_reports(request):
             report_title = "Income Statement / P&L"
             report_columns = ["Line Item", "Amount", "Notes"]
             report_rows, report_highlights, totals, entry_count, period_start, period_end = build_income_statement_rows(
+                request.user,
                 filtered_properties,
                 start_date,
                 end_date,
