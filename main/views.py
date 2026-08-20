@@ -1742,6 +1742,39 @@ def non_cash_service_credit_entries(entries):
     return entries.filter(service_credit_entry_query())
 
 
+def recurring_category_presence(entries, month_start):
+    month_entries = entries.filter(
+        Q(year=month_start.year, month=month_start.month) |
+        Q(entry_date__year=month_start.year, entry_date__month=month_start.month)
+    ).filter(entry_type__in=["operating_expense", "debt_service"])
+    present = set()
+    for row in month_entries.values("entry_type", "category").annotate(total=Sum("amount")):
+        if row["total"] and row["total"] > 0:
+            present.add((row["entry_type"], (row["category"] or "Uncategorized").strip() or "Uncategorized"))
+    return present
+
+
+def recurring_category_warnings(entries, period_start, period_end):
+    warnings = []
+    month_starts = list(month_starts_between(period_start, period_end))
+    prior_counts = {}
+    for month_start in month_starts:
+        present = recurring_category_presence(entries, month_start)
+        expected = sorted(
+            category
+            for category, count in prior_counts.items()
+            if count >= 2 and category not in present
+        )
+        if expected:
+            labels = [category for _entry_type, category in expected[:8]]
+            extra = len(expected) - len(labels)
+            suffix = f" and {extra} more" if extra > 0 else ""
+            warnings.append(f"{month_start.strftime('%B %Y')} is missing recurring expense categories seen in prior months: {', '.join(labels)}{suffix}.")
+        for category in present:
+            prior_counts[category] = prior_counts.get(category, 0) + 1
+    return warnings
+
+
 def add_statement_category_total(category_totals, category, amount):
     category = (category or "Uncategorized").strip() or "Uncategorized"
     category_totals[category] = category_totals.get(category, Decimal("0.00")) + Decimal(amount or "0.00")
@@ -1879,6 +1912,10 @@ def build_income_statement_rows(user, query_properties, start_date=None, end_dat
         highlights.append("No debt service was recorded for this period.")
     if service_credit_total:
         highlights.append(f"Excluded non-cash service/rent trade credits from cash P&L totals: ${service_credit_total:,.2f}.")
+    data_warnings = recurring_category_warnings(entries, period_start, period_end)
+    if data_warnings:
+        highlights.append("Data quality warning: one or more months appear incomplete.")
+        highlights.extend(data_warnings[:6])
 
     return rows, highlights, totals, entries.count(), period_start, period_end
 
