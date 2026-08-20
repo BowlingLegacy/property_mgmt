@@ -27,3 +27,13 @@ def get_item(mapping, key):
         return ""
 
     return mapping.get(key, "")
+
+
+@register.filter
+def statement_money(value):
+    try:
+        if value < 0:
+            return f"(${abs(value):,.2f})"
+        return f"${value:,.2f}"
+    except (TypeError, ValueError):
+        return "$0.00"

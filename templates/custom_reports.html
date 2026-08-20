@@ -64,6 +64,32 @@ body {
     background: #f3ead7;
 }
 
+.report-table .statement-section td {
+    background: #efe3c4;
+    color: #2c2110;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.report-table .statement-total td {
+    background: #fbf7ee;
+    border-top: 2px solid #665023;
+    font-weight: 900;
+}
+
+.report-table .statement-net td {
+    background: #f7ebc8;
+    border-top: 3px double #2c2110;
+    border-bottom: 3px double #2c2110;
+    font-weight: 900;
+}
+
+.report-table td:nth-child(2),
+.report-table th:nth-child(2) {
+    text-align: right;
+}
+
 .totals-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -236,7 +262,7 @@ body {
                     {% for label, value in totals.items %}
                             <div class="total-box">
                                 <div class="total-label">{{ label }}</div>
-                            <div class="total-value">${{ value|floatformat:2 }}</div>
+                            <div class="total-value">{{ value|statement_money }}</div>
                         </div>
                     {% endfor %}
                 </div>
@@ -261,10 +287,16 @@ body {
                     </thead>
                     <tbody>
                         {% for row in report_rows %}
-                            <tr>
-                                {% for value in row %}
-                                    <td>{{ value }}</td>
-                                {% endfor %}
+                            <tr{% if row.class %} class="{{ row.class }}"{% endif %}>
+                                {% if row.cells %}
+                                    {% for value in row.cells %}
+                                        <td>{{ value }}</td>
+                                    {% endfor %}
+                                {% else %}
+                                    {% for value in row %}
+                                        <td>{{ value }}</td>
+                                    {% endfor %}
+                                {% endif %}
                             </tr>
                         {% empty %}
                             <tr>

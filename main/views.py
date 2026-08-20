@@ -1626,6 +1626,167 @@ def custom_report_period_year(start_date):
     return start_date.year if start_date else timezone.localdate().year
 
 
+def custom_report_period_dates(start_date=None, end_date=None):
+    today = timezone.localdate()
+    period_start = start_date or date(today.year, 1, 1)
+    period_end = end_date or today
+    return period_start, period_end
+
+
+def month_starts_between(start_date, end_date):
+    current = date(start_date.year, start_date.month, 1)
+    final = date(end_date.year, end_date.month, 1)
+    while current <= final:
+        yield current
+        if current.month == 12:
+            current = date(current.year + 1, 1, 1)
+        else:
+            current = date(current.year, current.month + 1, 1)
+
+
+def format_statement_amount(amount):
+    amount = Decimal(amount or "0.00").quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    if amount < 0:
+        return f"(${abs(amount):,.2f})"
+    return f"${amount:,.2f}"
+
+
+def statement_row(label, amount=None, notes="", row_class=""):
+    return {
+        "cells": [
+            label,
+            format_statement_amount(amount) if amount is not None else "",
+            notes,
+        ],
+        "class": row_class,
+    }
+
+
+def statement_section(label, notes=""):
+    return statement_row(label, None, notes, "statement-section")
+
+
+def statement_total(label, amount, notes=""):
+    return statement_row(label, amount, notes, "statement-total")
+
+
+def statement_net(label, amount, notes=""):
+    return statement_row(label, amount, notes, "statement-net")
+
+
+def report_date_label(value):
+    return value.strftime("%b %d, %Y").replace(" 0", " ")
+
+
+def current_rule_financial_entries_for_period(query_properties, start_date, end_date):
+    property_names = list(query_properties.values_list("name", flat=True))
+    financial_entries = FinancialEntry.objects.filter(
+        property_name__in=property_names,
+        entry_type__in=["income", "operating_expense", "debt_service", "capital_expense"],
+    ).select_related("upload")
+    included_ids = set()
+
+    for month_start in month_starts_between(start_date, end_date):
+        month_filter = Q(year=month_start.year, month=month_start.month) | Q(
+            entry_date__year=month_start.year,
+            entry_date__month=month_start.month,
+        )
+        month_entries = financial_entries.filter(month_filter)
+        summary_entries = month_entries.filter(source_receipt__isnull=True, source_receipt_split__isnull=True)
+        receipt_entries = month_entries.filter(Q(source_receipt__isnull=False) | Q(source_receipt_split__isnull=False))
+        baseline_time = latest_summary_baseline_time(financial_entries, month_filter)
+        if baseline_time:
+            receipt_entries = receipt_entries.filter(created_at__gt=baseline_time)
+
+        included_ids.update(summary_entries.values_list("id", flat=True))
+        included_ids.update(receipt_entries.values_list("id", flat=True))
+
+    entries = FinancialEntry.objects.filter(id__in=included_ids)
+    entries = entries.filter(
+        Q(entry_date__isnull=True) |
+        Q(entry_date__gte=start_date, entry_date__lte=end_date)
+    )
+    return entries.order_by("property_name", "entry_type", "category", "entry_date", "year", "month")
+
+
+def grouped_statement_totals(entries, entry_type):
+    grouped = (
+        entries
+        .filter(entry_type=entry_type)
+        .values("category")
+        .annotate(total=Sum("amount"))
+        .order_by("category")
+    )
+    return [(row["category"] or "Uncategorized", row["total"] or Decimal("0.00")) for row in grouped]
+
+
+def build_income_statement_rows(query_properties, start_date=None, end_date=None):
+    period_start, period_end = custom_report_period_dates(start_date, end_date)
+    entries = current_rule_financial_entries_for_period(query_properties, period_start, period_end)
+    rows = []
+
+    income_total = entries_total(entries.filter(entry_type="income").exclude(category__icontains="deposit"))
+    operating_expense_total = entries_total(entries.filter(entry_type="operating_expense"))
+    debt_service_total = entries_total(entries.filter(entry_type="debt_service"))
+    capital_expense_total = entries_total(entries.filter(entry_type="capital_expense"))
+    net_operating_income = income_total - operating_expense_total
+    cash_flow_after_debt = net_operating_income - debt_service_total
+    net_cash_flow = cash_flow_after_debt - capital_expense_total
+
+    rows.append(statement_section("Income", "Gross operating income. Security deposits are excluded from income."))
+    for category, amount in grouped_statement_totals(entries.exclude(category__icontains="deposit"), "income"):
+        rows.append(statement_row(f"  {category}", amount))
+    rows.append(statement_total("Total Income", income_total))
+
+    rows.append(statement_section("Operating Expenses", "Ordinary property operating costs before debt service."))
+    for category, amount in grouped_statement_totals(entries, "operating_expense"):
+        rows.append(statement_row(f"  {category}", amount))
+    rows.append(statement_total("Total Operating Expenses", operating_expense_total))
+    rows.append(statement_net("Net Operating Income (NOI)", net_operating_income, "Income minus operating expenses."))
+
+    rows.append(statement_section("Debt Service", "Loan, seller-financing, and other debt-service payments."))
+    for category, amount in grouped_statement_totals(entries, "debt_service"):
+        rows.append(statement_row(f"  {category}", amount))
+    rows.append(statement_total("Total Debt Service", debt_service_total))
+    rows.append(statement_net("Cash Flow After Debt Service", cash_flow_after_debt))
+
+    rows.append(statement_section("Capital Expenses", "Capital improvements shown below NOI and debt service."))
+    for category, amount in grouped_statement_totals(entries, "capital_expense"):
+        rows.append(statement_row(f"  {category}", amount))
+    rows.append(statement_total("Total Capital Expenses", capital_expense_total))
+    rows.append(statement_net("Net Cash Flow", net_cash_flow))
+
+    active_months = list(month_starts_between(period_start, period_end))
+    average_monthly_noi = (
+        (net_operating_income / Decimal(len(active_months))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        if active_months else Decimal("0.00")
+    )
+    debt_coverage = (
+        (net_operating_income / debt_service_total).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        if debt_service_total > 0 else Decimal("0.00")
+    )
+    totals = {
+        "Total Income": income_total,
+        "Operating Expenses": operating_expense_total,
+        "NOI": net_operating_income,
+        "Debt Service": debt_service_total,
+        "Cash Flow After Debt": cash_flow_after_debt,
+        "Capital Expenses": capital_expense_total,
+        "Net Cash Flow": net_cash_flow,
+    }
+    highlights = [
+        f"Statement period: {report_date_label(period_start)} through {report_date_label(period_end)}.",
+        "Prepared on cash-basis operating records using current T-12 rules: spreadsheet summaries are the baseline and receipt-backed entries after the baseline are added.",
+        f"Average monthly NOI for the period: ${average_monthly_noi:,.2f}.",
+    ]
+    if debt_service_total > 0:
+        highlights.append(f"Debt coverage ratio for the period: {debt_coverage}x.")
+    else:
+        highlights.append("No debt service was recorded for this period.")
+
+    return rows, highlights, totals, entries.count(), period_start, period_end
+
+
 def decimal_percent(numerator, denominator):
     denominator = Decimal(denominator or "0.00")
     if denominator <= 0:
@@ -6022,17 +6183,16 @@ def custom_reports(request):
 
         elif report_type == "income_statement":
             report_title = "Income Statement / P&L"
-            report_columns = ["Property", "Month", "Type", "Category", "Amount"]
-            entries = custom_report_financial_entries(filtered_properties, ["income", "operating_expense", "debt_service", "capital_expense"], start_date, end_date)
-            for entry in entries:
-                report_rows.append([
-                    entry.property_name,
-                    entry.entry_date.strftime("%B %Y") if entry.entry_date else f"{entry.year or ''}-{entry.month or ''}",
-                    entry.get_entry_type_display(),
-                    entry.category,
-                    entry.amount,
-                ])
-            totals = {"Report Total": entries.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")}
+            report_columns = ["Line Item", "Amount", "Notes"]
+            report_rows, report_highlights, totals, entry_count, period_start, period_end = build_income_statement_rows(
+                filtered_properties,
+                start_date,
+                end_date,
+            )
+            report_highlights.insert(
+                0,
+                f"Scope: {selected_property.name if selected_property else 'all accessible properties'}; source ledger entries used: {entry_count}.",
+            )
 
         elif report_type == "expense_by_category":
             report_title = "Expense Detail by Category"
