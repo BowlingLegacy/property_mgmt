@@ -1720,6 +1720,22 @@ def grouped_statement_totals(entries, entry_type):
     return [(row["category"] or "Uncategorized", row["total"] or Decimal("0.00")) for row in grouped]
 
 
+def service_credit_entry_query():
+    return (
+        Q(sheet_name__iexact="Service Credits") |
+        Q(upload__name__icontains="Service Credit") |
+        Q(description__icontains="service credit")
+    )
+
+
+def cash_statement_entries(entries):
+    return entries.exclude(service_credit_entry_query())
+
+
+def non_cash_service_credit_entries(entries):
+    return entries.filter(service_credit_entry_query())
+
+
 def add_statement_category_total(category_totals, category, amount):
     category = (category or "Uncategorized").strip() or "Uncategorized"
     category_totals[category] = category_totals.get(category, Decimal("0.00")) + Decimal(amount or "0.00")
@@ -1743,6 +1759,8 @@ def payment_statement_category_totals(payments, year, month_number, payment_type
     payment_types = set(payment_types or [])
     category_totals = OrderedDict()
     for payment in payments:
+        if payment.payment_method == "service_credit":
+            continue
         if payment.service_month:
             if payment.service_month.year != year or payment.service_month.month != month_number:
                 continue
@@ -1758,7 +1776,9 @@ def payment_statement_category_totals(payments, year, month_number, payment_type
 
 def build_income_statement_rows(user, query_properties, start_date=None, end_date=None):
     period_start, period_end = custom_report_period_dates(start_date, end_date)
-    entries = current_rule_financial_entries_for_period(query_properties, period_start, period_end)
+    all_entries = current_rule_financial_entries_for_period(query_properties, period_start, period_end)
+    service_credit_total = entries_total(non_cash_service_credit_entries(all_entries))
+    entries = cash_statement_entries(all_entries)
     completed_payments = list(
         Payment.objects
         .filter(application__in=staff_managed_applications(user), status="completed")
@@ -1816,6 +1836,13 @@ def build_income_statement_rows(user, query_properties, start_date=None, end_dat
         rows.append(statement_row(f"  {category}", amount))
     rows.append(statement_total("Total Capital Expenses", capital_expense_total))
     rows.append(statement_net("Net Cash Flow", net_cash_flow))
+    if service_credit_total:
+        rows.append(statement_section("Non-Cash Memo Items", "Shown for audit support only; excluded from cash P&L totals."))
+        rows.append(statement_row(
+            "  Service / labor rent trade credits",
+            service_credit_total,
+            "Non-cash work trade offset against resident balances; not a cash operating expense.",
+        ))
 
     active_months = list(month_starts_between(period_start, period_end))
     average_monthly_noi = (
@@ -1844,6 +1871,8 @@ def build_income_statement_rows(user, query_properties, start_date=None, end_dat
         highlights.append(f"Debt coverage ratio for the period: {debt_coverage}x.")
     else:
         highlights.append("No debt service was recorded for this period.")
+    if service_credit_total:
+        highlights.append(f"Excluded non-cash service/rent trade credits from cash P&L totals: ${service_credit_total:,.2f}.")
 
     return rows, highlights, totals, entries.count(), period_start, period_end
 
