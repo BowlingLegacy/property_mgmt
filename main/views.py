@@ -172,6 +172,20 @@ def notify_resident_of_portal_reply_sms(request, resident_message):
     )
 
 
+def notify_resident_of_new_portal_message_sms(request, resident_message):
+    portal_url = request.build_absolute_uri(reverse("resident_requests"))
+    body = (
+        "Bowling Legacy: You have a new secure portal message. "
+        f"Log in to view it: {portal_url} Reply STOP to opt out."
+    )
+    return send_sms_message(
+        resident_message.application,
+        body[:1500],
+        request.user,
+        resident_message=resident_message,
+    )
+
+
 def send_resident_portal_notification_email(request, application, subject, message, target_view_name):
     if not application.email:
         return False
@@ -4627,7 +4641,7 @@ def landlord_new_resident_message(request):
                 messages.warning(request, "No email is on file for this resident.")
 
         if form.cleaned_data["send_sms"]:
-            sms_log = notify_resident_of_portal_reply_sms(request, resident_message)
+            sms_log = notify_resident_of_new_portal_message_sms(request, resident_message)
             if sms_log.status == "sent":
                 messages.success(request, "Text notification sent.")
             elif sms_log.status in ["skipped_no_consent", "not_configured"]:
