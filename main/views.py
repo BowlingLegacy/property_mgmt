@@ -57,6 +57,7 @@ from .forms import (
     EndTenancyForm,
     BeginNewTenancyForm,
     GroupResidentMessageForm,
+    StaffResidentMessageForm,
     CompanyEmailComposeForm,
     CompanyEmailReplyForm,
 )
@@ -118,6 +119,34 @@ Use this direct link to open My Requests. If you are not already signed in, the 
 {dashboard_url}
 
 For privacy, the reply content is stored inside your portal rather than in this email.
+
+Thank you,
+Bowling Legacy Housing
+""",
+        getattr(settings, "DEFAULT_FROM_EMAIL", None),
+        [application.email],
+        fail_silently=False,
+    )
+    return True
+
+
+def notify_resident_of_new_portal_message(request, resident_message):
+    application = resident_message.application
+
+    if not application.email:
+        return False
+
+    dashboard_url = request.build_absolute_uri(reverse("resident_requests"))
+    send_mail(
+        f"New secure portal message: {resident_message.subject}",
+        f"""Hello {application.full_name},
+
+Bowling Legacy Housing sent you a new secure message in your resident portal.
+
+Use this direct link to open My Requests. If you are not already signed in, the site will ask for your login first:
+{dashboard_url}
+
+For privacy, the message content is stored inside your portal rather than in this email.
 
 Thank you,
 Bowling Legacy Housing
@@ -4562,6 +4591,55 @@ def landlord_message_detail(request, message_id):
     return render(request, "landlord_message_detail.html", {
         "resident_message": resident_message,
         "application": resident_message.application,
+    })
+
+
+@login_required
+@user_passes_test(staff_required)
+def landlord_new_resident_message(request):
+    residents = (
+        active_staff_managed_resident_files(request.user)
+        .filter(user__isnull=False)
+        .order_by("property__name", "space_label", "full_name")
+    )
+    form = StaffResidentMessageForm(request.POST or None, residents=residents)
+
+    if request.method == "POST" and form.is_valid():
+        application = form.cleaned_data["resident"]
+        resident_message = ResidentMessage.objects.create(
+            application=application,
+            message_type="general",
+            subject=form.cleaned_data["subject"],
+            message=form.cleaned_data["message"],
+            status="reviewed",
+            locked=True,
+        )
+
+        messages.success(request, "Private message saved to the resident portal.")
+        try:
+            email_sent = notify_resident_of_new_portal_message(request, resident_message)
+        except Exception as exc:
+            messages.warning(request, f"Email notification failed: {exc}")
+        else:
+            if email_sent:
+                messages.success(request, "Email notification sent.")
+            else:
+                messages.warning(request, "No email is on file for this resident.")
+
+        if form.cleaned_data["send_sms"]:
+            sms_log = notify_resident_of_portal_reply_sms(request, resident_message)
+            if sms_log.status == "sent":
+                messages.success(request, "Text notification sent.")
+            elif sms_log.status in ["skipped_no_consent", "not_configured"]:
+                messages.info(request, f"Text notification not sent: {sms_log.get_status_display()}.")
+            else:
+                messages.warning(request, f"Text notification failed: {sms_log.error_message}")
+
+        return redirect("landlord_message_detail", message_id=resident_message.id)
+
+    return render(request, "landlord_new_resident_message.html", {
+        "form": form,
+        "resident_count": residents.count(),
     })
 
 

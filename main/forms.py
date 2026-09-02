@@ -850,6 +850,47 @@ class GroupResidentMessageForm(forms.Form):
         return cleaned_data
 
 
+class StaffResidentMessageForm(forms.Form):
+    resident = forms.ModelChoiceField(
+        label="Resident",
+        queryset=HousingApplication.objects.none(),
+        empty_label="Choose a resident",
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    subject = forms.CharField(
+        max_length=255,
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": "Example: Lease update or payment reminder",
+        }),
+    )
+    message = forms.CharField(
+        widget=forms.Textarea(attrs={
+            "class": "form-control",
+            "rows": 6,
+            "placeholder": "Write the private message the resident will see in their portal...",
+        }),
+    )
+    send_sms = forms.BooleanField(
+        label="Also send a text notification when the resident has opted in",
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+    )
+
+    def __init__(self, *args, residents=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if residents is not None:
+            self.fields["resident"].queryset = residents
+        self.fields["resident"].label_from_instance = self.resident_label
+
+    @staticmethod
+    def resident_label(application):
+        property_name = application.property.name if application.property else "No property"
+        space = f" - {application.space_type} {application.space_label}" if application.space_label else ""
+        return f"{application.full_name} - {property_name}{space}"
+
+
 def parse_phone_copy_numbers(raw_value):
     return [value.strip() for value in re.split(r"[,;\n]+", raw_value or "") if value.strip()]
 

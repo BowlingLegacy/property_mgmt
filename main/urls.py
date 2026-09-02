@@ -96,6 +96,7 @@ urlpatterns = [
     path("property-blogs/comments/<int:comment_id>/delete/", blog_views.delete_blog_comment, name="delete_blog_comment"),
     path("landlord/create-tenant/", landlord_views.create_tenant, name="landlord_create_tenant"),
     path("landlord-message/<int:message_id>/", views.landlord_message_detail, name="landlord_message_detail"),
+    path("landlord-messages/new/", views.landlord_new_resident_message, name="landlord_new_resident_message"),
     path("document/<int:document_id>/reviewed/", views.mark_document_reviewed, name="mark_document_reviewed"),
 
     path("payment-log/", views.payment_log, name="payment_log"),

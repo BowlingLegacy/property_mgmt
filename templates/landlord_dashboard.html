@@ -339,6 +339,11 @@ body {
             </section>
 
             <div class="workspace-grid">
+                <a href="{% url 'landlord_new_resident_message' %}" class="workspace-card">
+                    <h2>New Resident Message</h2>
+                    <p class="text-muted mb-0">Start a private portal conversation with one active resident.</p>
+                </a>
+
                 <a href="{% url 'landlord_attention' %}" class="workspace-card">
                     <div class="badge-count">{{ attention_count }}</div>
                     <h2>Needs Attention</h2>
