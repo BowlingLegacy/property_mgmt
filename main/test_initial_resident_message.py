@@ -2,7 +2,7 @@ from django.core import mail
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from .models import HousingApplication, Property, ResidentMessage, User
+from .models import HousingApplication, Property, ResidentMessage, SmsMessageLog, User
 
 
 @override_settings(
@@ -69,6 +69,29 @@ class InitialResidentMessageTests(TestCase):
         portal_response = self.client.get(reverse("resident_requests"))
         self.assertContains(portal_response, "Scheduled inspection")
         self.assertContains(portal_response, "Please review the inspection date in your portal.")
+
+    def test_staff_message_sms_notice_links_log_without_private_body(self):
+        self.resident.sms_opted_in = True
+        self.resident.save(update_fields=["sms_opted_in"])
+
+        response = self.client.post(reverse("landlord_new_resident_message"), {
+            "resident": self.resident.id,
+            "subject": "Lease renewal",
+            "message": "Your updated private lease terms are ready.",
+            "send_sms": "on",
+        })
+
+        resident_message = ResidentMessage.objects.get()
+        self.assertRedirects(
+            response,
+            reverse("landlord_message_detail", args=[resident_message.id]),
+        )
+        sms_log = SmsMessageLog.objects.get()
+        self.assertEqual(sms_log.application, self.resident)
+        self.assertEqual(sms_log.resident_message, resident_message)
+        self.assertEqual(sms_log.status, "not_configured")
+        self.assertIn("Log in to view it", sms_log.body)
+        self.assertNotIn(resident_message.message, sms_log.body)
 
     def test_staff_cannot_message_resident_outside_managed_properties(self):
         other_property = Property.objects.create(
