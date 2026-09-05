@@ -16,7 +16,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .models import AccountingReceipt, AccountingReceiptSplit, ApplicantDocument, BlogComment, BlogPost, CompanyMailboxConnection, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, PropertyRoomRent, RentHistory, ResidentBalanceEntry, ResidentMessage, ResidentMessageReply, SignedDocument, SmsMessageLog, User, VendorCategoryRule
-from .views import applicant_review_summary, apply_completed_payment_to_balance, current_month_bounds, ensure_existing_resident_portal_application, monthly_collection_watch_rows, payment_amount_for_month, prorated_monthly_charge, rent_roll_rows_for_properties, send_sms_message, t12_report_rows
+from .views import applicant_review_summary, apply_completed_payment_to_balance, build_income_statement_rows, current_month_bounds, ensure_existing_resident_portal_application, monthly_collection_watch_rows, payment_amount_for_month, prorated_monthly_charge, rent_roll_rows_for_properties, send_sms_message, t12_report_rows
 
 
 @override_settings(
@@ -6875,6 +6875,118 @@ class LiveFlowTests(TestCase):
         self.assertEqual(may_row["debt_service"], Decimal("500.00"))
         self.assertEqual(may_row["net_operating_income"], Decimal("1700.00"))
         self.assertEqual(may_row["cash_flow_after_debt"], Decimal("1200.00"))
+
+    def test_t12_excludes_service_credit_payments_and_ledger_entries_from_cash_totals(self):
+        landlord = User.objects.create_user(
+            username="t12-cash-basis-landlord",
+            email="t12-cash-basis@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="T12 Cash Basis Property", landlord_email=landlord.email)
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Cash Basis Resident",
+            phone="555-0714",
+            email="cash-basis@example.com",
+            age=47,
+            monthly_rent=Decimal("700.00"),
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+        )
+        Payment.objects.create(
+            application=resident,
+            payment_type="rent",
+            payment_method="cash",
+            amount=Decimal("700.00"),
+            status="completed",
+            service_month=date(2026, 7, 1),
+        )
+        Payment.objects.create(
+            application=resident,
+            payment_type="rent",
+            payment_method="service_credit",
+            amount=Decimal("250.00"),
+            status="completed",
+            service_month=date(2026, 7, 1),
+        )
+        upload = FinancialUpload.objects.create(
+            property=property_obj,
+            name="Service Credit Ledger",
+            file=SimpleUploadedFile("service-credits.csv", b"category,amount\n", content_type="text/csv"),
+        )
+        FinancialEntry.objects.create(
+            upload=upload,
+            property_name=property_obj.name,
+            sheet_name="Service Credits",
+            row_number=1,
+            year=2026,
+            month=7,
+            entry_type="operating_expense",
+            category="Cleaning Labor",
+            description="Resident service credit",
+            amount=Decimal("250.00"),
+        )
+
+        months, totals = t12_report_rows(landlord, 2026)
+        july_row = months[6]
+
+        self.assertEqual(july_row["income_source"], "Portal")
+        self.assertEqual(july_row["online_income"], Decimal("700.00"))
+        self.assertEqual(july_row["total_income"], Decimal("700.00"))
+        self.assertEqual(july_row["operating_expenses"], Decimal("0.00"))
+        self.assertEqual(july_row["net_operating_income"], Decimal("700.00"))
+        self.assertEqual(totals["total_income"], Decimal("700.00"))
+        self.assertEqual(totals["operating_expenses"], Decimal("0.00"))
+
+    def test_income_statement_warns_when_recurring_expense_category_disappears(self):
+        landlord = User.objects.create_user(
+            username="recurring-warning-landlord",
+            email="recurring-warning@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Recurring Warning Property", landlord_email=landlord.email)
+        upload = FinancialUpload.objects.create(
+            property=property_obj,
+            name="Recurring Summary",
+            file=SimpleUploadedFile("recurring.csv", b"category,amount\n", content_type="text/csv"),
+        )
+        for row_number, month, category, amount in [
+            (1, 1, "Insurance", Decimal("300.00")),
+            (2, 1, "Mortgage", Decimal("900.00")),
+            (3, 2, "Insurance", Decimal("300.00")),
+            (4, 2, "Mortgage", Decimal("900.00")),
+            (5, 3, "Mortgage", Decimal("900.00")),
+        ]:
+            FinancialEntry.objects.create(
+                upload=upload,
+                property_name=property_obj.name,
+                sheet_name="Summary",
+                row_number=row_number,
+                entry_date=date(2026, month, 1),
+                year=2026,
+                month=month,
+                entry_type="debt_service" if category == "Mortgage" else "operating_expense",
+                category=category,
+                amount=amount,
+            )
+
+        _rows, highlights, _totals, _entry_count, _period_start, _period_end = build_income_statement_rows(
+            landlord,
+            Property.objects.filter(id=property_obj.id),
+            date(2026, 1, 1),
+            date(2026, 3, 31),
+        )
+
+        self.assertIn("Data quality warning: one or more months appear incomplete.", highlights)
+        self.assertIn(
+            "March 2026 is missing recurring expense categories seen in prior months: Insurance.",
+            highlights,
+        )
 
     def test_statement_supported_entries_create_debt_service_without_receipts(self):
         property_obj = Property.objects.create(
