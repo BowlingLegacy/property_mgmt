@@ -7063,7 +7063,7 @@ def bank_upload_review(request, upload_id):
     try:
         sheet_name, headers, rows = read_financial_upload_rows(upload, selected_sheet_name=selected_sheet_name)
     except Exception as exc:
-        messages.error(request, f"Rental Ledger Pro could not read that bank file yet: {exc}")
+        messages.error(request, f"Rental Ready Pro could not read that bank file yet: {exc}")
         return redirect("financial_upload")
 
     guesses = guess_financial_columns(headers)
@@ -7657,7 +7657,7 @@ def parse_financial_upload(request, upload_id):
     try:
         sheet_name, headers, rows = read_financial_upload_rows(upload, selected_sheet_name=selected_sheet_name)
     except Exception as exc:
-        messages.error(request, f"Rental Ledger Pro could not read that file yet: {exc}")
+        messages.error(request, f"Rental Ready Pro could not read that file yet: {exc}")
         return redirect("financial_upload")
 
     guesses = guess_financial_columns(headers)
