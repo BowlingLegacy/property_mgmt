@@ -453,6 +453,66 @@ def apply_vendor_rule_to_receipt(receipt):
     return changed
 
 
+def recurring_vendor_key(vendor):
+    key = re.sub(r"[^a-z0-9]+", " ", (vendor or "").lower()).strip()
+    if "charter" in key or "spectrum" in key:
+        return "charter spectrum"
+    return key
+
+
+def apply_recurring_receipt_template(receipt):
+    """Copy a prior bill's accounting treatment when vendor and total are unchanged."""
+    vendor_key = recurring_vendor_key(receipt.vendor)
+    if not vendor_key or receipt.amount <= 0:
+        return None
+
+    candidates = (
+        AccountingReceipt.objects
+        .select_related("category")
+        .prefetch_related("splits__category")
+        .filter(
+            property=receipt.property,
+            amount=receipt.amount,
+        )
+        .exclude(id=receipt.id)
+        .exclude(status="ignored")
+        .order_by("-receipt_date", "-uploaded_at")
+    )
+    source = next(
+        (
+            candidate for candidate in candidates
+            if candidate.receipt_date and recurring_vendor_key(candidate.vendor) == vendor_key
+        ),
+        None,
+    )
+    if not source:
+        return None
+
+    source_splits = list(source.splits.all())
+    source_split_total = sum((split.amount for split in source_splits), Decimal("0.00"))
+    if source_splits and source_split_total == source.amount:
+        for split in source_splits:
+            AccountingReceiptSplit.objects.create(
+                receipt=receipt,
+                category=split.category,
+                entry_type=split.entry_type,
+                description=split.description,
+                amount=split.amount,
+                created_by=receipt.uploaded_by,
+            )
+        return "split"
+
+    if source.category:
+        receipt.category = source.category
+        receipt.entry_type = source.entry_type
+        if not receipt.description:
+            receipt.description = source.description
+        receipt.save(update_fields=["category", "entry_type", "description"])
+        return "category"
+
+    return None
+
+
 MONTH_NAME_MAP = {
     "jan": 1,
     "january": 1,
@@ -7239,7 +7299,12 @@ def accounting_receipts(request):
 
         if form.is_valid():
             receipt = form.save()
-            if apply_vendor_rule_to_receipt(receipt):
+            recurring_match = apply_recurring_receipt_template(receipt)
+            if recurring_match == "split":
+                messages.info(request, "Recurring bill recognized. The prior split was applied automatically because the vendor and total match.")
+            elif recurring_match == "category":
+                messages.info(request, "Recurring bill recognized. The prior accounting category was applied automatically.")
+            elif apply_vendor_rule_to_receipt(receipt):
                 messages.info(request, "A saved vendor rule filled in this receipt's accounting category.")
             messages.success(request, "Receipt uploaded and saved for accounting review.")
             return redirect("accounting_receipts")
@@ -7296,6 +7361,21 @@ def accounting_receipts(request):
         })
 
     undated_receipts = [receipt for receipt in receipts if not receipt.receipt_date]
+    current_month_receipts = [
+        receipt for receipt in dated_receipts
+        if receipt.receipt_date.year == today.year and receipt.receipt_date.month == today.month
+    ]
+    current_expense_receipts = [receipt for receipt in current_month_receipts if receipt.status != "ignored"]
+    current_month = {
+        "number": today.month,
+        "name": calendar.month_name[today.month],
+        "receipts": current_month_receipts,
+        "count": len(current_month_receipts),
+        "tracked": bool(current_month_receipts),
+        "needs_review_count": sum(receipt.status == "needs_review" for receipt in current_month_receipts),
+        "total": sum((receipt.amount for receipt in current_expense_receipts), Decimal("0.00")),
+    }
+    archived_months = [month for month in receipt_months if month["is_archived"]]
 
     return render(request, "accounting_receipts.html", {
         "form": form,
@@ -7303,6 +7383,9 @@ def accounting_receipts(request):
         "undated_receipts": undated_receipts,
         "selected_year": selected_year,
         "available_years": available_years,
+        "current_month": current_month,
+        "archived_months": archived_months,
+        "today": today,
     })
 
 

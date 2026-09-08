@@ -118,8 +118,8 @@ body {
         <section class="soft-card p-4">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                 <div>
-                    <h2 class="section-title mb-1">Receipts By Month</h2>
-                    <div class="text-muted small">Expenses stay organized by receipt month. Completed months are archived automatically.</div>
+                    <h2 class="section-title mb-1">Current Month</h2>
+                    <div class="text-muted small">Only vendor expenses dated in the current month appear here.</div>
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
                     <a href="{% url 'vendor_category_rules' %}" class="message-btn text-decoration-none">Vendor Rules</a>
@@ -128,27 +128,36 @@ body {
                     </a>
                 </div>
             </div>
-            <form method="get" class="d-flex align-items-center gap-2 mb-3">
-                <label for="receipt-year" class="fw-bold">Year</label>
-                <select id="receipt-year" name="year" class="form-select w-auto" onchange="this.form.submit()">
-                    {% for year in available_years %}<option value="{{ year }}"{% if year == selected_year %} selected{% endif %}>{{ year }}</option>{% endfor %}
-                </select>
-                <noscript><button class="message-btn" type="submit">View</button></noscript>
-            </form>
-
             {% if undated_receipts %}
                 <div class="alert alert-warning"><strong>{{ undated_receipts|length }} receipt{{ undated_receipts|length|pluralize }} need a receipt date.</strong> Add dates so they appear in the correct month.</div>
                 <div class="table-responsive mb-4"><table class="table receipt-table align-middle"><thead><tr><th>Uploaded</th><th>Date</th><th>Property</th><th>Vendor</th><th>Category</th><th>Amount</th><th>Status</th><th>Receipt</th><th>Action</th></tr></thead><tbody>{% include "includes/accounting_receipt_rows.html" with receipt_list=undated_receipts %}</tbody></table></div>
             {% endif %}
 
-            {% for month in receipt_months %}
-                {% if month.is_archived %}<details class="month-card archive-month">{% else %}<div class="month-card">{% endif %}
-                    {% if month.is_archived %}<summary class="month-header d-flex justify-content-between align-items-center gap-3 flex-wrap">{% else %}<div class="month-header d-flex justify-content-between align-items-center gap-3 flex-wrap">{% endif %}
-                        <div><strong>{{ month.name }} {{ selected_year }}</strong>{% if month.tracked %}<span class="text-muted small ms-2">{{ month.count }} receipt{{ month.count|pluralize }} · ${{ month.total|floatformat:2 }}{% if month.needs_review_count %} · {{ month.needs_review_count }} need review{% endif %}</span>{% endif %}</div>
-                        <span class="tracking-pill {% if month.is_archived %}archived{% elif month.is_current %}current{% elif month.tracked %}tracked{% else %}missing{% endif %}">{% if month.is_archived %}Archived{% elif month.is_current %}Current month{% elif month.is_upcoming %}Upcoming{% elif month.tracked %}Tracked{% else %}Not tracked{% endif %}</span>
-                    {% if month.is_archived %}</summary>{% else %}</div>{% endif %}
-                    {% if month.tracked %}<div class="table-responsive"><table class="table receipt-table align-middle mb-0"><thead><tr><th>Uploaded</th><th>Date</th><th>Property</th><th>Vendor</th><th>Category</th><th>Amount</th><th>Status</th><th>Receipt</th><th>Action</th></tr></thead><tbody>{% include "includes/accounting_receipt_rows.html" with receipt_list=month.receipts %}</tbody></table></div>{% else %}<div class="text-muted small px-3 py-3">{% if month.is_upcoming %}This month has not started yet.{% else %}No receipts have been recorded for this month.{% endif %}</div>{% endif %}
-                {% if month.is_archived %}</details>{% else %}</div>{% endif %}
+            <div class="month-card mb-4">
+                <div class="month-header d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                    <div><strong>{{ today|date:"F Y" }}</strong>{% if current_month.tracked %}<span class="text-muted small ms-2">{{ current_month.count }} bill{{ current_month.count|pluralize }} · ${{ current_month.total|floatformat:2 }}{% if current_month.needs_review_count %} · {{ current_month.needs_review_count }} need review{% endif %}</span>{% endif %}</div>
+                    <span class="tracking-pill current">Current month</span>
+                </div>
+                {% if current_month.tracked %}<div class="table-responsive"><table class="table receipt-table align-middle mb-0"><thead><tr><th>Uploaded</th><th>Bill Date</th><th>Property</th><th>Vendor</th><th>Category</th><th>Amount</th><th>Status</th><th>Receipt</th><th>Action</th></tr></thead><tbody>{% include "includes/accounting_receipt_rows.html" with receipt_list=current_month.receipts %}</tbody></table></div>{% else %}<div class="text-muted px-3 py-4">No vendor expenses have been recorded for {{ today|date:"F" }} yet. This month starts with a clean page.</div>{% endif %}
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+                <div><h2 class="section-title mb-1">Monthly Archives</h2><div class="text-muted small">Past months are stored here automatically.</div></div>
+                <form method="get" class="d-flex align-items-center gap-2">
+                    <label for="receipt-year" class="fw-bold">Year</label>
+                    <select id="receipt-year" name="year" class="form-select w-auto" onchange="this.form.submit()">
+                        {% for year in available_years %}<option value="{{ year }}"{% if year == selected_year %} selected{% endif %}>{{ year }}</option>{% endfor %}
+                    </select>
+                    <noscript><button class="message-btn" type="submit">View</button></noscript>
+                </form>
+            </div>
+            {% for month in archived_months %}
+                <details class="month-card archive-month">
+                    <summary class="month-header d-flex justify-content-between align-items-center gap-3 flex-wrap"><div><strong>{{ month.name }} {{ selected_year }}</strong>{% if month.tracked %}<span class="text-muted small ms-2">{{ month.count }} bill{{ month.count|pluralize }} · ${{ month.total|floatformat:2 }}{% if month.needs_review_count %} · {{ month.needs_review_count }} need review{% endif %}</span>{% endif %}</div><span class="tracking-pill archived">Archived</span></summary>
+                    {% if month.tracked %}<div class="table-responsive"><table class="table receipt-table align-middle mb-0"><thead><tr><th>Uploaded</th><th>Bill Date</th><th>Property</th><th>Vendor</th><th>Category</th><th>Amount</th><th>Status</th><th>Receipt</th><th>Action</th></tr></thead><tbody>{% include "includes/accounting_receipt_rows.html" with receipt_list=month.receipts %}</tbody></table></div>{% else %}<div class="text-muted small px-3 py-3">No vendor expenses were recorded for this month.</div>{% endif %}
+                </details>
+            {% empty %}
+                <div class="text-muted small">There are no completed months to show for this year.</div>
             {% endfor %}
         </section>
     </div>

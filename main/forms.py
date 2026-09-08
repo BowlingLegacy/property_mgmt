@@ -154,6 +154,10 @@ class AccountingReceiptForm(forms.ModelForm):
 
         self.fields["category"].queryset = ExpenseCategory.objects.filter(is_active=True).order_by("entry_type", "name")
         self.fields["category"].required = False
+        self.fields["vendor"].required = True
+        self.fields["receipt_date"].required = True
+        self.fields["vendor"].help_text = "Required so recurring bills can be recognized reliably."
+        self.fields["receipt_date"].help_text = "This date determines which monthly expense page receives the bill."
 
     def save(self, commit=True):
         receipt = super().save(commit=False)
