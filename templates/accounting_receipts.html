@@ -67,6 +67,18 @@ body {
     font-size: .78rem;
     font-weight: 900;
 }
+.month-card { border: 1px solid #e5dcc9; border-radius: 14px; overflow: hidden; }
+.month-card + .month-card { margin-top: .8rem; }
+.month-header { background: #fbf8f1; padding: .9rem 1rem; }
+.tracking-pill { border-radius: 999px; padding: .25rem .65rem; font-size: .75rem; font-weight: 900; }
+.tracking-pill.tracked { background: #e3f3e7; color: #28663a; }
+.tracking-pill.missing { background: #f1ede4; color: #786d5b; }
+.tracking-pill.archived { background: #e9e6ef; color: #554768; }
+.tracking-pill.current { background: #e3f3e7; color: #28663a; }
+.archive-month summary { cursor: pointer; list-style: none; }
+.archive-month summary::-webkit-details-marker { display: none; }
+.archive-month summary::before { content: "\25B8"; color: #8a6a1f; margin-right: .55rem; }
+.archive-month[open] summary::before { content: "\25BE"; }
 </style>
 
 <div class="mb-4">
@@ -105,7 +117,10 @@ body {
     <div class="col-lg-8">
         <section class="soft-card p-4">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                <h2 class="section-title mb-0">Receipt Review Queue</h2>
+                <div>
+                    <h2 class="section-title mb-1">Receipts By Month</h2>
+                    <div class="text-muted small">Expenses stay organized by receipt month. Completed months are archived automatically.</div>
+                </div>
                 <div class="d-flex gap-2 flex-wrap">
                     <a href="{% url 'vendor_category_rules' %}" class="message-btn text-decoration-none">Vendor Rules</a>
                     <a href="{% url 'custom_reports' %}?report_type=financial_entries" class="message-btn text-decoration-none">
@@ -113,85 +128,28 @@ body {
                     </a>
                 </div>
             </div>
+            <form method="get" class="d-flex align-items-center gap-2 mb-3">
+                <label for="receipt-year" class="fw-bold">Year</label>
+                <select id="receipt-year" name="year" class="form-select w-auto" onchange="this.form.submit()">
+                    {% for year in available_years %}<option value="{{ year }}"{% if year == selected_year %} selected{% endif %}>{{ year }}</option>{% endfor %}
+                </select>
+                <noscript><button class="message-btn" type="submit">View</button></noscript>
+            </form>
 
-            <div class="table-responsive">
-                <table class="table receipt-table align-middle">
-                    <thead>
-                        <tr>
-                            <th>Uploaded</th>
-                            <th>Date</th>
-                            <th>Property</th>
-                            <th>Vendor</th>
-                            <th>Category</th>
-                            <th>Amount</th>
-                            <th>Status</th>
-                            <th>Receipt</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for receipt in receipts %}
-                            <tr>
-                                <td>{{ receipt.uploaded_at|date:"M j, Y" }}</td>
-                                <td>{{ receipt.receipt_date|date:"M j, Y"|default:"Needs date" }}</td>
-                                <td>{{ receipt.property.name }}</td>
-                                <td>{{ receipt.vendor|default:"-" }}</td>
-                                <td>
-                                    {% if receipt.has_splits %}
-                                        Split across categories
-                                        <div class="text-muted small">
-                                            Split: ${{ receipt.split_total|floatformat:2 }}
-                                            {% if receipt.split_difference != 0 %}
-                                                | Difference: ${{ receipt.split_difference|floatformat:2 }}
-                                            {% endif %}
-                                        </div>
-                                    {% elif receipt.category %}
-                                        {{ receipt.category.name }}
-                                    {% else %}
-                                        Needs category
-                                    {% endif %}
-                                </td>
-                                <td>${{ receipt.amount }}</td>
-                                <td><span class="status-pill">{{ receipt.get_status_display }}</span></td>
-                                <td>
-                                    {% if receipt.receipt_file %}
-                                        <a href="{{ receipt.receipt_file.url }}" target="_blank">View</a>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if receipt.status == "needs_review" %}
-                                        <a href="{% url 'edit_accounting_receipt' receipt.id %}" class="message-btn d-inline-flex text-decoration-none mb-2">Edit</a>
-                                        <a href="{% url 'split_accounting_receipt' receipt.id %}" class="message-btn d-inline-flex text-decoration-none mb-2">Split</a>
-                                        <form method="post" action="{% url 'approve_accounting_receipt' receipt.id %}">
-                                            {% csrf_token %}
-                                            <button type="submit" class="message-btn">Approve</button>
-                                        </form>
-                                        <form method="post" action="{% url 'ignore_accounting_receipt' receipt.id %}" class="mt-2">
-                                            {% csrf_token %}
-                                            <button type="submit" class="danger-btn">Ignore Duplicate</button>
-                                        </form>
-                                        {% if receipt.vendor and receipt.category %}
-                                            <form method="post" action="{% url 'save_receipt_vendor_rule' receipt.id %}" class="mt-2">
-                                                {% csrf_token %}
-                                                <button type="submit" class="message-btn">Remember Vendor</button>
-                                            </form>
-                                        {% endif %}
-                                    {% elif receipt.financial_entry or receipt.is_split_ledgered %}
-                                        <a href="{% url 'edit_accounting_receipt' receipt.id %}" class="message-btn d-inline-flex text-decoration-none mb-2">Edit</a>
-                                        <div>Ledgered</div>
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </td>
-                            </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="9" class="text-muted p-4">No receipts uploaded yet.</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+            {% if undated_receipts %}
+                <div class="alert alert-warning"><strong>{{ undated_receipts|length }} receipt{{ undated_receipts|length|pluralize }} need a receipt date.</strong> Add dates so they appear in the correct month.</div>
+                <div class="table-responsive mb-4"><table class="table receipt-table align-middle"><thead><tr><th>Uploaded</th><th>Date</th><th>Property</th><th>Vendor</th><th>Category</th><th>Amount</th><th>Status</th><th>Receipt</th><th>Action</th></tr></thead><tbody>{% include "includes/accounting_receipt_rows.html" with receipt_list=undated_receipts %}</tbody></table></div>
+            {% endif %}
+
+            {% for month in receipt_months %}
+                {% if month.is_archived %}<details class="month-card archive-month">{% else %}<div class="month-card">{% endif %}
+                    {% if month.is_archived %}<summary class="month-header d-flex justify-content-between align-items-center gap-3 flex-wrap">{% else %}<div class="month-header d-flex justify-content-between align-items-center gap-3 flex-wrap">{% endif %}
+                        <div><strong>{{ month.name }} {{ selected_year }}</strong>{% if month.tracked %}<span class="text-muted small ms-2">{{ month.count }} receipt{{ month.count|pluralize }} · ${{ month.total|floatformat:2 }}{% if month.needs_review_count %} · {{ month.needs_review_count }} need review{% endif %}</span>{% endif %}</div>
+                        <span class="tracking-pill {% if month.is_archived %}archived{% elif month.is_current %}current{% elif month.tracked %}tracked{% else %}missing{% endif %}">{% if month.is_archived %}Archived{% elif month.is_current %}Current month{% elif month.is_upcoming %}Upcoming{% elif month.tracked %}Tracked{% else %}Not tracked{% endif %}</span>
+                    {% if month.is_archived %}</summary>{% else %}</div>{% endif %}
+                    {% if month.tracked %}<div class="table-responsive"><table class="table receipt-table align-middle mb-0"><thead><tr><th>Uploaded</th><th>Date</th><th>Property</th><th>Vendor</th><th>Category</th><th>Amount</th><th>Status</th><th>Receipt</th><th>Action</th></tr></thead><tbody>{% include "includes/accounting_receipt_rows.html" with receipt_list=month.receipts %}</tbody></table></div>{% else %}<div class="text-muted small px-3 py-3">{% if month.is_upcoming %}This month has not started yet.{% else %}No receipts have been recorded for this month.{% endif %}</div>{% endif %}
+                {% if month.is_archived %}</details>{% else %}</div>{% endif %}
+            {% endfor %}
         </section>
     </div>
 </div>

@@ -1,0 +1,32 @@
+{% for receipt in receipt_list %}
+    <tr>
+        <td>{{ receipt.uploaded_at|date:"M j, Y" }}</td>
+        <td>{{ receipt.receipt_date|date:"M j, Y"|default:"Needs date" }}</td>
+        <td>{{ receipt.property.name }}</td>
+        <td>{{ receipt.vendor|default:"-" }}</td>
+        <td>
+            {% if receipt.has_splits %}
+                Split across categories
+                <div class="text-muted small">
+                    Split: ${{ receipt.split_total|floatformat:2 }}
+                    {% if receipt.split_difference != 0 %}| Difference: ${{ receipt.split_difference|floatformat:2 }}{% endif %}
+                </div>
+            {% elif receipt.category %}{{ receipt.category.name }}{% else %}Needs category{% endif %}
+        </td>
+        <td>${{ receipt.amount }}</td>
+        <td><span class="status-pill">{{ receipt.get_status_display }}</span></td>
+        <td>{% if receipt.receipt_file %}<a href="{{ receipt.receipt_file.url }}" target="_blank">View</a>{% endif %}</td>
+        <td>
+            {% if receipt.status == "needs_review" %}
+                <a href="{% url 'edit_accounting_receipt' receipt.id %}" class="message-btn d-inline-flex text-decoration-none mb-2">Edit</a>
+                <a href="{% url 'split_accounting_receipt' receipt.id %}" class="message-btn d-inline-flex text-decoration-none mb-2">Split</a>
+                <form method="post" action="{% url 'approve_accounting_receipt' receipt.id %}">{% csrf_token %}<button type="submit" class="message-btn">Approve</button></form>
+                <form method="post" action="{% url 'ignore_accounting_receipt' receipt.id %}" class="mt-2">{% csrf_token %}<button type="submit" class="danger-btn">Ignore Duplicate</button></form>
+                {% if receipt.vendor and receipt.category %}<form method="post" action="{% url 'save_receipt_vendor_rule' receipt.id %}" class="mt-2">{% csrf_token %}<button type="submit" class="message-btn">Remember Vendor</button></form>{% endif %}
+            {% elif receipt.financial_entry or receipt.is_split_ledgered %}
+                <a href="{% url 'edit_accounting_receipt' receipt.id %}" class="message-btn d-inline-flex text-decoration-none mb-2">Edit</a>
+                <div>Ledgered</div>
+            {% else %}-{% endif %}
+        </td>
+    </tr>
+{% endfor %}

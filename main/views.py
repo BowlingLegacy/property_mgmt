@@ -7246,7 +7246,7 @@ def accounting_receipts(request):
     else:
         form = AccountingReceiptForm(properties=properties, user=request.user)
 
-    receipts = (
+    receipts = list(
         AccountingReceipt.objects
         .select_related("property", "category", "uploaded_by", "financial_entry")
         .prefetch_related("splits__category", "splits__financial_entry")
@@ -7259,9 +7259,50 @@ def accounting_receipts(request):
         receipt.has_splits = receipt.split_total > 0
         receipt.is_split_ledgered = receipt.splits.filter(financial_entry__isnull=False).exists()
 
+    today = timezone.localdate()
+    current_year = today.year
+    try:
+        selected_year = int(request.GET.get("year", current_year))
+    except (TypeError, ValueError):
+        selected_year = current_year
+    if selected_year < 2000 or selected_year > 2100:
+        selected_year = current_year
+
+    dated_receipts = [receipt for receipt in receipts if receipt.receipt_date]
+    available_years = sorted(
+        {current_year, selected_year, *(receipt.receipt_date.year for receipt in dated_receipts)},
+        reverse=True,
+    )
+    receipt_months = []
+    for month_number in range(12, 0, -1):
+        month_receipts = [
+            receipt for receipt in dated_receipts
+            if receipt.receipt_date.year == selected_year and receipt.receipt_date.month == month_number
+        ]
+        expense_receipts = [receipt for receipt in month_receipts if receipt.status != "ignored"]
+        month_key = (selected_year, month_number)
+        current_month_key = (today.year, today.month)
+        receipt_months.append({
+            "number": month_number,
+            "name": calendar.month_name[month_number],
+            "receipts": month_receipts,
+            "count": len(month_receipts),
+            "tracked": bool(month_receipts),
+            "needs_review_count": sum(receipt.status == "needs_review" for receipt in month_receipts),
+            "total": sum((receipt.amount for receipt in expense_receipts), Decimal("0.00")),
+            "is_archived": month_key < current_month_key,
+            "is_current": month_key == current_month_key,
+            "is_upcoming": month_key > current_month_key,
+        })
+
+    undated_receipts = [receipt for receipt in receipts if not receipt.receipt_date]
+
     return render(request, "accounting_receipts.html", {
         "form": form,
-        "receipts": receipts,
+        "receipt_months": receipt_months,
+        "undated_receipts": undated_receipts,
+        "selected_year": selected_year,
+        "available_years": available_years,
     })
 
 
