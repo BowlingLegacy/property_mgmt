@@ -5,7 +5,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import csv
 import html
 from html.parser import HTMLParser
-from io import TextIOWrapper
+from io import StringIO, TextIOWrapper
 import base64
 import json
 import re
@@ -282,13 +282,12 @@ def read_financial_upload_rows(upload, limit=None, selected_sheet_name=None):
             raw_rows = list(worksheet.iter_rows(values_only=True))
             sheet_name = worksheet.title
         else:
-            wrapper = TextIOWrapper(upload.file, encoding="utf-8-sig", newline="")
+            contents = upload.file.read()
             try:
-                raw_rows = list(csv.reader(wrapper))
+                decoded = contents.decode("utf-8-sig")
             except UnicodeDecodeError:
-                upload.file.seek(0)
-                wrapper = TextIOWrapper(upload.file, encoding="latin-1", newline="")
-                raw_rows = list(csv.reader(wrapper))
+                decoded = contents.decode("latin-1")
+            raw_rows = list(csv.reader(StringIO(decoded, newline="")))
             sheet_name = "CSV"
     finally:
         upload.file.close()
