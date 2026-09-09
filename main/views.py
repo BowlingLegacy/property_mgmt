@@ -300,13 +300,31 @@ def read_financial_upload_rows(upload, limit=None, selected_sheet_name=None):
     if not non_empty_rows:
         return sheet_name, [], []
 
-    headers = unique_headers(non_empty_rows[0])
-    data_rows = non_empty_rows[1:]
+    header_index = 0
+    if not file_name.endswith(".xlsx"):
+        aliases = {
+            alias
+            for field_aliases in FINANCIAL_COLUMN_ALIASES.values()
+            for alias in field_aliases
+        }
+        for index, row in enumerate(non_empty_rows):
+            recognized = sum(
+                1
+                for cell in row
+                if normalized_header(cell) in aliases
+                or normalized_header(cell) in {"transaction number", "check number", "amount debit", "amount credit", "balance"}
+            )
+            if len(row) > 1 and recognized >= 2:
+                header_index = index
+                break
+
+    headers = unique_headers(non_empty_rows[header_index])
+    data_rows = non_empty_rows[header_index + 1:]
     if limit:
         data_rows = data_rows[:limit]
 
     rows = []
-    for row_number, row in enumerate(data_rows, start=2):
+    for row_number, row in enumerate(data_rows, start=header_index + 2):
         row_data = {}
         for index, header in enumerate(headers):
             row_data[header] = row[index] if index < len(row) else ""
