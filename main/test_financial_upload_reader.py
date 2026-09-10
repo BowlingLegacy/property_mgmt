@@ -25,3 +25,20 @@ class FinancialUploadReaderTests(SimpleTestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["row_number"], 5)
         self.assertEqual(rows[0]["data"]["Amount Debit"], "-291.38")
+
+    def test_header_row_can_be_selected_manually(self):
+        contents = (
+            "Account Name : Rogue Business Checking Basic\n"
+            "Account Number : 1234\n"
+            "Date Range : 08/03/2026-08/31/2026\n"
+            "Transaction Number,Date,Description,Memo,Amount Debit,Amount Credit,Balance,Check Number\n"
+            'txn-1,08/07/2026,"Ext Withdrawal CHARTER COMM -",ONLINE PMT,-291.38,,900.00,\n'
+        )
+        source_file = ContentFile(contents.encode("utf-8"), name="august.csv")
+        upload = SimpleNamespace(file=source_file)
+
+        _sheet_name, headers, rows = read_financial_upload_rows(upload, header_row_number="4")
+
+        self.assertEqual(headers[1:7], ["Date", "Description", "Memo", "Amount Debit", "Amount Credit", "Balance"])
+        self.assertEqual(rows[0]["row_number"], 5)
+        self.assertEqual(rows[0]["data"]["Date"], "08/07/2026")

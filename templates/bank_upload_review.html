@@ -68,7 +68,7 @@
     <form method="get" class="bank-panel mb-4">
         <h2 class="h4 fw-bold mb-3">Map Bank Columns</h2>
         <p class="text-muted">
-            Choose the bank columns first. Then review each row below. Ignored rows never affect reports.
+            Choose the header row and bank columns first. Then review each row below. Ignored rows never affect reports.
         </p>
         <div class="bank-grid">
             <div>
@@ -78,6 +78,11 @@
                         <option value="{{ name }}" {% if selected_sheet_name == name %}selected{% endif %}>{{ name }}</option>
                     {% endfor %}
                 </select>
+            </div>
+            <div>
+                <label class="form-label fw-bold">Header Row</label>
+                <input type="number" name="header_row_number" class="form-control" min="1" value="{{ header_row_number }}" placeholder="Auto-detect">
+                <div class="form-text">For Rogue statements, enter 4.</div>
             </div>
             <div>
                 <label class="form-label fw-bold">Date Column</label>
@@ -94,6 +99,15 @@
                     <option value="">No description column</option>
                     {% for header in headers %}
                         <option value="{{ header }}" {% if description_column == header %}selected{% endif %}>{{ header }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="form-label fw-bold">Memo Column</label>
+                <select name="memo_column" class="form-select">
+                    <option value="">No memo column</option>
+                    {% for header in headers %}
+                        <option value="{{ header }}" {% if memo_column == header %}selected{% endif %}>{{ header }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -124,6 +138,15 @@
                     {% endfor %}
                 </select>
             </div>
+            <div>
+                <label class="form-label fw-bold">Balance Column</label>
+                <select name="balance_column" class="form-select">
+                    <option value="">No balance column</option>
+                    {% for header in headers %}
+                        <option value="{{ header }}" {% if balance_column == header %}selected{% endif %}>{{ header }}</option>
+                    {% endfor %}
+                </select>
+            </div>
         </div>
         <div class="d-flex justify-content-end mt-3">
             <button class="btn btn-primary" type="submit">Refresh Review</button>
@@ -133,11 +156,14 @@
     <form method="post" class="bank-panel">
         {% csrf_token %}
         <input type="hidden" name="sheet_name" value="{{ selected_sheet_name }}">
+        <input type="hidden" name="header_row_number" value="{{ header_row_number }}">
         <input type="hidden" name="date_column" value="{{ date_column }}">
         <input type="hidden" name="description_column" value="{{ description_column }}">
+        <input type="hidden" name="memo_column" value="{{ memo_column }}">
         <input type="hidden" name="amount_column" value="{{ amount_column }}">
         <input type="hidden" name="debit_column" value="{{ debit_column }}">
         <input type="hidden" name="credit_column" value="{{ credit_column }}">
+        <input type="hidden" name="balance_column" value="{{ balance_column }}">
 
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
             <div>

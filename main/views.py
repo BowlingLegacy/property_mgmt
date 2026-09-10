@@ -272,7 +272,7 @@ def financial_upload_sheet_names(upload):
         upload.file.close()
 
 
-def read_financial_upload_rows(upload, limit=None, selected_sheet_name=None):
+def read_financial_upload_rows(upload, limit=None, selected_sheet_name=None, header_row_number=None):
     file_name = upload.file.name.lower()
     upload.file.open("rb")
     try:
@@ -292,22 +292,33 @@ def read_financial_upload_rows(upload, limit=None, selected_sheet_name=None):
     finally:
         upload.file.close()
 
-    non_empty_rows = [
-        list(row)
-        for row in raw_rows
+    indexed_rows = [
+        (row_number, list(row))
+        for row_number, row in enumerate(raw_rows, start=1)
         if any(str(cell or "").strip() for cell in row)
     ]
-    if not non_empty_rows:
+    if not indexed_rows:
         return sheet_name, [], []
 
-    header_index = 0
-    if not file_name.endswith(".xlsx"):
+    requested_header_row = None
+    try:
+        requested_header_row = int(header_row_number) if header_row_number else None
+    except (TypeError, ValueError):
+        requested_header_row = None
+
+    header_position = 0
+    if requested_header_row:
+        for position, (row_number, _row) in enumerate(indexed_rows):
+            if row_number == requested_header_row:
+                header_position = position
+                break
+    elif not file_name.endswith(".xlsx"):
         aliases = {
             alias
             for field_aliases in FINANCIAL_COLUMN_ALIASES.values()
             for alias in field_aliases
         }
-        for index, row in enumerate(non_empty_rows):
+        for position, (_row_number, row) in enumerate(indexed_rows):
             recognized = sum(
                 1
                 for cell in row
@@ -315,16 +326,17 @@ def read_financial_upload_rows(upload, limit=None, selected_sheet_name=None):
                 or normalized_header(cell) in {"transaction number", "check number", "amount debit", "amount credit", "balance"}
             )
             if len(row) > 1 and recognized >= 2:
-                header_index = index
+                header_position = position
                 break
 
-    headers = unique_headers(non_empty_rows[header_index])
-    data_rows = non_empty_rows[header_index + 1:]
+    header_row_number, header_row = indexed_rows[header_position]
+    headers = unique_headers(header_row)
+    data_rows = indexed_rows[header_position + 1:]
     if limit:
         data_rows = data_rows[:limit]
 
     rows = []
-    for row_number, row in enumerate(data_rows, start=header_index + 2):
+    for row_number, row in data_rows:
         row_data = {}
         for index, header in enumerate(headers):
             row_data[header] = row[index] if index < len(row) else ""
@@ -7136,9 +7148,14 @@ def bank_upload_review(request, upload_id):
 
     sheet_names = financial_upload_sheet_names(upload)
     selected_sheet_name = request.POST.get("sheet_name") or request.GET.get("sheet_name") or (sheet_names[0] if sheet_names else None)
+    header_row_number = request.POST.get("header_row_number") or request.GET.get("header_row_number") or ""
 
     try:
-        sheet_name, headers, rows = read_financial_upload_rows(upload, selected_sheet_name=selected_sheet_name)
+        sheet_name, headers, rows = read_financial_upload_rows(
+            upload,
+            selected_sheet_name=selected_sheet_name,
+            header_row_number=header_row_number,
+        )
     except Exception as exc:
         messages.error(request, f"Rental Ready Pro could not read that bank file yet: {exc}")
         return redirect("financial_upload")
@@ -7146,9 +7163,11 @@ def bank_upload_review(request, upload_id):
     guesses = guess_financial_columns(headers)
     date_column = request.POST.get("date_column") or request.GET.get("date_column") or guesses.get("entry_date", "")
     description_column = request.POST.get("description_column") or request.GET.get("description_column") or guesses.get("description", "")
+    memo_column = request.POST.get("memo_column") or request.GET.get("memo_column") or ""
     amount_column = request.POST.get("amount_column") or request.GET.get("amount_column") or guesses.get("amount", "")
     debit_column = request.POST.get("debit_column") or request.GET.get("debit_column") or ""
     credit_column = request.POST.get("credit_column") or request.GET.get("credit_column") or ""
+    balance_column = request.POST.get("balance_column") or request.GET.get("balance_column") or ""
 
     if request.method == "POST":
         planned_entries = []
@@ -7288,13 +7307,16 @@ def bank_upload_review(request, upload_id):
         "upload": upload,
         "sheet_names": sheet_names,
         "selected_sheet_name": sheet_name,
+        "header_row_number": header_row_number,
         "headers": headers,
         "review_rows": review_rows,
         "date_column": date_column,
         "description_column": description_column,
+        "memo_column": memo_column,
         "amount_column": amount_column,
         "debit_column": debit_column,
         "credit_column": credit_column,
+        "balance_column": balance_column,
         "entry_type_choices": FinancialEntry.ENTRY_TYPE_CHOICES,
         "properties": list(properties),
         "existing_entries": upload.entries.count(),
