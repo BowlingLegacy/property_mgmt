@@ -7547,6 +7547,72 @@ class LiveFlowTests(TestCase):
         self.assertEqual(entries[1].entry_type, "capital_expense")
         self.assertTrue(ExpenseCategory.objects.filter(name="Utilities").exists())
 
+    def test_bank_upload_review_uses_selected_header_and_memo_columns(self):
+        landlord = User.objects.create_user(
+            username="bank-review-landlord",
+            email="bank-review-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Bank Review Property", landlord_email=landlord.email)
+        csv_file = SimpleUploadedFile(
+            "august-bank.csv",
+            (
+                "Account Name : Rogue Business Checking Basic\n"
+                "Account Number : 1234\n"
+                "Date Range : 08/03/2026-08/31/2026\n"
+                "Transaction Number,Date,Description,Memo,Amount Debit,Amount Credit,Balance,Check Number\n"
+                'txn-1,08/07/2026,"Ext Withdrawal CHARTER COMM -",ONLINE PMT,-291.38,,900.00,\n'
+            ).encode("utf-8"),
+            content_type="text/csv",
+        )
+
+        self.client.login(username="bank-review-landlord", password="StrongPass123!")
+        upload_response = self.client.post(reverse("financial_upload"), {
+            "property": property_obj.id,
+            "ledger_scope": "bank",
+            "name": "August Bank Statement",
+            "file": csv_file,
+            "notes": "Rogue statement",
+        })
+
+        upload = FinancialUpload.objects.get(name="August Bank Statement")
+        review_url = reverse("bank_upload_review", args=[upload.id])
+        self.assertRedirects(upload_response, review_url)
+
+        response = self.client.get(review_url, {
+            "header_row_number": "4",
+            "date_column": "Date",
+            "description_column": "Description",
+            "memo_column": "Memo",
+            "debit_column": "Amount Debit",
+            "credit_column": "Amount Credit",
+            "balance_column": "Balance",
+        })
+
+        self.assertContains(response, "Ext Withdrawal CHARTER COMM - - ONLINE PMT")
+        post_response = self.client.post(review_url, {
+            "header_row_number": "4",
+            "date_column": "Date",
+            "description_column": "Description",
+            "memo_column": "Memo",
+            "debit_column": "Amount Debit",
+            "credit_column": "Amount Credit",
+            "balance_column": "Balance",
+            "row_action_5": "property",
+            "property_5": str(property_obj.id),
+            "entry_type_5": "operating_expense",
+            "category_5": "Internet",
+        })
+
+        self.assertRedirects(post_response, reverse("financial_upload"))
+        entry = FinancialEntry.objects.get(upload=upload)
+        self.assertEqual(entry.property_name, property_obj.name)
+        self.assertEqual(entry.entry_date.isoformat(), "2026-08-07")
+        self.assertEqual(entry.amount, Decimal("291.38"))
+        self.assertEqual(entry.description, "Ext Withdrawal CHARTER COMM - - ONLINE PMT")
+
     def test_duplicate_financial_upload_does_not_create_second_ledger_entry(self):
         landlord = User.objects.create_user(
             username="duplicate-upload-landlord",
