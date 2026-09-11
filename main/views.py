@@ -767,6 +767,14 @@ def bank_transaction_amount(row_data, amount_column="", debit_column="", credit_
     return Decimal("0.00")
 
 
+def bank_row_description(row_data, description_column="", memo_column=""):
+    description = str(row_data.get(description_column, "") or "").strip()
+    memo = str(row_data.get(memo_column, "") or "").strip()
+    if memo and memo != description:
+        return " - ".join(part.strip(" -") for part in [description, memo] if part.strip(" -"))
+    return description or memo
+
+
 def sms_provider_name():
     return getattr(settings, "SMS_PROVIDER", "twilio").lower()
 
@@ -7184,7 +7192,7 @@ def bank_upload_review(request, upload_id):
                 continue
 
             entry_date = parse_import_date(row_data.get(date_column))
-            description = str(row_data.get(description_column, "") or "").strip()
+            description = bank_row_description(row_data, description_column, memo_column)
             transaction_amount = bank_transaction_amount(row_data, amount_column, debit_column, credit_column)
             if transaction_amount == Decimal("0.00"):
                 skipped += 1
@@ -7293,7 +7301,7 @@ def bank_upload_review(request, upload_id):
     for row in rows[:100]:
         row_data = row["data"]
         amount = bank_transaction_amount(row_data, amount_column, debit_column, credit_column)
-        description = str(row_data.get(description_column, "") or "").strip()
+        description = bank_row_description(row_data, description_column, memo_column)
         review_rows.append({
             "row": row,
             "amount": amount,

@@ -7594,6 +7594,66 @@ class LiveFlowTests(TestCase):
             1,
         )
 
+    def test_bank_upload_review_uses_selected_header_and_memo_columns(self):
+        landlord = User.objects.create_user(
+            username="bank-review-landlord",
+            email="bank-review-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Bank Review Property", landlord_email=landlord.email)
+        csv_file = SimpleUploadedFile(
+            "rogue.csv",
+            (
+                "Account Name : Rogue Business Checking Basic\n"
+                "Account Number : 1234\n"
+                "Date Range : 08/03/2026-08/31/2026\n"
+                "Transaction Number,Date,Description,Memo,Amount Debit,Amount Credit,Balance,Check Number\n"
+                'txn-1,08/07/2026,"Ext Withdrawal CHARTER COMM -",ONLINE PMT,-291.38,,900.00,\n'
+            ).encode("utf-8"),
+            content_type="text/csv",
+        )
+        upload = FinancialUpload.objects.create(
+            property=property_obj,
+            ledger_scope="bank",
+            name="Rogue Bank Statement",
+            file=csv_file,
+        )
+
+        self.client.login(username="bank-review-landlord", password="StrongPass123!")
+        response = self.client.get(reverse("bank_upload_review", args=[upload.id]), {
+            "header_row_number": "4",
+            "date_column": "Date",
+            "description_column": "Description",
+            "memo_column": "Memo",
+            "debit_column": "Amount Debit",
+            "credit_column": "Amount Credit",
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ext Withdrawal CHARTER COMM - ONLINE PMT")
+
+        response = self.client.post(reverse("bank_upload_review", args=[upload.id]), {
+            "header_row_number": "4",
+            "date_column": "Date",
+            "description_column": "Description",
+            "memo_column": "Memo",
+            "amount_column": "",
+            "debit_column": "Amount Debit",
+            "credit_column": "Amount Credit",
+            "row_action_5": "company",
+            "entry_type_5": "operating_expense",
+            "category_5": "Internet",
+        })
+
+        self.assertRedirects(response, reverse("financial_upload"))
+        entry = FinancialEntry.objects.get(upload=upload)
+        self.assertEqual(entry.ledger_scope, "company")
+        self.assertEqual(entry.entry_date, date(2026, 8, 7))
+        self.assertEqual(entry.amount, Decimal("291.38"))
+        self.assertEqual(entry.description, "Ext Withdrawal CHARTER COMM - ONLINE PMT")
+
     def test_accounting_import_can_split_rent_utilities_and_deposits(self):
         landlord = User.objects.create_user(
             username="split-ledger-landlord",
