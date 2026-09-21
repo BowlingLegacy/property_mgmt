@@ -5715,35 +5715,42 @@ def payment_log(request):
         .values_list("id", flat=True)
     )
     payment_application_ids = active_resident_ids | real_former_resident_ids
-    completed_payments = (
+    completed_payments = list(
         Payment.objects
         .filter(application_id__in=payment_application_ids, status="completed")
-        .select_related("application", "application__property")
+        .order_by("application__property__name", "-created_at", "application__space_label", "application__full_name")
+    )
+    application_ids = {payment.application_id for payment in completed_payments}
+    applications = (
+        HousingApplication.objects
+        .filter(id__in=application_ids)
+        .select_related("property")
         .prefetch_related(
             Prefetch(
-                "application__payments",
+                "payments",
                 queryset=Payment.objects.filter(status="completed"),
                 to_attr="payment_log_completed_payments",
             ),
             Prefetch(
-                "application__rent_history",
+                "rent_history",
                 queryset=RentHistory.objects.order_by("-effective_date", "-id"),
                 to_attr="payment_log_rent_history",
             ),
             Prefetch(
-                "application__property__room_rents",
+                "property__room_rents",
                 queryset=PropertyRoomRent.objects.filter(is_active=True),
                 to_attr="payment_log_room_rents",
             ),
         )
-        .order_by("application__property__name", "-created_at", "application__space_label", "application__full_name")
     )
+    applications_by_id = {application.id: application for application in applications}
 
     grouped = OrderedDict()
     balance_cache = {}
 
     for payment in completed_payments:
-        application = payment.application
+        application = applications_by_id[payment.application_id]
+        payment.application = application
         payment.display_unit_label = canonical_room_label(application.space_label or application.space_type)
         payment.display_paid_at = payment.received_at or payment.created_at
         property_name = application.property.name if application.property else "No Property"
