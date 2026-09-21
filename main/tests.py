@@ -6013,6 +6013,53 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "Payment Query Resident")
         self.assertLessEqual(len(query_context), 12)
 
+    def test_utility_payment_correction_targets_only_unreferenced_58_cash_records(self):
+        import importlib
+        from django.apps import apps as django_apps
+
+        property_obj = Property.objects.create(name="The Painted Lady Inn")
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Utility Correction Resident",
+            phone="555-0199",
+            email="utility-correction@example.com",
+            age=45,
+            space_label="B",
+            monthly_rent=Decimal("506.00"),
+            utility_monthly=Decimal("55.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        incorrect_payment = Payment.objects.create(
+            application=resident,
+            payment_type="utility",
+            payment_method="cash",
+            amount=Decimal("58.00"),
+            status="completed",
+            service_month=date(2026, 1, 1),
+        )
+        referenced_payment = Payment.objects.create(
+            application=resident,
+            payment_type="utility",
+            payment_method="cash",
+            amount=Decimal("58.00"),
+            status="completed",
+            service_month=date(2026, 2, 1),
+            reference_number="verified-58-payment",
+        )
+
+        migration = importlib.import_module(
+            "main.migrations.0077_correct_painted_lady_58_utility_payments"
+        )
+        migration.correct_utility_payments(django_apps, None)
+
+        incorrect_payment.refresh_from_db()
+        referenced_payment.refresh_from_db()
+        self.assertEqual(incorrect_payment.amount, Decimal("55.00"))
+        self.assertIn("migration 0077", incorrect_payment.notes)
+        self.assertEqual(referenced_payment.amount, Decimal("58.00"))
+
     def test_rent_roll_lists_room_roster_before_profile_setup(self):
         landlord = User.objects.create_user(
             username="rent-roll-roster-landlord",
