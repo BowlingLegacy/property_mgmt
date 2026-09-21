@@ -5881,7 +5881,7 @@ class LiveFlowTests(TestCase):
 
         self.client.login(username="print-report-landlord", password="StrongPass123!")
         t12_response = self.client.get(reverse("t12_report"))
-        payment_response = self.client.get(reverse("payment_log"))
+        payment_response = self.client.get(f"{reverse('payment_log')}?month=all")
 
         self.assertContains(t12_response, "Print Report")
         self.assertContains(t12_response, "window.print()")
@@ -5925,13 +5925,17 @@ class LiveFlowTests(TestCase):
             )
 
         self.client.login(username="payment-month-order-landlord", password="StrongPass123!")
-        response = self.client.get(reverse("payment_log"))
+        response = self.client.get(f"{reverse('payment_log')}?month=all")
         months = response.context["payment_log"][0]["months"]
 
         self.assertEqual(
             [month["month_label"] for month in months],
             ["January 2026", "February 2026", "March 2026", "April 2026", "May 2026", "June 2026"],
         )
+
+        default_response = self.client.get(reverse("payment_log"))
+        self.assertTrue(default_response.context["month_filter_active"])
+        self.assertEqual(default_response.context["selected_month"], timezone.localdate().replace(day=1))
 
         filtered_response = self.client.get(f"{reverse('payment_log')}?month=2026-05")
         filtered_groups = filtered_response.context["payment_log"][0]["months"]
@@ -6013,7 +6017,7 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "Payment Query Resident")
         self.assertLessEqual(len(query_context), 12)
 
-    def test_utility_payment_correction_targets_only_unreferenced_58_cash_records(self):
+    def test_utility_payment_correction_is_restored_by_followup_migration(self):
         import importlib
         from django.apps import apps as django_apps
 
@@ -6054,10 +6058,16 @@ class LiveFlowTests(TestCase):
         )
         migration.correct_utility_payments(django_apps, None)
 
+        restore_migration = importlib.import_module(
+            "main.migrations.0078_restore_painted_lady_58_utility_payments"
+        )
+        restore_migration.restore_utility_payments(django_apps, None)
+
         incorrect_payment.refresh_from_db()
         referenced_payment.refresh_from_db()
-        self.assertEqual(incorrect_payment.amount, Decimal("55.00"))
+        self.assertEqual(incorrect_payment.amount, Decimal("58.00"))
         self.assertIn("migration 0077", incorrect_payment.notes)
+        self.assertIn("migration 0078", incorrect_payment.notes)
         self.assertEqual(referenced_payment.amount, Decimal("58.00"))
 
     def test_rent_roll_lists_room_roster_before_profile_setup(self):

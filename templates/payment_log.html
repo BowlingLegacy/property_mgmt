@@ -171,7 +171,7 @@
                 <a href="{% url 'payment_log' %}?month={{ previous_month|date:'Y-m' }}" class="btn btn-outline-primary">
                     Previous Month
                 </a>
-                <a href="{% url 'payment_log' %}" class="btn btn-outline-dark">
+                <a href="{% url 'payment_log' %}?month=all" class="btn btn-outline-dark">
                     All Months
                 </a>
                 <a href="{% url 'payment_log' %}?month={{ next_month|date:'Y-m' }}" class="btn btn-outline-primary">

@@ -5703,8 +5703,9 @@ Replying to this email will go to the resident's email address. To keep the conv
 @user_passes_test(staff_required)
 def payment_log(request):
     raw_month = (request.GET.get("month") or "").strip()
-    month_filter_active = bool(raw_month)
-    selected_month = selected_report_month(request) if month_filter_active else None
+    show_all_months = raw_month.lower() == "all"
+    month_filter_active = not show_all_months
+    selected_month = None if show_all_months else selected_report_month(request)
     previous_month = add_months(selected_month, -1) if selected_month else None
     next_month = add_months(selected_month, 1) if selected_month else None
     active_resident_ids = set(active_staff_managed_resident_files(request.user).values_list("id", flat=True))
