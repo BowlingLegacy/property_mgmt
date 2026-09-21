@@ -102,6 +102,11 @@
 </head>
 
 <body>
+{% if demo_mode %}
+<div class="alert alert-warning rounded-0 text-center fw-bold mb-0" role="alert">
+    Demo Mode: sample data resets automatically. Do not enter real resident, owner, payment, or banking information.
+</div>
+{% endif %}
 <header class="site-header py-3">
     <div class="container d-flex justify-content-between align-items-center flex-wrap gap-3">
         <a class="brand-lockup d-flex align-items-center" href="/">
@@ -122,6 +127,18 @@
         </nav>
     </div>
 </header>
+
+{% if painted_lady_profile_open %}
+<section class="resident-start">
+    <div class="container">
+        <div>
+            <div class="resident-start-title">Already live at The Painted Lady Inn?</div>
+            <p class="resident-start-copy">Set up your resident profile and request portal access.</p>
+        </div>
+        <a class="resident-start-btn" href="{% url 'existing_resident_intake' painted_lady_profile_property.id %}">Set Up My Profile</a>
+    </div>
+</section>
+{% endif %}
 
 <section class="hero-section">
     <div class="container">

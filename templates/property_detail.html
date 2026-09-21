@@ -275,6 +275,15 @@
         <p class="text-muted mb-0">Safe, stable, dignified housing with structure, respect, and community.</p>
     </section>
 
+    {% if existing_resident_intake_open %}
+    <section class="existing-resident-callout mb-4">
+        <div class="eyebrow">Existing Resident Profile</div>
+        <h2 class="card-title">Already live at {{ property.name }}?</h2>
+        <p class="text-muted">Set up your resident profile and request portal access.</p>
+        <a class="gold-btn" href="{% url 'existing_resident_intake' property.id %}">Set Up My Profile</a>
+    </section>
+    {% endif %}
+
     <div class="row g-4">
         <div class="col-lg-8">
             {% if property.photo %}

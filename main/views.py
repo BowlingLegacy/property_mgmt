@@ -26,7 +26,7 @@ from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.management import call_command
 from django.core.mail import EmailMessage, send_mail
-from django.db.models import Count, Max, Q, Sum
+from django.db.models import Count, Max, Prefetch, Q, Sum
 from django.http import Http404, JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
@@ -1166,12 +1166,18 @@ def historical_rent_for_month(application, month_start):
     ):
         return Decimal("600.00")
     month_end = date(month_start.year, month_start.month, calendar.monthrange(month_start.year, month_start.month)[1])
-    history = (
-        application.rent_history
-        .filter(effective_date__lte=month_end)
-        .order_by("-effective_date", "-id")
-        .first()
-    )
+    if hasattr(application, "payment_log_rent_history"):
+        history = next(
+            (item for item in application.payment_log_rent_history if item.effective_date <= month_end),
+            None,
+        )
+    else:
+        history = (
+            application.rent_history
+            .filter(effective_date__lte=month_end)
+            .order_by("-effective_date", "-id")
+            .first()
+        )
     return history.rent_amount if history else configured_monthly_rent(application)
 
 
@@ -2968,7 +2974,6 @@ def landlord_application_folder(request, folder):
 
     applications = HousingApplication.objects.select_related("property", "user").filter(
         property__in=staff_managed_properties(request.user),
-        user__isnull=True,
     )
     if folder == "reviewed":
         applications = applications.filter(
@@ -3467,7 +3472,11 @@ def find_room_rent_setting(property_obj, room_unit_label):
         return None
 
     target_label = normalized_room_label(room_unit_label)
-    for setting in PropertyRoomRent.objects.filter(property=property_obj, is_active=True):
+    if hasattr(property_obj, "payment_log_room_rents"):
+        room_rents = property_obj.payment_log_room_rents
+    else:
+        room_rents = PropertyRoomRent.objects.filter(property=property_obj, is_active=True)
+    for setting in room_rents:
         if normalized_room_label(setting.room_unit_label) == target_label:
             return setting
     return None
@@ -5710,10 +5719,28 @@ def payment_log(request):
         Payment.objects
         .filter(application_id__in=payment_application_ids, status="completed")
         .select_related("application", "application__property")
+        .prefetch_related(
+            Prefetch(
+                "application__payments",
+                queryset=Payment.objects.filter(status="completed"),
+                to_attr="payment_log_completed_payments",
+            ),
+            Prefetch(
+                "application__rent_history",
+                queryset=RentHistory.objects.order_by("-effective_date", "-id"),
+                to_attr="payment_log_rent_history",
+            ),
+            Prefetch(
+                "application__property__room_rents",
+                queryset=PropertyRoomRent.objects.filter(is_active=True),
+                to_attr="payment_log_room_rents",
+            ),
+        )
         .order_by("application__property__name", "-created_at", "application__space_label", "application__full_name")
     )
 
     grouped = OrderedDict()
+    balance_cache = {}
 
     for payment in completed_payments:
         application = payment.application
@@ -5724,21 +5751,30 @@ def payment_log(request):
         if selected_month and accounting_month != selected_month:
             continue
         month_label = accounting_month.strftime("%B %Y")
-        application_payments = list(application.payments.filter(status="completed"))
-        payment.display_rent_balance = max(
-            expected_rent_for_month(application, accounting_month)
-            - payment_amount_for_month(application_payments, accounting_month.year, accounting_month.month, ["rent"]),
-            Decimal("0.00"),
-        )
-        payment.display_utility_balance = max(
-            expected_utility_for_month(application, accounting_month)
-            - payment_amount_for_month(application_payments, accounting_month.year, accounting_month.month, ["utility"]),
-            Decimal("0.00"),
-        )
-        payment.display_deposit_due = max(
-            application.deposit_required - application.deposit_paid,
-            Decimal("0.00"),
-        )
+        balance_key = (application.id, accounting_month)
+        if balance_key not in balance_cache:
+            application_payments = application.payment_log_completed_payments
+            balance_cache[balance_key] = (
+                max(
+                    expected_rent_for_month(application, accounting_month)
+                    - payment_amount_for_month(application_payments, accounting_month.year, accounting_month.month, ["rent"]),
+                    Decimal("0.00"),
+                ),
+                max(
+                    expected_utility_for_month(application, accounting_month)
+                    - payment_amount_for_month(application_payments, accounting_month.year, accounting_month.month, ["utility"]),
+                    Decimal("0.00"),
+                ),
+                max(
+                    application.deposit_required - application.deposit_paid,
+                    Decimal("0.00"),
+                ),
+            )
+        (
+            payment.display_rent_balance,
+            payment.display_utility_balance,
+            payment.display_deposit_due,
+        ) = balance_cache[balance_key]
 
         grouped.setdefault(property_name, OrderedDict())
         grouped[property_name].setdefault(month_label, {

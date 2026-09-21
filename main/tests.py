@@ -10,8 +10,10 @@ from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db import connection
 from django.db.models import Sum
 from django.test import RequestFactory, TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
@@ -89,7 +91,7 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "$55")
         self.assertContains(response, "phone-input")
         self.assertContains(response, "formatPhoneInput")
-        self.assertContains(response, "Selfie With Today&#x27;s Date")
+        self.assertContains(response, "Selfie With Today's Date")
         self.assertContains(response, "Do you drive or own a car/truck?")
 
     def test_applicant_review_summary_identifies_strong_candidate(self):
@@ -364,7 +366,7 @@ class LiveFlowTests(TestCase):
         self.assertEqual(application.user.username, "resident")
         self.assertFalse(User.objects.filter(id=temp_user.id).exists())
 
-    def test_invite_code_expires_after_30_minutes(self):
+    def test_invite_code_expires_after_48_hours(self):
         temp_user = User.objects.create_user(
             username="expired-applicant",
             email="expired@example.com",
@@ -372,7 +374,7 @@ class LiveFlowTests(TestCase):
             role="tenant",
         )
         temp_user.refresh_invite_code()
-        temp_user.invite_code_created_at = timezone.now() - timezone.timedelta(minutes=31)
+        temp_user.invite_code_created_at = timezone.now() - timezone.timedelta(hours=49)
         temp_user.save(update_fields=["invite_code_created_at"])
         HousingApplication.objects.create(
             user=temp_user,
@@ -1281,6 +1283,7 @@ class LiveFlowTests(TestCase):
             space_label="Room O",
             monthly_rent=Decimal("506.00"),
             utility_monthly=Decimal("0.00"),
+            deposit_paid=Decimal("450.00"),
         )
         Payment.objects.create(
             application=application,
@@ -1599,13 +1602,13 @@ class LiveFlowTests(TestCase):
         self.assertContains(payment_log, "June 2026")
         self.assertContains(payment_log, "Unit")
         self.assertContains(payment_log, "Date/Time")
-        self.assertContains(payment_log, "Rent Balance")
+        self.assertContains(payment_log, "Rent Due")
         self.assertNotContains(payment_log, "Room / Unit")
         self.assertNotContains(payment_log, "Date / Time Paid")
         self.assertNotContains(payment_log, "Rent Balance Owed")
         self.assertNotContains(payment_log, "<th>Description</th>", html=True)
         self.assertNotContains(payment_log, "<th>Reference</th>", html=True)
-        self.assertNotContains(payment_log, "CASH-JUNE")
+        self.assertContains(payment_log, "CASH-JUNE")
 
     def test_multi_month_payment_is_allocated_across_reporting_months(self):
         application = HousingApplication.objects.create(
@@ -2085,7 +2088,7 @@ class LiveFlowTests(TestCase):
         resident_message.refresh_from_db()
         self.assertEqual(resident_message.status, "closed")
         self.assertFalse(ResidentMessageReply.objects.filter(message=resident_message).exists())
-        self.assertIn(reverse("resident_requests"), sms_log.body)
+        self.assertFalse(SmsMessageLog.objects.filter(resident_message=resident_message).exists())
 
     def test_landlord_cannot_reply_to_other_property_message(self):
         landlord = User.objects.create_user(
@@ -3022,6 +3025,7 @@ class LiveFlowTests(TestCase):
             housing_need="Application approved.",
             space_type="Room",
             space_label="Y",
+            landlord_reviewed_at=timezone.now(),
             monthly_rent=Decimal("700.00"),
             balance=Decimal("700.00"),
         )
@@ -4596,6 +4600,7 @@ class LiveFlowTests(TestCase):
             income_source="Employment",
             monthly_income=Decimal("2500.00"),
             housing_need="Current resident.",
+            space_label="A",
         )
         other_application = HousingApplication.objects.create(
             property=other_property,
@@ -5103,6 +5108,7 @@ class LiveFlowTests(TestCase):
             space_label="A",
             monthly_rent=Decimal("500.00"),
             utility_monthly=Decimal("66.00"),
+            deposit_paid=Decimal("450.00"),
             income_source="Employment",
             monthly_income=Decimal("2500.00"),
             housing_need="Current resident.",
@@ -5120,6 +5126,7 @@ class LiveFlowTests(TestCase):
             lease_start_date=date(2026, 7, 3),
             move_in_rent_charge=Decimal("456.06"),
             move_in_utility_charge=Decimal("50.45"),
+            deposit_paid=Decimal("450.00"),
             income_source="Employment",
             monthly_income=Decimal("2500.00"),
             housing_need="Current resident.",
@@ -5332,7 +5339,7 @@ class LiveFlowTests(TestCase):
         self.assertEqual(status_response.status_code, 200)
         self.assertEqual(status_response.context["completed_count"], 1)
         self.assertEqual(status_response.context["not_completed_count"], 0)
-        self.assertContains(status_response, "Completed Resident")
+        self.assertContains(status_response, "Completed Setup Resident")
         self.assertContains(status_response, "Completed")
 
     def test_resident_setup_status_prefers_active_resident_over_old_roster_entry(self):
@@ -5945,6 +5952,67 @@ class LiveFlowTests(TestCase):
         self.assertIn("May 2026", csv_content)
         self.assertNotIn("January 2026", csv_content)
 
+    def test_payment_log_query_count_does_not_scale_with_payment_rows(self):
+        landlord = User.objects.create_user(
+            username="payment-log-query-landlord",
+            email="payment-log-query@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Payment Query Property", landlord_email=landlord.email)
+        PropertyRoomRent.objects.create(
+            property=property_obj,
+            room_unit_label="A",
+            monthly_rent=Decimal("650.00"),
+            utility_monthly=Decimal("55.00"),
+        )
+        resident_user = User.objects.create_user(
+            username="payment-log-query-resident",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=resident_user,
+            full_name="Payment Query Resident",
+            phone="555-0712",
+            email="payment-query-resident@example.com",
+            age=45,
+            space_label="A",
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+        RentHistory.objects.create(
+            application=resident,
+            rent_amount=Decimal("650.00"),
+            effective_date=date(2026, 1, 1),
+        )
+        for month in range(1, 13):
+            Payment.objects.create(
+                application=resident,
+                payment_type="rent",
+                amount=Decimal("650.00"),
+                status="completed",
+                service_month=date(2026, month, 1),
+            )
+            Payment.objects.create(
+                application=resident,
+                payment_type="utility",
+                amount=Decimal("55.00"),
+                status="completed",
+                service_month=date(2026, month, 1),
+            )
+
+        self.client.login(username="payment-log-query-landlord", password="StrongPass123!")
+        with CaptureQueriesContext(connection) as query_context:
+            response = self.client.get(reverse("payment_log"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Payment Query Resident")
+        self.assertLessEqual(len(query_context), 12)
+
     def test_rent_roll_lists_room_roster_before_profile_setup(self):
         landlord = User.objects.create_user(
             username="rent-roll-roster-landlord",
@@ -5983,7 +6051,8 @@ class LiveFlowTests(TestCase):
         )
 
         self.client.login(username="rent-roll-roster-landlord", password="StrongPass123!")
-        response = self.client.get(f"{reverse('rent_roll')}?month=2026-05")
+        current_month = timezone.localdate().strftime("%Y-%m")
+        response = self.client.get(f"{reverse('rent_roll')}?month={current_month}")
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Michael Dudley")
@@ -6202,6 +6271,7 @@ class LiveFlowTests(TestCase):
             move_in_rent_charge=Decimal("104.84"),
             utility_monthly=Decimal("55.00"),
             move_in_utility_charge=Decimal("8.87"),
+            deposit_paid=Decimal("450.00"),
             income_source="Employment",
             monthly_income=Decimal("2500.00"),
             housing_need="Current resident.",
@@ -6333,6 +6403,8 @@ class LiveFlowTests(TestCase):
             phone="5550113344",
             email="report-resident@example.com",
             age=51,
+            space_label="A",
+            landlord_reviewed_at=timezone.now(),
             income_source="Employment",
             monthly_income=Decimal("2500.00"),
             housing_need="Current resident.",
@@ -6343,6 +6415,8 @@ class LiveFlowTests(TestCase):
             phone="5550113355",
             email="hidden-resident@example.com",
             age=52,
+            space_label="B",
+            landlord_reviewed_at=timezone.now(),
             income_source="Employment",
             monthly_income=Decimal("2500.00"),
             housing_need="Current resident.",
@@ -6449,6 +6523,8 @@ class LiveFlowTests(TestCase):
             phone="5550114455",
             email="owned-resident@example.com",
             age=51,
+            space_label="A",
+            landlord_reviewed_at=timezone.now(),
             income_source="Employment",
             monthly_income=Decimal("2500.00"),
             housing_need="Current resident.",
@@ -6459,6 +6535,8 @@ class LiveFlowTests(TestCase):
             phone="5550114466",
             email="different-owner-resident@example.com",
             age=52,
+            space_label="B",
+            landlord_reviewed_at=timezone.now(),
             income_source="Employment",
             monthly_income=Decimal("2500.00"),
             housing_need="Current resident.",
@@ -6564,8 +6642,8 @@ class LiveFlowTests(TestCase):
         self.assertTrue(Property.objects.filter(name="Pine Street Villas").exists())
         self.assertTrue(Property.objects.filter(name="Harbor View Senior Living").exists())
         self.assertEqual(Property.objects.count(), 4)
-        self.assertEqual(HousingApplication.objects.filter(property__name="Demo Ridge Apartments").count(), 4)
-        self.assertEqual(HousingApplication.objects.count(), 13)
+        self.assertEqual(HousingApplication.objects.filter(property__name="Demo Ridge Apartments").count(), 12)
+        self.assertEqual(HousingApplication.objects.count(), 36)
         self.assertTrue(Payment.objects.filter(application__property__name="Demo Ridge Apartments", status="completed").exists())
         self.assertTrue(Payment.objects.filter(application__property__name="Cedar Market Lofts", status="completed").exists())
         self.assertTrue(FinancialEntry.objects.filter(property_name="Demo Ridge Apartments").exists())
@@ -6880,9 +6958,6 @@ class LiveFlowTests(TestCase):
         property_obj = Property.objects.create(
             name="Statement Supported Property",
             address="1005 W Main St",
-            city="Medford",
-            state="OR",
-            zip_code="97501",
         )
 
         preview = StringIO()
@@ -7593,6 +7668,80 @@ class LiveFlowTests(TestCase):
             ).count(),
             1,
         )
+
+    def test_bank_review_posts_split_from_manually_selected_header_row(self):
+        landlord = User.objects.create_user(
+            username="bank-split-landlord",
+            email="bank-split-landlord@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Bank Split Property", landlord_email=landlord.email)
+        csv_file = SimpleUploadedFile(
+            "rogue-august.csv",
+            (
+                b"Account Name : Rogue Business Checking Basic\n"
+                b"Account Number : 1234\n"
+                b"Date Range : 08/03/2026-08/31/2026\n"
+                b"Transaction Number,Date,Description,Memo,Amount Debit,Amount Credit,Balance,Check Number\n"
+                b'txn-1,08/07/2026,"Ext Withdrawal CHARTER COMM -",ONLINE PMT,-291.38,,900.00,\n'
+            ),
+            content_type="text/csv",
+        )
+        upload = FinancialUpload.objects.create(
+            property=property_obj,
+            ledger_scope="bank",
+            name="August Rogue Bank",
+            file=csv_file,
+        )
+
+        self.client.login(username="bank-split-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("bank_upload_review", args=[upload.id]), {
+            "sheet_name": "CSV",
+            "header_row_number": "4",
+            "date_column": "Date",
+            "description_column": "Description",
+            "amount_column": "",
+            "debit_column": "Amount Debit",
+            "credit_column": "Amount Credit",
+            "row_action_5": "split",
+            "split_amount_5_1": "200.00",
+            "split_scope_5_1": "property",
+            "split_property_5_1": str(property_obj.id),
+            "split_entry_type_5_1": "operating_expense",
+            "split_category_5_1": "Internet",
+            "split_description_5_1": "Charter property internet",
+            "split_amount_5_2": "91.38",
+            "split_scope_5_2": "company",
+            "split_entry_type_5_2": "operating_expense",
+            "split_category_5_2": "Office Internet",
+            "split_description_5_2": "Charter company internet",
+        })
+
+        self.assertRedirects(response, reverse("financial_upload"))
+        upload.refresh_from_db()
+        self.assertIsNotNone(upload.parsed_at)
+        entries = FinancialEntry.objects.filter(upload=upload).order_by("category")
+        self.assertEqual(entries.count(), 2)
+        self.assertTrue(entries.filter(
+            ledger_scope="property",
+            property_name=property_obj.name,
+            row_number=5,
+            entry_date=date(2026, 8, 7),
+            category="Internet",
+            description="Charter property internet",
+            amount=Decimal("200.00"),
+        ).exists())
+        self.assertTrue(entries.filter(
+            ledger_scope="company",
+            property_name="",
+            row_number=5,
+            entry_date=date(2026, 8, 7),
+            category="Office Internet",
+            description="Charter company internet",
+            amount=Decimal("91.38"),
+        ).exists())
 
     def test_accounting_import_can_split_rent_utilities_and_deposits(self):
         landlord = User.objects.create_user(
