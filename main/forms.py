@@ -984,12 +984,21 @@ class ManualPaymentForm(forms.ModelForm):
             .select_related("property")
             .order_by("property__name", "space_label", "full_name")
         )
+        self.fields["application"].label_from_instance = self.resident_label
         self.fields["service_credit_category"].queryset = ExpenseCategory.objects.filter(
             entry_type="operating_expense", is_active=True,
         ).order_by("name")
         self.fields["service_credit_category"].initial = ExpenseCategory.objects.filter(
             name__iexact="Cleaning Labor", entry_type="operating_expense", is_active=True,
         ).first()
+
+    @staticmethod
+    def resident_label(application):
+        property_name = application.property.name if application.property else "No property"
+        space_type = application.space_type or "Unit"
+        space = f"{space_type} {application.space_label}" if application.space_label else "No unit"
+        email = application.email or "No email"
+        return f"{application.full_name} — {property_name} — {space} — {email} — File #{application.pk}"
 
     def clean(self):
         cleaned_data = super().clean()
