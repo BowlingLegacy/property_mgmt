@@ -30,6 +30,14 @@ def get_item(mapping, key):
 
 
 @register.filter
+def money(value):
+    try:
+        return f"{value:,.2f}"
+    except (TypeError, ValueError):
+        return "0.00"
+
+
+@register.filter
 def statement_money(value):
     try:
         if value < 0:

@@ -1,6 +1,7 @@
 from decimal import Decimal
 from datetime import date, datetime
 from io import BytesIO, StringIO
+import importlib
 import json
 from urllib.error import HTTPError
 from unittest.mock import patch
@@ -17,8 +18,9 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
+from .forms import ManualPaymentForm
 from .models import AccountingReceipt, AccountingReceiptSplit, ApplicantDocument, BlogComment, BlogPost, CompanyMailboxConnection, CurrentResidentRosterEntry, ExistingResidentIntake, ExpenseCategory, FinancialEntry, FinancialUpload, HousingApplication, LandlordIntake, Payment, Property, PropertyOnboardingDocument, PropertyOwnerIntake, PropertyRoomRent, RentHistory, ResidentBalanceEntry, ResidentMessage, ResidentMessageReply, SignedDocument, SmsMessageLog, User, VendorCategoryRule
-from .views import applicant_review_summary, apply_completed_payment_to_balance, current_month_bounds, ensure_existing_resident_portal_application, monthly_collection_watch_rows, payment_amount_for_month, prorated_monthly_charge, rent_roll_rows_for_properties, send_sms_message, t12_report_rows
+from .views import applicant_review_summary, apply_completed_payment_to_balance, current_month_bounds, ensure_existing_resident_portal_application, monthly_collection_watch_rows, payment_amount_for_month, prorated_monthly_charge, rent_roll_rows_for_properties, resident_portal_rent_due, resident_portal_utility_due, send_sms_message, t12_report_rows
 
 
 @override_settings(
@@ -33,6 +35,775 @@ from .views import applicant_review_summary, apply_completed_payment_to_balance,
     STATICFILES_STORAGE="django.contrib.staticfiles.storage.StaticFilesStorage",
 )
 class LiveFlowTests(TestCase):
+    @patch("main.views.timezone.localdate", return_value=date(2026, 8, 11))
+    def test_collection_watch_includes_mitchells_unpaid_deposit(self, _mock_localdate):
+        property_obj = Property.objects.create(name="Mitchell Deposit Property")
+        resident = HousingApplication.objects.create(
+            property=property_obj, full_name="Mitchell Brent", phone="555-0136", age=50,
+            space_label="G", monthly_rent=Decimal("650.00"), utility_monthly=Decimal("55.00"),
+            deposit_required=Decimal("450.00"), deposit_paid=Decimal("0.00"),
+            income_source="Employment", monthly_income=Decimal("2500.00"), housing_need="Current resident.",
+        )
+        Payment.objects.create(
+            application=resident, payment_type="rent", amount=Decimal("650.00"),
+            status="completed", service_month=date(2026, 8, 1),
+        )
+        Payment.objects.create(
+            application=resident, payment_type="utility", amount=Decimal("55.00"),
+            status="completed", service_month=date(2026, 8, 1),
+        )
+
+        row = monthly_collection_watch_rows([resident])[0]
+
+        self.assertEqual(row["missing"], "Deposit")
+        self.assertEqual(row["rent_due"], Decimal("0.00"))
+        self.assertEqual(row["utility_due"], Decimal("0.00"))
+        self.assertEqual(row["deposit_due"], Decimal("450.00"))
+
+    def test_payment_log_shows_chris_monthly_rent_and_utility_due(self):
+        landlord = User.objects.create_user(
+            username="chris-payment-log-landlord", email="chris-log@example.com",
+            password="StrongPass123!", role="landlord", is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Chris Payment Log Property", landlord_email=landlord.email)
+        resident = HousingApplication.objects.create(
+            property=property_obj, full_name="Chris Honey", phone="555-0137", age=50,
+            space_label="Q", monthly_rent=Decimal("600.00"), utility_monthly=Decimal("55.00"),
+            deposit_required=Decimal("90.00"), deposit_paid=Decimal("90.00"),
+            income_source="Employment", monthly_income=Decimal("2500.00"), housing_need="Current resident.",
+        )
+        Payment.objects.create(
+            application=resident, payment_type="rent", amount=Decimal("550.00"),
+            status="completed", service_month=date(2026, 8, 1),
+        )
+
+        self.client.login(username="chris-payment-log-landlord", password="StrongPass123!")
+        response = self.client.get(f"{reverse('payment_log')}?month=2026-08")
+        payment = response.context["payment_log"][0]["months"][0]["payment_groups"][0]["payments"][0]
+
+        self.assertEqual(payment.display_rent_balance, Decimal("50.00"))
+        self.assertEqual(payment.display_utility_balance, Decimal("55.00"))
+        self.assertEqual(payment.display_deposit_due, Decimal("0.00"))
+        self.assertContains(response, "Rent Due")
+        self.assertContains(response, "Utilities Due")
+
+    def test_chris_a_honey_august_rent_is_completed_without_crediting_utilities(self):
+        property_obj = Property.objects.create(name="Chris Paid In Full Property")
+        resident = HousingApplication.objects.create(
+            property=property_obj, full_name="Chris A Honey", phone="555-0135", age=50,
+            space_label="Q", monthly_rent=Decimal("600.00"), utility_monthly=Decimal("55.00"),
+            balance=Decimal("25.00"), utility_balance=Decimal("55.00"),
+            deposit_required=Decimal("90.00"), deposit_paid=Decimal("90.00"),
+            income_source="Employment", monthly_income=Decimal("2500.00"), housing_need="Current resident.",
+        )
+        Payment.objects.create(
+            application=resident, payment_type="rent", payment_method="cash",
+            amount=Decimal("575.00"), status="completed", service_month=date(2026, 8, 1),
+        )
+
+        migration = importlib.import_module("main.migrations.0073_complete_chris_honey_august_rent")
+        from django.apps import apps as django_apps
+        migration.complete_chris_august_rent(django_apps, None)
+        migration.complete_chris_august_rent(django_apps, None)
+        resident.refresh_from_db()
+
+        rent_paid = Payment.objects.filter(
+            application=resident, payment_type="rent", service_month=date(2026, 8, 1), status="completed",
+        ).aggregate(total=Sum("amount"))["total"]
+        utility_paid = Payment.objects.filter(
+            application=resident, payment_type="utility", service_month=date(2026, 8, 1), status="completed",
+        ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        self.assertEqual(rent_paid, Decimal("600.00"))
+        self.assertEqual(utility_paid, Decimal("0.00"))
+        self.assertEqual(resident.balance, Decimal("0.00"))
+        self.assertEqual(resident.utility_balance, Decimal("55.00"))
+        self.assertEqual(resident.deposit_paid, Decimal("90.00"))
+
+    def test_owner_spaces_are_excluded_from_current_and_historical_rent_rolls(self):
+        admin_user = User.objects.create_superuser("owner-roll-admin", "owner-roll@example.com", "pass")
+        property_obj = Property.objects.create(name="Owner Exclusion Property")
+        PropertyRoomRent.objects.create(
+            property=property_obj, room_unit_label="OWNER",
+            monthly_rent=Decimal("1000.00"), utility_monthly=Decimal("55.00"),
+        )
+        HousingApplication.objects.create(
+            property=property_obj, user=admin_user, full_name="Property Owner", phone="555-0134", age=50,
+            space_label="OWNER", monthly_rent=Decimal("1000.00"), utility_monthly=Decimal("55.00"),
+            income_source="Owner", monthly_income=Decimal("0.00"), housing_need="Owner space.",
+        )
+        CurrentResidentRosterEntry.objects.create(
+            property=property_obj, first_name="Property", last_name="Owner", room_unit_label="OWNER",
+        )
+        from .models import RentRollSnapshot
+        RentRollSnapshot.objects.create(
+            property=property_obj, service_month=date(2026, 6, 1), room_unit_label="OWNER",
+            resident_name="Property Owner", monthly_rent=Decimal("1000.00"), rent_charge=Decimal("1000.00"),
+        )
+
+        migration = importlib.import_module("main.migrations.0072_remove_owner_from_all_rent_roll_snapshots")
+        from django.apps import apps as django_apps
+        migration.remove_owner_snapshots(django_apps, None)
+
+        current_rows = rent_roll_rows_for_properties(
+            admin_user, date(2026, 8, 1), Property.objects.filter(id=property_obj.id),
+        )
+        historical_rows = rent_roll_rows_for_properties(
+            admin_user, date(2026, 6, 1), Property.objects.filter(id=property_obj.id),
+        )
+        self.assertEqual(current_rows, [])
+        self.assertEqual(historical_rows, [])
+        self.assertFalse(RentRollSnapshot.objects.filter(property=property_obj, room_unit_label="OWNER").exists())
+
+    def test_aaron_brown_gets_55_july_utility_cleaning_credit(self):
+        property_obj = Property.objects.create(name="Aaron Cleaning Utility Credit Property")
+        resident = HousingApplication.objects.create(
+            property=property_obj, full_name="Aaron Brian Brown", phone="555-0133", age=50,
+            space_label="N", monthly_rent=Decimal("650.00"), utility_monthly=Decimal("55.00"),
+            balance=Decimal("300.00"), utility_balance=Decimal("55.00"),
+            deposit_required=Decimal("450.00"), deposit_paid=Decimal("0.00"),
+            income_source="Employment", monthly_income=Decimal("2500.00"), housing_need="Current resident.",
+        )
+
+        migration = importlib.import_module("main.migrations.0071_record_aaron_july_cleaning_utility_credit")
+        from django.apps import apps as django_apps
+        migration.record_aaron_cleaning_utility_credit(django_apps, None)
+        migration.record_aaron_cleaning_utility_credit(django_apps, None)
+        resident.refresh_from_db()
+
+        credit = Payment.objects.get(
+            application=resident, payment_type="utility",
+            payment_method="service_credit", service_month=date(2026, 7, 1),
+        )
+        expense = FinancialEntry.objects.get(
+            property_name=property_obj.name, sheet_name="Service Credits", row_number=credit.id,
+        )
+        self.assertEqual(credit.amount, Decimal("55.00"))
+        self.assertEqual(credit.description, "July utilities credit for cleaning labor")
+        self.assertEqual(resident.utility_balance, Decimal("0.00"))
+        self.assertEqual(resident.balance, Decimal("300.00"))
+        self.assertEqual(resident.deposit_paid, Decimal("0.00"))
+        self.assertEqual(expense.entry_type, "operating_expense")
+        self.assertEqual(expense.category, "Cleaning Labor")
+        self.assertEqual(expense.amount, Decimal("55.00"))
+        self.assertEqual(expense.month, 7)
+
+    def test_aaron_brown_gets_300_july_rent_credit_and_maintenance_expense(self):
+        property_obj = Property.objects.create(name="Aaron Maintenance Credit Property")
+        resident = HousingApplication.objects.create(
+            property=property_obj, full_name="Aaron Brian Brown", phone="555-0132", age=50,
+            space_label="N", monthly_rent=Decimal("650.00"), utility_monthly=Decimal("55.00"),
+            balance=Decimal("600.00"), deposit_required=Decimal("450.00"), deposit_paid=Decimal("0.00"),
+            income_source="Employment", monthly_income=Decimal("2500.00"), housing_need="Current resident.",
+        )
+
+        migration = importlib.import_module("main.migrations.0070_record_aaron_july_maintenance_credit")
+        from django.apps import apps as django_apps
+        migration.record_aaron_maintenance_credit(django_apps, None)
+        migration.record_aaron_maintenance_credit(django_apps, None)
+        resident.refresh_from_db()
+
+        credit = Payment.objects.get(
+            application=resident, payment_method="service_credit", service_month=date(2026, 7, 1),
+        )
+        expense = FinancialEntry.objects.get(
+            property_name=property_obj.name, sheet_name="Service Credits", row_number=credit.id,
+        )
+        self.assertEqual(credit.payment_type, "rent")
+        self.assertEqual(credit.amount, Decimal("300.00"))
+        self.assertEqual(credit.description, "July rent credit for maintenance labor")
+        self.assertEqual(resident.balance, Decimal("300.00"))
+        self.assertEqual(resident.deposit_paid, Decimal("0.00"))
+        self.assertEqual(expense.entry_type, "operating_expense")
+        self.assertEqual(expense.category, "Maintenance Labor")
+        self.assertEqual(expense.amount, Decimal("300.00"))
+        self.assertEqual(expense.month, 7)
+
+    @patch("main.views.timezone.localdate", return_value=date(2026, 8, 7))
+    def test_cleaning_space_is_excluded_from_collection_watch(self, _localdate):
+        property_obj = Property.objects.create(name="Non Rentable Cleaning Property")
+        cleaning = HousingApplication.objects.create(
+            property=property_obj, full_name="Cleaning Space", phone="555-0130", age=50,
+            space_label="CLEANING", monthly_rent=Decimal("555.00"), utility_monthly=Decimal("0.00"),
+            income_source="Services", monthly_income=Decimal("0.00"), housing_need="Non-rentable service space.",
+        )
+        self.assertEqual(monthly_collection_watch_rows([cleaning]), [])
+
+    def test_service_credit_reduces_rent_creates_expense_and_does_not_change_deposit(self):
+        landlord = User.objects.create_user(
+            username="service-credit-landlord", email="service-credit@example.com",
+            password="StrongPass123!", role="landlord", is_staff=True,
+        )
+        property_obj = Property.objects.create(
+            name="Service Credit Property", landlord_email=landlord.email,
+        )
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=User.objects.create_user(username="service-credit-resident", role="tenant"),
+            full_name="Service Credit Resident", phone="555-0131", age=50,
+            space_label="A", monthly_rent=Decimal("650.00"), utility_monthly=Decimal("55.00"),
+            balance=Decimal("300.00"), deposit_required=Decimal("450.00"), deposit_paid=Decimal("200.00"),
+            income_source="Employment", monthly_income=Decimal("2500.00"), housing_need="Current resident.",
+        )
+        category = ExpenseCategory.objects.create(
+            name="Cleaning Labor Service Credit", entry_type="operating_expense", is_active=True,
+        )
+
+        self.client.login(username="service-credit-landlord", password="StrongPass123!")
+        response = self.client.post(reverse("record_manual_payment"), {
+            "application": resident.id,
+            "payment_type": "rent",
+            "payment_method": "service_credit",
+            "amount": "200.00",
+            "service_month": "2026-08",
+            "months_covered": "1",
+            "service_credit_category": category.id,
+            "description": "Partial rent credit for cleaning labor",
+        })
+        self.assertEqual(response.status_code, 302)
+
+        resident.refresh_from_db()
+        payment = Payment.objects.get(application=resident, payment_method="service_credit")
+        expense = FinancialEntry.objects.get(
+            property_name=property_obj.name,
+            sheet_name="Service Credits",
+            row_number=payment.id,
+        )
+        self.assertEqual(payment.payment_type, "rent")
+        self.assertEqual(payment.amount, Decimal("200.00"))
+        self.assertEqual(resident.balance, Decimal("100.00"))
+        self.assertEqual(resident.deposit_paid, Decimal("200.00"))
+        self.assertEqual(expense.entry_type, "operating_expense")
+        self.assertEqual(expense.category, category.name)
+        self.assertEqual(expense.amount, Decimal("200.00"))
+        self.assertEqual(expense.month, 8)
+
+    def test_service_credit_cannot_be_applied_to_deposit(self):
+        category = ExpenseCategory.objects.create(
+            name="Deposit Guard Service Credit", entry_type="operating_expense", is_active=True,
+        )
+        form = ManualPaymentForm(data={
+            "payment_type": "deposit",
+            "payment_method": "service_credit",
+            "amount": "100.00",
+            "service_credit_category": category.id,
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn("payment_type", form.errors)
+
+    @patch("main.views.timezone.localdate", return_value=date(2026, 8, 7))
+    def test_chris_a_honey_production_name_is_corrected_to_600(self, _localdate):
+        property_obj = Property.objects.create(name="Chris A Honey Property")
+        PropertyRoomRent.objects.create(
+            property=property_obj, room_unit_label="Q",
+            monthly_rent=Decimal("625.00"), utility_monthly=Decimal("55.00"),
+        )
+        resident = HousingApplication.objects.create(
+            property=property_obj, full_name="Chris A Honey", phone="555-0129", age=50,
+            space_label="Q", monthly_rent=Decimal("625.00"), utility_monthly=Decimal("55.00"),
+            move_in_rent_charge=Decimal("625.00"),
+            income_source="Employment", monthly_income=Decimal("2500.00"), housing_need="Current resident.",
+        )
+        RentHistory.objects.create(
+            application=resident, effective_date=date(2026, 8, 1), rent_amount=Decimal("625.00"),
+        )
+
+        migration = importlib.import_module("main.migrations.0068_correct_chris_a_honey_rent")
+        from django.apps import apps as django_apps
+        migration.correct_chris_a_honey_rent(django_apps, None)
+        resident.refresh_from_db()
+
+        watch_row = monthly_collection_watch_rows([resident])[0]
+        rent_roll_row = rent_roll_rows_for_properties(
+            User.objects.create_superuser("chris-a-admin", "chris-a@example.com", "pass"),
+            date(2026, 8, 1),
+            Property.objects.filter(id=property_obj.id),
+        )[0]
+        self.assertEqual(resident.monthly_rent, Decimal("600.00"))
+        self.assertEqual(resident.move_in_rent_charge, Decimal("0.00"))
+        self.assertEqual(watch_row["rent_expected"], Decimal("600.00"))
+        self.assertEqual(rent_roll_row["monthly_rent"], Decimal("600.00"))
+        self.assertEqual(PropertyRoomRent.objects.get(property=property_obj, room_unit_label="Q").monthly_rent, Decimal("600.00"))
+
+    @patch("main.views.timezone.localdate", return_value=date(2026, 8, 7))
+    def test_collection_watch_uses_600_for_duplicate_chris_honey_files(self, _localdate):
+        property_obj = Property.objects.create(name="Duplicate Chris Honey Property")
+        PropertyRoomRent.objects.create(
+            property=property_obj, room_unit_label="Q",
+            monthly_rent=Decimal("625.00"), utility_monthly=Decimal("55.00"),
+        )
+        residents = []
+        for index, rent in enumerate((Decimal("600.00"), Decimal("625.00"))):
+            resident = HousingApplication.objects.create(
+                property=property_obj, full_name="Chris Honey", phone=f"555-012{index}", age=50,
+                space_label="Q", monthly_rent=rent, utility_monthly=Decimal("55.00"),
+                move_in_rent_charge=rent,
+                income_source="Employment", monthly_income=Decimal("2500.00"), housing_need="Current resident.",
+            )
+            RentHistory.objects.create(
+                application=resident, effective_date=date(2026, 8, 1), rent_amount=rent,
+            )
+            residents.append(resident)
+
+        migration = importlib.import_module("main.migrations.0067_enforce_chris_honey_600_rent")
+        from django.apps import apps as django_apps
+        migration.enforce_chris_honey_rent(django_apps, None)
+
+        for resident in residents:
+            resident.refresh_from_db()
+            self.assertEqual(resident.monthly_rent, Decimal("600.00"))
+            self.assertEqual(resident.move_in_rent_charge, Decimal("0.00"))
+            self.assertFalse(resident.rent_history.exclude(rent_amount=Decimal("600.00")).exists())
+
+        watch_rows = monthly_collection_watch_rows(HousingApplication.objects.filter(id__in=[r.id for r in residents]))
+        self.assertEqual(len(watch_rows), 1)
+        self.assertEqual(watch_rows[0]["rent_expected"], Decimal("600.00"))
+        self.assertEqual(PropertyRoomRent.objects.get(property=property_obj, room_unit_label="Q").monthly_rent, Decimal("600.00"))
+
+    def test_cleaning_labor_is_555_operating_expense_january_through_august(self):
+        property_obj = Property.objects.create(name="Cleaning Labor Expense Property")
+        HousingApplication.objects.create(
+            property=property_obj, full_name="Diane Torgerson", phone="555-0119", age=50,
+            space_label="A", monthly_rent=Decimal("500.00"), utility_monthly=Decimal("55.00"),
+            income_source="Cleaning services", monthly_income=Decimal("0.00"), housing_need="Current resident.",
+        )
+
+        migration = importlib.import_module("main.migrations.0066_add_2026_cleaning_labor_expenses")
+        from django.apps import apps as django_apps
+        migration.add_cleaning_labor_expenses(django_apps, None)
+        migration.add_cleaning_labor_expenses(django_apps, None)
+
+        entries = FinancialEntry.objects.filter(
+            property_name=property_obj.name,
+            year=2026,
+            entry_type="operating_expense",
+            category="Cleaning Labor",
+        ).order_by("month")
+        self.assertEqual(list(entries.values_list("month", flat=True)), list(range(1, 9)))
+        self.assertTrue(all(entry.amount == Decimal("555.00") for entry in entries))
+        self.assertEqual(entries.aggregate(total=Sum("amount"))["total"], Decimal("4440.00"))
+
+    @patch("main.views.timezone.localdate", return_value=date(2026, 8, 5))
+    def test_mike_dudley_august_paid_in_full_is_absent_from_collection_watch(self, _localdate):
+        property_obj = Property.objects.create(name="Mike Dudley Payment Property")
+        resident = HousingApplication.objects.create(
+            property=property_obj, full_name="Mike Dudley", phone="555-0118", age=50,
+            space_label="J", monthly_rent=Decimal("650.00"), utility_monthly=Decimal("55.00"),
+            balance=Decimal("650.00"), utility_balance=Decimal("55.00"),
+            income_source="Employment", monthly_income=Decimal("2500.00"), housing_need="Current resident.",
+        )
+
+        migration = importlib.import_module("main.migrations.0065_reconcile_mike_dudley_august_payments")
+        from django.apps import apps as django_apps
+        migration.reconcile_mike_dudley_august_payments(django_apps, None)
+        migration.reconcile_mike_dudley_august_payments(django_apps, None)
+        resident.refresh_from_db()
+
+        self.assertEqual(Payment.objects.filter(
+            application=resident, payment_type="rent", service_month=date(2026, 8, 1), status="completed"
+        ).aggregate(total=Sum("amount"))["total"], Decimal("650.00"))
+        self.assertEqual(Payment.objects.filter(
+            application=resident, payment_type="utility", service_month=date(2026, 8, 1), status="completed"
+        ).aggregate(total=Sum("amount"))["total"], Decimal("55.00"))
+        self.assertEqual(monthly_collection_watch_rows([resident]), [])
+        self.assertEqual(resident.balance, Decimal("0.00"))
+        self.assertEqual(resident.utility_balance, Decimal("0.00"))
+
+    def test_sherry_880_payments_move_from_insurance_to_debt_service_and_june_4000_is_added(self):
+        property_obj = Property.objects.create(name="Sherry Debt Service Property")
+        upload = FinancialUpload.objects.create(
+            property=property_obj,
+            name="2026 ledger",
+            file=SimpleUploadedFile("ledger.csv", b"date,amount\n", content_type="text/csv"),
+        )
+        entries = []
+        for month in (3, 4, 5, 6, 7, 8):
+            entries.append(FinancialEntry.objects.create(
+                upload=upload, property_name=property_obj.name, sheet_name="Expenses",
+                row_number=month, entry_date=date(2026, month, 1), month=month, year=2026,
+                entry_type="operating_expense", category="Insurance",
+                description="Insurance automatic payment", amount=Decimal("880.47"),
+            ))
+        insurance_category = ExpenseCategory.objects.create(name="Insurance Test", entry_type="operating_expense")
+        receipt = AccountingReceipt.objects.create(
+            property=property_obj,
+            receipt_file=SimpleUploadedFile("receipt.pdf", b"receipt", content_type="application/pdf"),
+            vendor="Insurance", receipt_date=date(2026, 3, 1), category=insurance_category,
+            entry_type="operating_expense", description="Insurance automatic payment",
+            amount=Decimal("880.47"), status="approved", financial_entry=entries[0],
+        )
+
+        migration = importlib.import_module("main.migrations.0064_reclassify_sherry_payments_as_debt_service")
+        from django.apps import apps as django_apps
+        migration.reclassify_sherry_payments(django_apps, None)
+        migration.reclassify_sherry_payments(django_apps, None)
+        receipt.refresh_from_db()
+
+        corrected = FinancialEntry.objects.filter(upload=upload, amount=Decimal("880.47"))
+        self.assertEqual(corrected.filter(entry_type="debt_service").count(), 6)
+        self.assertFalse(corrected.filter(category__icontains="insurance").exists())
+        self.assertFalse(corrected.filter(description__icontains="insurance").exists())
+        self.assertEqual(receipt.entry_type, "debt_service")
+        self.assertEqual(receipt.category.name, "Debt Service - Sherry")
+        self.assertNotIn("insurance", receipt.description.lower())
+        june_debt = FinancialEntry.objects.filter(
+            upload=upload, entry_type="debt_service", year=2026, month=6,
+        ).aggregate(total=Sum("amount"))["total"]
+        self.assertEqual(june_debt, Decimal("4880.47"))
+        self.assertEqual(FinancialEntry.objects.filter(
+            upload=upload, entry_type="debt_service", year=2026, month=6, amount=Decimal("4000.00")
+        ).count(), 1)
+
+    def test_rooms_i_and_j_have_mark_and_mike_only(self):
+        property_obj = Property.objects.create(name="Rooms I J Occupancy Property")
+        mike = HousingApplication.objects.create(
+            property=property_obj, full_name="Mike Dudley", phone="555-0116", age=50,
+            space_label="I", monthly_rent=Decimal("650.00"), utility_monthly=Decimal("55.00"),
+            income_source="Employment", monthly_income=Decimal("2500.00"), housing_need="Current resident.",
+        )
+        mark = HousingApplication.objects.create(
+            property=property_obj, full_name="Mark Moore", phone="555-0117", age=50,
+            space_label="J", monthly_rent=Decimal("650.00"), utility_monthly=Decimal("55.00"),
+            income_source="Employment", monthly_income=Decimal("2500.00"), housing_need="Current resident.",
+        )
+        CurrentResidentRosterEntry.objects.create(
+            property=property_obj, first_name="Mike", last_name="Dudley", room_unit_label="I",
+        )
+        CurrentResidentRosterEntry.objects.create(
+            property=property_obj, first_name="Mike", last_name="Dudley", room_unit_label="J",
+        )
+        CurrentResidentRosterEntry.objects.create(
+            property=property_obj, first_name="Mark", last_name="Moore", room_unit_label="J",
+        )
+
+        migration = importlib.import_module("main.migrations.0063_correct_rooms_i_and_j_occupancy")
+        from django.apps import apps as django_apps
+        migration.correct_rooms_i_and_j_occupancy(django_apps, None)
+        mike.refresh_from_db()
+        mark.refresh_from_db()
+
+        self.assertEqual(mike.space_label, "J")
+        self.assertEqual(mark.space_label, "I")
+        self.assertTrue(CurrentResidentRosterEntry.objects.get(
+            property=property_obj, first_name="Mike", last_name="Dudley", room_unit_label="J"
+        ).is_active)
+        self.assertFalse(CurrentResidentRosterEntry.objects.get(
+            property=property_obj, first_name="Mike", last_name="Dudley", room_unit_label="I"
+        ).is_active)
+        self.assertEqual(CurrentResidentRosterEntry.objects.filter(
+            property=property_obj, first_name="Mark", last_name="Moore", room_unit_label="I", is_active=True
+        ).count(), 1)
+
+    def test_room_h_setup_archives_felicia_and_keeps_arjen_active(self):
+        property_obj = Property.objects.create(name="Room H Occupancy Property")
+        felicia = HousingApplication.objects.create(
+            property=property_obj, full_name="Felicia Valdez", phone="555-0114", age=50,
+            space_label="H", monthly_rent=Decimal("600.00"), utility_monthly=Decimal("55.00"),
+            income_source="Employment", monthly_income=Decimal("2500.00"), housing_need="Former resident.",
+        )
+        arjen = HousingApplication.objects.create(
+            property=property_obj, full_name="Arjen Pomalaza", phone="555-0115", age=50,
+            space_label="H", monthly_rent=Decimal("650.00"), utility_monthly=Decimal("55.00"),
+            income_source="Employment", monthly_income=Decimal("2500.00"), housing_need="Current resident.",
+        )
+        CurrentResidentRosterEntry.objects.create(
+            property=property_obj, first_name="Felicia", last_name="Valdez", room_unit_label="H",
+        )
+        CurrentResidentRosterEntry.objects.create(
+            property=property_obj, first_name="Arjen", last_name="Pomalaza", room_unit_label="H",
+        )
+
+        migration = importlib.import_module("main.migrations.0062_correct_room_h_current_occupant")
+        from django.apps import apps as django_apps
+        migration.correct_room_h_current_occupant(django_apps, None)
+        felicia.refresh_from_db()
+        arjen.refresh_from_db()
+
+        self.assertEqual(felicia.tenancy_status, "former")
+        self.assertEqual(felicia.application_folder, "archived")
+        self.assertEqual(felicia.move_out_date, date(2026, 6, 30))
+        self.assertEqual(arjen.tenancy_status, "active")
+        self.assertEqual(arjen.application_folder, "active")
+        self.assertEqual(arjen.space_label, "H")
+        self.assertEqual(arjen.lease_start_date, date(2026, 7, 1))
+        self.assertFalse(CurrentResidentRosterEntry.objects.get(
+            property=property_obj, first_name="Felicia", last_name="Valdez"
+        ).is_active)
+        self.assertTrue(CurrentResidentRosterEntry.objects.get(
+            property=property_obj, first_name="Arjen", last_name="Pomalaza"
+        ).is_active)
+
+    @patch("main.views.timezone.localdate", return_value=date(2026, 8, 5))
+    def test_chris_honey_rent_is_600_in_setup_watch_and_august_rent_roll(self, _localdate):
+        property_obj = Property.objects.create(name="Chris Honey Rent Property")
+        PropertyRoomRent.objects.create(
+            property=property_obj, room_unit_label="Q",
+            monthly_rent=Decimal("625.00"), utility_monthly=Decimal("55.00"),
+        )
+        resident = HousingApplication.objects.create(
+            property=property_obj, full_name="Chris Honey", phone="555-0113", age=50,
+            space_label="Q", monthly_rent=Decimal("600.00"), utility_monthly=Decimal("55.00"),
+            move_in_rent_charge=Decimal("625.00"), lease_start_date=date(2026, 8, 1),
+            income_source="Employment", monthly_income=Decimal("2500.00"), housing_need="Current resident.",
+        )
+        RentHistory.objects.create(
+            application=resident, effective_date=date(2026, 8, 1), rent_amount=Decimal("625.00"),
+        )
+
+        migration = importlib.import_module("main.migrations.0061_correct_chris_honey_rent")
+        from django.apps import apps as django_apps
+        migration.correct_chris_honey_rent(django_apps, None)
+        resident.refresh_from_db()
+
+        watch_row = monthly_collection_watch_rows([resident])[0]
+        rent_roll_row = rent_roll_rows_for_properties(
+            resident.user if resident.user_id else User.objects.create_superuser("rent-roll-admin", "admin@example.com", "pass"),
+            date(2026, 8, 1),
+            Property.objects.filter(id=property_obj.id),
+        )[0]
+        self.assertEqual(resident.monthly_rent, Decimal("600.00"))
+        self.assertEqual(resident.move_in_rent_charge, Decimal("0.00"))
+        self.assertEqual(watch_row["rent_expected"], Decimal("600.00"))
+        self.assertEqual(rent_roll_row["monthly_rent"], Decimal("600.00"))
+        self.assertEqual(PropertyRoomRent.objects.get(property=property_obj, room_unit_label="Q").monthly_rent, Decimal("600.00"))
+
+    @patch("main.views.timezone.localdate", return_value=date(2026, 8, 5))
+    def test_current_balance_total_includes_past_due_rent_and_utilities(self, _localdate):
+        property_obj = Property.objects.create(name="Past Due Balance Property")
+        resident = HousingApplication.objects.create(
+            property=property_obj, full_name="Past Due Resident", phone="555-0111", age=50,
+            space_label="C", monthly_rent=Decimal("650.00"), utility_monthly=Decimal("55.00"),
+            balance=Decimal("100.00"), utility_balance=Decimal("20.00"),
+            income_source="Employment", monthly_income=Decimal("2500.00"), housing_need="Current resident.",
+        )
+        Payment.objects.create(
+            application=resident, payment_type="rent", amount=Decimal("650.00"),
+            status="completed", service_month=date(2026, 8, 1),
+        )
+        Payment.objects.create(
+            application=resident, payment_type="utility", amount=Decimal("55.00"),
+            status="completed", service_month=date(2026, 8, 1),
+        )
+        Payment.objects.create(
+            application=resident, payment_type="rent", amount=Decimal("650.00"),
+            status="pending", service_month=date(2026, 8, 1),
+        )
+
+        self.assertEqual(resident_portal_rent_due(resident), Decimal("100.00"))
+        self.assertEqual(resident_portal_utility_due(resident), Decimal("20.00"))
+
+    def test_arjen_completed_705_payment_is_split_between_august_rent_and_utilities(self):
+        property_obj = Property.objects.create(name="Arjen Payment Property")
+        resident = HousingApplication.objects.create(
+            property=property_obj, full_name="Arjen Example", phone="555-0112", age=50,
+            space_label="E", monthly_rent=Decimal("650.00"), utility_monthly=Decimal("55.00"),
+            balance=Decimal("650.00"), utility_balance=Decimal("55.00"),
+            income_source="Employment", monthly_income=Decimal("2500.00"), housing_need="Current resident.",
+        )
+        pending = Payment.objects.create(
+            application=resident, payment_type="rent", payment_method="check",
+            amount=Decimal("650.00"), status="pending", service_month=date(2026, 8, 1),
+        )
+        Payment.objects.create(
+            application=resident, payment_type="other", payment_method="check",
+            amount=Decimal("705.00"), status="completed", service_month=date(2026, 8, 1),
+            description="Combined payment",
+        )
+
+        migration = importlib.import_module("main.migrations.0060_reconcile_arjen_august_combined_payment")
+        from django.apps import apps as django_apps
+        migration.reconcile_arjen_august_payment(django_apps, None)
+        migration.reconcile_arjen_august_payment(django_apps, None)
+        resident.refresh_from_db()
+        pending.refresh_from_db()
+
+        completed = Payment.objects.filter(application=resident, status="completed", service_month=date(2026, 8, 1))
+        self.assertEqual(completed.filter(payment_type="rent").aggregate(total=Sum("amount"))["total"], Decimal("650.00"))
+        self.assertEqual(completed.filter(payment_type="utility").aggregate(total=Sum("amount"))["total"], Decimal("55.00"))
+        self.assertEqual(completed.aggregate(total=Sum("amount"))["total"], Decimal("705.00"))
+        self.assertEqual(pending.status, "pending")
+        self.assertEqual(resident.balance, Decimal("0.00"))
+        self.assertEqual(resident.utility_balance, Decimal("0.00"))
+
+    def test_mark_moore_august_rent_and_utilities_are_paid_in_full(self):
+        property_obj = Property.objects.create(name="Mark Moore Payment Property")
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Mark Moore",
+            phone="555-0109",
+            age=50,
+            space_label="B",
+            monthly_rent=Decimal("650.00"),
+            utility_monthly=Decimal("55.00"),
+            balance=Decimal("650.00"),
+            utility_balance=Decimal("55.00"),
+            income_source="Employment",
+            monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.",
+        )
+
+        migration = importlib.import_module("main.migrations.0059_reconcile_mark_moore_august_payments")
+        from django.apps import apps as django_apps
+        migration.reconcile_mark_moore_august_payments(django_apps, None)
+        resident.refresh_from_db()
+
+        self.assertEqual(
+            Payment.objects.filter(
+                application=resident, payment_type="rent", service_month=date(2026, 8, 1), status="completed"
+            ).aggregate(total=Sum("amount"))["total"],
+            Decimal("650.00"),
+        )
+        self.assertEqual(
+            Payment.objects.filter(
+                application=resident, payment_type="utility", service_month=date(2026, 8, 1), status="completed"
+            ).aggregate(total=Sum("amount"))["total"],
+            Decimal("55.00"),
+        )
+        self.assertEqual(resident.balance, Decimal("0.00"))
+        self.assertEqual(resident.utility_balance, Decimal("0.00"))
+
+    def test_diane_torgerson_cleaning_services_pay_rent_and_utilities_january_through_august(self):
+        property_obj = Property.objects.create(name="Diane Cleaning Credit Property")
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            full_name="Diane Torgerson",
+            phone="555-0108",
+            age=50,
+            space_label="A",
+            monthly_rent=Decimal("0.00"),
+            utility_monthly=Decimal("55.00"),
+            balance=Decimal("500.00"),
+            utility_balance=Decimal("55.00"),
+            income_source="Cleaning services",
+            monthly_income=Decimal("0.00"),
+            housing_need="Current resident.",
+        )
+
+        migration = importlib.import_module("main.migrations.0058_record_diane_torgerson_cleaning_payments")
+        from django.apps import apps as django_apps
+        migration.record_diane_cleaning_payments(django_apps, None)
+        resident.refresh_from_db()
+
+        self.assertEqual(resident.monthly_rent, Decimal("500.00"))
+        self.assertEqual(resident.balance, Decimal("0.00"))
+        self.assertEqual(resident.utility_balance, Decimal("0.00"))
+        for month in range(1, 9):
+            service_month = date(2026, month, 1)
+            self.assertEqual(
+                Payment.objects.filter(
+                    application=resident,
+                    payment_type="rent",
+                    service_month=service_month,
+                    status="completed",
+                ).aggregate(total=Sum("amount"))["total"],
+                Decimal("500.00"),
+            )
+            self.assertEqual(
+                Payment.objects.filter(
+                    application=resident,
+                    payment_type="utility",
+                    service_month=service_month,
+                    status="completed",
+                ).aggregate(total=Sum("amount"))["total"],
+                Decimal("55.00"),
+            )
+
+    @patch("main.views.timezone.localdate", return_value=date(2026, 8, 3))
+    def test_mitchell_brent_collection_watch_uses_full_august_charges(self, _localdate):
+        property_obj = Property.objects.create(name="Mitchell Charge Property")
+        PropertyRoomRent.objects.create(
+            property=property_obj, room_unit_label="P",
+            monthly_rent=Decimal("473.00"), utility_monthly=Decimal("51.00"),
+        )
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=User.objects.create_user(username="mitchell-brent", role="tenant"),
+            full_name="Mitchell Brent", phone="555-0110", age=50, space_label="P",
+            lease_start_date=date(2026, 8, 3), monthly_rent=Decimal("650.00"),
+            utility_monthly=Decimal("55.00"), move_in_rent_charge=Decimal("473.00"),
+            move_in_utility_charge=Decimal("51.00"), income_source="Employment",
+            monthly_income=Decimal("2500.00"), housing_need="Current resident.",
+        )
+
+        migration = importlib.import_module("main.migrations.0057_correct_mitchell_brent_august_charges")
+        from django.apps import apps as django_apps
+        migration.correct_mitchell_august_charges(django_apps, None)
+        resident.refresh_from_db()
+        row = monthly_collection_watch_rows([resident])[0]
+
+        self.assertEqual(resident.move_in_rent_charge, Decimal("0.00"))
+        self.assertEqual(resident.move_in_utility_charge, Decimal("0.00"))
+        self.assertEqual(row["rent_expected"], Decimal("650.00"))
+        self.assertEqual(row["utility_expected"], Decimal("55.00"))
+        self.assertEqual(row["rent_due"], Decimal("650.00"))
+        self.assertEqual(row["utility_due"], Decimal("55.00"))
+
+    def test_july_2026_rent_roll_reconciliation_matches_confirmed_residents(self):
+        landlord = User.objects.create_user(
+            username="july-reconcile-landlord", email="july-reconcile@example.com",
+            password="StrongPass123!", role="landlord", is_staff=True,
+        )
+        property_obj = Property.objects.create(name="July Reconcile Property", landlord_email=landlord.email)
+        rents = {"P": "650.00", "D": "616.00", "O": "506.00", "Q": "650.00", "I": "650.00", "F": "650.00", "N": "650.00"}
+        for room, rent in rents.items():
+            PropertyRoomRent.objects.create(
+                property=property_obj, room_unit_label=room,
+                monthly_rent=Decimal(rent), utility_monthly=Decimal("55.00"),
+            )
+
+        residents = {}
+        for name, room in (
+            ("Robert Cisneros", "X"), ("Ron Rucker", "X"), ("Ray Ferro", "X"),
+            ("Chris Honey", "X"), ("Mike Dudley", "X"), ("Carlos Rios", "X"),
+            ("Aaron Brown", "R"), ("Mike Bowling", "Owner"),
+        ):
+            residents[name] = HousingApplication.objects.create(
+                property=property_obj, full_name=name, phone="555-0100", age=50,
+                space_label=room, monthly_rent=Decimal("650.00"), utility_monthly=Decimal("55.00"),
+                income_source="Test", monthly_income=Decimal("2500.00"), housing_need="Resident.",
+            )
+
+        CurrentResidentRosterEntry.objects.create(
+            property=property_obj, first_name="Ron", last_name="Rucker",
+            email="", room_unit_label="X", is_active=True,
+        )
+        CurrentResidentRosterEntry.objects.create(
+            property=property_obj, first_name="Ron", last_name="Rucker",
+            email="", room_unit_label="D", is_active=True,
+        )
+
+        migration = importlib.import_module("main.migrations.0056_reconcile_july_2026_rent_roll")
+        from django.apps import apps as django_apps
+        migration.reconcile_july_rent_roll(django_apps, None)
+
+        self.client.login(username="july-reconcile-landlord", password="StrongPass123!")
+        response = self.client.get(f"{reverse('rent_roll')}?month=2026-07")
+        rows = {row["resident"]: row for row in response.context["rows"]}
+
+        expected = {
+            "Robert Cisneros": ("P", "0.00", "0.00"),
+            "Ron Rucker": ("D", "0.00", "0.00"),
+            "Ray Ferro": ("O", "0.00", "0.00"),
+            "Chris Honey": ("Q", "0.00", "55.00"),
+            "Mike Dudley": ("I", "0.00", "0.00"),
+            "Carlos Rios": ("F", "0.00", "0.00"),
+            "Aaron Brown": ("N", "600.00", "55.00"),
+        }
+        for name, (room, rent_due, utility_due) in expected.items():
+            self.assertEqual(rows[name]["room"], room)
+            self.assertEqual(rows[name]["rent_balance"], Decimal(rent_due))
+            self.assertEqual(rows[name]["utility_balance"], Decimal(utility_due))
+        self.assertEqual(rows["Chris Honey"]["monthly_rent"], Decimal("600.00"))
+        self.assertNotIn("Mike Bowling", rows)
+        residents["Robert Cisneros"].refresh_from_db()
+        self.assertEqual(residents["Robert Cisneros"].tenancy_status, "former")
+        self.assertEqual(residents["Robert Cisneros"].move_out_date, date(2026, 7, 31))
+        self.assertTrue(CurrentResidentRosterEntry.objects.get(
+            property=property_obj, first_name="Ron", last_name="Rucker", room_unit_label="D"
+        ).is_active)
+        self.assertFalse(CurrentResidentRosterEntry.objects.get(
+            property=property_obj, first_name="Ron", last_name="Rucker", room_unit_label="X"
+        ).is_active)
+
     def application_payload(self):
         return {
             "full_name": "New Applicant",
@@ -679,7 +1450,7 @@ class LiveFlowTests(TestCase):
                 "monthly_rent": "650.00",
                 "balance": "650.00",
                 "rent_due_day": "17",
-                "lease_start_date": "2026-06-01",
+                "lease_start_date": "2026-06-15",
                 "deposit_required": "0.00",
                 "deposit_paid": "0.00",
                 "deposit_payment_plan": "paid_in_full",
@@ -729,6 +1500,7 @@ class LiveFlowTests(TestCase):
                 "balance": "650.00",
                 "rent_due_day": "1",
                 "lease_start_date": "2026-05-27",
+                "prorate_first_month": "on",
                 "deposit_required": "450.00",
                 "deposit_paid": "450.00",
                 "deposit_payment_plan": "paid_in_full",
@@ -793,8 +1565,8 @@ class LiveFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         application.refresh_from_db()
         self.assertEqual(application.lease_start_date, next_month)
-        self.assertEqual(application.move_in_rent_charge, Decimal("650.00"))
-        self.assertEqual(application.move_in_utility_charge, Decimal("55.00"))
+        self.assertEqual(application.move_in_rent_charge, Decimal("0.00"))
+        self.assertEqual(application.move_in_utility_charge, Decimal("0.00"))
         self.assertEqual(application.balance, Decimal("0.00"))
         self.assertEqual(application.utility_balance, Decimal("0.00"))
         self.assertEqual(monthly_collection_watch_rows([application]), [])
@@ -1024,6 +1796,9 @@ class LiveFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Payment Receipt")
         self.assertContains(response, "BANK-123")
+        self.assertNotContains(response, "Move-In Rent Due")
+        self.assertNotContains(response, "Move-In Utilities Due")
+        self.assertNotContains(response, "Regular Monthly Charges")
 
     def test_dashboard_payment_link_returns_to_dashboard_and_records_utilities(self):
         staff_user = User.objects.create_user(
@@ -1496,6 +2271,71 @@ class LiveFlowTests(TestCase):
         self.assertNotIn(applicant, choices)
         self.assertNotIn(former, choices)
         self.assertNotIn(placeholder, choices)
+
+    def test_manual_payment_dropdown_distinguishes_residents_with_the_same_name(self):
+        staff_user = User.objects.create_user(
+            username="payment-duplicate-name-staff",
+            email="payment-duplicate-name@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(
+            name="Duplicate Name Property",
+            landlord_email=staff_user.email,
+        )
+        first_user = User.objects.create_user(
+            username="payment-michael-dudley-a",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        second_user = User.objects.create_user(
+            username="payment-michael-dudley-b",
+            password="StrongPass123!",
+            role="tenant",
+        )
+        first_resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=first_user,
+            full_name="Michael Dudley",
+            phone="555-0150",
+            email="michael-a@example.com",
+            age=44,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            space_type="Room",
+            space_label="A",
+            tenancy_status="active",
+        )
+        second_resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=second_user,
+            full_name="Michael Dudley",
+            phone="555-0151",
+            email="michael-b@example.com",
+            age=45,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+            space_type="Room",
+            space_label="B",
+            tenancy_status="active",
+        )
+
+        self.client.login(username="payment-duplicate-name-staff", password="StrongPass123!")
+        response = self.client.get(reverse("record_manual_payment"))
+        rendered_choices = response.context["form"].fields["application"].choices
+        labels = {str(value): label for value, label in rendered_choices}
+
+        self.assertEqual(
+            labels[str(first_resident.id)],
+            f"Michael Dudley — Duplicate Name Property — Room A — michael-a@example.com — File #{first_resident.id}",
+        )
+        self.assertEqual(
+            labels[str(second_resident.id)],
+            f"Michael Dudley — Duplicate Name Property — Room B — michael-b@example.com — File #{second_resident.id}",
+        )
 
     def test_payment_log_excludes_applicant_and_placeholder_payments(self):
         staff_user = User.objects.create_user(
@@ -4010,6 +4850,39 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "Renters Insurance")
         self.assertContains(response, "Back to Super Admin Dashboard")
 
+    def test_superadmin_can_open_lease_from_inspected_resident_inbox(self):
+        User.objects.create_user(
+            username="superadmin-lease-inspection",
+            email="superadmin-lease@example.com",
+            password="StrongPass123!",
+            role="admin",
+            is_staff=True,
+        )
+        application = HousingApplication.objects.create(
+            full_name="Mitchell Brent",
+            phone="5550112233",
+            email="mitchell@example.com",
+            age=50,
+            income_source="Employment",
+            monthly_income=Decimal("3000.00"),
+            housing_need="Current resident.",
+        )
+        lease = SignedDocument.objects.create(
+            application=application,
+            document_type="lease",
+            title="Resident Lease Agreement",
+        )
+        self.client.login(username="superadmin-lease-inspection", password="StrongPass123!")
+
+        inbox_response = self.client.get(f"{reverse('resident_inbox')}?resident={application.id}")
+        lease_url = f"{reverse('onboarding_document', args=[lease.id])}?resident={application.id}"
+
+        self.assertContains(inbox_response, lease_url)
+        lease_response = self.client.get(lease_url)
+        self.assertEqual(lease_response.status_code, 200)
+        self.assertEqual(lease_response.context["signed_document"], lease)
+        self.assertContains(lease_response, "Mitchell Brent")
+
     def test_superadmin_resident_inspection_collapses_duplicate_units(self):
         superuser = User.objects.create_user(
             username="superadmin-resident-dedupe",
@@ -5201,6 +6074,29 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "<td>J</td>", html=True)
         self.assertNotContains(response, "<td>Room J</td>", html=True)
 
+    @patch("main.views.timezone.localdate", return_value=date(2026, 7, 30))
+    def test_collection_watch_excludes_future_resident_sharing_current_room(self, _localdate):
+        property_obj = Property.objects.create(name="Turnover Property")
+        current_resident = HousingApplication.objects.create(
+            property=property_obj, full_name="Z Current Resident", phone="555-0311", age=40,
+            space_label="A", monthly_rent=Decimal("500.00"), utility_monthly=Decimal("55.00"),
+            income_source="Employment", monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.", lease_start_date=date(2026, 1, 1),
+        )
+        HousingApplication.objects.create(
+            property=property_obj, full_name="A Future Resident", phone="555-0312", age=41,
+            space_label="A", monthly_rent=Decimal("600.00"), utility_monthly=Decimal("60.00"),
+            income_source="Employment", monthly_income=Decimal("2500.00"),
+            housing_need="Upcoming resident.", lease_start_date=date(2026, 8, 3),
+        )
+
+        rows = monthly_collection_watch_rows(HousingApplication.objects.all())
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["application"], current_resident)
+        self.assertEqual(rows[0]["rent_expected"], Decimal("500.00"))
+        self.assertEqual(rows[0]["utility_expected"], Decimal("55.00"))
+
     def test_attention_count_drops_when_items_are_opened(self):
         landlord = User.objects.create_user(
             username="attention-landlord",
@@ -5488,7 +6384,7 @@ class LiveFlowTests(TestCase):
         self.assertEqual(response.context["totals"]["rent_balance"], Decimal("1575.00"))
         self.assertEqual(response.context["totals"]["utility_monthly"], Decimal("187.00"))
         self.assertEqual(response.context["totals"]["deposit_required"], Decimal("1350.00"))
-        self.assertContains(response, "<td>Total</td>", html=True)
+        self.assertContains(response, '<td class="unit-col">Total</td>', html=True)
         self.assertContains(response, "Print Report")
         self.assertContains(response, "window.print()")
         self.assertContains(response, "size: landscape")
@@ -5841,10 +6737,12 @@ class LiveFlowTests(TestCase):
         content = response.content.decode()
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("June 2026,CSV Resident,G", content)
+        self.assertIn("June 2026,G,560.00", content)
         self.assertIn("Utilities Paid", content)
-        self.assertIn("June 2026,TOTAL,,560.00,0.00,560.00,55.00,55.00,0.00,450.00,0.00,450.00", content)
+        self.assertIn("June 2026,TOTAL,560.00,0.00,560.00,55.00,55.00,0.00,450.00,0.00,450.00", content)
         self.assertNotIn("Property", content.splitlines()[0])
+        self.assertNotIn("Resident", content.splitlines()[0])
+        self.assertNotIn("CSV Resident", content)
         self.assertNotIn("Utilities Paid This Month", content)
         self.assertNotIn("CSV Applicant", content)
 
@@ -6069,6 +6967,42 @@ class LiveFlowTests(TestCase):
         self.assertIn("migration 0077", incorrect_payment.notes)
         self.assertIn("migration 0078", incorrect_payment.notes)
         self.assertEqual(referenced_payment.amount, Decimal("58.00"))
+    def test_payment_log_groups_rent_and_utilities_and_hides_move_in_charge_note(self):
+        landlord = User.objects.create_user(
+            username="grouped-payment-landlord", email="grouped-payment@example.com",
+            password="StrongPass123!", role="landlord", is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Grouped Payment Property", landlord_email=landlord.email)
+        resident = HousingApplication.objects.create(
+            property=property_obj,
+            user=User.objects.create_user(username="grouped-payment-resident", role="tenant"),
+            full_name="Grouped Payment Resident", phone="555-0712", age=45, space_label="C",
+            monthly_rent=Decimal("500.00"), move_in_rent_charge=Decimal("250.00"),
+            utility_monthly=Decimal("55.00"), move_in_utility_charge=Decimal("27.50"),
+            income_source="Employment", monthly_income=Decimal("2500.00"), housing_need="Current resident.",
+        )
+        for payment_type, amount in (("utility", "55.00"), ("rent", "500.00")):
+            payment = Payment.objects.create(
+                application=resident, payment_type=payment_type, amount=Decimal(amount),
+                status="completed", service_month=date(2026, 6, 1),
+            )
+            if payment_type == "rent":
+                payment.payment_method = "stripe_card"
+                payment.stripe_payment_intent = "pi_grouped_payment_test"
+                payment.save(update_fields=["payment_method", "stripe_payment_intent"])
+
+        self.client.login(username="grouped-payment-landlord", password="StrongPass123!")
+        response = self.client.get(f"{reverse('payment_log')}?month=2026-06")
+        groups = response.context["payment_log"][0]["months"][0]["payment_groups"]
+
+        self.assertEqual([group["label"] for group in groups], ["Rent Payments", "Utility Payments"])
+        self.assertEqual([group["total"] for group in groups], [Decimal("500.00"), Decimal("55.00")])
+        self.assertContains(response, "Rent Payments")
+        self.assertContains(response, "Utility Payments")
+        self.assertContains(response, "Processor Reference")
+        self.assertContains(response, "pi_grouped_payment_test")
+        self.assertContains(response, "Transaction Date/Time")
+        self.assertNotContains(response, "Move-in charges for this file")
 
     def test_rent_roll_lists_room_roster_before_profile_setup(self):
         landlord = User.objects.create_user(
@@ -6816,6 +7750,12 @@ class LiveFlowTests(TestCase):
         delinquency = self.client.get(reverse("custom_reports"), {"report_type": "delinquency_report", "property_id": property_obj.id})
         capital = self.client.get(reverse("custom_reports"), {"report_type": "capital_improvement_log", "property_id": property_obj.id})
         insurance = self.client.get(reverse("custom_reports"), {"report_type": "insurance_compliance", "property_id": property_obj.id})
+        income_statement = self.client.get(reverse("custom_reports"), {
+            "report_type": "income_statement",
+            "property_id": property_obj.id,
+            "start_date": "2026-05-01",
+            "end_date": "2026-05-31",
+        })
         lender_package = self.client.get(reverse("custom_reports"), {"report_type": "supportive_housing_lender_package", "property_id": property_obj.id})
 
         self.assertContains(valuation, "Valuation Estimate Report")
@@ -6832,12 +7772,21 @@ class LiveFlowTests(TestCase):
         self.assertContains(delinquency, "Last Completed Payment")
         self.assertContains(capital, "Windows")
         self.assertContains(insurance, "Insurance / Compliance Report")
+        self.assertContains(income_statement, "Income Statement / P&amp;L")
+        self.assertContains(income_statement, "Total Income")
+        self.assertContains(income_statement, "$1,000.00")
+        self.assertContains(income_statement, "Total Operating Expenses")
+        self.assertContains(income_statement, "Net Operating Income (NOI)")
+        self.assertContains(income_statement, "Cash Flow After Debt Service")
+        self.assertContains(income_statement, "Net Cash Flow")
+        self.assertContains(income_statement, "($250.00)")
         self.assertContains(lender_package, "Supportive Housing / Lender Package")
         self.assertContains(lender_package, "recovery-oriented supportive shared-housing")
         self.assertContains(lender_package, "Eligibility before appraisal")
         self.assertNotContains(utility, "Hidden Expense")
 
-    def test_t12_report_includes_uploaded_income_and_expenses(self):
+    @patch("main.views.timezone.localdate", return_value=date(2026, 7, 30))
+    def test_t12_report_includes_uploaded_income_and_expenses(self, _localdate):
         landlord = User.objects.create_user(
             username="t12-landlord",
             email="t12-landlord@example.com",
@@ -6897,6 +7846,17 @@ class LiveFlowTests(TestCase):
             category="Mortgage",
             amount=Decimal("400.00"),
         )
+        FinancialEntry.objects.create(
+            upload=upload,
+            property_name=property_obj.name,
+            sheet_name="Summary",
+            row_number=4,
+            year=2026,
+            month=6,
+            entry_type="capital_expense",
+            category="Equipment",
+            amount=Decimal("100.00"),
+        )
         Payment.objects.create(
             application=resident,
             payment_type="rent",
@@ -6916,15 +7876,27 @@ class LiveFlowTests(TestCase):
         response = self.client.get(f"{reverse('t12_report')}?year=2026")
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Spreadsheet Income")
+        self.assertContains(response, "Profit &amp; Loss Statement")
+        self.assertContains(response, "Operating Expenses")
+        self.assertContains(response, "Power")
+        self.assertContains(response, "Debt Service")
+        self.assertContains(response, "Mortgage")
+        self.assertContains(response, "June 2026")
+        self.assertContains(response, "Total Operating Expenses for June")
+        self.assertContains(response, "Total Debt Service for June")
         self.assertContains(response, "Total Income")
-        self.assertContains(response, "<td>$1200.00</td>", html=True)
-        self.assertNotContains(response, "<td>$1900.00</td>", html=True)
-        self.assertContains(response, "<td>$1200.00</td>", html=True)
-        self.assertContains(response, "<td>$900.00</td>", html=True)
-        self.assertContains(response, "<td>$500.00</td>", html=True)
-        self.assertContains(response, "<td>$1200.00</td>", html=True)
-        self.assertNotContains(response, "<td>$2350.00</td>", html=True)
+        self.assertContains(response, "NOI")
+        self.assertContains(response, "Total Net After Debt Service")
+        june = response.context["months"][5]
+        self.assertEqual(june["total_income"], Decimal("1200.00"))
+        self.assertEqual(june["operating_expenses"], Decimal("300.00"))
+        self.assertEqual(june["debt_service"], Decimal("400.00"))
+        self.assertEqual(june["net_operating_income"], Decimal("900.00"))
+        self.assertEqual(june["cash_flow_after_debt"], Decimal("500.00"))
+        self.assertEqual(june["net_cash_flow"], Decimal("400.00"))
+        self.assertEqual(response.context["totals"]["projected_annual_cash_flow"], Decimal("685.71"))
+        self.assertContains(response, "Projected Annual Cash Flow")
+        self.assertContains(response, "Net Cash Flow")
 
         csv_response = self.client.get(f"{reverse('export_t12_csv')}?year=2026")
         csv_content = csv_response.content.decode()
@@ -7319,6 +8291,77 @@ class LiveFlowTests(TestCase):
         self.assertEqual(receipt.status, "needs_review")
         self.assertEqual(receipt.category.name, "Plumbing Repairs")
         self.assertTrue(receipt.receipt_file.name)
+
+    @patch("main.views.timezone.localdate", return_value=date(2026, 9, 8))
+    def test_accounting_receipts_are_grouped_into_all_months_for_selected_year(self, _mock_localdate):
+        landlord = User.objects.create_user(
+            username="monthly-receipt-landlord",
+            email="monthly-receipts@example.com",
+            password="StrongPass123!",
+            role="landlord",
+            is_staff=True,
+        )
+        property_obj = Property.objects.create(name="Monthly Receipt Property", landlord_email=landlord.email)
+        AccountingReceipt.objects.create(
+            property=property_obj,
+            receipt_file="accounting_receipts/may.pdf",
+            vendor="May Vendor",
+            receipt_date=date(2025, 5, 20),
+            amount=Decimal("125.50"),
+        )
+        AccountingReceipt.objects.create(
+            property=property_obj,
+            receipt_file="accounting_receipts/undated.pdf",
+            vendor="Undated Vendor",
+            amount=Decimal("25.00"),
+        )
+        AccountingReceipt.objects.create(
+            property=property_obj,
+            receipt_file="accounting_receipts/ignored-may.pdf",
+            vendor="Ignored Duplicate",
+            receipt_date=date(2025, 5, 21),
+            amount=Decimal("999.00"),
+            status="ignored",
+        )
+        self.client.login(username="monthly-receipt-landlord", password="StrongPass123!")
+
+        response = self.client.get(reverse("accounting_receipts"), {"year": "2025"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["selected_year"], 2025)
+        self.assertEqual(len(response.context["receipt_months"]), 12)
+        may = next(month for month in response.context["receipt_months"] if month["number"] == 5)
+        june = next(month for month in response.context["receipt_months"] if month["number"] == 6)
+        self.assertTrue(may["tracked"])
+        self.assertEqual(may["count"], 2)
+        self.assertEqual(may["total"], Decimal("125.50"))
+        self.assertTrue(may["is_archived"])
+        self.assertFalse(may["is_current"])
+        self.assertFalse(june["tracked"])
+        self.assertEqual(len(response.context["undated_receipts"]), 1)
+        self.assertContains(response, "May 2025")
+        self.assertContains(response, "Archived")
+        self.assertContains(response, "need a receipt date")
+
+    @patch("main.views.timezone.localdate", return_value=date(2026, 9, 8))
+    def test_receipt_months_mark_current_and_upcoming_months(self, _mock_localdate):
+        landlord = User.objects.create_user(
+            username="receipt-archive-landlord", email="receipt-archive@example.com",
+            password="StrongPass123!", role="landlord", is_staff=True,
+        )
+        Property.objects.create(name="Receipt Archive Property", landlord_email=landlord.email)
+        self.client.login(username="receipt-archive-landlord", password="StrongPass123!")
+
+        response = self.client.get(reverse("accounting_receipts"), {"year": "2026"})
+
+        september = next(month for month in response.context["receipt_months"] if month["number"] == 9)
+        october = next(month for month in response.context["receipt_months"] if month["number"] == 10)
+        august = next(month for month in response.context["receipt_months"] if month["number"] == 8)
+        self.assertTrue(september["is_current"])
+        self.assertTrue(october["is_upcoming"])
+        self.assertTrue(august["is_archived"])
+        self.assertContains(response, "Current month")
+        self.assertContains(response, "Upcoming")
 
     def test_accounting_receipt_approval_creates_financial_entry_and_scopes_property(self):
         landlord = User.objects.create_user(
@@ -9300,6 +10343,9 @@ class LiveFlowTests(TestCase):
             ["Move-in prorated May rent"],
         )
         self.assertContains(history_response, "Move-in prorated May rent")
+        self.assertContains(history_response, "Applies To")
+        self.assertContains(history_response, "May 2026")
+        self.assertContains(history_response, "Transaction Date")
         self.assertNotContains(history_response, "Prior occupant April rent")
 
     def test_resident_dashboard_uses_matching_duplicate_file_payments_for_current_month(self):

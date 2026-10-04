@@ -133,15 +133,24 @@ def create_tenant(request):
             monthly_rent = room_values["monthly_rent"]
             utility_monthly = room_values["utility_monthly"]
             lease_start_date = form.cleaned_data.get("lease_start_date")
-            move_in_rent_charge = prorated_monthly_charge(monthly_rent, lease_start_date)
-            move_in_utility_charge = prorated_monthly_charge(utility_monthly, lease_start_date)
+            prorate_first_month = form.cleaned_data.get("prorate_first_month", False)
+            move_in_rent_charge = (
+                prorated_monthly_charge(monthly_rent, lease_start_date)
+                if prorate_first_month else Decimal("0.00")
+            )
+            move_in_utility_charge = (
+                prorated_monthly_charge(utility_monthly, lease_start_date)
+                if prorate_first_month else Decimal("0.00")
+            )
+            first_rent_charge = move_in_rent_charge if prorate_first_month else monthly_rent
+            first_utility_charge = move_in_utility_charge if prorate_first_month else utility_monthly
             current_month_start, _ = current_month_bounds()
             starts_after_current_month = lease_start_date and lease_start_date > month_end_for(current_month_start)
 
             application.space_type = form.cleaned_data.get("space_type", "")
             application.space_label = room_values["space_label"]
             application.monthly_rent = monthly_rent
-            application.balance = Decimal("0.00") if starts_after_current_month else move_in_rent_charge
+            application.balance = Decimal("0.00") if starts_after_current_month else first_rent_charge
             application.rent_due_day = room_values["rent_due_day"]
             application.lease_start_date = lease_start_date
             application.move_in_rent_charge = move_in_rent_charge
@@ -150,16 +159,22 @@ def create_tenant(request):
             application.deposit_paid = room_values["deposit_paid"]
             application.deposit_payment_plan = form.cleaned_data.get("deposit_payment_plan") or "paid_in_full"
             application.utility_monthly = utility_monthly
-            application.utility_balance = Decimal("0.00") if starts_after_current_month else move_in_utility_charge
+            application.utility_balance = Decimal("0.00") if starts_after_current_month else first_utility_charge
             application.application_folder = "active"
             application.tenancy_status = "active"
             application.landlord_reviewed_at = application.landlord_reviewed_at or timezone.now()
             application.additional_notes = form.cleaned_data.get("additional_notes") or ""
-            move_in_note = (
-                f"Move-in charges calculated from lease start date: "
-                f"rent ${move_in_rent_charge}, utilities ${move_in_utility_charge}. "
-                f"Regular monthly rent remains ${monthly_rent}; regular monthly utilities remain ${utility_monthly}."
-            )
+            if prorate_first_month:
+                move_in_note = (
+                    f"First-month charges were explicitly prorated from the lease start date: "
+                    f"rent ${move_in_rent_charge}, utilities ${move_in_utility_charge}. "
+                    f"Regular monthly rent remains ${monthly_rent}; regular monthly utilities remain ${utility_monthly}."
+                )
+            else:
+                move_in_note = (
+                    f"No proration requested. Full monthly charges apply: "
+                    f"rent ${monthly_rent}, utilities ${utility_monthly}."
+                )
             if room_values["room_setting"]:
                 move_in_note += f" Rent setup was pulled from room/unit {room_values['room_setting'].room_unit_label}."
             application.additional_notes = f"{application.additional_notes}\n\n{move_in_note}".strip()

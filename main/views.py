@@ -5885,7 +5885,7 @@ def record_manual_payment(request, property_id=None):
 
     if application_id:
         selected_application = get_object_or_404(
-            active_staff_managed_resident_files(request.user).select_related("property"),
+            staff_managed_applications(request.user).select_related("property"),
             id=application_id,
         )
         selected_property = selected_application.property
@@ -5894,8 +5894,14 @@ def record_manual_payment(request, property_id=None):
     elif accessible_properties.count() == 1:
         selected_property = accessible_properties.first()
 
-    application_queryset = active_staff_managed_resident_files(request.user).order_by("space_label", "full_name")
-    if selected_property:
+    if application_id:
+        # A former tenant may still have a final move-out balance to pay. Keep
+        # the direct-payment screen scoped to that exact managed resident file.
+        application_queryset = staff_managed_applications(request.user).filter(id=application_id)
+    else:
+        application_queryset = active_staff_managed_resident_files(request.user)
+    application_queryset = application_queryset.order_by("space_label", "full_name")
+    if selected_property and not application_id:
         application_queryset = application_queryset.filter(property=selected_property)
 
     if request.method == "POST":
@@ -5946,6 +5952,8 @@ def record_manual_payment(request, property_id=None):
                 messages.success(request, "Manual payment recorded and resident balance updated.")
             if return_to == "dashboard":
                 return redirect("landlord_dashboard")
+            if return_to == "former_tenants":
+                return redirect("former_tenant_files")
             return redirect("payment_receipt", payment_id=payment.id)
     else:
         initial = {}
@@ -5953,12 +5961,16 @@ def record_manual_payment(request, property_id=None):
         if application_id:
             initial["application"] = application_id
             selected_application = get_object_or_404(
-                active_staff_managed_resident_files(request.user).select_related("property"),
+                staff_managed_applications(request.user).select_related("property"),
                 id=application_id,
             )
-            month_start, _next_month = current_month_bounds()
-            monthly_payments = list(selected_application.payments.filter(status="completed"))
-            rent_due = current_rent_due_with_carryforward(selected_application, month_start, monthly_payments)
+            if selected_application.tenancy_status == "former" and selected_application.move_out_date:
+                month_start = selected_application.move_out_date.replace(day=1)
+                rent_due = selected_application.balance
+            else:
+                month_start, _next_month = current_month_bounds()
+                monthly_payments = list(selected_application.payments.filter(status="completed"))
+                rent_due = current_rent_due_with_carryforward(selected_application, month_start, monthly_payments)
             if rent_due > 0:
                 initial["payment_type"] = "rent"
                 initial["amount"] = rent_due
@@ -5987,7 +5999,7 @@ def edit_manual_payment(request, payment_id):
 
     if request.method == "POST":
         form = ManualPaymentForm(request.POST, instance=payment)
-        form.fields["application"].queryset = active_staff_managed_resident_files(request.user).order_by("property__name", "space_label", "full_name")
+        form.fields["application"].queryset = staff_managed_applications(request.user).order_by("property__name", "space_label", "full_name")
 
         if form.is_valid():
             payment = form.save()
@@ -5997,7 +6009,7 @@ def edit_manual_payment(request, payment_id):
             return redirect("payment_receipt", payment_id=payment.id)
     else:
         form = ManualPaymentForm(instance=payment)
-        form.fields["application"].queryset = active_staff_managed_resident_files(request.user).order_by("property__name", "space_label", "full_name")
+        form.fields["application"].queryset = staff_managed_applications(request.user).order_by("property__name", "space_label", "full_name")
 
     return render(request, "record_manual_payment.html", {
         "form": form,
@@ -6912,7 +6924,6 @@ def export_rent_roll_csv(request):
     writer = csv.writer(response)
     writer.writerow([
         "Month",
-        "Resident",
         "Unit",
         "Rent",
         "Rent Paid",
@@ -6930,7 +6941,6 @@ def export_rent_roll_csv(request):
     for row in rows:
         writer.writerow([
             selected_month.strftime("%B %Y"),
-            row["resident"],
             row["room"],
             row["monthly_rent"],
             row["rent_paid"],
@@ -6945,7 +6955,6 @@ def export_rent_roll_csv(request):
     writer.writerow([
         selected_month.strftime("%B %Y"),
         "TOTAL",
-        "",
         totals["monthly_rent"],
         totals["rent_paid"],
         totals["rent_balance"],
@@ -7020,7 +7029,6 @@ def t12_report(request):
     year = selected_report_year(request)
     report_properties, selected_property = selected_report_properties(request)
     months, totals = t12_report_rows(request.user, year, report_properties)
-
     return render(request, "t12_report.html", {
         "year": year,
         "months": months,
@@ -7028,6 +7036,22 @@ def t12_report(request):
         "properties": staff_managed_properties(request.user).order_by("name"),
         "selected_property": selected_property,
     })
+
+
+def financial_entry_category_totals(queryset):
+    totals = OrderedDict()
+    for row in queryset.values("category").annotate(total=Sum("amount")).order_by("category"):
+        category = (row["category"] or "Uncategorized").strip() or "Uncategorized"
+        totals[category] = totals.get(category, Decimal("0.00")) + (row["total"] or Decimal("0.00"))
+    return totals
+
+
+def merge_category_totals(*groups):
+    merged = OrderedDict()
+    for group in groups:
+        for category, amount in group.items():
+            merged[category] = merged.get(category, Decimal("0.00")) + amount
+    return merged
 
 
 def selected_report_year(request):
@@ -7081,6 +7105,7 @@ def t12_report_rows(user, year, report_properties=None):
         "capital_expenses": Decimal("0.00"),
         "net_operating_income": Decimal("0.00"),
         "cash_flow_after_debt": Decimal("0.00"),
+        "net_cash_flow": Decimal("0.00"),
     }
 
     for month_number in range(1, 13):
@@ -7122,6 +7147,15 @@ def t12_report_rows(user, year, report_properties=None):
             + entries_total(receipt_entries.filter(entry_type="capital_expense"))
         )
 
+        operating_expense_categories = merge_category_totals(
+            financial_entry_category_totals(summary_entries.filter(entry_type="operating_expense")),
+            financial_entry_category_totals(receipt_entries.filter(entry_type="operating_expense")),
+        )
+        debt_service_categories = merge_category_totals(
+            financial_entry_category_totals(summary_entries.filter(entry_type="debt_service")),
+            financial_entry_category_totals(receipt_entries.filter(entry_type="debt_service")),
+        )
+
         if spreadsheet_income > 0:
             online_income = Decimal("0.00")
             total_income = spreadsheet_income + receipt_income
@@ -7133,6 +7167,7 @@ def t12_report_rows(user, year, report_properties=None):
 
         net_operating_income = total_income - operating_expenses
         cash_flow_after_debt = net_operating_income - debt_service
+        net_cash_flow = cash_flow_after_debt - capital_expenses
 
         row = {
             "month_name": date(year, month_number, 1).strftime("%B"),
@@ -7145,11 +7180,25 @@ def t12_report_rows(user, year, report_properties=None):
             "capital_expenses": capital_expenses,
             "net_operating_income": net_operating_income,
             "cash_flow_after_debt": cash_flow_after_debt,
+            "net_cash_flow": net_cash_flow,
+            "operating_expense_categories": operating_expense_categories,
+            "debt_service_categories": debt_service_categories,
         }
         months.append(row)
 
         for key in totals:
             totals[key] += row[key]
+
+    today = timezone.localdate()
+    projection_months = today.month if year == today.year else 12
+    if year > today.year:
+        projection_months = 0
+    totals["projection_months"] = projection_months
+    totals["projected_annual_cash_flow"] = (
+        (totals["net_cash_flow"] / Decimal(projection_months) * Decimal("12")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        if projection_months
+        else Decimal("0.00")
+    )
 
     return months, totals
 

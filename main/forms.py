@@ -1262,6 +1262,14 @@ class LandlordCreateTenantForm(forms.Form):
         }),
     )
 
+    prorate_first_month = forms.BooleanField(
+        label="Prorate first month's rent and utilities",
+        required=False,
+        initial=False,
+        help_text="Select only when you want charges calculated from the lease-start day. Otherwise the full monthly amounts apply.",
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+    )
+
     deposit_payment_plan = forms.ChoiceField(
         choices=HousingApplication.DEPOSIT_PAYMENT_PLAN_CHOICES,
         initial="paid_in_full",

@@ -8,6 +8,7 @@
             <p class="text-muted mb-0">Move-out archives for completed tenancies. These are separate from applicant archives.</p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'landlord_dashboard' %}" class="btn btn-outline-secondary">Landlord Dashboard</a>
             <a href="{% url 'begin_new_tenancy' %}" class="btn btn-primary">Begin New Tenancy</a>
             <a href="{% url 'landlord_resident_files' %}" class="btn btn-outline-dark">Active Resident Files</a>
         </div>
@@ -40,6 +41,9 @@
                             <td class="d-flex gap-2 flex-wrap">
                                 <a href="{% url 'application_detail' resident.id %}" class="btn btn-outline-secondary btn-sm">Open File</a>
                                 <a href="{% url 'move_out_statement' resident.id %}" class="btn btn-outline-dark btn-sm">Statement</a>
+                                {% if resident.balance or resident.utility_balance %}
+                                    <a href="{% url 'record_manual_payment' %}?application={{ resident.id }}&return=former_tenants" class="btn btn-success btn-sm">Record Payment</a>
+                                {% endif %}
                                 <a href="{% url 'end_resident_tenancy' resident.id %}" class="btn btn-outline-primary btn-sm">Edit Move-Out</a>
                                 <a href="{% url 'printable_application' resident.id %}" class="btn btn-outline-secondary btn-sm">Print</a>
                                 <a href="{% url 'begin_new_tenancy' %}?property={{ resident.property.id }}&unit={{ resident.space_label|urlencode }}" class="btn btn-primary btn-sm">New Tenant In Unit</a>

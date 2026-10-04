@@ -92,6 +92,10 @@
                 width: auto !important;
                 min-width: 0 !important;
             }
+
+            .resident-private {
+                display: none !important;
+            }
         }
     </style>
 </head>
@@ -152,7 +156,7 @@
                 <thead>
                     <tr>
                         <th class="unit-col">Unit</th>
-                        <th>Resident</th>
+                        <th class="resident-private">Resident</th>
                         <th class="money-col">Rent</th>
                         <th class="money-col">Rent Paid</th>
                         <th class="money-col">Rent Balance</th>
@@ -170,7 +174,7 @@
                     {% for row in rows %}
                         <tr>
                             <td class="unit-col">{{ row.room }}</td>
-                            <td>{{ row.resident }}</td>
+                            <td class="resident-private">{{ row.resident }}</td>
                             <td class="money-col">${{ row.monthly_rent }}</td>
                             <td class="money-col">${{ row.rent_paid }}</td>
                             <td class="money-col">${{ row.rent_balance }}</td>
@@ -197,8 +201,8 @@
                 {% if rows %}
                     <tfoot>
                         <tr class="totals-row">
-                            <td class="unit-col"></td>
-                            <td>Total</td>
+                            <td class="unit-col">Total</td>
+                            <td class="resident-private"></td>
                             <td class="money-col">${{ totals.monthly_rent }}</td>
                             <td class="money-col">${{ totals.rent_paid }}</td>
                             <td class="money-col">${{ totals.rent_balance }}</td>

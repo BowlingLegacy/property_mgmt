@@ -1,8 +1,9 @@
 <!DOCTYPE html>
+{% load formatting %}
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>T-12 Report | Bowling Legacy</title>
+    <title>Profit &amp; Loss Statement | Bowling Legacy</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -48,6 +49,14 @@
                 word-break: break-word;
             }
         }
+        .statement-table th, .statement-table td { text-align: right; white-space: nowrap; }
+        .statement-table th:first-child, .statement-table td:first-child { text-align: left; }
+        .statement-section td { background: #e9ecef !important; font-weight: 800; }
+        .statement-total td { border-top: 2px solid #212529; font-weight: 800; }
+        .statement-net td { border-top: 3px double #212529; border-bottom: 3px double #212529; font-weight: 900; }
+        .amount-negative { color: #9b2c2c; }
+        .month-statement { break-inside: avoid; page-break-inside: avoid; }
+        .month-statement .table { max-width: 760px; margin-left: auto; margin-right: auto; }
     </style>
 </head>
 
@@ -66,7 +75,14 @@
 </nav>
 
 <div class="container-fluid my-5 px-4">
-    <h1 class="fw-bold mb-2">T-12 Report</h1>
+    <div class="text-center mb-4">
+        <div class="text-uppercase small fw-bold text-muted">Bowling Legacy</div>
+        <h1 class="fw-bold mb-1">Profit &amp; Loss Statement</h1>
+        <div class="fw-semibold">
+            {% if selected_property %}{{ selected_property.name }}{% else %}All Managed Properties{% endif %}
+        </div>
+        <div class="text-muted">January 1–December 31, {{ year }} · Accrual/cash records entered in the portal</div>
+    </div>
     <p class="text-muted">
         Year: {{ year }}
         {% if selected_property %}
@@ -101,54 +117,54 @@
         </div>
     {% endif %}
 
-    <div class="table-responsive">
-        <table class="table table-bordered table-striped align-middle bg-white">
-            <thead>
-                <tr>
-                    <th>Month</th>
-                    <th>Income Source</th>
-                    <th>Online Income</th>
-                    <th>Spreadsheet Income</th>
-                    <th>Total Income</th>
-                    <th>Operating Expenses</th>
-                    <th>Debt Service</th>
-                    <th>Capital Expenses</th>
-                    <th>NOI</th>
-                    <th>Cash Flow After Debt</th>
-                </tr>
-            </thead>
+    {% for month in months %}
+        <section class="month-statement mb-5">
+            <h2 class="h3 fw-bold text-center border-bottom pb-2">{{ month.month_name }} {{ year }}</h2>
+            <table class="table table-sm statement-table bg-white">
+                <tbody>
+                    <tr class="statement-section"><td colspan="2">Operating Expenses</td></tr>
+                    {% for category, amount in month.operating_expense_categories.items %}
+                        <tr><td>{{ category }}</td><td>${{ amount|money }}</td></tr>
+                    {% empty %}
+                        <tr><td class="text-muted">No operating expenses entered</td><td>$0.00</td></tr>
+                    {% endfor %}
+                    <tr class="statement-total"><td>Total Operating Expenses for {{ month.month_name }}</td><td>${{ month.operating_expenses|money }}</td></tr>
 
+                    <tr class="statement-section"><td colspan="2">Debt Service</td></tr>
+                    {% for category, amount in month.debt_service_categories.items %}
+                        <tr><td>{{ category }}</td><td>${{ amount|money }}</td></tr>
+                    {% empty %}
+                        <tr><td class="text-muted">No debt service entered</td><td>$0.00</td></tr>
+                    {% endfor %}
+                    <tr class="statement-total"><td>Total Debt Service for {{ month.month_name }}</td><td>${{ month.debt_service|money }}</td></tr>
+
+                    <tr class="statement-total"><td>Total Income</td><td>${{ month.total_income|money }}</td></tr>
+                    <tr class="statement-total"><td>NOI</td><td>${{ month.net_operating_income|money }}</td></tr>
+                    <tr class="statement-net"><td>Total Net After Debt Service</td><td>${{ month.cash_flow_after_debt|money }}</td></tr>
+                    <tr class="statement-net"><td>Net Cash Flow</td><td>${{ month.net_cash_flow|money }}</td></tr>
+                </tbody>
+            </table>
+        </section>
+    {% endfor %}
+
+    <section class="month-statement mt-5">
+        <h2 class="h3 fw-bold text-center border-bottom pb-2">{{ year }} Annual Totals</h2>
+        <table class="table statement-table bg-white">
             <tbody>
-                {% for month in months %}
-                    <tr>
-                        <td>{{ month.month_name }}</td>
-                        <td>{{ month.income_source|default:"-" }}</td>
-                        <td>${{ month.online_income }}</td>
-                        <td>${{ month.spreadsheet_income }}</td>
-                        <td>${{ month.total_income }}</td>
-                        <td>${{ month.operating_expenses }}</td>
-                        <td>${{ month.debt_service }}</td>
-                        <td>${{ month.capital_expenses }}</td>
-                        <td>${{ month.net_operating_income }}</td>
-                        <td>${{ month.cash_flow_after_debt }}</td>
-                    </tr>
-                {% endfor %}
-
-                <tr class="fw-bold">
-                    <td>Total</td>
-                    <td>-</td>
-                    <td>${{ totals.online_income }}</td>
-                    <td>${{ totals.spreadsheet_income }}</td>
-                    <td>${{ totals.total_income }}</td>
-                    <td>${{ totals.operating_expenses }}</td>
-                    <td>${{ totals.debt_service }}</td>
-                    <td>${{ totals.capital_expenses }}</td>
-                    <td>${{ totals.net_operating_income }}</td>
-                    <td>${{ totals.cash_flow_after_debt }}</td>
-                </tr>
+                <tr><td>Total Operating Expenses</td><td>${{ totals.operating_expenses|money }}</td></tr>
+                <tr><td>Total Debt Service</td><td>${{ totals.debt_service|money }}</td></tr>
+                <tr><td>Total Income</td><td>${{ totals.total_income|money }}</td></tr>
+                <tr><td>NOI</td><td>${{ totals.net_operating_income|money }}</td></tr>
+                <tr class="statement-net"><td>Total Net After Debt Service</td><td>${{ totals.cash_flow_after_debt|money }}</td></tr>
+                <tr class="statement-net"><td>Net Cash Flow</td><td>${{ totals.net_cash_flow|money }}</td></tr>
+                <tr class="statement-net"><td>Projected Annual Cash Flow</td><td>${{ totals.projected_annual_cash_flow|money }}</td></tr>
             </tbody>
         </table>
-    </div>
+        <p class="text-muted small text-center">
+            Projected Annual Cash Flow annualizes net cash flow through {{ totals.projection_months }} month{{ totals.projection_months|pluralize }}.
+            Net Cash Flow includes capital expenditures; Total Net After Debt Service does not.
+        </p>
+    </section>
 </div>
 
 </body>

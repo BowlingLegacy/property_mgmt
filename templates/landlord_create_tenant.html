@@ -86,6 +86,13 @@
                 <div class="col-md-3">{{ form.balance.label_tag }}{{ form.balance }}{{ form.balance.errors }}</div>
                 <div class="col-md-3">{{ form.rent_due_day.label_tag }}{{ form.rent_due_day }}{{ form.rent_due_day.errors }}</div>
                 <div class="col-md-3">{{ form.lease_start_date.label_tag }}{{ form.lease_start_date }}{{ form.lease_start_date.errors }}</div>
+                <div class="col-12">
+                    <div class="form-check">
+                        {{ form.prorate_first_month }}
+                        <label class="form-check-label fw-bold" for="{{ form.prorate_first_month.id_for_label }}">{{ form.prorate_first_month.label }}</label>
+                        <div class="form-text">{{ form.prorate_first_month.help_text }}</div>
+                    </div>
+                </div>
                 <div class="col-md-3">{{ form.deposit_required.label_tag }}{{ form.deposit_required }}{{ form.deposit_required.errors }}</div>
                 <div class="col-md-3">{{ form.deposit_paid.label_tag }}{{ form.deposit_paid }}{{ form.deposit_paid.errors }}</div>
                 <div class="col-md-3">{{ form.deposit_payment_plan.label_tag }}{{ form.deposit_payment_plan }}{{ form.deposit_payment_plan.errors }}</div>
