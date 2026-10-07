@@ -272,7 +272,9 @@
     <section class="property-hero">
         <div class="eyebrow">A Bowling Legacy Community</div>
         <h1 class="property-title">{{ property.name }}</h1>
-        <p class="text-muted mb-0">Safe, stable, dignified housing with structure, respect, and community.</p>
+        <p class="text-muted mb-0">
+            {% if is_belmont %}Established long-term housing in Eugene's Santa Clara area.{% else %}Safe, stable, dignified housing with structure, respect, and community.{% endif %}
+        </p>
     </section>
 
     {% if existing_resident_intake_open %}
@@ -294,12 +296,21 @@
                 <div class="alert alert-warning">No main property photo uploaded.</div>
             {% endif %}
 
+            {% if is_painted_lady %}
             <div class="mb-4">
                 <span class="badge-soft">55+ Housing</span>
                 <span class="badge-soft">Sober Living</span>
                 <span class="badge-soft">Recovery Friendly</span>
                 <span class="badge-soft">Long-Term Housing</span>
             </div>
+            {% elif is_belmont %}
+            <div class="mb-4">
+                <span class="badge-soft">Duplex</span>
+                <span class="badge-soft">3 Bedrooms Per Home</span>
+                <span class="badge-soft">Single-Car Garages</span>
+                <span class="badge-soft">Extra-Large Backyard</span>
+            </div>
+            {% endif %}
 
             <div class="soft-card p-4 mb-4">
                 <h3 class="section-title mb-3">About This Property</h3>
@@ -386,14 +397,16 @@
                 <p class="mb-0">{{ property.availability_message }}</p>
             </div>
 
-            <a href="{% url 'apply' %}?property={{ property.pk }}" class="gold-btn w-100 mb-3">Apply / Join Waitlist</a>
+            {% if not is_belmont %}
+                <a href="{% url 'apply' %}?property={{ property.pk }}" class="gold-btn w-100 mb-3">Apply / Join Waitlist</a>
+            {% endif %}
 
             <div class="soft-card p-4">
                 <h3 class="card-title mb-3">Property Details</h3>
                 <div class="info-row"><span class="info-label">Address</span><span>{{ property.address|default:"N/A" }}</span></div>
                 <div class="info-row"><span class="info-label">Unit Size</span><span>{{ property.unit_size|default:"N/A" }}</span></div>
                 <div class="info-row"><span class="info-label">Available Date</span><span>{{ property.available_date|date:"M d, Y"|default:"N/A" }}</span></div>
-                <div class="info-row"><span class="info-label">Rent</span><span>{% if property.rent_amount %}${{ property.rent_amount }}{% else %}$650.00{% endif %}</span></div>
+                <div class="info-row"><span class="info-label">Rent</span><span>{% if property.rent_amount %}${{ property.rent_amount }}{% elif is_belmont %}Not publicly listed{% else %}$650.00{% endif %}</span></div>
                 <div class="info-row"><span class="info-label">Rental Term</span><span>{{ property.get_lease_type_display|default:"N/A" }}</span></div>
                 <div class="info-row"><span class="info-label">Deposit</span><span>{% if property.deposit_amount %}${{ property.deposit_amount }}{% else %}N/A{% endif %}</span></div>
                 <div class="info-row"><span class="info-label">Move-In Costs</span><span>{{ property.get_move_in_cost_type_display }}{% if property.move_in_cost_notes %}: {{ property.move_in_cost_notes }}{% endif %}</span></div>

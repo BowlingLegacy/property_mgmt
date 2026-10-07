@@ -8109,10 +8109,13 @@ def property_detail(request, pk):
     property_obj = get_object_or_404(Property, pk=pk)
     gallery_images = property_obj.images.all()
     can_manage_property_blog = user_can_manage_property_blog(request.user, property_obj)
+    normalized_property_name = property_obj.name.strip().lower()
 
     return render(request, "property_detail.html", {
         "property": property_obj,
         "gallery_images": gallery_images,
+        "is_belmont": normalized_property_name == "belmont",
+        "is_painted_lady": "painted lady" in normalized_property_name,
         "can_view_property_blog": False,
         "can_manage_property_blog": can_manage_property_blog,
         "existing_resident_intake_open": property_existing_resident_intake_open(property_obj),
