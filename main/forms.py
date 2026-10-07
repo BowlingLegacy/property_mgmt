@@ -1428,7 +1428,7 @@ class HousingApplicationForm(forms.ModelForm):
 
         widgets = {
             "full_name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Legal first and last name"}),
-            "phone": forms.TextInput(attrs={"class": "form-control phone-input", "placeholder": "(541) 326-8047", "inputmode": "tel", "autocomplete": "tel"}),
+            "phone": forms.TextInput(attrs={"class": "form-control phone-input", "placeholder": "Applicant phone number", "inputmode": "tel", "autocomplete": "tel"}),
             "email": forms.EmailInput(attrs={"class": "form-control", "placeholder": "name@example.com", "autocomplete": "email"}),
             "age": forms.NumberInput(attrs={"class": "form-control", "min": "18", "placeholder": "Age"}),
             "sms_opted_in": forms.CheckboxInput(attrs={"class": "form-check-input"}),
@@ -1460,17 +1460,17 @@ class HousingApplicationForm(forms.ModelForm):
             "drug_of_choice": forms.TextInput(attrs={"class": "form-control", "placeholder": "Support needs, recovery plan, or stability notes"}),
             "on_parole": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "parole_officer_name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Parole / probation officer name"}),
-            "parole_officer_phone": forms.TextInput(attrs={"class": "form-control phone-input", "placeholder": "(541) 326-8047", "inputmode": "tel"}),
+            "parole_officer_phone": forms.TextInput(attrs={"class": "form-control phone-input", "placeholder": "Officer phone number", "inputmode": "tel"}),
             "felony_history": forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Court, felony, pending case, or supervision details we should understand"}),
             "odoc_time_served": forms.CheckboxInput(attrs={"class": "form-check-input"}),
 
             "reference_1_name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Case manager, employer, landlord, family, friend"}),
-            "reference_1_phone": forms.TextInput(attrs={"class": "form-control phone-input", "placeholder": "(541) 326-8047", "inputmode": "tel"}),
+            "reference_1_phone": forms.TextInput(attrs={"class": "form-control phone-input", "placeholder": "Reference phone number", "inputmode": "tel"}),
             "reference_1_relationship": forms.TextInput(attrs={"class": "form-control", "placeholder": "Relationship"}),
             "reference_1_type": forms.TextInput(attrs={"class": "form-control", "placeholder": "Landlord, employer, support worker, personal"}),
 
             "reference_2_name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Second reference"}),
-            "reference_2_phone": forms.TextInput(attrs={"class": "form-control phone-input", "placeholder": "(541) 326-8047", "inputmode": "tel"}),
+            "reference_2_phone": forms.TextInput(attrs={"class": "form-control phone-input", "placeholder": "Reference phone number", "inputmode": "tel"}),
             "reference_2_relationship": forms.TextInput(attrs={"class": "form-control", "placeholder": "Relationship"}),
             "reference_2_type": forms.TextInput(attrs={"class": "form-control", "placeholder": "Landlord, employer, support worker, personal"}),
 
