@@ -11,6 +11,8 @@ class BelmontPropertyTests(TestCase):
     def setUp(self):
         migration = importlib.import_module("main.migrations.0080_add_belmont_property")
         migration.add_belmont_property(django_apps, None)
+        history_migration = importlib.import_module("main.migrations.0081_add_belmont_family_history")
+        history_migration.add_belmont_family_history(django_apps, None)
         self.property = Property.objects.get(name="Belmont")
 
     def test_belmont_profile_is_privacy_safe_and_currently_occupied(self):
@@ -27,6 +29,10 @@ class BelmontPropertyTests(TestCase):
         self.assertContains(response, "Residents pay power, utilities, and garbage")
         self.assertContains(response, "Not publicly listed")
         self.assertContains(response, "Extra-Large Backyard")
+        self.assertContains(response, "Jeffery R. Bowling")
+        self.assertContains(response, "more than twenty years")
+        self.assertContains(response, "thirty-nine years old")
+        self.assertContains(response, "honor Jeffery&#x27;s memory", html=False)
         self.assertNotContains(response, "Apply / Join Waitlist")
         self.assertNotContains(response, "Sober Living")
         self.assertNotContains(response, "$650.00")
