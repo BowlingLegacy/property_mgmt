@@ -279,7 +279,7 @@
     <div class="d-flex justify-content-between align-items-end flex-wrap gap-2 mb-4"><div><h2 class="section-title mb-1">Our Properties</h2><p class="text-muted mb-0">Explore Bowling Legacy communities and available housing information.</p></div><a href="{% url 'properties_list' %}" class="outline-btn">View All Properties</a></div>
     <div class="row g-4">
         {% for property in properties %}
-        <div class="col-md-4"><div class="soft-card property-card">{% if property.photo %}<img src="{{ property.photo.url }}" alt="{{ property.name }}">{% else %}<img src="{% static 'images/photo03.JPG' %}" alt="Property">{% endif %}<div class="p-4"><h5 class="section-title" style="font-size:1.45rem;">{{ property.name }}</h5><p class="text-muted">{{ property.description|truncatewords:18 }}</p><a href="{% url 'property_detail' property.pk %}" class="outline-btn">View Details</a></div></div></div>
+        <div class="col-md-4"><div class="soft-card property-card">{% if property.name == "Belmont" %}<img src="{% static 'property_photos/belmont-front-privacy-safe.png' %}" alt="Belmont">{% elif property.photo %}<img src="{{ property.photo.url }}" alt="{{ property.name }}">{% else %}<img src="{% static 'images/photo03.JPG' %}" alt="Property">{% endif %}<div class="p-4"><h5 class="section-title" style="font-size:1.45rem;">{{ property.name }}</h5><p class="text-muted">{{ property.description|truncatewords:18 }}</p><a href="{% url 'property_detail' property.pk %}" class="outline-btn">View Details</a></div></div></div>
         {% empty %}<p class="text-muted">No properties available.</p>{% endfor %}
     </div>
 </section>

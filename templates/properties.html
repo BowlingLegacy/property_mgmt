@@ -141,7 +141,11 @@
 
                 <div class="property-img-frame">
 
-                    {% if property.photo %}
+                    {% if property.name == "Belmont" %}
+                        <img src="{% static 'property_photos/belmont-front-privacy-safe.png' %}"
+                             class="property-img"
+                             alt="Belmont">
+                    {% elif property.photo %}
                         <img src="{{ property.photo.url }}"
                              class="property-img"
                              alt="{{ property.name }}">

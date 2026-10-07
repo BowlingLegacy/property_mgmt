@@ -1,12 +1,13 @@
 import importlib
 
 from django.apps import apps as django_apps
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .models import Property
 
 
+@override_settings(STATICFILES_STORAGE="django.contrib.staticfiles.storage.StaticFilesStorage")
 class BelmontPropertyTests(TestCase):
     def setUp(self):
         migration = importlib.import_module("main.migrations.0080_add_belmont_property")
@@ -33,6 +34,15 @@ class BelmontPropertyTests(TestCase):
         self.assertContains(response, "more than twenty years")
         self.assertContains(response, "thirty-nine years old")
         self.assertContains(response, "honor Jeffery&#x27;s memory", html=False)
+        self.assertContains(response, "/static/property_photos/belmont-front-privacy-safe.png")
+        self.assertContains(response, "/static/property_photos/belmont-side-privacy-safe.png")
+        self.assertNotContains(response, "/media/property_photos/belmont-front-privacy-safe.png")
         self.assertNotContains(response, "Apply / Join Waitlist")
         self.assertNotContains(response, "Sober Living")
         self.assertNotContains(response, "$650.00")
+
+    def test_belmont_list_card_uses_deploy_safe_static_photo(self):
+        response = self.client.get(reverse("properties_list"))
+
+        self.assertContains(response, "/static/property_photos/belmont-front-privacy-safe.png")
+        self.assertNotContains(response, "/media/property_photos/belmont-front-privacy-safe.png")

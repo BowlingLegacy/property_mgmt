@@ -288,7 +288,11 @@
 
     <div class="row g-4">
         <div class="col-lg-8">
-            {% if property.photo %}
+            {% if is_belmont %}
+            <div class="main-photo-frame">
+                <img src="{% static 'property_photos/belmont-front-privacy-safe.png' %}" class="main-photo expandable-img" alt="Belmont">
+            </div>
+            {% elif property.photo %}
             <div class="main-photo-frame">
                 <img src="{{ property.photo.url }}" class="main-photo expandable-img" alt="{{ property.name }}">
             </div>
@@ -326,6 +330,13 @@
                 </div>
 
                 <div class="row g-4">
+                    {% if is_belmont %}
+                    <div class="col-md-4">
+                        <div class="gallery-img-wrap">
+                            <img src="{% static 'property_photos/belmont-side-privacy-safe.png' %}" class="gallery-img expandable-img" alt="Belmont duplex side entry and garden">
+                        </div>
+                    </div>
+                    {% else %}
                     {% for img in gallery_images %}
                     <div class="col-md-4">
                         <div class="gallery-img-wrap">
@@ -335,6 +346,7 @@
                     {% empty %}
                         <p class="text-muted">No gallery photos have been uploaded yet.</p>
                     {% endfor %}
+                    {% endif %}
                 </div>
             </div>
 
