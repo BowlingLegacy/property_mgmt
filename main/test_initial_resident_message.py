@@ -2,7 +2,7 @@ from django.core import mail
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from .models import HousingApplication, Property, ResidentMessage, User
+from .models import HousingApplication, Property, ResidentMessage, SmsMessageLog, User
 
 
 @override_settings(
@@ -50,6 +50,7 @@ class InitialResidentMessageTests(TestCase):
             "resident": self.resident.id,
             "subject": "Scheduled inspection",
             "message": "Please review the inspection date in your portal.",
+            "send_sms": "on",
         })
 
         resident_message = ResidentMessage.objects.get()
@@ -63,6 +64,9 @@ class InitialResidentMessageTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, [self.resident.email])
         self.assertNotIn(resident_message.message, mail.outbox[0].body)
+        sms_log = SmsMessageLog.objects.get(resident_message=resident_message)
+        self.assertIn("new secure portal message", sms_log.body)
+        self.assertNotIn("new secure portal reply", sms_log.body)
 
         self.client.logout()
         self.client.login(username=self.resident_user.username, password="StrongPass123!")
