@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load tz %}
 {% block content %}
 
 <div class="container my-4">
@@ -53,12 +54,12 @@
                                 {% endif %}
                             </td>
                             <td>{{ application.property.name|default:"No Property" }}</td>
-                            <td>{{ application.created_at|date:"M j, Y, g:i A" }}</td>
+                            <td>{{ application.created_at|localtime|date:"M j, Y, g:i A" }}</td>
                             <td>
                                 {% if folder == "invited" and application.user.invite_code_created_at %}
-                                    {{ application.user.invite_code_created_at|date:"M j, Y, g:i A" }}
+                                    {{ application.user.invite_code_created_at|localtime|date:"M j, Y, g:i A" }}
                                 {% else %}
-                                    {{ application.application_folder_updated_at|date:"M j, Y, g:i A"|default:"-" }}
+                                    {{ application.application_folder_updated_at|localtime|date:"M j, Y, g:i A"|default:"-" }}
                                 {% endif %}
                             </td>
                             <td class="d-flex gap-2 flex-wrap">

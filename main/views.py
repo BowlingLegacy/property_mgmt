@@ -4081,6 +4081,7 @@ def landlord_rent_setup(request, property_id=None):
 def get_superadmin_workspace_context():
     properties = Property.objects.all().order_by("name")
     users = User.objects.all().order_by("username")
+    owner_count = User.objects.filter(role="property_owner").distinct().count()
     applications = (
         HousingApplication.objects
         .select_related("property", "user")
@@ -4123,6 +4124,7 @@ def get_superadmin_workspace_context():
         "applications": dedupe_resident_inspection_applications(visible_resident_files(applications)),
         "recent_messages": recent_messages,
         "owner_groups": owner_groups,
+        "owner_count": owner_count,
         "site_payment_total": site_payment_total,
     }
     context.update(company_mailbox_context())

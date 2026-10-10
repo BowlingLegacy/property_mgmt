@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load tz %}
 {% block content %}
 
 <div class="container my-4">
@@ -36,7 +37,7 @@
                                 <a href="{% url 'landlord_existing_resident_intake_detail' intake.id %}" class="btn btn-outline-secondary btn-sm mt-1">Open</a>
                             </td>
                             <td>{{ intake.property.name }}</td>
-                            <td>{{ intake.created_at|date:"M j, g:i A" }}</td>
+                            <td>{{ intake.created_at|localtime|date:"M j, g:i A" }}</td>
                             <td>{{ intake.email }}<br><span class="text-muted small">{{ intake.phone }}</span></td>
                             <td>
                                 {% if row.setup_status == "completed" %}
@@ -93,7 +94,7 @@
                                 {% endif %}
                             </td>
                             <td>{{ application.property.name|default:"No Property" }}</td>
-                            <td>{{ application.created_at|date:"M j, g:i A" }}</td>
+                            <td>{{ application.created_at|localtime|date:"M j, g:i A" }}</td>
                             <td class="d-flex gap-2 flex-wrap">
                                 <a href="{% url 'application_detail' application.id %}" class="btn btn-outline-secondary btn-sm">Open</a>
                                 <a href="{% url 'landlord_create_tenant' %}?application={{ application.id }}" class="btn btn-primary btn-sm">Create File</a>
