@@ -4081,7 +4081,11 @@ def landlord_rent_setup(request, property_id=None):
 def get_superadmin_workspace_context():
     properties = Property.objects.all().order_by("name")
     users = User.objects.all().order_by("username")
-    owner_count = User.objects.filter(role="property_owner").distinct().count()
+    owner_count = len({
+        property_obj.owner_email.strip().casefold()
+        for property_obj in properties
+        if property_obj.owner_email and property_obj.owner_email.strip()
+    })
     applications = (
         HousingApplication.objects
         .select_related("property", "user")

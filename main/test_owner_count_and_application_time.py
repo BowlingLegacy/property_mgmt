@@ -33,6 +33,13 @@ class OwnerCountAndApplicationTimeTests(TestCase):
         self.client.login(username=self.admin.username, password="StrongPass123!")
 
     def test_dashboard_counts_one_owner_account_and_two_properties(self):
+        User.objects.create_user(
+            username="unused-owner-account",
+            email="unused-owner@example.com",
+            password="StrongPass123!",
+            role="property_owner",
+        )
+
         response = self.client.get(reverse("superadmin_dashboard"))
 
         self.assertEqual(response.status_code, 200)
