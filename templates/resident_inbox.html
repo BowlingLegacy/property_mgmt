@@ -88,9 +88,9 @@ body {
                         <td>{{ document.get_status_display }}</td>
                         <td>
                             {% if document.file %}
-                                <a href="{{ document.file.url }}" target="_blank" class="gold-link">View</a>
+                                <a href="{% url 'open_applicant_document' document.id %}" target="_blank" class="gold-link">View</a>
                                 |
-                                <a href="{{ document.file.url }}" target="_blank" class="gold-link">Print</a>
+                                <a href="{% url 'open_applicant_document' document.id %}" target="_blank" class="gold-link">Print</a>
                             {% else %}
                                 -
                             {% endif %}

@@ -55,7 +55,7 @@
                     {% for document in documents %}
                         <tr>
                             <td>{{ document.get_document_type_display }}</td>
-                            <td><a href="{{ document.source_file.url }}" target="_blank">{{ document.title }}</a></td>
+                            <td><a href="{% url 'owner_property_onboarding_document_file' document.id %}" target="_blank">{{ document.title }}</a></td>
                             <td>{{ document.get_conversion_status_display }}</td>
                         </tr>
                     {% endfor %}

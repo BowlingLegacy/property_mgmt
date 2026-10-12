@@ -383,7 +383,7 @@ class LiveFlowTests(TestCase):
         self.assertEqual(entries.aggregate(total=Sum("amount"))["total"], Decimal("4440.00"))
 
     @patch("main.views.timezone.localdate", return_value=date(2026, 8, 5))
-    def test_mike_dudley_august_paid_in_full_is_absent_from_collection_watch(self, _localdate):
+    def test_mike_dudley_august_current_rent_and_utilities_still_shows_unpaid_deposit(self, _localdate):
         property_obj = Property.objects.create(name="Mike Dudley Payment Property")
         resident = HousingApplication.objects.create(
             property=property_obj, full_name="Mike Dudley", phone="555-0118", age=50,
@@ -404,9 +404,18 @@ class LiveFlowTests(TestCase):
         self.assertEqual(Payment.objects.filter(
             application=resident, payment_type="utility", service_month=date(2026, 8, 1), status="completed"
         ).aggregate(total=Sum("amount"))["total"], Decimal("55.00"))
-        self.assertEqual(monthly_collection_watch_rows([resident]), [])
+        rows = monthly_collection_watch_rows([resident])
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["missing"], "Deposit")
+        self.assertEqual(rows[0]["rent_due"], Decimal("0.00"))
+        self.assertEqual(rows[0]["utility_due"], Decimal("0.00"))
+        self.assertEqual(rows[0]["deposit_due"], Decimal("450.00"))
         self.assertEqual(resident.balance, Decimal("0.00"))
         self.assertEqual(resident.utility_balance, Decimal("0.00"))
+
+        resident.deposit_paid = resident.deposit_required
+        resident.save(update_fields=["deposit_paid"])
+        self.assertEqual(monthly_collection_watch_rows([resident]), [])
 
     def test_sherry_880_payments_move_from_insurance_to_debt_service_and_june_4000_is_added(self):
         property_obj = Property.objects.create(name="Sherry Debt Service Property")
@@ -1052,7 +1061,9 @@ class LiveFlowTests(TestCase):
         self.assertEqual(payment.amount, Decimal("35.00"))
 
     def test_printable_application_includes_full_intake_details(self):
+        property_obj = Property.objects.create(name="Detailed Application Property")
         application = HousingApplication.objects.create(
+            property=property_obj,
             full_name="Detailed Applicant",
             phone="555-0100",
             email="detailed@example.com",
@@ -1084,6 +1095,14 @@ class LiveFlowTests(TestCase):
             unconditional_regard_acknowledgment=True,
         )
 
+        response = self.client.get(reverse("application_detail", args=[application.id]))
+
+        self.assertRedirects(response, f"{reverse('login')}?next={reverse('application_detail', args=[application.id])}")
+        reviewer = User.objects.create_superuser(
+            username="detailed-application-reviewer", email="reviewer@example.com",
+            password="StrongPass123!", role="admin",
+        )
+        self.client.force_login(reviewer)
         response = self.client.get(reverse("application_detail", args=[application.id]))
 
         self.assertEqual(response.status_code, 200)
@@ -2438,7 +2457,7 @@ class LiveFlowTests(TestCase):
         self.assertEqual(payment_amount_for_month([payment], 2026, 5, ["rent"]), Decimal("0.00"))
         self.assertEqual(payment_amount_for_month([payment], 2026, 6, ["rent"]), Decimal("650.00"))
 
-        payment_log = self.client.get(reverse("payment_log"))
+        payment_log = self.client.get(reverse("payment_log"), {"month": "all"})
         self.assertContains(payment_log, "June 2026")
         self.assertContains(payment_log, "Unit")
         self.assertContains(payment_log, "Date/Time")
@@ -6737,12 +6756,12 @@ class LiveFlowTests(TestCase):
         content = response.content.decode()
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("June 2026,G,560.00", content)
+        self.assertIn("June 2026,Rent Roll CSV Property,G,CSV Resident,560.00,560.00", content)
         self.assertIn("Utilities Paid", content)
-        self.assertIn("June 2026,TOTAL,560.00,0.00,560.00,55.00,55.00,0.00,450.00,0.00,450.00", content)
-        self.assertNotIn("Property", content.splitlines()[0])
-        self.assertNotIn("Resident", content.splitlines()[0])
-        self.assertNotIn("CSV Resident", content)
+        self.assertIn("June 2026,,TOTAL,,560.00,560.00,0.00,560.00,55.00,55.00,0.00,450.00,0.00,450.00", content)
+        self.assertIn("Property", content.splitlines()[0])
+        self.assertIn("Resident", content.splitlines()[0])
+        self.assertIn("CSV Resident", content)
         self.assertNotIn("Utilities Paid This Month", content)
         self.assertNotIn("CSV Applicant", content)
 
@@ -7781,7 +7800,10 @@ class LiveFlowTests(TestCase):
         self.assertContains(income_statement, "Net Cash Flow")
         self.assertContains(income_statement, "($250.00)")
         self.assertContains(lender_package, "Supportive Housing / Lender Package")
-        self.assertContains(lender_package, "recovery-oriented supportive shared-housing")
+        self.assertContains(lender_package, "incomplete draft")
+        self.assertContains(lender_package, "No verified property-specific operating narrative")
+        self.assertNotContains(lender_package, "$650,000")
+        self.assertNotContains(lender_package, "$200,000")
         self.assertContains(lender_package, "Eligibility before appraisal")
         self.assertNotContains(utility, "Hidden Expense")
 
@@ -7901,7 +7923,7 @@ class LiveFlowTests(TestCase):
         csv_response = self.client.get(f"{reverse('export_t12_csv')}?year=2026")
         csv_content = csv_response.content.decode()
 
-        self.assertIn("June,Spreadsheet,0.00,1200.00,1200.00,300.00,400.00", csv_content)
+        self.assertIn("June,Spreadsheet,0.00,1200.00,0.00,1200.00,300.00,400.00", csv_content)
 
     def test_t12_prefers_summary_income_over_portal_income_for_same_month(self):
         landlord = User.objects.create_user(

@@ -263,6 +263,12 @@ class PropertyOwnerIntakeAdmin(admin.ModelAdmin):
     readonly_fields = ("portal_invite_code", "invite_sent_at", "created_at")
     actions = ("send_property_owner_portal_invites",)
 
+    def get_readonly_fields(self, request, obj=None):
+        readonly = list(super().get_readonly_fields(request, obj))
+        if obj and obj.user_id:
+            readonly.append("email")
+        return tuple(readonly)
+
     def portal_invite_code(self, obj):
         if obj.user and obj.user.invite_code:
             return obj.user.invite_code

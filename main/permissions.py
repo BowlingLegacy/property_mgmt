@@ -94,3 +94,26 @@ def can_access_django_admin(user):
 
 def can_modify_platform_structure(user):
     return is_super_admin(user)
+
+
+def verified_portal_email(user, role):
+    if not user or not user.is_authenticated:
+        return ""
+    cache_key = f"_verified_portal_email_{role}"
+    if hasattr(user, cache_key):
+        return getattr(user, cache_key)
+    if role == "property_owner":
+        intakes = user.property_owner_intakes.order_by("created_at")
+    elif role == "landlord":
+        intakes = user.landlord_intakes.order_by("created_at")
+    else:
+        return ""
+    intake = intakes.filter(status="registered").first()
+    if not intake and user.has_usable_password():
+        intake = intakes.first()
+    if intake:
+        email = intake.email.strip()
+    else:
+        email = (user.email or "").strip() if user.has_usable_password() else ""
+    setattr(user, cache_key, email)
+    return email

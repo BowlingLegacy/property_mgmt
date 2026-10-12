@@ -421,7 +421,7 @@
                 <div class="info-row"><span class="info-label">Rent</span><span>{% if property.rent_amount %}${{ property.rent_amount }}{% elif is_belmont %}Not publicly listed{% else %}$650.00{% endif %}</span></div>
                 <div class="info-row"><span class="info-label">Rental Term</span><span>{{ property.get_lease_type_display|default:"N/A" }}</span></div>
                 <div class="info-row"><span class="info-label">Deposit</span><span>{% if property.deposit_amount %}${{ property.deposit_amount }}{% else %}N/A{% endif %}</span></div>
-                <div class="info-row"><span class="info-label">Move-In Costs</span><span>{{ property.get_move_in_cost_type_display }}{% if property.move_in_cost_notes %}: {{ property.move_in_cost_notes }}{% endif %}</span></div>
+                <div class="info-row"><span class="info-label">{% if property.move_in_cost_notes %}Estimated Move-In Total{% else %}Move-In Cost Formula{% endif %}</span><span>{% if property.move_in_cost_notes %}{{ property.move_in_cost_notes }}{% else %}{{ property.get_move_in_cost_type_display }}{% endif %}</span></div>
                 {% if property.utilities_cost %}
                     <div class="info-row"><span class="info-label">Utilities</span><span>{{ property.utilities_cost }}</span></div>
                 {% endif %}

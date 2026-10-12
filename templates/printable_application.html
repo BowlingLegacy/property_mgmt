@@ -389,8 +389,8 @@ body {
                 <div class="field-item"><div class="field-label">Driver License Number</div><div class="field-value">{{ application.drivers_license_number|default:"Not provided" }}</div></div>
                 <div class="field-item"><div class="field-label">Valid Oregon ID / License</div><div class="field-value">{% if application.has_valid_odl %}Yes{% else %}No{% endif %}</div></div>
                 <div class="field-item"><div class="field-label">Oregon ID Number</div><div class="field-value">{{ application.oregon_id_number|default:"Not provided" }}</div></div>
-                <div class="field-item"><div class="field-label">Uploaded ID</div><div class="field-value">{% if application.id_upload %}<a href="{{ application.id_upload.url }}" target="_blank">Open uploaded ID</a>{% else %}Not uploaded{% endif %}</div></div>
-                <div class="field-item"><div class="field-label">Selfie With Date</div><div class="field-value">{% if application.identity_selfie_upload %}<a href="{{ application.identity_selfie_upload.url }}" target="_blank">Open selfie proof</a>{% else %}Not uploaded{% endif %}</div></div>
+                <div class="field-item"><div class="field-label">Uploaded ID</div><div class="field-value">{% if application.id_upload %}<a href="{% url 'open_application_upload' application.id 'id_upload' %}" target="_blank">Open uploaded ID</a>{% else %}Not uploaded{% endif %}</div></div>
+                <div class="field-item"><div class="field-label">Selfie With Date</div><div class="field-value">{% if application.identity_selfie_upload %}<a href="{% url 'open_application_upload' application.id 'identity_selfie_upload' %}" target="_blank">Open selfie proof</a>{% else %}Not uploaded{% endif %}</div></div>
             </div>
         </div>
 

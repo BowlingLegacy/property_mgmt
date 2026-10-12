@@ -157,9 +157,11 @@
                     <tr>
                         <th class="unit-col">Unit</th>
                         <th class="resident-private">Resident</th>
-                        <th class="money-col">Rent</th>
+                        <th class="money-col">Scheduled Rate</th>
+                        <th class="money-col">Actual Charge</th>
                         <th class="money-col">Rent Paid</th>
-                        <th class="money-col">Rent Balance</th>
+                        <th class="money-col">Prior Balance</th>
+                        <th class="money-col">Total Due</th>
                         <th class="money-col">Utilities</th>
                         <th class="money-col">Utilities Paid</th>
                         <th class="money-col">Utilities Balance</th>
@@ -176,7 +178,9 @@
                             <td class="unit-col">{{ row.room }}</td>
                             <td class="resident-private">{{ row.resident }}</td>
                             <td class="money-col">${{ row.monthly_rent }}</td>
+                            <td class="money-col">${{ row.rent_charge|default:row.monthly_rent }}</td>
                             <td class="money-col">${{ row.rent_paid }}</td>
+                            <td class="money-col">${{ row.current_rent_balance }}</td>
                             <td class="money-col">${{ row.rent_balance }}</td>
                             <td class="money-col">${{ row.utility_monthly }}</td>
                             <td class="money-col">${{ row.utility_paid }}</td>
@@ -193,7 +197,7 @@
                         </tr>
                     {% empty %}
                         <tr>
-                            <td colspan="12" class="text-muted">No residents found.</td>
+                            <td colspan="14" class="text-muted">No residents found.</td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -204,7 +208,9 @@
                             <td class="unit-col">Total</td>
                             <td class="resident-private"></td>
                             <td class="money-col">${{ totals.monthly_rent }}</td>
+                            <td class="money-col">${{ totals.rent_charge }}</td>
                             <td class="money-col">${{ totals.rent_paid }}</td>
+                            <td class="money-col"></td>
                             <td class="money-col">${{ totals.rent_balance }}</td>
                             <td class="money-col">${{ totals.utility_monthly }}</td>
                             <td class="money-col">${{ totals.utility_paid }}</td>

@@ -90,7 +90,7 @@
 
         <div class="receipt-row">
             <div class="receipt-label">Reference</div>
-            <div class="receipt-value">{{ payment.reference_number|default:"N/A" }}</div>
+            <div class="receipt-value">{% firstof payment.reference_number payment.stripe_payment_intent payment.stripe_session_id "N/A" %}</div>
         </div>
 
         <div class="receipt-row">

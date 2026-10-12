@@ -85,10 +85,7 @@ body {
     font-weight: 900;
 }
 
-.report-table td:nth-child(2),
-.report-table th:nth-child(2) {
-    text-align: right;
-}
+.report-table td, .report-table th { overflow-wrap: anywhere; }
 
 .totals-grid {
     display: grid;
@@ -240,6 +237,13 @@ body {
                 </div>
             </div>
         </form>
+        {% if form.errors %}
+            <div class="alert alert-danger mt-3" role="alert">
+                <strong>Report could not be generated.</strong>
+                {{ form.non_field_errors }}
+                {% for field in form %}{{ field.errors }}{% endfor %}
+            </div>
+        {% endif %}
     </section>
 
     {% if generated %}
@@ -250,6 +254,11 @@ body {
                     <p class="text-muted mb-0">
                         {% if selected_property %}{{ selected_property.name }}{% else %}All accessible properties{% endif %}
                         | {{ row_count }} matching record{{ row_count|pluralize }}
+                    </p>
+                    <p class="text-muted small mb-0">
+                        Period: {% if start_date %}{{ start_date|date:"M j, Y" }}{% else %}report default{% endif %}
+                        through {% if end_date %}{{ end_date|date:"M j, Y" }}{% else %}report default{% endif %}.
+                        Basis: payments use service month except Payment Summary, which uses received date; ledger rows use entry date/month.
                     </p>
                 </div>
                 <div class="text-muted small">

@@ -314,7 +314,7 @@ body {
                         {% csrf_token %}
                         <label for="{{ profile_photo_form.profile_photo.id_for_label }}" class="profile-photo profile-photo-form" title="Change profile photo">
                             {% if application.profile_photo %}
-                                <img id="profilePhotoPreview" src="{{ application.profile_photo.url }}" alt="{{ application.full_name }}">
+                                <img id="profilePhotoPreview" src="{% url 'open_resident_profile_photo' application.id %}" alt="{{ application.full_name }}">
                             {% else %}
                                 <span id="profilePhotoInitial">{{ application.full_name|first|upper }}</span>
                                 <img id="profilePhotoPreview" src="" alt="{{ application.full_name }}" style="display:none;">
@@ -329,7 +329,7 @@ body {
                 {% else %}
                     <div class="profile-photo">
                         {% if application.profile_photo %}
-                            <img src="{{ application.profile_photo.url }}" alt="{{ application.full_name }}">
+                            <img src="{% url 'open_resident_profile_photo' application.id %}" alt="{{ application.full_name }}">
                         {% else %}
                             {{ application.full_name|first|upper }}
                         {% endif %}
@@ -625,9 +625,9 @@ body {
                                         <td>{{ document.get_status_display }}</td>
                                         <td>
                                             {% if document.file %}
-                                            <a href="{{ document.file.url }}" target="_blank" class="gold-link">View</a>
+                                            <a href="{% url 'open_applicant_document' document.id %}" target="_blank" class="gold-link">View</a>
                                             |
-                                            <a href="{{ document.file.url }}" target="_blank" class="gold-link">Print</a>
+                                            <a href="{% url 'open_applicant_document' document.id %}" target="_blank" class="gold-link">Print</a>
                                             {% else %}
                                             —
                                             {% endif %}

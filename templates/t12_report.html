@@ -57,6 +57,13 @@
         .amount-negative { color: #9b2c2c; }
         .month-statement { break-inside: avoid; page-break-inside: avoid; }
         .month-statement .table { max-width: 760px; margin-left: auto; margin-right: auto; }
+        body { overflow-x: hidden; }
+        h1, .fw-semibold { overflow-wrap: anywhere; }
+        @media (max-width: 576px) {
+            .container-fluid { padding-left: .75rem !important; padding-right: .75rem !important; }
+            h1 { font-size: 1.65rem; }
+            .statement-table th, .statement-table td { white-space: normal; overflow-wrap: anywhere; }
+        }
     </style>
 </head>
 
@@ -141,6 +148,7 @@
                     <tr class="statement-total"><td>Total Income</td><td>${{ month.total_income|money }}</td></tr>
                     <tr class="statement-total"><td>NOI</td><td>${{ month.net_operating_income|money }}</td></tr>
                     <tr class="statement-net"><td>Total Net After Debt Service</td><td>${{ month.cash_flow_after_debt|money }}</td></tr>
+                    <tr class="statement-total"><td>Capital Expenses</td><td>${{ month.capital_expenses|money }}</td></tr>
                     <tr class="statement-net"><td>Net Cash Flow</td><td>${{ month.net_cash_flow|money }}</td></tr>
                 </tbody>
             </table>
@@ -156,6 +164,7 @@
                 <tr><td>Total Income</td><td>${{ totals.total_income|money }}</td></tr>
                 <tr><td>NOI</td><td>${{ totals.net_operating_income|money }}</td></tr>
                 <tr class="statement-net"><td>Total Net After Debt Service</td><td>${{ totals.cash_flow_after_debt|money }}</td></tr>
+                <tr><td>Total Capital Expenses</td><td>${{ totals.capital_expenses|money }}</td></tr>
                 <tr class="statement-net"><td>Net Cash Flow</td><td>${{ totals.net_cash_flow|money }}</td></tr>
                 <tr class="statement-net"><td>Projected Annual Cash Flow</td><td>${{ totals.projected_annual_cash_flow|money }}</td></tr>
             </tbody>

@@ -114,7 +114,7 @@
                 <div class="file-panel">
                     <h2 class="h5 fw-bold">Profile Photo</h2>
                     {% if intake.profile_photo %}
-                        <img src="{{ intake.profile_photo.url }}" alt="{{ intake.full_name }}" class="img-fluid rounded">
+                        <img src="{% url 'open_existing_resident_intake_photo' intake.id %}" alt="{{ intake.full_name }}" class="img-fluid rounded">
                     {% else %}
                         <p class="text-muted mb-0">No profile photo uploaded.</p>
                     {% endif %}

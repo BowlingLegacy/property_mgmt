@@ -1164,6 +1164,14 @@ class FinancialEntry(models.Model):
     ]
 
     upload = models.ForeignKey(FinancialUpload, on_delete=models.CASCADE, related_name="entries")
+    property = models.ForeignKey(
+        Property,
+        on_delete=models.SET_NULL,
+        related_name="financial_entries",
+        blank=True,
+        null=True,
+        help_text="Stable row-level property attribution; company rows remain blank.",
+    )
     ledger_scope = models.CharField(max_length=30, choices=FinancialUpload.LEDGER_SCOPE_CHOICES, default="property")
     property_name = models.CharField(max_length=255, blank=True, default="Painted Lady")
     sheet_name = models.CharField(max_length=255)
@@ -1335,8 +1343,8 @@ class RentRollSnapshot(models.Model):
         ordering = ["property__name", "room_unit_label", "resident_name"]
         constraints = [
             models.UniqueConstraint(
-                fields=["property", "service_month", "room_unit_label"],
-                name="unique_monthly_rent_roll_room",
+                fields=["property", "service_month", "room_unit_label", "application"],
+                name="unique_monthly_rent_roll_tenancy",
             ),
         ]
 

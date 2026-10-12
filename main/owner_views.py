@@ -4,6 +4,7 @@ from urllib.parse import urlencode
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db.models import Q, Sum
+from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -14,9 +15,9 @@ from .forms import (
     OwnerPropertyOnboardingDocumentsForm,
 )
 from .invite_utils import create_pending_portal_user, send_portal_access_invite_email
-from .models import FinancialEntry, FinancialUpload, Property, PropertyImage, PropertyRoomRent, HousingApplication, Payment, ResidentMessage
-from .permissions import can_access_owner_dashboard, is_super_admin, is_assistant_admin
-from .views import is_rentable_room_label, normalized_room_label, payment_amount_for_month, visible_resident_files
+from .models import FinancialEntry, FinancialUpload, Property, PropertyImage, PropertyOnboardingDocument, PropertyRoomRent, HousingApplication, Payment, ResidentMessage
+from .permissions import can_access_owner_dashboard, is_super_admin, is_assistant_admin, verified_portal_email
+from .views import is_rentable_room_label, normalized_room_label, payment_amount_for_month, t12_report_rows, visible_resident_files
 
 
 def owner_dashboard_report_url(report_type, property_obj, extra_params=None):
@@ -103,12 +104,13 @@ def property_owner_dashboard(request):
             payment_amount_for_month(completed_rent_payments, current_year, month_number, ["rent"])
             for month_number in range(1, today.month + 1)
         )
-        operating_expenses_ytd = financial_entry_total(property_obj, current_year, ["operating_expense"])
-        debt_service_ytd = financial_entry_total(property_obj, current_year, ["debt_service"])
-        capital_expenses_ytd = financial_entry_total(property_obj, current_year, ["capital_expense"])
-        income_ytd = financial_entry_total(property_obj, current_year, ["income"])
-        noi_ytd = income_ytd - operating_expenses_ytd
-        cash_flow_ytd = noi_ytd - debt_service_ytd
+        t12_months, _t12_totals = t12_report_rows(request.user, current_year, Property.objects.filter(id=property_obj.id))
+        ytd_rows = t12_months[:today.month]
+        operating_expenses_ytd = sum((row["operating_expenses"] for row in ytd_rows), Decimal("0.00"))
+        debt_service_ytd = sum((row["debt_service"] for row in ytd_rows), Decimal("0.00"))
+        capital_expenses_ytd = sum((row["capital_expenses"] for row in ytd_rows), Decimal("0.00"))
+        noi_ytd = sum((row["net_operating_income"] for row in ytd_rows), Decimal("0.00"))
+        cash_flow_ytd = sum((row["cash_flow_after_debt"] for row in ytd_rows), Decimal("0.00"))
 
         portfolio_monthly_rent += scheduled_rent
         portfolio_balances_due += balances_due
@@ -187,7 +189,10 @@ def owner_properties_for(user):
     if is_super_admin(user) or is_assistant_admin(user):
         return Property.objects.all().order_by("name")
 
-    return Property.objects.filter(owner_email__iexact=user.email).order_by("name")
+    verified_email = verified_portal_email(user, "property_owner")
+    if not verified_email:
+        return Property.objects.none()
+    return Property.objects.filter(owner_email__iexact=verified_email).order_by("name")
 
 
 @login_required
@@ -197,7 +202,7 @@ def owner_property_create(request):
 
     if request.method == "POST" and form.is_valid():
         property_obj = form.save(commit=False)
-        property_obj.owner_email = request.user.email
+        property_obj.owner_email = verified_portal_email(request.user, "property_owner")
         property_obj.save()
 
         PropertyImage.objects.bulk_create([
@@ -232,6 +237,15 @@ def owner_property_onboarding_documents(request, property_id):
         "property": property_obj,
         "documents": documents,
     })
+
+
+@login_required
+@user_passes_test(can_access_owner_dashboard)
+def owner_property_onboarding_document_file(request, document_id):
+    document = get_object_or_404(PropertyOnboardingDocument.objects.select_related("property"), id=document_id, property__in=owner_properties_for(request.user))
+    if not document.source_file:
+        raise Http404
+    return FileResponse(document.source_file.open("rb"), filename=document.source_file.name.rsplit("/", 1)[-1])
 
 
 @login_required

@@ -15,7 +15,7 @@
         </td>
         <td>${{ receipt.amount }}</td>
         <td><span class="status-pill">{{ receipt.get_status_display }}</span></td>
-        <td>{% if receipt.receipt_file %}<a href="{{ receipt.receipt_file.url }}" target="_blank">View</a>{% endif %}</td>
+        <td>{% if receipt.receipt_file %}<a href="{% url 'open_accounting_receipt_file' receipt.id %}" target="_blank">View</a>{% endif %}</td>
         <td>
             {% if receipt.status == "needs_review" %}
                 <a href="{% url 'edit_accounting_receipt' receipt.id %}" class="message-btn d-inline-flex text-decoration-none mb-2">Edit</a>

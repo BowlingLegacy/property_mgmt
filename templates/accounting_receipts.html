@@ -151,6 +151,15 @@ body {
                     <noscript><button class="message-btn" type="submit">View</button></noscript>
                 </form>
             </div>
+
+            {% if upcoming_months %}
+                <div class="mb-4">
+                    <h3 class="h6 fw-bold">Upcoming</h3>
+                    {% for month in upcoming_months %}
+                        <span class="tracking-pill missing me-2">{{ month.name }} {{ selected_year }}</span>
+                    {% endfor %}
+                </div>
+            {% endif %}
             {% for month in archived_months %}
                 <details class="month-card archive-month">
                     <summary class="month-header d-flex justify-content-between align-items-center gap-3 flex-wrap"><div><strong>{{ month.name }} {{ selected_year }}</strong>{% if month.tracked %}<span class="text-muted small ms-2">{{ month.count }} bill{{ month.count|pluralize }} · ${{ month.total|floatformat:2 }}{% if month.needs_review_count %} · {{ month.needs_review_count }} need review{% endif %}</span>{% endif %}</div><span class="tracking-pill archived">Archived</span></summary>

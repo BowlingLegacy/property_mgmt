@@ -140,7 +140,7 @@
                                                 {{ entry.get_balance_type_display }}
                                             {% endif %}
                                         </td>
-                                        <td class="text-end">${{ entry.amount|floatformat:0 }}</td>
+                                        <td class="text-end">${{ entry.amount|floatformat:2 }}</td>
                                     </tr>
                                 {% endfor %}
                             </tbody>
