@@ -6649,18 +6649,43 @@ def custom_reports(request):
 
         elif report_type == "valuation_estimate":
             report_title = "Valuation Estimate Report"
-            report_columns = ["Property", "NOI Used", "Cap Rate", "Estimated Value", "Method"]
+            report_columns = ["Property", "NOI Used", "Cap Rate", "Estimated Value", "Status / Method"]
             report_year = custom_report_period_year(start_date)
             cap_rates = [Decimal("0.060"), Decimal("0.065"), Decimal("0.070"), Decimal("0.075"), Decimal("0.080"), Decimal("0.085")]
             for property_obj in filtered_properties:
                 property_qs = Property.objects.filter(id=property_obj.id)
                 months, property_totals = t12_report_rows(request.user, report_year, property_qs)
-                active_months = sum(1 for month in months if month["total_income"] > 0 or month["operating_expenses"] > 0)
+                closed_months = set(
+                    AccountingPeriod.objects.filter(
+                        property=property_obj,
+                        year=report_year,
+                        status="closed",
+                        month__gte=1,
+                        month__lte=12,
+                    ).values_list("month", flat=True)
+                )
+                missing_months = [
+                    calendar.month_abbr[month_number]
+                    for month_number in range(1, 13)
+                    if month_number not in closed_months
+                ]
+                if missing_months:
+                    completeness = f"Incomplete: {len(closed_months)} of 12 accounting months closed"
+                    report_rows.append([
+                        property_obj.name,
+                        "Not calculated",
+                        "—",
+                        "Not calculated",
+                        f"{completeness}; missing {', '.join(missing_months)}.",
+                    ])
+                    report_highlights.append(
+                        f"{property_obj.name}: valuation withheld because {report_year} financial history is incomplete. "
+                        "Close every accounting month after reconciliation; a closed month with no activity is a confirmed zero."
+                    )
+                    continue
+
                 noi_used = property_totals["net_operating_income"]
-                method = f"{report_year} actual"
-                if active_months and active_months < 12:
-                    noi_used = (noi_used / Decimal(active_months) * Decimal("12.00")).quantize(Decimal("0.01"))
-                    method = f"{active_months} months annualized"
+                method = f"{report_year} actual; 12 of 12 accounting months closed"
                 for cap_rate in cap_rates:
                     estimated_value = (noi_used / cap_rate).quantize(Decimal("0.01")) if cap_rate else Decimal("0.00")
                     report_rows.append([
@@ -6706,41 +6731,54 @@ def custom_reports(request):
         elif report_type == "vendor_expense":
             report_title = "Vendor Expense Report"
             report_columns = ["Property", "Vendor", "Category", "Amount", "Status"]
-            receipts = AccountingReceipt.objects.filter(property__in=filtered_properties)
+            receipts = AccountingReceipt.objects.filter(property__in=filtered_properties).select_related(
+                "property", "category"
+            ).prefetch_related("splits__category")
             if start_date:
                 receipts = receipts.filter(receipt_date__gte=start_date)
             if end_date:
                 receipts = receipts.filter(receipt_date__lte=end_date)
-            split_receipts = receipts.filter(splits__isnull=False)
-            grouped_splits = (
-                split_receipts.values("property__name", "vendor", "splits__category__name", "status")
-                .annotate(total=Sum("splits__amount"))
-                .order_by("property__name", "vendor", "splits__category__name")
-            )
-            for receipt in grouped_splits:
+            status_labels = {
+                "approved": "Approved",
+                "needs_review": "Pending / Needs Review",
+                "ignored": "Ignored / Duplicate",
+            }
+            status_totals = {status: Decimal("0.00") for status in status_labels}
+            grouped_amounts = {}
+            for receipt in receipts:
+                status = receipt.status if receipt.status in status_labels else "needs_review"
+                splits = list(receipt.splits.all())
+                source_rows = [
+                    (split.category.name if split.category_id else "Unassigned Category", split.amount)
+                    for split in splits
+                ] or [
+                    (receipt.category.name if receipt.category_id else "Unassigned Category", receipt.amount)
+                ]
+                for category_name, amount in source_rows:
+                    amount = amount or Decimal("0.00")
+                    key = (
+                        receipt.property.name,
+                        receipt.vendor or "Unassigned Vendor",
+                        category_name,
+                        status,
+                    )
+                    grouped_amounts[key] = grouped_amounts.get(key, Decimal("0.00")) + amount
+                    status_totals[status] += amount
+
+            for key in sorted(grouped_amounts, key=lambda value: (value[0], value[1], value[2], value[3])):
+                property_name, vendor, category_name, status = key
                 report_rows.append([
-                    receipt["property__name"],
-                    receipt["vendor"] or "Unassigned Vendor",
-                    receipt["splits__category__name"] or "Unassigned Category",
-                    receipt["total"],
-                    receipt["status"],
+                    property_name,
+                    vendor,
+                    category_name,
+                    grouped_amounts[key],
+                    status_labels[status],
                 ])
-            grouped_receipts = (
-                receipts.filter(splits__isnull=True).values("property__name", "vendor", "category__name", "status")
-                .annotate(total=Sum("amount"))
-                .order_by("property__name", "vendor", "category__name")
-            )
-            for receipt in grouped_receipts:
-                report_rows.append([
-                    receipt["property__name"],
-                    receipt["vendor"] or "Unassigned Vendor",
-                    receipt["category__name"] or "Unassigned Category",
-                    receipt["total"],
-                    receipt["status"],
-                ])
-            split_total = split_receipts.aggregate(total=Sum("splits__amount"))["total"] or Decimal("0.00")
-            unsplit_total = receipts.filter(splits__isnull=True).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-            totals = {"Vendor Expense Total": split_total + unsplit_total}
+            totals = {
+                "Approved Expense Total": status_totals["approved"],
+                "Pending / Needs Review (excluded)": status_totals["needs_review"],
+                "Ignored / Duplicate (excluded)": status_totals["ignored"],
+            }
 
         elif report_type == "occupancy_vacancy":
             report_title = "Occupancy / Vacancy Report"

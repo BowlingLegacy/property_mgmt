@@ -8,6 +8,10 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .models import (
+    AccountingPeriod,
+    AccountingReceipt,
+    AccountingReceiptSplit,
+    ExpenseCategory,
     FinancialEntry,
     FinancialUpload,
     HousingApplication,
@@ -183,3 +187,90 @@ class ComprehensiveReportRegressionTests(TestCase):
         _months, totals = t12_report_rows(self.landlord, 2026, Property.objects.filter(id=self.a.id))
         self.assertEqual(totals["net_cash_flow"], Decimal("1200.00"))
         self.assertEqual(totals["projected_annual_cash_flow"], Decimal("1200.00"))
+
+    def test_vendor_totals_count_only_approved_and_each_source_line_once(self):
+        power = ExpenseCategory.objects.create(name="Power", entry_type="operating_expense")
+        repairs = ExpenseCategory.objects.create(name="Repairs", entry_type="operating_expense")
+
+        def receipt(vendor, amount, status, category=None):
+            return AccountingReceipt.objects.create(
+                property=self.a,
+                vendor=vendor,
+                receipt_file=SimpleUploadedFile(f"{vendor}.txt", b"synthetic receipt"),
+                receipt_date=date(2026, 4, 15),
+                category=category,
+                amount=amount,
+                status=status,
+            )
+
+        receipt("Approved Unsplit", Decimal("50.00"), "approved", power)
+        split_receipt = receipt("Approved Split", Decimal("999.00"), "approved")
+        AccountingReceiptSplit.objects.create(receipt=split_receipt, category=power, amount=Decimal("60.00"))
+        AccountingReceiptSplit.objects.create(receipt=split_receipt, category=repairs, amount=Decimal("40.00"))
+        receipt("Pending Vendor", Decimal("20.00"), "needs_review", power)
+        receipt("Ignored Duplicate", Decimal("30.00"), "ignored", power)
+
+        response = self.client.get(reverse("custom_reports"), {
+            "report_type": "vendor_expense",
+            "property_id": self.a.id,
+            "start_date": "2026-04-01",
+            "end_date": "2026-04-30",
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["totals"], {
+            "Approved Expense Total": Decimal("150.00"),
+            "Pending / Needs Review (excluded)": Decimal("20.00"),
+            "Ignored / Duplicate (excluded)": Decimal("30.00"),
+        })
+        self.assertContains(response, "Approved")
+        self.assertContains(response, "Pending / Needs Review")
+        self.assertContains(response, "Ignored / Duplicate")
+        self.assertNotIn(Decimal("999.00"), [row[3] for row in response.context["report_rows"]])
+
+    def test_valuation_withholds_partial_year_and_distinguishes_missing_from_zero(self):
+        upload = self.upload(self.a, "partial-year")
+        self.entry(upload, self.a, Decimal("1200.00"), month=1)
+        AccountingPeriod.objects.create(property=self.a, year=2026, month=1, status="closed")
+
+        response = self.client.get(reverse("custom_reports"), {
+            "report_type": "valuation_estimate",
+            "property_id": self.a.id,
+            "start_date": "2026-01-01",
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Incomplete: 1 of 12 accounting months closed")
+        self.assertContains(response, "missing Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec")
+        self.assertContains(response, "Not calculated")
+        self.assertNotContains(response, "months annualized")
+
+        for month_number in range(2, 12):
+            AccountingPeriod.objects.create(property=self.a, year=2026, month=month_number, status="closed")
+        still_missing = self.client.get(reverse("custom_reports"), {
+            "report_type": "valuation_estimate",
+            "property_id": self.a.id,
+            "start_date": "2026-01-01",
+        })
+        self.assertContains(still_missing, "Incomplete: 11 of 12 accounting months closed")
+        self.assertContains(still_missing, "missing Dec")
+
+    def test_valuation_uses_actual_noi_only_after_all_months_are_closed(self):
+        upload = self.upload(self.a, "complete-year")
+        self.entry(upload, self.a, Decimal("1200.00"), month=1)
+        self.entry(upload, self.a, Decimal("200.00"), entry_type="operating_expense", month=1)
+        for month_number in range(1, 13):
+            AccountingPeriod.objects.create(property=self.a, year=2026, month=month_number, status="closed")
+
+        response = self.client.get(reverse("custom_reports"), {
+            "report_type": "valuation_estimate",
+            "property_id": self.a.id,
+            "start_date": "2026-01-01",
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["report_rows"]), 6)
+        self.assertEqual(response.context["report_rows"][0][1], Decimal("1000.00"))
+        self.assertEqual(response.context["report_rows"][0][3], Decimal("16666.67"))
+        self.assertContains(response, "2026 actual; 12 of 12 accounting months closed")
+        self.assertNotContains(response, "Incomplete:")

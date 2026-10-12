@@ -130,6 +130,17 @@ body {
     color: #3a2a08;
 }
 
+@media screen and (max-width: 600px) {
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .report-table {
+        min-width: 720px;
+    }
+}
+
 @media print {
     @page {
         size: landscape;

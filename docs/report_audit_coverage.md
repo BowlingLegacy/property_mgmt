@@ -14,6 +14,8 @@ Data boundary: synthetic test databases only; no production reads, snapshot rewr
 - Summary/receipt precedence is resolved independently per property and month before portfolio aggregation.
 - Unpaid deposits remain receivable for active and former residents until a separately modeled payment or waiver exists. Applied deposits reduce held liability without being represented as cash.
 - T-12 is the selected calendar year (January–December), not rolling twelve months.
+- Vendor expense totals include approved receipts only. Pending and ignored/duplicate receipt amounts remain visible as separately labeled, excluded totals.
+- Valuation estimates require all twelve `AccountingPeriod` records for the property/year to be explicitly closed. A closed month without activity is a confirmed zero; an open or absent month is missing, and the valuation is withheld rather than annualized.
 
 ## Custom reports
 
@@ -25,10 +27,10 @@ Data boundary: synthetic test databases only; no production reads, snapshot rewr
 | Delinquency | Fixed | Prior balance plus current shortfall; active/former unpaid deposits included. |
 | Deposit Liability | Fixed | Required, paid, applied, still-held and unpaid amounts separated; former residents retained. |
 | Property Performance | Checked / labeled | Uses the calendar-year T-12 engine; occupancy month and current open balances remain separately labeled concepts. A single shared period is not inferred. |
-| Valuation Estimate | Blocked on policy | Existing nonzero-month annualization remains. Distinguishing a true zero month from missing source data requires an explicit completeness marker. |
+| Valuation Estimate | Fixed | Uses actual calendar-year NOI only after all 12 property accounting months are explicitly closed. Missing/open months produce a clear incomplete status and no estimate; closed zero-activity months are confirmed zeroes. |
 | Income Statement / P&L | Fixed | Per-property/month precedence, service-month allocation, cash/noncash cutoff, partial-date filtering, golden NOI/debt/capital arithmetic. |
 | Expense by Category | Fixed via shared scope | Stable row attribution and ledger-scope filtering; legacy month-only rows are retained when the requested period includes their month. |
-| Vendor Expense | Checked / labeled gap | Source statuses remain visible. Whether ignored receipts belong in a vendor grand total needs an explicit approved/pending/ignored presentation decision. |
+| Vendor Expense | Fixed | Approved expenses are the only counted total. Pending and ignored/duplicate amounts are separately labeled and excluded. Each receipt header or split lineage is counted once, never both. |
 | Occupancy / Vacancy | Checked / blocked historically | Current effective room inventory and tenancy dates used. Historical room-rate/inventory reconstruction needs effective-dated room history. |
 | Capital Improvement Log | Fixed via shared scope | Stable property attribution and date handling. |
 | Utility Cost Trend | Checked / labeled gap | This is a cost trend; no utility usage quantity model exists, so it must not be described as metered usage. |
@@ -65,11 +67,9 @@ All custom-report invalid choices, inaccessible properties, invalid dates, and r
 
 1. Deposit waiver and refund need first-class ledger event types. Current fields can prove required, paid, applied, and still held, but cannot infer a waiver/refund safely.
 2. Historical occupancy, room rate, transfer and inventory accuracy needs effective-dated room/lease history. Existing snapshots are not rewritten.
-3. Valuation annualization needs month-completeness metadata before zero activity can be separated from missing data.
-4. Vendor reporting needs a policy for approved versus pending versus ignored receipt totals.
-5. Insurance compliance and utility usage require dedicated verified data models; present reports cover cost/source inventory only.
-6. The named-person rent override predates this audit. It should be migrated to a lease/resident/effective-date record after the underlying agreement is verified; this audit does not guess or remove that obligation.
-7. Import parsing still needs a product decision for invalid monetary/date cells and same-valued legitimate transactions. Unreadable values should become review errors rather than inferred zero, but changing import acceptance policy without an exception workflow is unsafe.
+3. Insurance compliance and utility usage require dedicated verified data models; present reports cover cost/source inventory only.
+4. The named-person rent override predates this audit. It should be migrated to a lease/resident/effective-date record after the underlying agreement is verified; this audit does not guess or remove that obligation.
+5. Import parsing still needs a product decision for invalid monetary/date cells and same-valued legitimate transactions. Unreadable values should become review errors rather than inferred zero, but changing import acceptance policy without an exception workflow is unsafe.
 
 ## Verification limits
 
