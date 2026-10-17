@@ -85,6 +85,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "main.context_processors.demo_mode",
+                "main.context_processors.dashboard_return_navigation",
             ],
         },
     },

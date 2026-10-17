@@ -1,0 +1,21 @@
+{% if show_dashboard_return %}
+    <div class="dashboard-return-bar d-flex justify-content-end" data-dashboard-return style="margin: 1.25rem auto; max-width: 1320px; padding: 0 1rem;">
+        <a href="{{ dashboard_return_url }}" class="message-btn btn btn-outline-dark">
+            &larr; Return to {{ dashboard_return_label }}
+        </a>
+    </div>
+    {{ dashboard_route_urls|json_script:"dashboard-route-urls" }}
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const routeUrls = JSON.parse(document.getElementById("dashboard-route-urls").textContent);
+            const dashboardPaths = new Set(routeUrls.map((url) => new URL(url, window.location.origin).pathname));
+            document.querySelectorAll("a[href]").forEach((link) => {
+                if (link.closest("[data-dashboard-return]") || link.dataset.keepDashboardLink !== undefined) return;
+                const target = new URL(link.href, window.location.origin);
+                if (target.origin === window.location.origin && dashboardPaths.has(target.pathname)) {
+                    link.hidden = true;
+                }
+            });
+        });
+    </script>
+{% endif %}
