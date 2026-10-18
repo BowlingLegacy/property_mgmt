@@ -1,0 +1,30 @@
+# Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Local databases and secrets
+db.sqlite3
+.env
+.env.*
+
+# User uploads and generated application data
+media/
+output/
+outputs/
+tmp/
+
+# Collected static files
+staticfiles/
+
+# Test and tooling caches
+.coverage
+.pytest_cache/
+.mypy_cache/
+
+# Operating-system and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
