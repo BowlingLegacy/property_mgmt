@@ -7312,9 +7312,13 @@ def t12_report_rows(user, year, report_properties=None):
     )
     completed_payments = list(
         Payment.objects
+        .select_related("application")
         .filter(application__in=staff_managed_applications(user), status="completed")
         .filter(application__property__in=accessible_properties)
     )
+    completed_payments_by_property = {}
+    for payment in completed_payments:
+        completed_payments_by_property.setdefault(payment.application.property_id, []).append(payment)
     months = []
     totals = {
         "online_income": Decimal("0.00"),
@@ -7354,7 +7358,7 @@ def t12_report_rows(user, year, report_properties=None):
                 receipt_entries.filter(entry_type="income").exclude(category__icontains="deposit")
             )
             property_portal_income = payment_amount_for_month(
-                [p for p in completed_payments if p.application.property_id == property_obj.id],
+                completed_payments_by_property.get(property_obj.id, []),
                 year, month_number, T12_INCOME_PAYMENT_TYPES, include_service_credits=False,
             )
             spreadsheet_income += property_spreadsheet_income
