@@ -281,6 +281,9 @@ class OwnerPropertyForm(forms.ModelForm):
         fields = [
             "name",
             "address",
+            "management_mode",
+            "management_company_name",
+            "management_company_email",
             "description",
             "photo",
             "gallery_images",
@@ -304,6 +307,9 @@ class OwnerPropertyForm(forms.ModelForm):
             "availability_message",
         ]
         labels = {
+            "management_mode": "Who will manage this property?",
+            "management_company_name": "Property management company",
+            "management_company_email": "Management company login email",
             "photo": "Cover Photo",
             "rent_amount": "Rent",
             "lease_type": "Rental Term",
@@ -319,6 +325,9 @@ class OwnerPropertyForm(forms.ModelForm):
         widgets = {
             "name": forms.TextInput(attrs={"class": "form-control"}),
             "address": forms.TextInput(attrs={"class": "form-control"}),
+            "management_mode": forms.Select(attrs={"class": "form-select"}),
+            "management_company_name": forms.TextInput(attrs={"class": "form-control"}),
+            "management_company_email": forms.EmailInput(attrs={"class": "form-control"}),
             "description": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
             "photo": forms.ClearableFileInput(attrs={"class": "form-control"}),
             "unit_size": forms.TextInput(attrs={"class": "form-control"}),
@@ -343,6 +352,21 @@ class OwnerPropertyForm(forms.ModelForm):
             "availability_status": forms.Select(attrs={"class": "form-select"}),
             "availability_message": forms.TextInput(attrs={"class": "form-control"}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["management_mode"].required = False
+        self.fields["management_mode"].initial = "owner_managed"
+
+    def clean(self):
+        cleaned_data = super().clean()
+        cleaned_data["management_mode"] = cleaned_data.get("management_mode") or "owner_managed"
+        if cleaned_data.get("management_mode") == "management_company":
+            if not cleaned_data.get("management_company_name"):
+                self.add_error("management_company_name", "Enter the company that will manage this property.")
+            if not cleaned_data.get("management_company_email"):
+                self.add_error("management_company_email", "Enter the management company's portal email.")
+        return cleaned_data
 
     def save_utility_vendors(self, property_obj):
         from .models import PropertyUtilityVendor
@@ -461,6 +485,14 @@ class OwnerLandlordInviteForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["property"].queryset = properties if properties is not None else Property.objects.none()
 
+    def clean(self):
+        cleaned_data = super().clean()
+        property_obj = cleaned_data.get("property")
+        email = (cleaned_data.get("email") or "").strip()
+        if email and Property.objects.filter(landlord_email__iexact=email).exclude(id=getattr(property_obj, "id", None)).exists():
+            self.add_error("email", "This landlord login is already assigned to another property. Create a separate property landlord profile.")
+        return cleaned_data
+
 
 class PropertyOwnerIntakeForm(forms.ModelForm):
     REPORT_CHOICES = [
@@ -494,6 +526,7 @@ class PropertyOwnerIntakeForm(forms.ModelForm):
     class Meta:
         model = PropertyOwnerIntake
         fields = [
+            "portal_type",
             "full_name",
             "company_name",
             "email",
@@ -527,6 +560,7 @@ class PropertyOwnerIntakeForm(forms.ModelForm):
             "additional_notes",
         ]
         labels = {
+            "portal_type": "Which best describes your business?",
             "property_count": "How many properties do you manage or own?",
             "total_units": "Approximate total units",
             "current_software": "Current software or accounting system",
@@ -554,6 +588,7 @@ class PropertyOwnerIntakeForm(forms.ModelForm):
             "dashboard_goals": "What should your dashboard make easy?",
         }
         widgets = {
+            "portal_type": forms.Select(attrs={"class": "form-select"}),
             "full_name": forms.TextInput(attrs={"class": "form-control"}),
             "company_name": forms.TextInput(attrs={"class": "form-control"}),
             "email": forms.EmailInput(attrs={"class": "form-control"}),
@@ -582,8 +617,13 @@ class PropertyOwnerIntakeForm(forms.ModelForm):
     def clean_desired_reports(self):
         return ", ".join(self.cleaned_data.get("desired_reports") or [])
 
+    def clean_portal_type(self):
+        return self.cleaned_data.get("portal_type") or "property_owner"
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["portal_type"].required = False
+        self.fields["portal_type"].initial = "property_owner"
 
         if self.instance and self.instance.pk and self.instance.property_types:
             self.initial["property_types"] = self.instance.property_types.split(",")

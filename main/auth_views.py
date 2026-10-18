@@ -9,6 +9,9 @@ def dashboard_for_user(user):
     if getattr(user, "role", "") == "property_owner":
         return "property_owner_dashboard"
 
+    if getattr(user, "role", "") == "property_manager":
+        return "property_management_dashboard"
+
     if user.is_staff or getattr(user, "role", "") in ["landlord", "assistant"]:
         return "landlord_dashboard"
 

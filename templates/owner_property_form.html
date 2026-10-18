@@ -4,8 +4,8 @@
 <div class="soft-card p-4 p-md-5" style="max-width:960px;margin:0 auto;">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-4">
         <div>
-            <h1 class="section-title mb-1">Add Property</h1>
-            <p class="text-muted mb-0">This property will be linked to your owner login email automatically.</p>
+            <h1 class="section-title mb-1">{% if is_edit %}Update {{ property.dashboard_name }}{% else %}Add Property{% endif %}</h1>
+            <p class="text-muted mb-0">Choose who will manage this property now. You can change the arrangement later.</p>
         </div>
         <a href="{% url 'property_owner_dashboard' %}" class="message-btn">Back to Owner Dashboard</a>
     </div>
@@ -23,7 +23,7 @@
             {% endfor %}
         </div>
         <div class="d-flex justify-content-end mt-4">
-            <button type="submit" class="gold-btn">Add Property</button>
+            <button type="submit" class="gold-btn">{% if is_edit %}Save Property Setup{% else %}Add Property{% endif %}</button>
         </div>
     </form>
 </div>

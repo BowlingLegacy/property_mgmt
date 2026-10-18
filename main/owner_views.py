@@ -16,7 +16,7 @@ from .forms import (
 )
 from .invite_utils import create_pending_portal_user, send_portal_access_invite_email
 from .models import FinancialEntry, FinancialUpload, Property, PropertyImage, PropertyOnboardingDocument, PropertyRoomRent, HousingApplication, Payment, ResidentMessage
-from .permissions import can_access_owner_dashboard, is_super_admin, is_assistant_admin, verified_portal_email
+from .permissions import can_access_owner_dashboard, can_access_property_management_dashboard, can_create_landlord, is_super_admin, is_assistant_admin, verified_portal_email
 from .views import is_rentable_room_label, normalized_room_label, payment_amount_for_month, t12_report_rows, visible_resident_files
 
 
@@ -195,6 +195,12 @@ def owner_properties_for(user):
     return Property.objects.filter(owner_email__iexact=verified_email).order_by("name")
 
 
+def landlord_assignable_properties(user):
+    if getattr(user, "role", "") == "property_manager":
+        return Property.objects.filter(management_company_email__iexact=user.email).order_by("owner_email", "name")
+    return owner_properties_for(user)
+
+
 @login_required
 @user_passes_test(can_access_owner_dashboard)
 def owner_property_create(request):
@@ -203,6 +209,10 @@ def owner_property_create(request):
     if request.method == "POST" and form.is_valid():
         property_obj = form.save(commit=False)
         property_obj.owner_email = verified_portal_email(request.user, "property_owner")
+        if property_obj.management_mode == "owner_managed":
+            property_obj.landlord_email = property_obj.owner_email
+            property_obj.management_company_name = ""
+            property_obj.management_company_email = ""
         property_obj.save()
 
         PropertyImage.objects.bulk_create([
@@ -215,6 +225,29 @@ def owner_property_create(request):
         return redirect("owner_property_onboarding_documents", property_id=property_obj.id)
 
     return render(request, "owner_property_form.html", {"form": form})
+
+
+@login_required
+@user_passes_test(can_access_owner_dashboard)
+def owner_property_edit(request, property_id):
+    property_obj = get_object_or_404(owner_properties_for(request.user), id=property_id)
+    form = OwnerPropertyForm(request.POST or None, request.FILES or None, instance=property_obj)
+    if request.method == "POST" and form.is_valid():
+        property_obj = form.save(commit=False)
+        if property_obj.management_mode == "owner_managed":
+            property_obj.landlord_email = property_obj.owner_email
+            property_obj.management_company_name = ""
+            property_obj.management_company_email = ""
+        elif property_obj.management_mode == "management_company":
+            property_obj.landlord_email = ""
+        else:
+            property_obj.management_company_name = ""
+            property_obj.management_company_email = ""
+        property_obj.save()
+        form.save_utility_vendors(property_obj)
+        messages.success(request, f"{property_obj.dashboard_name} setup was updated.")
+        return redirect("property_owner_dashboard")
+    return render(request, "owner_property_form.html", {"form": form, "property": property_obj, "is_edit": True})
 
 
 @login_required
@@ -249,16 +282,22 @@ def owner_property_onboarding_document_file(request, document_id):
 
 
 @login_required
-@user_passes_test(can_access_owner_dashboard)
+@user_passes_test(can_create_landlord)
 def owner_landlord_invite(request):
-    properties = owner_properties_for(request.user)
+    properties = landlord_assignable_properties(request.user)
     form = OwnerLandlordInviteForm(request.POST or None, properties=properties)
 
     if request.method == "POST" and form.is_valid():
         intake = form.save()
         property_obj = form.cleaned_data["property"]
         property_obj.landlord_email = intake.email
-        property_obj.save(update_fields=["landlord_email"])
+        update_fields = ["landlord_email"]
+        if getattr(request.user, "role", "") == "property_owner":
+            property_obj.management_mode = "independent_landlord"
+            property_obj.management_company_name = ""
+            property_obj.management_company_email = ""
+            update_fields.extend(["management_mode", "management_company_name", "management_company_email"])
+        property_obj.save(update_fields=update_fields)
 
         user = create_pending_portal_user(intake.full_name, intake.email, "landlord", intake.id)
         user.refresh_invite_code()
@@ -280,6 +319,22 @@ def owner_landlord_invite(request):
     return render(request, "owner_landlord_invite.html", {
         "form": form,
         "properties": properties,
+    })
+
+
+@login_required
+@user_passes_test(can_access_property_management_dashboard)
+def property_management_dashboard(request):
+    properties = landlord_assignable_properties(request.user)
+    owner_groups = []
+    for owner_email in properties.values_list("owner_email", flat=True).distinct():
+        owner_groups.append({
+            "owner_email": owner_email or "Owner not assigned",
+            "properties": properties.filter(owner_email=owner_email),
+        })
+    return render(request, "property_management_dashboard.html", {
+        "owner_groups": owner_groups,
+        "total_properties": properties.count(),
     })
 
 

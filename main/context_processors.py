@@ -8,6 +8,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 DASHBOARD_ROUTES = {
     "superadmin_dashboard": "Super Admin Dashboard",
     "property_owner_dashboard": "Owner Dashboard",
+    "property_management_dashboard": "Management Company Dashboard",
     "landlord_dashboard": "Landlord Dashboard",
     "tenant_dashboard": "Resident Dashboard",
 }
@@ -18,6 +19,8 @@ def _default_dashboard_route(user):
         return "superadmin_dashboard"
     if getattr(user, "role", "") == "property_owner":
         return "property_owner_dashboard"
+    if getattr(user, "role", "") == "property_manager":
+        return "property_management_dashboard"
     if user.is_staff or getattr(user, "role", "") in {"landlord", "assistant"}:
         return "landlord_dashboard"
     return "tenant_dashboard"

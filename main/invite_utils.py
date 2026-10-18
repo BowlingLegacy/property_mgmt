@@ -20,7 +20,7 @@ def create_pending_portal_user(full_name, email, role, source_id):
         email=email,
         password=None,
         role=role,
-        is_staff=role in ["landlord", "assistant"],
+        is_staff=role in ["landlord", "property_manager", "assistant"],
         is_superuser=False,
     )
 

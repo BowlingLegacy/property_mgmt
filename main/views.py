@@ -2339,7 +2339,7 @@ def signup(request):
         return redirect("request_invite_code")
 
     if request.method == "POST":
-        form_class = LandlordSignUpForm if pending_user.role in ["landlord", "assistant"] else SignUpForm
+        form_class = LandlordSignUpForm if pending_user.role in ["landlord", "property_manager", "assistant"] else SignUpForm
         form = form_class(request.POST)
 
         if form.is_valid():
@@ -2390,7 +2390,7 @@ def signup(request):
             from .auth_views import dashboard_for_user
             return redirect(dashboard_for_user(user))
     else:
-        form_class = LandlordSignUpForm if pending_user.role in ["landlord", "assistant"] else SignUpForm
+        form_class = LandlordSignUpForm if pending_user.role in ["landlord", "property_manager", "assistant"] else SignUpForm
         initial = {"email": pending_user.email}
 
         if landlord_intake_obj:
@@ -2510,6 +2510,10 @@ def staff_managed_properties(user):
     if getattr(user, "role", "") == "landlord":
         verified_email = verified_portal_email(user, "landlord")
         return Property.objects.filter(landlord_email__iexact=verified_email) if verified_email else Property.objects.none()
+
+    if getattr(user, "role", "") == "property_manager":
+        email = (user.email or "").strip()
+        return Property.objects.filter(management_company_email__iexact=email) if email else Property.objects.none()
 
     return Property.objects.none()
 
@@ -2999,6 +3003,8 @@ def landlord_dashboard(request):
         selected_property = get_object_or_404(properties, id=property_id)
     elif properties.count() == 1:
         selected_property = properties.first()
+    elif getattr(request.user, "role", "") == "landlord":
+        return render(request, "landlord_assignment_required.html", {"properties": properties})
     if selected_property is None:
         return render(request, "landlord_property_picker.html", {"properties": properties})
     context = get_landlord_workspace_context(request.user, selected_property=selected_property)
@@ -4667,7 +4673,7 @@ def superadmin_send_owner_invite(request, intake_id):
         return redirect("superadmin_owner_intake_detail", intake_id=intake.id)
 
     if not user:
-        user = create_pending_portal_user(intake.full_name, intake.email, "property_owner", intake.id)
+        user = create_pending_portal_user(intake.full_name, intake.email, intake.portal_type, intake.id)
         intake.user = user
 
     user.refresh_invite_code()
@@ -4676,7 +4682,8 @@ def superadmin_send_owner_invite(request, intake_id):
     intake.save(update_fields=["user", "status", "invite_sent_at"])
 
     try:
-        sent = send_portal_access_invite_email(user, intake.full_name, "Property Owner")
+        role_label = "Property Management Company" if intake.portal_type == "property_manager" else "Property Owner"
+        sent = send_portal_access_invite_email(user, intake.full_name, role_label)
     except Exception as exc:
         messages.warning(request, f"Owner setup code created, but email failed: {exc}")
     else:

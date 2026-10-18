@@ -54,6 +54,14 @@ def can_access_owner_dashboard(user):
     )
 
 
+def can_access_property_management_dashboard(user):
+    return (
+        user_role(user) == "property_manager"
+        or is_assistant_admin(user)
+        or is_super_admin(user)
+    )
+
+
 
 def can_create_resident_invite(user):
     return (
@@ -68,6 +76,7 @@ def can_create_resident_invite(user):
 def can_create_landlord(user):
     return (
         is_owner(user)
+        or user_role(user) == "property_manager"
         or is_assistant_admin(user)
         or is_super_admin(user)
     )

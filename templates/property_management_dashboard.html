@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+        <div>
+            <div class="text-uppercase small fw-bold text-muted">Rental Ready Pro</div>
+            <h1>Property Management Company Dashboard</h1>
+            <p class="text-muted mb-0">Owners and their properties are kept in separate operational workspaces.</p>
+        </div>
+        <a class="btn btn-dark" href="{% url 'owner_landlord_invite' %}">Create Property Landlord</a>
+    </div>
+    <div class="alert alert-info">{{ total_properties }} assigned propert{{ total_properties|pluralize:"y,ies" }}. Property creation remains with each owner.</div>
+    {% for group in owner_groups %}
+        <section class="card border-0 shadow-sm rounded-4 p-4 mb-4">
+            <h2 class="h4">Owner: {{ group.owner_email }}</h2>
+            <div class="row g-3 mt-1">
+                {% for property in group.properties %}
+                    <div class="col-md-6">
+                        <div class="border rounded-3 p-3 h-100">
+                            <h3 class="h5">{{ property.dashboard_name }}</h3>
+                            <p class="text-muted">{{ property.address|default:"No address entered" }}</p>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <a class="btn btn-warning" href="{% url 'landlord_dashboard' %}?property_id={{ property.id }}">Open Dashboard</a>
+                                <a class="btn btn-outline-dark" href="{% url 'property_accounting_receipts' property.id %}">Receipts</a>
+                                <a class="btn btn-outline-dark" href="{% url 'custom_reports' %}?property_id={{ property.id }}">Reports</a>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </section>
+    {% empty %}
+        <div class="alert alert-warning">No owners have assigned properties to this company yet.</div>
+    {% endfor %}
+</div>
+{% endblock %}

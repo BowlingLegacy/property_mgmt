@@ -137,7 +137,6 @@
                 <a href="{% url 'superadmin_dashboard' %}" class="btn-dark-soft">Back to Super Admin</a>
             {% endif %}
             <a href="{% url 'property_blog_manager' %}" class="btn-dark-soft">Property Blogs</a>
-            <a href="{% url 'landlord_dashboard' %}" class="btn-dark-soft">Landlord Operations</a>
             <a href="{% url 'rent_roll' %}?month={{ selected_month|date:'Y-m' }}" class="btn-owner">Monthly Rent Roll</a>
         </div>
     </div>
@@ -174,8 +173,13 @@
             <summary class="folder-header" style="cursor:pointer; list-style:none;">
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <div>
-                        <h4 class="fw-bold mb-1">{{ card.property.name }}</h4>
+                        <h4 class="fw-bold mb-1">{{ card.property.dashboard_name }}</h4>
                         <small style="color:#d9d0bc;">{{ card.property.address|default:"No address entered" }}</small>
+                        <div class="small mt-1" style="color:#d9d0bc;">
+                            {{ card.property.get_management_mode_display }}
+                            {% if card.property.management_company_name %} · {{ card.property.management_company_name }}{% endif %}
+                            {% if card.property.landlord_email and card.property.management_mode == "independent_landlord" %} · {{ card.property.landlord_email }}{% endif %}
+                        </div>
                     </div>
                     <div class="text-end">
                         <div class="fw-bold">${{ card.monthly_rent }}</div>
@@ -217,6 +221,7 @@
 
                 <div class="d-flex gap-2 flex-wrap mt-3">
                     <a href="{% url 'property_financials' card.property.id %}" class="btn-owner">Open {{ card.property.name }} Financials</a>
+                    <a href="{% url 'owner_property_edit' card.property.id %}" class="btn-dark-soft">Management Setup</a>
                     <a href="{% url 'property_accounting_receipts' card.property.id %}" class="btn-dark-soft">Receipts</a>
                     <a href="{% url 'custom_reports' %}?property_id={{ card.property.id }}" class="btn-dark-soft">Custom Reports</a>
                     <a href="{% url 'owner_property_onboarding_documents' card.property.id %}" class="btn-dark-soft">Onboarding Files</a>

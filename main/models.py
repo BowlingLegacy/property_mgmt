@@ -53,7 +53,8 @@ class User(AbstractUser):
     ROLE_CHOICES = [
         ("tenant", "Tenant / Applicant"),
         ("property_owner", "Property Owner"),
-        ("landlord", "Landlord / Property Manager"),
+        ("landlord", "Property Landlord"),
+        ("property_manager", "Property Management Company"),
         ("assistant", "Assistant"),
         ("admin", "Platform Admin"),
     ]
@@ -67,7 +68,7 @@ class User(AbstractUser):
         if self.role in ["tenant", "property_owner"]:
             self.is_staff = False
             self.is_superuser = False
-        elif self.role in ["landlord", "assistant", "admin"]:
+        elif self.role in ["landlord", "property_manager", "assistant", "admin"]:
             self.is_staff = True
 
         super().save(*args, **kwargs)
@@ -102,6 +103,11 @@ class User(AbstractUser):
 
 
 class Property(models.Model):
+    MANAGEMENT_MODE_CHOICES = [
+        ("owner_managed", "I will manage this property myself"),
+        ("independent_landlord", "I will assign my own landlord"),
+        ("management_company", "A property management company will manage it"),
+    ]
     LEASE_TYPE_CHOICES = [
         ("month_to_month", "Month to Month"),
         ("lease", "Lease"),
@@ -123,6 +129,17 @@ class Property(models.Model):
         blank=True,
         help_text="Login email for the landlord or property manager assigned to this property.",
     )
+    management_mode = models.CharField(
+        max_length=30,
+        choices=MANAGEMENT_MODE_CHOICES,
+        default="owner_managed",
+    )
+    management_company_name = models.CharField(max_length=255, blank=True)
+    management_company_email = models.EmailField(blank=True)
+
+    @property
+    def dashboard_name(self):
+        return f"{self.name} Dashboard"
 
     unit_size = models.CharField(max_length=100, blank=True)
     cable_ready = models.BooleanField(default=True)
@@ -1001,7 +1018,12 @@ class PropertyOwnerIntake(models.Model):
         ("single_family", "Single-Family Rentals"),
         ("specialty", "Specialty / Other"),
     ]
+    PORTAL_TYPE_CHOICES = [
+        ("property_owner", "I own properties"),
+        ("property_manager", "I manage properties for multiple owners"),
+    ]
 
+    portal_type = models.CharField(max_length=30, choices=PORTAL_TYPE_CHOICES, default="property_owner")
     full_name = models.CharField(max_length=255)
     company_name = models.CharField(max_length=255, blank=True)
     email = models.EmailField()

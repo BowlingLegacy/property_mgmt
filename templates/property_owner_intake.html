@@ -157,7 +157,12 @@
                             {{ form.company_name.errors }}
                         </div>
                         <div class="row g-3">
-                            <div class="col-md-6">
+                        <div class="col-12">
+                            <label class="form-label fw-bold" for="{{ form.portal_type.id_for_label }}">{{ form.portal_type.label }}</label>
+                            {{ form.portal_type }}
+                            {{ form.portal_type.errors }}
+                        </div>
+                        <div class="col-md-6">
                                 <label class="form-label fw-bold" for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
                                 {{ form.email }}
                                 {{ form.email.errors }}
