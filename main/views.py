@@ -976,6 +976,13 @@ def reporting_required(user):
     )
 
 
+def financial_import_required(user):
+    return user.is_authenticated and (
+        user.is_superuser
+        or getattr(user, "role", "") in ["property_owner", "assistant", "admin"]
+    )
+
+
 def apply_completed_payment_to_balance(payment):
     application = payment.application
 
@@ -7448,7 +7455,7 @@ def t12_report_rows(user, year, report_properties=None):
 
 
 @login_required
-@user_passes_test(reporting_required)
+@user_passes_test(financial_import_required)
 def financial_upload(request):
     properties = staff_managed_properties(request.user).order_by("name")
 
@@ -7473,7 +7480,7 @@ def financial_upload(request):
 
 
 @login_required
-@user_passes_test(reporting_required)
+@user_passes_test(financial_import_required)
 def bank_upload_review(request, upload_id):
     properties = staff_managed_properties(request.user).order_by("name")
     upload = get_object_or_404(
@@ -8166,7 +8173,7 @@ def save_receipt_vendor_rule(request, receipt_id):
 
 
 @login_required
-@user_passes_test(reporting_required)
+@user_passes_test(financial_import_required)
 def parse_financial_upload(request, upload_id):
     properties = staff_managed_properties(request.user).order_by("name")
     upload = get_object_or_404(

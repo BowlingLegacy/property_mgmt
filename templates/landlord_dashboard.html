@@ -207,7 +207,6 @@ body {
 
             <nav class="ops-nav">
                 <div class="ops-nav-label">Operations</div>
-                <a href="{% url 'landlord_dashboard' %}?property_id={{ selected_property.id }}" class="active">Dashboard</a>
                 <a href="{% url 'landlord_attention' %}">Needs Attention</a>
                 <a href="{% url 'landlord_resident_files' %}">Resident Files</a>
 
@@ -217,15 +216,8 @@ body {
                 <a href="{% url 'rent_roll' %}">Rent Roll</a>
                 <a href="{% url 'custom_reports' %}">Custom Reports</a>
                 <a href="{% url 'property_accounting_receipts' selected_property.id %}">Receipt Upload</a>
-                <a href="{% url 'financial_upload' %}">Expense Imports</a>
 
                 <div class="ops-nav-label">Account</div>
-                {% if request.user.is_superuser or request.user.role == "admin" or request.user.role == "assistant" %}
-                    <a href="{% url 'property_owner_dashboard' %}">Owner Portfolio</a>
-                {% endif %}
-                {% if request.user.is_superuser or request.user.role == "admin" %}
-                    <a href="{% url 'superadmin_dashboard' %}">Back to Super Admin</a>
-                {% endif %}
                 <a href="{% url 'logout' %}">Logout</a>
             </nav>
         </aside>
@@ -409,11 +401,6 @@ body {
                 <a href="{% url 'record_manual_payment' %}" class="workspace-card">
                     <h2>Record Payment</h2>
                     <p class="text-muted mb-0">Enter payments received outside Stripe and print receipts.</p>
-                </a>
-
-                <a href="{% url 'financial_upload' %}" class="workspace-card">
-                    <h2>Operating / Capital Expenses</h2>
-                    <p class="text-muted mb-0">Upload accounting exports and source documents.</p>
                 </a>
 
                 <a href="{% url 'property_accounting_receipts' selected_property.id %}" class="workspace-card">

@@ -220,6 +220,7 @@ body {
             <div class="soft-card section-card h-100">
                 <h3 class="section-title">Expenses & Debt Position</h3>
 
+                {% if request.user.is_superuser or request.user.role == "property_owner" or request.user.role == "admin" or request.user.role == "assistant" %}
                 <a href="{% url 'financial_upload' %}" class="report-btn">
                     <span>Operating Expenses</span>
                     <span class="report-value">${{ operating_expenses }}</span>
@@ -234,6 +235,22 @@ body {
                     <span>Capital Expenses</span>
                     <span class="report-value">${{ capital_expenses }}</span>
                 </a>
+                {% else %}
+                <div class="report-btn">
+                    <span>Operating Expenses</span>
+                    <span class="report-value">${{ operating_expenses }}</span>
+                </div>
+
+                <div class="report-btn">
+                    <span>Debt Service</span>
+                    <span class="report-value">${{ debt_service }}</span>
+                </div>
+
+                <div class="report-btn">
+                    <span>Capital Expenses</span>
+                    <span class="report-value">${{ capital_expenses }}</span>
+                </div>
+                {% endif %}
             </div>
         </div>
 

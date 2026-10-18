@@ -119,6 +119,22 @@ class PropertyManagementHierarchyTests(TestCase):
         self.assertNotContains(response, "First Home Dashboard")
         self.assertNotContains(response, "Second Home Dashboard")
 
+    def test_property_landlord_has_no_owner_admin_or_expense_import_access(self):
+        landlord = self.create_user("isolated-landlord", "landlord", "isolated-landlord@example.com")
+        property_obj = Property.objects.create(name="Belmont", landlord_email=landlord.email)
+        self.client.force_login(landlord)
+
+        dashboard = self.client.get(reverse("landlord_dashboard"))
+
+        self.assertContains(dashboard, property_obj.dashboard_name)
+        self.assertNotContains(dashboard, "Owner Portfolio")
+        self.assertNotContains(dashboard, "Super Admin")
+        self.assertNotContains(dashboard, "Expense Imports")
+        self.assertNotContains(dashboard, ">Dashboard</a>")
+        self.assertEqual(self.client.get(reverse("property_owner_dashboard")).status_code, 302)
+        self.assertEqual(self.client.get(reverse("superadmin_dashboard")).status_code, 302)
+        self.assertEqual(self.client.get(reverse("financial_upload")).status_code, 302)
+
     def test_landlord_profile_email_cannot_be_reused_for_another_property(self):
         first = Property.objects.create(name="First Home", landlord_email="landlord@example.com")
         second = Property.objects.create(name="Second Home")
