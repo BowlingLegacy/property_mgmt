@@ -822,6 +822,11 @@ class LiveFlowTests(TestCase):
             "income_source": "Employment",
             "monthly_income": "2500.00",
             "housing_need": "Needs a vacant room this month.",
+            "applicant_printed_name": "New Applicant",
+            "verification_authorization": "on",
+            "screening_authorization": "on",
+            "background_check_acknowledgment": "on",
+            "certification_acknowledgment": "on",
             "sobriety_acknowledgment": "on",
             "unconditional_regard_acknowledgment": "on",
         }
@@ -859,6 +864,9 @@ class LiveFlowTests(TestCase):
         self.assertEqual(application.utility_monthly, Decimal("55.00"))
         self.assertEqual(application.balance, Decimal("0.00"))
         self.assertEqual(application.utility_balance, Decimal("0.00"))
+        self.assertTrue(application.background_check_required)
+        self.assertEqual(application.background_check_fee_amount, Decimal("0.00"))
+        self.assertEqual(application.background_check_status, "pending")
 
     def test_application_page_displays_painted_lady_terms_and_phone_formatter(self):
         Property.objects.create(name="The Painted Lady Inn")
@@ -873,6 +881,23 @@ class LiveFlowTests(TestCase):
         self.assertContains(response, "formatPhoneInput")
         self.assertContains(response, "Selfie With Today's Date")
         self.assertContains(response, "Do you drive or own a car/truck?")
+        self.assertContains(response, "No application fee")
+        self.assertContains(response, "Screening Authorization")
+        self.assertContains(response, "Type Your Full Legal Name as Your Signature")
+        self.assertContains(response, "Additional Previous Housing")
+
+    def test_painted_lady_application_requires_screening_and_signature_acknowledgments(self):
+        Property.objects.create(name="The Painted Lady Inn")
+        payload = self.application_payload()
+        payload.pop("screening_authorization")
+        payload.pop("certification_acknowledgment")
+
+        response = self.client.post(reverse("apply"), payload)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Authorize tenant screening before submitting your application.")
+        self.assertContains(response, "Certify that the application is complete and accurate before submitting.")
+        self.assertFalse(HousingApplication.objects.filter(email="applicant@example.com").exists())
 
     def test_applicant_review_summary_identifies_strong_candidate(self):
         application = HousingApplication.objects.create(

@@ -45,18 +45,23 @@
 
     .app-section {
         background: #fff;
-        border: 1px solid rgba(188,150,45,.18);
-        border-radius: 18px;
-        padding: 1.25rem;
+        border: 1px solid rgba(188,150,45,.3);
+        border-radius: 14px;
+        padding: 0 1.25rem 1.25rem;
         margin-top: 1.25rem;
         box-shadow: 0 8px 18px rgba(0,0,0,.04);
+        overflow: hidden;
     }
 
     .app-section-title {
-        font-family: Georgia, serif;
-        color: #1c1c1c;
-        font-size: 1.45rem;
-        margin-bottom: .35rem;
+        background: #111;
+        color: #fffaf0;
+        font-size: 1.05rem;
+        font-weight: 900;
+        letter-spacing: .04em;
+        margin: 0 -1.25rem 1rem;
+        padding: .75rem 1.25rem;
+        text-transform: uppercase;
     }
 
     .app-section-note {
@@ -69,6 +74,15 @@
         color: #6f5411;
         font-weight: 800;
         margin-bottom: .35rem;
+    }
+
+    .form-control, .form-select {
+        border-color: rgba(197,154,50,.72);
+        min-height: 44px;
+    }
+
+    textarea.form-control {
+        min-height: 96px;
     }
 
     .check-card {
@@ -172,7 +186,14 @@
             See our <a href="{% url 'privacy_policy' %}">Privacy Policy</a> for more information.
         </div>
 
-        {% if property %}
+        <div class="application-notice mb-4" role="note" aria-label="Screening and fee notice">
+            <strong>No application fee.</strong> A background check is required before final approval for every serious
+            applicant. Submission does not guarantee approval. Before a report is ordered, you will receive the applicable
+            screening criteria and provider disclosures. Criminal history is reviewed in context and does not create an
+            automatic denial; you may provide supplemental information for individualized consideration.
+        </div>
+
+        {% if property and not is_painted_lady %}
             {% if property.charges_application_fee or property.requires_background_check %}
                 <div class="alert alert-warning mb-4">
                     {% if property.charges_application_fee %}
@@ -228,6 +249,13 @@
                         {{ form.current_address }}
                         {{ form.current_address.errors }}
                     </div>
+                    <div class="col-md-6">
+                        <div class="check-card">
+                            {{ form.sms_opted_in }}
+                            <label for="{{ form.sms_opted_in.id_for_label }}">{{ form.sms_opted_in.label }}</label>
+                            <div class="small text-muted mt-2">{{ form.sms_opted_in.help_text }}</div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -256,6 +284,22 @@
                     <div class="col-12">
                         <label class="form-label" for="{{ form.previous_evictions.id_for_label }}">Previous Evictions / Housing Barriers</label>
                         {{ form.previous_evictions }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="{{ form.previous_address_2.id_for_label }}">Additional Previous Housing</label>
+                        {{ form.previous_address_2 }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="{{ form.previous_address_2_length.id_for_label }}">Length of Stay / Reason for Leaving</label>
+                        {{ form.previous_address_2_length }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="{{ form.previous_address_3.id_for_label }}">Other Previous Housing</label>
+                        {{ form.previous_address_3 }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="{{ form.previous_address_3_length.id_for_label }}">Length of Stay / Reason for Leaving</label>
+                        {{ form.previous_address_3_length }}
                     </div>
                 </div>
             </section>
@@ -390,12 +434,29 @@
                 <h2 class="app-section-title">References</h2>
 
                 <div class="row g-3">
-                    <div class="col-md-4"><label class="form-label" for="{{ form.reference_1_name.id_for_label }}">Reference 1 Name</label>{{ form.reference_1_name }}</div>
-                    <div class="col-md-4"><label class="form-label" for="{{ form.reference_1_relationship.id_for_label }}">Relationship</label>{{ form.reference_1_relationship }}</div>
-                    <div class="col-md-4"><label class="form-label" for="{{ form.reference_1_phone.id_for_label }}">Phone</label>{{ form.reference_1_phone }}</div>
-                    <div class="col-md-4"><label class="form-label" for="{{ form.reference_2_name.id_for_label }}">Reference 2 Name</label>{{ form.reference_2_name }}</div>
-                    <div class="col-md-4"><label class="form-label" for="{{ form.reference_2_relationship.id_for_label }}">Relationship</label>{{ form.reference_2_relationship }}</div>
-                    <div class="col-md-4"><label class="form-label" for="{{ form.reference_2_phone.id_for_label }}">Phone</label>{{ form.reference_2_phone }}</div>
+                    <div class="col-md-3"><label class="form-label" for="{{ form.reference_1_name.id_for_label }}">Reference 1 Name</label>{{ form.reference_1_name }}</div>
+                    <div class="col-md-3"><label class="form-label" for="{{ form.reference_1_relationship.id_for_label }}">Relationship</label>{{ form.reference_1_relationship }}</div>
+                    <div class="col-md-3"><label class="form-label" for="{{ form.reference_1_type.id_for_label }}">Reference Type</label>{{ form.reference_1_type }}</div>
+                    <div class="col-md-3"><label class="form-label" for="{{ form.reference_1_phone.id_for_label }}">Phone</label>{{ form.reference_1_phone }}</div>
+                    <div class="col-md-3"><label class="form-label" for="{{ form.reference_2_name.id_for_label }}">Reference 2 Name</label>{{ form.reference_2_name }}</div>
+                    <div class="col-md-3"><label class="form-label" for="{{ form.reference_2_relationship.id_for_label }}">Relationship</label>{{ form.reference_2_relationship }}</div>
+                    <div class="col-md-3"><label class="form-label" for="{{ form.reference_2_type.id_for_label }}">Reference Type</label>{{ form.reference_2_type }}</div>
+                    <div class="col-md-3"><label class="form-label" for="{{ form.reference_2_phone.id_for_label }}">Phone</label>{{ form.reference_2_phone }}</div>
+                </div>
+            </section>
+
+            <section class="app-section">
+                <h2 class="app-section-title">Emergency Contact</h2>
+                <p class="app-section-note">Someone we may contact in an emergency. This person is not made financially responsible.</p>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="{{ form.emergency_contact_name.id_for_label }}">Emergency Contact Name</label>
+                        {{ form.emergency_contact_name }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="{{ form.emergency_contact_phone.id_for_label }}">Emergency Contact Phone</label>
+                        {{ form.emergency_contact_phone }}
+                    </div>
                 </div>
             </section>
 
@@ -421,6 +482,26 @@
                 </div>
             </section>
 
+            <section class="app-section">
+                <h2 class="app-section-title">Screening Authorization</h2>
+                <p class="app-section-note">Each authorization is required before the application can be submitted. Screening is ordered only after the required disclosures are provided.</p>
+                <div class="check-card">
+                    {{ form.verification_authorization }}
+                    <label for="{{ form.verification_authorization.id_for_label }}">I authorize verification of the information in this application and contact with my housing and personal references.</label>
+                    {{ form.verification_authorization.errors }}
+                </div>
+                <div class="check-card">
+                    {{ form.screening_authorization }}
+                    <label for="{{ form.screening_authorization.id_for_label }}">I authorize lawful tenant-screening reports after I receive the required screening disclosures.</label>
+                    {{ form.screening_authorization.errors }}
+                </div>
+                <div class="check-card">
+                    {{ form.background_check_acknowledgment }}
+                    <label for="{{ form.background_check_acknowledgment.id_for_label }}">I understand that a background check is required before final approval and that there is no application fee.</label>
+                    {{ form.background_check_acknowledgment.errors }}
+                </div>
+            </section>
+
             <div class="submit-panel">
                 <div class="row g-3 align-items-center">
                     <div class="col-lg-8">
@@ -429,6 +510,16 @@
                             By submitting, I certify the information provided is true and complete to the best of my knowledge.
                             I understand false information may result in denial of housing.
                         </p>
+                        <div class="mt-3">
+                            <label class="form-label" for="{{ form.applicant_printed_name.id_for_label }}">Type Your Full Legal Name as Your Signature</label>
+                            {{ form.applicant_printed_name }}
+                            {{ form.applicant_printed_name.errors }}
+                        </div>
+                        <div class="check-card mt-3">
+                            {{ form.certification_acknowledgment }}
+                            <label for="{{ form.certification_acknowledgment.id_for_label }}">I certify that this application is complete and accurate and intend my typed name and submission to serve as my electronic signature.</label>
+                            {{ form.certification_acknowledgment.errors }}
+                        </div>
                     </div>
                     <div class="col-lg-4 text-lg-end">
                         <button type="submit" class="gold-btn w-100">Submit Application</button>

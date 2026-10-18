@@ -391,6 +391,14 @@ class HousingApplication(models.Model):
     housing_need = models.TextField()
     additional_notes = models.TextField(blank=True)
 
+    emergency_contact_name = models.CharField(max_length=255, blank=True)
+    emergency_contact_phone = models.CharField(max_length=50, blank=True)
+    applicant_printed_name = models.CharField(max_length=255, blank=True)
+    verification_authorization = models.BooleanField(default=False)
+    screening_authorization = models.BooleanField(default=False)
+    background_check_acknowledgment = models.BooleanField(default=False)
+    certification_acknowledgment = models.BooleanField(default=False)
+
     sobriety_acknowledgment = models.BooleanField(default=False)
     unconditional_regard_acknowledgment = models.BooleanField(default=False)
 

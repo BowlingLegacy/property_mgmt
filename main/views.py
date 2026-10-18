@@ -2264,6 +2264,7 @@ def apply(request):
             .first()
             or Property.objects.filter(name__icontains="Painted Lady").first()
         )
+    is_painted_lady = bool(property_obj and "painted lady" in property_obj.name.lower())
 
     if request.method == "POST":
         form = HousingApplicationForm(request.POST, request.FILES)
@@ -2271,16 +2272,19 @@ def apply(request):
             application = form.save(commit=False)
             if property_obj:
                 application.property = property_obj
-                if "painted lady" in property_obj.name.lower():
+                if is_painted_lady:
                     application.space_type = application.space_type or "Room"
                     application.monthly_rent = Decimal("650.00")
                     application.deposit_required = Decimal("450.00")
                     application.utility_monthly = Decimal("55.00")
                     application.balance = Decimal("0.00")
                     application.utility_balance = Decimal("0.00")
-                if property_obj.charges_application_fee:
+                    application.background_check_required = True
+                    application.background_check_fee_amount = Decimal("0.00")
+                    application.background_check_status = "pending"
+                if property_obj.charges_application_fee and not is_painted_lady:
                     application.application_fee_amount = property_obj.application_fee_amount
-                if property_obj.requires_background_check:
+                if property_obj.requires_background_check and not is_painted_lady:
                     application.background_check_required = True
                     application.background_check_fee_amount = property_obj.background_check_fee_amount
                     application.background_check_status = "pending"
@@ -2295,6 +2299,7 @@ def apply(request):
     return render(request, "apply.html", {
         "form": form,
         "property": property_obj,
+        "is_painted_lady": is_painted_lady,
     })
 
 

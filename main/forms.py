@@ -1452,7 +1452,13 @@ class ResidentMessageForm(forms.ModelForm):
 
 
 class HousingApplicationForm(forms.ModelForm):
-    PHONE_FIELDS = ["phone", "parole_officer_phone", "reference_1_phone", "reference_2_phone"]
+    PHONE_FIELDS = [
+        "phone",
+        "emergency_contact_phone",
+        "parole_officer_phone",
+        "reference_1_phone",
+        "reference_2_phone",
+    ]
 
     class Meta:
         model = HousingApplication
@@ -1499,6 +1505,13 @@ class HousingApplicationForm(forms.ModelForm):
             "reference_2_type",
             "housing_need",
             "additional_notes",
+            "emergency_contact_name",
+            "emergency_contact_phone",
+            "applicant_printed_name",
+            "verification_authorization",
+            "screening_authorization",
+            "background_check_acknowledgment",
+            "certification_acknowledgment",
             "sobriety_acknowledgment",
             "unconditional_regard_acknowledgment",
         ]
@@ -1553,6 +1566,13 @@ class HousingApplicationForm(forms.ModelForm):
 
             "housing_need": forms.Textarea(attrs={"class": "form-control", "rows": 4, "placeholder": "When do you need housing, why this home, accessibility needs, pets/service animals, and any move-in concerns"}),
             "additional_notes": forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Anything else we should know before contacting you"}),
+            "emergency_contact_name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Emergency contact legal name"}),
+            "emergency_contact_phone": forms.TextInput(attrs={"class": "form-control phone-input", "placeholder": "Emergency contact phone number", "inputmode": "tel"}),
+            "applicant_printed_name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Type your full legal name"}),
+            "verification_authorization": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "screening_authorization": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "background_check_acknowledgment": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "certification_acknowledgment": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "sobriety_acknowledgment": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "unconditional_regard_acknowledgment": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
@@ -1563,10 +1583,31 @@ class HousingApplicationForm(forms.ModelForm):
             "sms_opted_in": "Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help. Consent is not required to rent from Bowling Legacy.",
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["applicant_printed_name"].required = True
+
     def clean(self):
         cleaned_data = super().clean()
         for field_name in self.PHONE_FIELDS:
             cleaned_data[field_name] = self.format_phone(cleaned_data.get(field_name))
+
+        required_acknowledgments = {
+            "verification_authorization": "Authorize verification before submitting your application.",
+            "screening_authorization": "Authorize tenant screening before submitting your application.",
+            "background_check_acknowledgment": "Acknowledge the background-check requirement before submitting.",
+            "certification_acknowledgment": "Certify that the application is complete and accurate before submitting.",
+            "sobriety_acknowledgment": "Acknowledge the drug- and alcohol-free housing requirement.",
+            "unconditional_regard_acknowledgment": "Acknowledge the community conduct standard.",
+        }
+        for field_name, message in required_acknowledgments.items():
+            if not cleaned_data.get(field_name):
+                self.add_error(field_name, message)
+
+        printed_name = (cleaned_data.get("applicant_printed_name") or "").strip()
+        legal_name = (cleaned_data.get("full_name") or "").strip()
+        if printed_name and legal_name and printed_name.casefold() != legal_name.casefold():
+            self.add_error("applicant_printed_name", "Type the same legal name entered at the top of the application.")
         return cleaned_data
 
     @staticmethod
