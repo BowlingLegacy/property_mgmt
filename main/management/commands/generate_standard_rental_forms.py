@@ -59,8 +59,6 @@ class FillableForm:
         self.y -= 32
 
     def note(self, text, height=28):
-        if self.y - height < 55:
-            self.new_page()
         words = text.split()
         line = ""
         lines = []
@@ -73,6 +71,9 @@ class FillableForm:
                 line = candidate
         if line:
             lines.append(line)
+        needed = max(height, (len(lines) * 11) + 5)
+        if self.y - needed < 55:
+            self.new_page()
         self.pdf.setFont("Helvetica", 8)
         for item in lines:
             self.pdf.drawString(45, self.y, item)
@@ -189,6 +190,14 @@ def build_application(path):
     doc.section("Household")
     doc.field("Every proposed occupant and relationship to the applicants", "occupants", height=52, multiline=True)
     doc.field("Animals or requested assistance-animal accommodation (do not disclose a diagnosis)", "animals", height=40, multiline=True)
+    doc.field("Vehicles to be kept at the property (year, make, model, color, plate)", "vehicles", height=45, multiline=True)
+    doc.two_fields("Emergency contact name", "emergency_contact_name", "Emergency contact phone/email", "emergency_contact_details")
+    doc.section("Guarantor, if requested after review")
+    doc.note("Complete this section only if the housing provider requests a guarantor. A guarantor must sign a separate written guaranty before being bound.")
+    doc.two_fields("Guarantor legal name", "guarantor_name", "Relationship to applicant", "guarantor_relationship")
+    doc.two_fields("Phone", "guarantor_phone", "Email", "guarantor_email")
+    doc.field("Mailing address", "guarantor_address")
+    doc.two_fields("Employer / income source", "guarantor_income_source", "Gross monthly income", "guarantor_monthly_income")
     doc.section("Screening notice and authorization")
     doc.note(
         "There is no application fee. A background check is required before final approval for every serious contender. "
@@ -216,7 +225,8 @@ def build_agreement(path):
     doc = FillableForm(
         path,
         "RENTALREADYPRO RESIDENTIAL RENTAL AGREEMENT",
-        "Reusable Oregon working template. Complete property-specific terms and obtain legal review before use.",
+        "Reusable Oregon working template. Complete every applicable field and attach required disclosures before use.",
+        auto_size_text=True,
     )
     doc.section("Parties and premises")
     doc.two_fields("Housing provider / landlord", "landlord_name", "Property owner", "owner_name")
@@ -232,32 +242,70 @@ def build_agreement(path):
     doc.two_fields("Monthly rent", "monthly_rent", "Rent due day", "rent_due_day")
     doc.field("Authorized payment methods and delivery location", "payment_methods")
     doc.two_fields("Security deposit", "security_deposit", "Prepaid rent, if any", "prepaid_rent")
-    doc.field("Lawful late-charge method and amount", "late_charge")
-    doc.note("No application fee is part of this rental agreement. Deposits, rent, and other charges must be handled and documented as required by current law.")
+    doc.field("Late charge: select one lawful method, state the amount, and state when it becomes due", "late_charge", height=34, multiline=True)
+    doc.note(
+        "No application fee is charged. Rent is delinquent only as provided by Oregon law. Any late charge must be "
+        "written here and comply with ORS 90.260. The landlord will provide a receipt for the security deposit and, "
+        "after the tenancy ends and possession is returned, will provide the accounting and refund required by law."
+    )
     doc.section("Utilities and services")
     doc.field("Tenant-paid utilities and providers", "tenant_utilities", height=42, multiline=True)
     doc.field("Owner-paid utilities and services", "owner_utilities", height=42, multiline=True)
     doc.field("Utility allocation or billing method, if applicable", "utility_method", height=42, multiline=True)
+    doc.field("Internet, garbage, yard care, and other recurring responsibilities", "other_services", height=42, multiline=True)
     doc.section("Use, condition, and rules")
     doc.field("Parking, storage, keys, and access devices", "parking_storage_keys", height=45, multiline=True)
     doc.field("Animals and assistance-animal accommodations", "animals", height=40, multiline=True)
-    doc.field("Smoking or vaping policy", "smoking_policy", height=35, multiline=True)
+    doc.field("Smoking and vaping policy for the dwelling, grounds, and common areas", "smoking_policy", height=35, multiline=True)
     doc.field("Property-specific rules incorporated into this agreement", "property_rules", height=75, multiline=True)
-    doc.note("Tenant will use the premises as a residence, keep it reasonably clean and safe, promptly report damage or unsafe conditions, and avoid conduct that unlawfully interferes with neighbors or damages property.")
+    doc.note(
+        "The premises may be occupied only by the authorized occupants. Subletting, assignment, and short-term rental "
+        "use are prohibited without the landlord's prior written approval. A guest who is not named in this agreement "
+        "may not stay overnight for more than five consecutive calendar days without prior written approval. The "
+        "landlord is willing to consider reasonable exceptions when requested in advance; tenants must communicate "
+        "promptly and keep the landlord informed."
+    )
+    doc.note(
+        "Tenant will use the premises as a residence, keep it reasonably clean and safe, promptly report damage or "
+        "unsafe conditions, and avoid conduct that unlawfully interferes with neighbors or damages property. Normal "
+        "wear is not tenant damage. No alteration, additional lock, painting, or fixture installation may be made "
+        "without prior written approval, except as otherwise allowed by law."
+    )
     doc.section("Maintenance, entry, and insurance")
     doc.field("Owner-provided appliances and equipment", "appliances", height=40, multiline=True)
     doc.field("Maintenance request method and emergency contact", "maintenance_contact", height=40, multiline=True)
-    doc.note("Landlord entry, repairs, habitability duties, smoke and carbon-monoxide alarms, and tenant remedies are governed by current Oregon law. Nothing in this agreement waives a nonwaivable right or duty.")
+    doc.note(
+        "Landlord entry, repairs, habitability duties, smoke and carbon-monoxide alarms, and tenant remedies are "
+        "governed by current Oregon law. Except for emergencies and other lawful exceptions, entry requires the "
+        "notice and reasonable timing required by ORS 90.322. Nothing in this agreement waives a nonwaivable right or duty."
+    )
     doc.two_fields("Renters insurance required?", "insurance_required", "Minimum liability coverage", "insurance_coverage")
+    doc.note(
+        "If renters insurance is required, it covers the tenant's personal property and personal liability. The tenant "
+        "is not responsible for insuring the building itself. Insurance requirements do not make a tenant responsible "
+        "for loss that is not legally attributable to the tenant."
+    )
+    doc.section("Condition and move-in records")
+    doc.field("Move-in inspection date and participants", "move_in_inspection")
+    doc.field("Existing damage or condition notes; attach a signed checklist and photographs when available", "condition_notes", height=75, multiline=True)
+    doc.two_fields("Number of dwelling keys", "dwelling_keys", "Other keys / remotes / devices", "other_access_devices")
     doc.section("Notices, screening, and incorporated documents")
     doc.field("Address or electronic method authorized for notices, if lawful", "notice_method", height=40, multiline=True)
     doc.field("Addenda and disclosures attached to this agreement", "addenda", height=70, multiline=True)
+    doc.check("Smoking-policy disclosure is completed above or in an attached addendum.", "smoking_disclosure_attached")
+    doc.check("Lead-based paint disclosure is attached if the dwelling was built before 1978 and the law requires it.", "lead_disclosure_attached")
+    doc.check("Move-in condition checklist is attached or will be completed at possession.", "condition_checklist_attached")
     doc.note("Any termination, rent increase, entry notice, fee, deposit accounting, or other legal notice must follow the law in effect when the notice is given. A background check is an application-stage requirement and is not a continuing authorization after tenancy begins unless separately authorized by law.")
     doc.section("Signatures")
     doc.note("The parties acknowledge receipt of a completed copy and agree to the filled terms and incorporated addenda. Electronic signatures are intended to have the same effect as handwritten signatures where permitted by law.")
+    doc.field("Tenant 1 printed / typed legal name", "tenant_1_printed_name")
     doc.two_fields("Tenant 1 signature", "tenant_1_signature", "Date", "tenant_1_date")
+    doc.field("Tenant 2 printed / typed legal name", "tenant_2_printed_name")
     doc.two_fields("Tenant 2 signature", "tenant_2_signature", "Date", "tenant_2_date")
-    doc.two_fields("Landlord / agent signature", "landlord_signature", "Date", "landlord_date")
+    doc.field("Tenant 3 printed / typed legal name, if any", "tenant_3_printed_name")
+    doc.two_fields("Tenant 3 signature", "tenant_3_signature", "Date", "tenant_3_date")
+    doc.field("Landlord / authorized agent printed / typed name", "landlord_printed_name")
+    doc.two_fields("Landlord / authorized agent signature", "landlord_signature", "Date", "landlord_date")
     doc.save()
 
 
