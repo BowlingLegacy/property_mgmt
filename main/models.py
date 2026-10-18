@@ -103,6 +103,10 @@ class User(AbstractUser):
 
 
 class Property(models.Model):
+    APPLICATION_REVIEW_PROFILE_CHOICES = [
+        ("standard_rental", "Standard whole-property rental"),
+        ("supportive_housing", "Supportive / room-based housing"),
+    ]
     MANAGEMENT_MODE_CHOICES = [
         ("owner_managed", "I will manage this property myself"),
         ("independent_landlord", "I will assign my own landlord"),
@@ -162,9 +166,15 @@ class Property(models.Model):
     charges_application_fee = models.BooleanField(default=False)
     application_fee_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"), blank=True)
     application_fee_notes = models.CharField(max_length=255, blank=True)
-    requires_background_check = models.BooleanField(default=False)
+    requires_background_check = models.BooleanField(default=True)
     background_check_fee_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"), blank=True)
     background_check_instructions = models.TextField(blank=True)
+    application_review_profile = models.CharField(
+        max_length=30,
+        choices=APPLICATION_REVIEW_PROFILE_CHOICES,
+        default="standard_rental",
+        help_text="Controls which application-review framework is used for this property.",
+    )
     renters_insurance_provider_name = models.CharField(max_length=255, blank=True, default="Progressive Renters Insurance")
     renters_insurance_url = models.URLField(blank=True, default="https://www.progressive.com/renters/")
     renters_insurance_notes = models.TextField(blank=True)

@@ -36,6 +36,9 @@ class PropertyManagementHierarchyTests(TestCase):
         self.assertEqual(property_obj.owner_email, owner.email)
         self.assertEqual(property_obj.landlord_email, owner.email)
         self.assertEqual(property_obj.dashboard_name, "Belmont Dashboard")
+        self.assertEqual(property_obj.application_review_profile, "standard_rental")
+        self.assertTrue(property_obj.requires_background_check)
+        self.assertFalse(property_obj.charges_application_fee)
 
     def test_owner_can_change_property_to_management_company(self):
         owner = self.create_user("managed-owner", "property_owner", "managed-owner@example.com")

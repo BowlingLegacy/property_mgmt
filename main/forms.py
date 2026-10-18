@@ -1,4 +1,5 @@
 import re
+from decimal import Decimal
 
 from django import forms
 from django.conf import settings
@@ -300,6 +301,7 @@ class OwnerPropertyForm(forms.ModelForm):
             "requires_background_check",
             "background_check_fee_amount",
             "background_check_instructions",
+            "application_review_profile",
             "renters_insurance_provider_name",
             "renters_insurance_url",
             "renters_insurance_notes",
@@ -319,6 +321,7 @@ class OwnerPropertyForm(forms.ModelForm):
             "application_fee_amount": "Application Fee Amount",
             "requires_background_check": "Require Background Check",
             "background_check_fee_amount": "Background Check Fee Amount",
+            "application_review_profile": "Application review type",
             "renters_insurance_provider_name": "Renters Insurance Provider",
             "renters_insurance_url": "Renters Insurance Link",
         }
@@ -346,6 +349,7 @@ class OwnerPropertyForm(forms.ModelForm):
             "requires_background_check": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "background_check_fee_amount": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
             "background_check_instructions": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "application_review_profile": forms.Select(attrs={"class": "form-select"}),
             "renters_insurance_provider_name": forms.TextInput(attrs={"class": "form-control"}),
             "renters_insurance_url": forms.URLInput(attrs={"class": "form-control"}),
             "renters_insurance_notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
@@ -357,10 +361,19 @@ class OwnerPropertyForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["management_mode"].required = False
         self.fields["management_mode"].initial = "owner_managed"
+        self.fields["application_review_profile"].required = False
+        self.fields["application_review_profile"].initial = "standard_rental"
 
     def clean(self):
         cleaned_data = super().clean()
         cleaned_data["management_mode"] = cleaned_data.get("management_mode") or "owner_managed"
+        cleaned_data["application_review_profile"] = (
+            cleaned_data.get("application_review_profile") or "standard_rental"
+        )
+        if cleaned_data["application_review_profile"] == "standard_rental":
+            cleaned_data["charges_application_fee"] = False
+            cleaned_data["application_fee_amount"] = Decimal("0.00")
+            cleaned_data["requires_background_check"] = True
         if cleaned_data.get("management_mode") == "management_company":
             if not cleaned_data.get("management_company_name"):
                 self.add_error("management_company_name", "Enter the company that will manage this property.")

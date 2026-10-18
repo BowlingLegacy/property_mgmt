@@ -3597,7 +3597,7 @@ def attention_identity_key(property_id, email, full_name, room_unit_label=""):
     )
 
 
-def applicant_review_summary(application):
+def supportive_application_review_summary(application):
     rent_amount = application.monthly_rent or Decimal("0.00")
     utility_amount = application.utility_monthly or Decimal("0.00")
     monthly_housing_cost = rent_amount + utility_amount
@@ -3740,6 +3740,151 @@ def applicant_review_summary(application):
         "review_flags": review_flags[:6],
         "missing_items": missing_items[:6],
     }
+
+
+def standard_rental_review_summary(application):
+    """Review a conventional rental without supportive-housing criteria.
+
+    Criminal-history results never add or subtract points. A non-clear result is
+    routed to a human for the individualized assessment required by Oregon law.
+    """
+    rent_amount = application.monthly_rent or Decimal("0.00")
+    utility_amount = application.utility_monthly or Decimal("0.00")
+    monthly_housing_cost = rent_amount + utility_amount
+    monthly_income = application.monthly_income or Decimal("0.00")
+    score = 0
+    strengths = []
+    review_flags = []
+    missing_items = []
+
+    if application.age >= 18:
+        score += 5
+    else:
+        review_flags.append("Applicant is under 18; confirm legal ability to sign.")
+
+    if monthly_housing_cost > 0 and monthly_income > 0:
+        rent_ratio = (monthly_housing_cost / monthly_income) * Decimal("100")
+        if rent_ratio <= Decimal("35"):
+            score += 35
+            strengths.append("Verified income appears strong against housing cost.")
+        elif rent_ratio <= Decimal("45"):
+            score += 27
+            strengths.append("Income appears workable against housing cost.")
+        elif rent_ratio <= Decimal("55"):
+            score += 17
+            review_flags.append("Income is tight compared with housing cost.")
+        else:
+            score += 7
+            review_flags.append("Income needs careful review against housing cost.")
+    else:
+        missing_items.append("Monthly income or housing cost is missing.")
+
+    if application.income_source:
+        score += 10
+    else:
+        missing_items.append("Verifiable income source is missing.")
+
+    if application.employment_length:
+        score += 5
+        strengths.append("Income stability information provided.")
+
+    if application.current_address and application.current_address_length:
+        score += 10
+    elif application.current_address or application.current_address_length:
+        score += 5
+        review_flags.append("Current housing history is incomplete.")
+    else:
+        missing_items.append("Current housing history is missing.")
+
+    if application.previous_address_1:
+        score += 10
+    else:
+        missing_items.append("Prior housing history is missing.")
+
+    evictions_text = (application.previous_evictions or "").strip().lower()
+    if evictions_text and evictions_text not in {"none", "n/a", "na", "no"}:
+        review_flags.append("Rental-history notes require verification and individual review.")
+
+    if application.reference_1_name and application.reference_1_phone:
+        score += 10
+        strengths.append("Primary rental or personal reference provided.")
+    elif application.reference_1_name or application.reference_1_phone:
+        score += 4
+        review_flags.append("Primary reference is incomplete.")
+    else:
+        missing_items.append("Primary reference is missing.")
+
+    if application.reference_2_name and application.reference_2_phone:
+        score += 5
+
+    if application.id_upload and application.identity_selfie_upload:
+        score += 10
+        strengths.append("Identity documentation is ready for verification.")
+    elif application.has_valid_odl or application.oregon_id_number or application.id_upload:
+        score += 5
+        review_flags.append("Identity documentation requires completion or comparison.")
+    else:
+        missing_items.append("Identity verification is missing.")
+
+    background_required = bool(application.background_check_required)
+    background_status = application.background_check_status
+    background_cleared = not background_required or background_status == "cleared"
+    if background_required and background_status in {"not_required", "pending"}:
+        review_flags.append("Background check is required before final approval.")
+    elif background_required and background_status == "ordered":
+        review_flags.append("Background check is in progress; no final decision yet.")
+    elif background_required and background_status in {"needs_review", "declined"}:
+        review_flags.append(
+            "Background information requires human review, supplemental evidence, and an individualized assessment."
+        )
+    elif background_status == "cleared":
+        strengths.append("Required background-check step is complete.")
+
+    score = max(0, min(100, int(score)))
+    ready_on_application = score >= 80 and not missing_items
+    eligible_for_final_approval = ready_on_application and background_cleared
+
+    if background_required and not background_cleared:
+        rating = "Background Review Required"
+        badge_class = "warning"
+        recommendation = "Do not make a final decision until screening and any required individualized review are complete."
+    elif ready_on_application:
+        rating = "Strong Application"
+        badge_class = "success"
+        recommendation = "Application is ready for final owner review."
+    elif score >= 60:
+        rating = "Review Application"
+        badge_class = "primary"
+        recommendation = "Verify the flagged or missing information before deciding."
+    else:
+        rating = "Incomplete Application"
+        badge_class = "danger"
+        recommendation = "Collect the missing information before making a housing decision."
+
+    return {
+        "score": score,
+        "rating": rating,
+        "badge_class": badge_class,
+        "recommendation": recommendation,
+        "monthly_housing_cost": monthly_housing_cost,
+        "income_ratio": (
+            ((monthly_housing_cost / monthly_income) * Decimal("100")).quantize(Decimal("0.1"))
+            if monthly_housing_cost > 0 and monthly_income > 0
+            else None
+        ),
+        "strengths": strengths[:5],
+        "review_flags": review_flags[:6],
+        "missing_items": missing_items[:6],
+        "eligible_for_final_approval": eligible_for_final_approval,
+    }
+
+
+def applicant_review_summary(application):
+    property_obj = application.property
+    profile = getattr(property_obj, "application_review_profile", "standard_rental")
+    if profile == "supportive_housing":
+        return supportive_application_review_summary(application)
+    return standard_rental_review_summary(application)
 
 
 def attach_applicant_review_summaries(applications):
