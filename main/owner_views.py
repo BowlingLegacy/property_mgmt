@@ -57,6 +57,9 @@ def financial_entry_total(property_obj, year, entry_types):
 @login_required
 @user_passes_test(can_access_owner_dashboard)
 def property_owner_dashboard(request):
+    request.session.pop("active_property_workspace_id", None)
+    if hasattr(request.user, "_active_property_workspace_id"):
+        del request.user._active_property_workspace_id
     properties = owner_properties_for(request.user)
     today = timezone.localdate()
     selected_month = today.replace(day=1)
@@ -325,6 +328,9 @@ def owner_landlord_invite(request):
 @login_required
 @user_passes_test(can_access_property_management_dashboard)
 def property_management_dashboard(request):
+    request.session.pop("active_property_workspace_id", None)
+    if hasattr(request.user, "_active_property_workspace_id"):
+        del request.user._active_property_workspace_id
     properties = landlord_assignable_properties(request.user)
     owner_groups = []
     for owner_email in properties.values_list("owner_email", flat=True).distinct():

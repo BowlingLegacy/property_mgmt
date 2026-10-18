@@ -2499,7 +2499,7 @@ def request_invite_code(request):
 
     return render(request, "request_invite_code.html", {"form": form})
 
-def staff_managed_properties(user):
+def all_managed_properties(user):
     if user.is_superuser or getattr(user, "role", "") in ["admin", "assistant"]:
         return Property.objects.all()
 
@@ -2516,6 +2516,14 @@ def staff_managed_properties(user):
         return Property.objects.filter(management_company_email__iexact=email) if email else Property.objects.none()
 
     return Property.objects.none()
+
+
+def staff_managed_properties(user):
+    properties = all_managed_properties(user)
+    active_property_id = getattr(user, "_active_property_workspace_id", None)
+    if active_property_id and getattr(user, "role", "") in ["property_owner", "property_manager", "assistant", "admin"]:
+        return properties.filter(id=active_property_id)
+    return properties
 
 
 def staff_managed_applications(user):
@@ -2996,7 +3004,7 @@ def get_landlord_workspace_context(user, selected_property=None):
 @login_required
 @user_passes_test(staff_required)
 def landlord_dashboard(request):
-    properties = staff_managed_properties(request.user).order_by("name")
+    properties = all_managed_properties(request.user).order_by("name")
     selected_property = None
     property_id = (request.GET.get("property_id") or "").strip()
     if property_id:
@@ -3007,6 +3015,8 @@ def landlord_dashboard(request):
         return render(request, "landlord_assignment_required.html", {"properties": properties})
     if selected_property is None:
         return render(request, "landlord_property_picker.html", {"properties": properties})
+    request.session["active_property_workspace_id"] = selected_property.id
+    request.user._active_property_workspace_id = selected_property.id
     context = get_landlord_workspace_context(request.user, selected_property=selected_property)
     return render(request, "landlord_dashboard.html", context)
 
@@ -4416,6 +4426,9 @@ def parse_graph_message(message):
 @login_required
 @user_passes_test(staff_required)
 def superadmin_dashboard(request):
+    request.session.pop("active_property_workspace_id", None)
+    if hasattr(request.user, "_active_property_workspace_id"):
+        del request.user._active_property_workspace_id
 
     if not request.user.is_superuser and request.user.role != "admin":
         return redirect("tenant_dashboard")

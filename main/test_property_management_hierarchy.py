@@ -84,6 +84,29 @@ class PropertyManagementHierarchyTests(TestCase):
         self.assertContains(response, "owner-one@example.com")
         self.assertNotContains(response, "Hidden Home")
 
+    def test_selected_management_company_workspace_scopes_followup_pages(self):
+        manager = self.create_user("scoped-manager", "property_manager", "scoped-manager@example.com")
+        first = Property.objects.create(
+            name="Belmont",
+            owner_email="owner@example.com",
+            management_mode="management_company",
+            management_company_email=manager.email,
+        )
+        second = Property.objects.create(
+            name="Painted Lady",
+            owner_email="owner@example.com",
+            management_mode="management_company",
+            management_company_email=manager.email,
+        )
+        self.client.force_login(manager)
+
+        dashboard = self.client.get(reverse("landlord_dashboard"), {"property_id": first.id})
+        receipt_workspace = self.client.get(reverse("accounting_receipts"))
+
+        self.assertContains(dashboard, first.dashboard_name)
+        self.assertEqual(receipt_workspace.context["selected_property"], first)
+        self.assertNotContains(receipt_workspace, second.name)
+
     def test_landlord_login_is_rejected_when_assigned_to_multiple_properties(self):
         landlord = self.create_user("crossed-landlord", "landlord", "landlord@example.com")
         Property.objects.create(name="First Home", landlord_email=landlord.email)
