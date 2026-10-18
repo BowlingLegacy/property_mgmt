@@ -13,10 +13,11 @@ PAPER = HexColor("#FFFAF0")
 
 
 class FillableForm:
-    def __init__(self, path, title, subtitle):
+    def __init__(self, path, title, subtitle, auto_size_text=False):
         self.path = path
         self.title = title
         self.subtitle = subtitle
+        self.field_font_size = 0 if auto_size_text else 9
         self.pdf = canvas.Canvas(str(path), pagesize=letter)
         self.form = self.pdf.acroForm
         self.page = 0
@@ -99,7 +100,7 @@ class FillableForm:
             forceBorder=True,
             fieldFlags=flags,
             fontName="Helvetica",
-            fontSize=9,
+            fontSize=self.field_font_size,
         )
         self.y -= 13
 
@@ -114,7 +115,7 @@ class FillableForm:
             self.form.textfield(
                 name=name, x=x, y=self.y, width=258, height=18,
                 borderColor=GOLD, fillColor=HexColor("#FFFFFF"), textColor=INK,
-                borderWidth=1, forceBorder=True, fontName="Helvetica", fontSize=9,
+                borderWidth=1, forceBorder=True, fontName="Helvetica", fontSize=self.field_font_size,
             )
         self.y -= 13
 
@@ -140,6 +141,7 @@ def build_application(path):
         path,
         "RENTALREADYPRO RENTAL APPLICATION",
         "Reusable application for standard whole-property rentals. No application fee is charged by this form.",
+        auto_size_text=True,
     )
     doc.section("Property requested")
     doc.field("Property address", "property_address")
