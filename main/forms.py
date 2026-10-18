@@ -1172,6 +1172,11 @@ class CustomReportForm(forms.Form):
         required=False,
         widget=forms.Select(attrs={"class": "form-select"}),
     )
+    owner_email = forms.ChoiceField(
+        label="Property Owner",
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
     start_date = forms.DateField(
         required=False,
         widget=forms.DateInput(attrs={"class": "form-control", "type": "date"}),
@@ -1186,7 +1191,7 @@ class CustomReportForm(forms.Form):
         widget=forms.CheckboxSelectMultiple(attrs={"class": "form-check-input"}),
     )
 
-    def __init__(self, *args, properties=None, **kwargs):
+    def __init__(self, *args, properties=None, show_owner_filter=False, **kwargs):
         super().__init__(*args, **kwargs)
         property_choices = [("", "All accessible properties")]
 
@@ -1194,6 +1199,17 @@ class CustomReportForm(forms.Form):
             property_choices.extend((str(property_obj.id), property_obj.name) for property_obj in properties)
 
         self.fields["property_id"].choices = property_choices
+        if show_owner_filter and properties is not None:
+            owner_emails = sorted({
+                property_obj.owner_email.strip()
+                for property_obj in properties
+                if property_obj.owner_email and property_obj.owner_email.strip()
+            }, key=str.casefold)
+            self.fields["owner_email"].choices = [("", "All property owners")] + [
+                (email, email) for email in owner_emails
+            ]
+        else:
+            self.fields.pop("owner_email")
 
     def clean(self):
         cleaned_data = super().clean()

@@ -40,6 +40,14 @@ class DashboardReturnNavigationTests(TestCase):
         self.assertNotContains(response, ">Owner Dashboard</a>")
         self.assertNotContains(response, ">Landlord Dashboard</a>")
 
+    def test_superadmin_dashboard_does_not_offer_receipt_entry(self):
+        user = self.create_user("no-receipt-admin", "admin", is_staff=True)
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("superadmin_dashboard"))
+
+        self.assertNotContains(response, "Receipt Accounting")
+
     def test_immediate_dashboard_referrer_wins_over_older_session_origin(self):
         user = self.create_user("switching-admin", "admin", is_staff=True)
         self.client.force_login(user)

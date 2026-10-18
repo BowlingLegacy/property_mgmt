@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+    <div class="card shadow-sm border-0 rounded-4 p-4">
+        <div class="text-uppercase small fw-bold text-muted">Landlord Operations</div>
+        <h1 class="mt-1">Choose a Property Dashboard</h1>
+        <p class="text-muted">Each landlord dashboard is limited to one property. Choose the property you want to manage.</p>
+        <div class="d-flex gap-3 flex-wrap">
+            {% for property in properties %}
+                <a class="btn btn-warning fw-bold" href="{% url 'landlord_dashboard' %}?property_id={{ property.id }}">{{ property.name }}</a>
+            {% empty %}
+                <span class="text-muted">No properties are assigned to this account.</span>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

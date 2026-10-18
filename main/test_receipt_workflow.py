@@ -94,3 +94,74 @@ class ReceiptMonthlyWorkflowTests(TestCase):
 
         self.assertRedirects(response, reverse("accounting_receipts"))
         self.assertFalse(AccountingReceipt.objects.exclude(id=prior.id).get().splits.exists())
+
+    def test_property_workspace_never_lists_another_property_receipt(self):
+        other_property = Property.objects.create(
+            name="Other Managed Property", landlord_email=self.user.email,
+        )
+        AccountingReceipt.objects.create(
+            property=self.property, receipt_file="accounting_receipts/ours.pdf",
+            vendor="Our Vendor", receipt_date=date(2026, 9, 5), amount=Decimal("25.00"),
+        )
+        AccountingReceipt.objects.create(
+            property=other_property, receipt_file="accounting_receipts/other.pdf",
+            vendor="Other Vendor", receipt_date=date(2026, 9, 5), amount=Decimal("30.00"),
+        )
+
+        response = self.client.get(
+            reverse("property_accounting_receipts", args=[self.property.id]),
+            {"year": "2026"},
+        )
+
+        self.assertContains(response, "Our Vendor")
+        self.assertNotContains(response, "Other Vendor")
+
+    def test_landlord_cannot_open_another_landlords_receipt_workspace(self):
+        other_property = Property.objects.create(
+            name="Private Property", landlord_email="somebody-else@example.com",
+        )
+
+        response = self.client.get(reverse("property_accounting_receipts", args=[other_property.id]))
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_owner_sees_all_owned_properties_but_not_another_owners_property(self):
+        owner = User.objects.create_user(
+            username="receipt-owner", email="owner@example.com",
+            password="StrongPass123!", role="property_owner",
+        )
+        owned_one = Property.objects.create(name="Owner One", owner_email=owner.email)
+        owned_two = Property.objects.create(name="Owner Two", owner_email=owner.email)
+        not_owned = Property.objects.create(name="Not Owned", owner_email="other-owner@example.com")
+        self.client.force_login(owner)
+
+        picker = self.client.get(reverse("accounting_receipts"))
+        self.assertContains(picker, owned_one.name)
+        self.assertContains(picker, owned_two.name)
+        self.assertNotContains(picker, not_owned.name)
+        self.assertEqual(
+            self.client.get(reverse("property_accounting_receipts", args=[not_owned.id])).status_code,
+            404,
+        )
+
+    def test_new_receipt_file_is_stored_under_property_accounting_folders(self):
+        response = self.client.post(reverse("property_accounting_receipts", args=[self.property.id]), {
+            "property": self.property.id,
+            "receipt_file": SimpleUploadedFile("power bill.pdf", b"bill", content_type="application/pdf"),
+            "vendor": "Pacific Power",
+            "receipt_date": "2026-09-05",
+            "entry_type": "operating_expense",
+            "category": self.internet.id,
+            "amount": "90.00",
+            "payment_method": "other",
+            "description": "September power bill",
+            "notes": "",
+        })
+
+        self.assertRedirects(response, reverse("property_accounting_receipts", args=[self.property.id]))
+        receipt = AccountingReceipt.objects.get(vendor="Pacific Power")
+        self.assertIn(
+            f"accounting_receipts/property-{self.property.id}-monthly-bills-property/2026/09/"
+            "pacific-power/operating_expense/internet/",
+            receipt.receipt_file.name,
+        )

@@ -208,6 +208,12 @@ body {
         </div>
 
         <form method="get" class="row g-3 align-items-end">
+            {% if show_owner_filter %}
+            <div class="col-lg-3">
+                <label class="form-label fw-bold">Property Owner</label>
+                {{ form.owner_email }}
+            </div>
+            {% endif %}
             <div class="col-lg-3">
                 <label class="form-label fw-bold">Report Type</label>
                 {{ form.report_type }}

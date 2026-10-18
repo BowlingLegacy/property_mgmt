@@ -2815,8 +2815,11 @@ def visible_resident_files(applications):
     return sorted_resident_list(visible)
 
 
-def get_landlord_workspace_context(user):
-    properties = staff_managed_properties(user).order_by("name")
+def get_landlord_workspace_context(user, selected_property=None):
+    accessible_properties = staff_managed_properties(user).order_by("name")
+    properties = accessible_properties
+    if selected_property is not None:
+        properties = accessible_properties.filter(id=selected_property.id)
 
     resident_files = (
         HousingApplication.objects
@@ -2956,6 +2959,8 @@ def get_landlord_workspace_context(user):
     return {
         "applications": applications,
         "properties": properties,
+        "accessible_properties": accessible_properties,
+        "selected_property": selected_property,
         "payments": payments,
         "landlord_inbox": landlord_inbox,
         "new_message_count": new_message_count,
@@ -2987,7 +2992,17 @@ def get_landlord_workspace_context(user):
 @login_required
 @user_passes_test(staff_required)
 def landlord_dashboard(request):
-    return render(request, "landlord_dashboard.html", get_landlord_workspace_context(request.user))
+    properties = staff_managed_properties(request.user).order_by("name")
+    selected_property = None
+    property_id = (request.GET.get("property_id") or "").strip()
+    if property_id:
+        selected_property = get_object_or_404(properties, id=property_id)
+    elif properties.count() == 1:
+        selected_property = properties.first()
+    if selected_property is None:
+        return render(request, "landlord_property_picker.html", {"properties": properties})
+    context = get_landlord_workspace_context(request.user, selected_property=selected_property)
+    return render(request, "landlord_dashboard.html", context)
 
 
 @login_required
@@ -5110,7 +5125,7 @@ def open_existing_resident_intake_photo(request, intake_id):
 
 
 @login_required
-@user_passes_test(staff_required)
+@user_passes_test(reporting_required)
 def open_accounting_receipt_file(request, receipt_id):
     receipt = get_object_or_404(AccountingReceipt, id=receipt_id, property__in=staff_managed_properties(request.user))
     return FileResponse(receipt.receipt_file.open("rb"), filename=receipt.receipt_file.name.rsplit("/", 1)[-1])
@@ -6370,9 +6385,11 @@ def rent_roll(request):
 @user_passes_test(reporting_required)
 def custom_reports(request):
     properties = custom_report_accessible_properties(request.user)
+    show_owner_filter = request.user.is_superuser or getattr(request.user, "role", "") in ["admin", "assistant"]
     form = CustomReportForm(
         request.GET or None,
         properties=properties,
+        show_owner_filter=show_owner_filter,
         initial={
             "report_type": "resident_phone_list",
             "financial_entry_types": ["operating_expense"],
@@ -6392,13 +6409,16 @@ def custom_reports(request):
     if generated:
         report_type = form.cleaned_data["report_type"]
         selected_property_id = form.cleaned_data.get("property_id")
+        selected_owner_email = form.cleaned_data.get("owner_email")
         start_date = form.cleaned_data.get("start_date")
         end_date = form.cleaned_data.get("end_date")
 
         filtered_properties = properties
+        if selected_owner_email:
+            filtered_properties = filtered_properties.filter(owner_email__iexact=selected_owner_email)
         if selected_property_id:
-            selected_property = get_object_or_404(properties, id=selected_property_id)
-            filtered_properties = properties.filter(id=selected_property.id)
+            selected_property = get_object_or_404(filtered_properties, id=selected_property_id)
+            filtered_properties = filtered_properties.filter(id=selected_property.id)
 
         residents = (
             HousingApplication.objects
@@ -7018,6 +7038,7 @@ def custom_reports(request):
 
     return render(request, "custom_reports.html", {
         "form": form,
+        "show_owner_filter": show_owner_filter,
         "generated": generated,
         "selected_property": selected_property,
         "report_title": report_title,
@@ -7617,8 +7638,21 @@ def bank_upload_review(request, upload_id):
 
 @login_required
 @user_passes_test(reporting_required)
-def accounting_receipts(request):
-    properties = staff_managed_properties(request.user).order_by("name")
+def accounting_receipts(request, property_id=None):
+    accessible_properties = staff_managed_properties(request.user).order_by("name")
+    selected_property = None
+    if property_id is not None:
+        selected_property = get_object_or_404(accessible_properties, id=property_id)
+    elif accessible_properties.count() == 1:
+        selected_property = accessible_properties.first()
+
+    if selected_property is None:
+        return render(request, "accounting_receipts.html", {
+            "properties": accessible_properties,
+            "show_property_picker": True,
+        })
+
+    properties = accessible_properties.filter(id=selected_property.id)
 
     if request.method == "POST":
         form = AccountingReceiptForm(
@@ -7638,9 +7672,15 @@ def accounting_receipts(request):
             elif apply_vendor_rule_to_receipt(receipt):
                 messages.info(request, "A saved vendor rule filled in this receipt's accounting category.")
             messages.success(request, "Receipt uploaded and saved for accounting review.")
+            if property_id is not None:
+                return redirect("property_accounting_receipts", property_id=selected_property.id)
             return redirect("accounting_receipts")
     else:
-        form = AccountingReceiptForm(properties=properties, user=request.user)
+        form = AccountingReceiptForm(
+            properties=properties,
+            user=request.user,
+            initial={"property": selected_property},
+        )
 
     receipts = list(
         AccountingReceipt.objects
@@ -7719,6 +7759,9 @@ def accounting_receipts(request):
         "archived_months": archived_months,
         "upcoming_months": upcoming_months,
         "today": today,
+        "properties": accessible_properties,
+        "selected_property": selected_property,
+        "show_property_picker": False,
     })
 
 

@@ -83,12 +83,25 @@ body {
 
 <div class="mb-4">
     <div class="text-uppercase small fw-bold text-muted">Accounting</div>
-    <h1 class="acct-title mb-1">Receipt Upload & Review</h1>
+    <h1 class="acct-title mb-1">Receipt Upload & Review{% if selected_property %} — {{ selected_property.name }}{% endif %}</h1>
     <p class="text-muted mb-0">
         Store original receipts, add simple accounting details, and approve clean entries into the financial ledger.
     </p>
 </div>
 
+{% if show_property_picker %}
+<section class="soft-card p-4">
+    <h2 class="section-title mb-2">Choose a Property</h2>
+    <p class="text-muted">Receipts are kept in a separate workspace and storage folder for each property.</p>
+    <div class="d-flex gap-2 flex-wrap">
+        {% for property in properties %}
+            <a class="message-btn text-decoration-none" href="{% url 'property_accounting_receipts' property.id %}">{{ property.name }}</a>
+        {% empty %}
+            <span class="text-muted">No properties are assigned to this account.</span>
+        {% endfor %}
+    </div>
+</section>
+{% else %}
 <div class="row g-4">
     <div class="col-lg-4">
         <section class="soft-card p-4">
@@ -97,6 +110,9 @@ body {
                 {% csrf_token %}
 
                 {% for field in form %}
+                    {% if field.name == "property" %}
+                        <input type="hidden" name="property" value="{{ selected_property.id }}">
+                    {% else %}
                     <div class="mb-3">
                         <label class="form-label fw-bold">{{ field.label }}</label>
                         {{ field }}
@@ -107,6 +123,7 @@ body {
                             <div class="text-danger small">{{ error }}</div>
                         {% endfor %}
                     </div>
+                    {% endif %}
                 {% endfor %}
 
                 <button type="submit" class="gold-btn w-100">Save Receipt For Review</button>
@@ -171,5 +188,6 @@ body {
         </section>
     </div>
 </div>
+{% endif %}
 
 {% endblock %}

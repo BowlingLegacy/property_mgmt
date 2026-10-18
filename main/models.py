@@ -2,9 +2,12 @@ from django.db import models
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
+from django.utils.text import slugify
 from decimal import Decimal
+from pathlib import Path
 import random
 import string
+import uuid
 
 
 class BlogPost(models.Model):
@@ -863,6 +866,22 @@ class AccountingPeriod(models.Model):
         return f"{self.property.name} {self.month:02d}/{self.year} - {self.get_status_display()}"
 
 
+def accounting_receipt_upload_path(instance, filename):
+    """Keep every new receipt inside a property-specific accounting folder."""
+    receipt_date = instance.receipt_date or timezone.localdate()
+    property_label = slugify(getattr(instance.property, "name", "")) or "property"
+    vendor_label = slugify(instance.vendor) or "unknown-vendor"
+    type_label = slugify(instance.entry_type) or "uncategorized-type"
+    category_label = slugify(getattr(instance.category, "name", "")) or "uncategorized"
+    extension = Path(filename).suffix.lower()[:10]
+    safe_filename = f"{uuid.uuid4().hex}{extension}"
+    return (
+        f"accounting_receipts/property-{instance.property_id}-{property_label}/"
+        f"{receipt_date.year}/{receipt_date.month:02d}/{vendor_label}/"
+        f"{type_label}/{category_label}/{safe_filename}"
+    )
+
+
 class AccountingReceipt(models.Model):
     STATUS_CHOICES = [
         ("needs_review", "Needs Review"),
@@ -873,7 +892,7 @@ class AccountingReceipt(models.Model):
     PAYMENT_METHOD_CHOICES = Payment.PAYMENT_METHOD_CHOICES
 
     property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name="accounting_receipts")
-    receipt_file = models.FileField(upload_to="accounting_receipts/")
+    receipt_file = models.FileField(upload_to=accounting_receipt_upload_path, max_length=255)
     vendor = models.CharField(max_length=255, blank=True)
     receipt_date = models.DateField(blank=True, null=True)
     category = models.ForeignKey(

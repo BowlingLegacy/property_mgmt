@@ -115,6 +115,7 @@ urlpatterns = [
     path("financial-upload/<int:upload_id>/bank-review/", views.bank_upload_review, name="bank_upload_review"),
     path("financial-upload/<int:upload_id>/parse/", views.parse_financial_upload, name="parse_financial_upload"),
     path("accounting/receipts/", views.accounting_receipts, name="accounting_receipts"),
+    path("accounting/properties/<int:property_id>/receipts/", views.accounting_receipts, name="property_accounting_receipts"),
     path("accounting/receipts/<int:receipt_id>/file/", views.open_accounting_receipt_file, name="open_accounting_receipt_file"),
     path("accounting/vendor-rules/", views.vendor_category_rules, name="vendor_category_rules"),
     path("accounting/receipts/<int:receipt_id>/edit/", views.edit_accounting_receipt, name="edit_accounting_receipt"),
