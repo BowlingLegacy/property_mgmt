@@ -17,6 +17,7 @@ def env_bool(name, default=False):
 # ---------------------------------------------------------
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")
 DEBUG = env_bool("DEBUG")
+LATE_FEE_JOB_TOKEN = os.environ.get("LATE_FEE_JOB_TOKEN", "")
 DEMO_MODE = env_bool("DEMO_MODE")
 DEMO_SESSION_SECONDS = int(os.environ.get("DEMO_SESSION_SECONDS", "7200"))
 DEMO_ADMIN_USERNAME = os.environ.get("DEMO_ADMIN_USERNAME", "demo-admin")

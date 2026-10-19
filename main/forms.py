@@ -7,6 +7,7 @@ from django.contrib.auth.forms import UserCreationForm
 
 from .models import (
     HousingApplication,
+    ResidentLateFeePolicy,
     User,
     BlogComment,
     FinancialUpload,
@@ -1183,6 +1184,8 @@ class ResidentBalanceAdjustmentForm(forms.Form):
             cleaned_data.get("deposit_to_rent") or 0,
             cleaned_data.get("deposit_to_utilities") or 0,
         ]
+        if (cleaned_data.get("late_fee_charge") or 0) > 0 and not cleaned_data.get("service_month"):
+            self.add_error("service_month", "Select the billing month for a late fee so it cannot be assessed twice.")
         if not any(amount > 0 for amount in amounts):
             raise forms.ValidationError("Enter at least one charge or deposit credit.")
         return cleaned_data
@@ -1668,3 +1671,28 @@ class LandlordSignUpForm(SignUpForm):
         max_length=255,
         widget=forms.TextInput(attrs={"class": "form-control"}),
     )
+
+
+class ResidentLateFeePolicyForm(forms.ModelForm):
+    confirm_agreed_terms = forms.BooleanField(required=False, label="I confirm these fees are in the resident's signed agreement and required notice has been given.")
+    class Meta:
+        model = ResidentLateFeePolicy
+        fields = ["enabled", "fee_type", "amount", "rent_due_day", "grace_days", "effective_from"]
+        labels = {"enabled": "Assess agreed late fees automatically", "amount": "Dollar amount or percentage", "grace_days": "Grace days after the rent due date", "rent_due_day": "Agreed rent due day", "effective_from": "First assessment date allowed"}
+        widgets = {"effective_from": forms.DateInput(attrs={"type": "date", "class": "form-control"}), "amount": forms.NumberInput(attrs={"class": "form-control", "min": ".01", "step": ".01"}), "grace_days": forms.NumberInput(attrs={"class": "form-control", "min": 3, "max": 27})}
+    def clean(self):
+        data = super().clean()
+        if data.get("enabled") and not data.get("confirm_agreed_terms"):
+            self.add_error("confirm_agreed_terms", "Confirm the signed terms and required notice before enabling fees.")
+        if data.get("rent_due_day") is not None and not 1 <= data["rent_due_day"] <= 31:
+            self.add_error("rent_due_day", "Use a due day from 1 to 31.")
+        if data.get("amount") is not None and data["amount"] <= 0:
+            self.add_error("amount", "Enter a positive amount.")
+        if data.get("grace_days") is not None and not 3 <= data["grace_days"] <= 27:
+            self.add_error("grace_days", "Use 3 through 27 grace days; statutory protection cannot be shortened.")
+        if data.get("fee_type") == "percent" and data.get("amount", 0) > 100:
+            self.add_error("amount", "Percentage cannot exceed 100.")
+        from django.utils import timezone
+        if data.get("enabled") and data.get("effective_from") and data["effective_from"] < timezone.localdate() and (not self.instance.pk or data["effective_from"] != self.instance.effective_from or any(key in self.changed_data for key in ("fee_type", "amount", "rent_due_day", "grace_days"))):
+            self.add_error("effective_from", "New or changed terms cannot be backdated.")
+        return data

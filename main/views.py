@@ -35,6 +35,11 @@ from django.utils.html import strip_tags
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
+from django.template.loader import render_to_string
+from .lease_terms import LEASE_VERSION, INITIALS, lease_sections
+from .late_fees import fee_due
+from .models import ResidentLateFeePolicy
+
 from .forms import (
     InviteCodeForm,
     BlogCommentForm,
@@ -47,6 +52,7 @@ from .forms import (
     ManualPaymentForm,
     ResidentBalanceCorrectionForm,
     ResidentBalanceAdjustmentForm,
+    ResidentLateFeePolicyForm,
     CustomReportForm,
     ResidentProfilePhotoForm,
     ReplacementInviteCodeForm,
@@ -1034,6 +1040,10 @@ def split_combined_payment(payment):
         allocations.append(("utility", utility_paid, "Utility Payment", month_start))
         remaining -= utility_paid
 
+    late_paid = min(fee_due(application), remaining)
+    if late_paid > 0:
+        allocations.append(("late_fee", late_paid, "Late Fee Payment", month_start))
+        remaining -= late_paid
     if remaining > 0:
         allocations.append(("other", remaining, "Unallocated Payment Remainder", month_start))
 
@@ -5319,6 +5329,7 @@ def tenant_dashboard(request):
     profile_photo_form = None
     property_blog_posts = []
     total_due = Decimal("0.00")
+    late_fee_due = Decimal("0.00")
     rent_due = Decimal("0.00")
     next_month_rent_due = Decimal("0.00")
     next_month_start = None
@@ -5345,7 +5356,8 @@ def tenant_dashboard(request):
         utility_setup_items = resident_utility_setup_items(application)
         utility_setup_complete = bool(utility_setup_items) and all(item.completed_at for item in utility_setup_items)
 
-        total_due = rent_due + deposit_due + utility_due
+        late_fee_due = fee_due(application)
+        total_due = rent_due + deposit_due + utility_due + late_fee_due
         if application.property:
             property_blog_posts = (
                 application.property.blog_posts
@@ -5363,6 +5375,7 @@ def tenant_dashboard(request):
         "profile_photo_form": profile_photo_form,
         "is_superadmin_inspecting": is_superadmin_inspecting,
         "total_due": total_due,
+        "late_fee_due": late_fee_due,
         "rent_due": rent_due,
         "next_month_rent_due": next_month_rent_due,
         "next_month_start": next_month_start,
@@ -5753,7 +5766,8 @@ def resident_balance_detail(request):
         "deposit_due": deposit_due,
         "utility_due": utility_due,
         "show_utilities": show_utilities,
-        "total_due": rent_due + deposit_due + utility_due,
+        "late_fee_due": fee_due(application),
+        "total_due": rent_due + deposit_due + utility_due + fee_due(application),
         "balance_entries": application.balance_entries.all()[:10],
         "dashboard_url": resident_portal_url("tenant_dashboard", is_superadmin_inspecting, application),
         "is_superadmin_inspecting": is_superadmin_inspecting,
@@ -6323,10 +6337,27 @@ def edit_resident_balances(request, application_id):
 
     correction_form = ResidentBalanceCorrectionForm(instance=application)
     adjustment_form = ResidentBalanceAdjustmentForm()
+    policy = ResidentLateFeePolicy.objects.filter(application=application).first()
+    if not policy:
+        today = timezone.localdate()
+        policy = ResidentLateFeePolicy(application=application, rent_due_day=application.rent_due_day, effective_from=add_months(today.replace(day=1), 1))
+        if application.property and application.property.name.strip().casefold() == "belmont":
+            policy.fee_type, policy.amount, policy.grace_days = "percent", Decimal("5.00"), 7
+    late_fee_policy_form = ResidentLateFeePolicyForm(instance=policy)
 
     if request.method == "POST":
         action = request.POST.get("action")
-        if action == "adjust":
+        if action == "late_fee_policy":
+            late_fee_policy_form = ResidentLateFeePolicyForm(request.POST, instance=policy)
+            if late_fee_policy_form.is_valid():
+                agreed_policy = late_fee_policy_form.save(commit=False)
+                agreed_policy.application = application
+                agreed_policy.confirmed_at = timezone.now()
+                agreed_policy.confirmed_by = request.user
+                agreed_policy.save()
+                messages.success(request, "Agreed late-fee policy saved. Fees remain separate from rent.")
+                return redirect("edit_resident_balances", application_id=application.id)
+        elif action == "adjust":
             adjustment_form = ResidentBalanceAdjustmentForm(request.POST)
             if adjustment_form.is_valid():
                 service_month = adjustment_form.cleaned_data.get("service_month")
@@ -6366,7 +6397,7 @@ def edit_resident_balances(request, application_id):
                     post_resident_balance_entry(
                         application,
                         entry_kind="charge",
-                        balance_type="rent",
+                        balance_type="late_fee",
                         amount=late_fee_charge,
                         service_month=service_month,
                         description="Late fee charge",
@@ -6420,6 +6451,8 @@ def edit_resident_balances(request, application_id):
         "application": application,
         "form": correction_form,
         "adjustment_form": adjustment_form,
+        "late_fee_policy_form": late_fee_policy_form,
+        "late_fee_due": fee_due(application),
         "balance_entries": balance_entries,
         "deposit_applied_total": deposit_applied_total,
         "deposit_available_to_apply": deposit_available_to_apply,
@@ -9436,6 +9469,14 @@ def get_resident_signed_document(request, document_id):
     )
 
 
+def lease_template(document):
+    return "lease_sign.html" if document.lease_version == LEASE_VERSION else "lease_sign_legacy.html"
+
+
+def lease_context(document):
+    return {"application": document.application, "signed_document": document, "lease_sections": lease_sections(document), "lease_initials": INITIALS}
+
+
 @login_required
 def lease_sign(request):
 
@@ -9458,10 +9499,7 @@ def lease_sign(request):
             lease_sent_date=timezone.localdate(),
         )
 
-    return render(request, "lease_sign.html", {
-        "application": application,
-        "signed_document": signed_document,
-    })
+    return render(request, lease_template(signed_document), lease_context(signed_document))
 
 
 @login_required
@@ -9471,16 +9509,14 @@ def onboarding_document(request, document_id):
     if not signed_document:
         return redirect("tenant_dashboard")
 
-    template_name = "lease_sign.html"
+    template_name = lease_template(signed_document)
 
     if signed_document.document_type != "lease":
         template_name = "onboarding_document_sign.html"
 
-    return render(request, template_name, {
-        "application": signed_document.application,
-        "signed_document": signed_document,
-        "is_superadmin_inspecting": bool(request.GET.get("resident")),
-    })
+    context = lease_context(signed_document)
+    context["is_superadmin_inspecting"] = bool(request.GET.get("resident"))
+    return render(request, template_name, context)
 
 
 @login_required
@@ -9538,10 +9574,17 @@ def submit_lease_signature(request, document_id=None):
         messages.error(request, "You must agree to electronically sign.")
         return redirect("lease_sign")
 
+    if signed_document.lease_version == LEASE_VERSION:
+        if any(not getattr(signed_document, name) for name, _label in INITIALS):
+            messages.error(request, "Initial each lease acknowledgment before signing.")
+            return redirect("onboarding_document", document_id=signed_document.id)
+        signed_document.signed_lease_html = render_to_string("includes/painted_lady_lease_body.html", lease_context(signed_document))
     signed_document.signed_at = timezone.now()
     signed_document.locked = True
-
     signed_document.save()
+    if signed_document.lease_version == LEASE_VERSION:
+        # An existing waiver or separately agreed policy stays under staff control.
+        ResidentLateFeePolicy.objects.get_or_create(application=signed_document.application, defaults={"enabled": True, "fee_type": "flat", "amount": Decimal("25.00"), "rent_due_day": 1, "grace_days": 4, "effective_from": timezone.localdate(), "agreed_lease": signed_document, "confirmed_at": timezone.now()})
 
     if sms_opted_in and not application.sms_opted_in:
         application.sms_opted_in = True
@@ -9680,12 +9723,16 @@ def create_checkout_session(request, application_id, payment_type="rent"):
         amount = max(application.background_check_fee_amount - application.background_check_fee_paid, Decimal("0.00"))
         description = "Background Check Fee"
 
+    elif payment_type == "late_fee":
+        amount = fee_due(application)
+        description = "Late Fee Payment"
+
     elif payment_type == "total":
         rent_due = rent_portal_due
         deposit_due = max(application.deposit_required - application.deposit_paid, Decimal("0.00"))
         utility_due = utility_portal_due
 
-        amount = rent_due + deposit_due + utility_due
+        amount = rent_due + deposit_due + utility_due + fee_due(application)
         description = "Combined Payment - Total Due"
 
     else:

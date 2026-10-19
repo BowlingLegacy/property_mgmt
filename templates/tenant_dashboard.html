@@ -389,6 +389,7 @@ body {
                                     Pay Rent
                                 </a>
                             {% endif %}
+                            {% if late_fee_due > 0 %}<div class="mt-2">Late fees: ${{ late_fee_due }} (separate from rent) <a href="{% url 'pay_by_type' application.id 'late_fee' %}">Pay Late Fees</a></div>{% endif %}
                             {% if next_month_rent_due > 0 %}
                                 <a href="{% url 'pay_by_type' application.id 'next_rent' %}"
                                    class="gold-btn d-block text-center text-decoration-none mt-3">

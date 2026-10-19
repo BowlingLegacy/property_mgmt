@@ -498,6 +498,22 @@ class ApplicantDocument(models.Model):
     def __str__(self):
         return f"{self.name} ({self.application.full_name})"
 
+class ResidentLateFeePolicy(models.Model):
+    application = models.OneToOneField(HousingApplication, on_delete=models.CASCADE, related_name="late_fee_policy")
+    enabled = models.BooleanField(default=False)
+    fee_type = models.CharField(max_length=10, choices=[("flat", "Flat dollar amount"), ("percent", "Percent of monthly rent")], default="flat")
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("25.00"))
+    rent_due_day = models.PositiveSmallIntegerField(default=1)
+    grace_days = models.PositiveSmallIntegerField(default=4, help_text="Days after rent is due before the final pay-by day. Due on the 1st plus 4 days means pay by the 5th; assess on the 6th.")
+    effective_from = models.DateField()
+    agreed_lease = models.ForeignKey("SignedDocument", on_delete=models.SET_NULL, null=True, blank=True, related_name="late_fee_policies")
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    confirmed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.application.full_name} - late fee policy"
+
+
 class SignedDocument(models.Model):
     DOCUMENT_TYPE_CHOICES = [
         ("lease", "Resident Lease Agreement"),
@@ -522,6 +538,8 @@ class SignedDocument(models.Model):
     )
 
     title = models.CharField(max_length=255)
+    lease_version = models.CharField(max_length=60, default="legacy", db_default="legacy")
+    signed_lease_html = models.TextField(blank=True, db_default="")
 
     # ---------------------------------------------------------
     # AUTO-POPULATED LEASE FIELDS
@@ -615,8 +633,12 @@ class SignedDocument(models.Model):
 
     def save(self, *args, **kwargs):
 
-        # AUTO POPULATE FROM RESIDENT FILE
-        if self.application:
+        # Signed financial particulars must not drift when the resident file changes.
+        was_locked = bool(self.pk and type(self).objects.filter(pk=self.pk, locked=True).exists())
+        if self._state.adding and not self.locked and self.document_type == "lease" and self.application.property_id and self.application.property.name.strip().casefold() in {"the painted lady inn", "painted lady inn", "painted lady"}:
+            from .lease_terms import LEASE_VERSION
+            self.lease_version = LEASE_VERSION
+        if self.application and not was_locked:
 
             self.resident_name = self.application.full_name
 
@@ -740,8 +762,10 @@ class ResidentBalanceEntry(models.Model):
     BALANCE_TYPE_CHOICES = [
         ("rent", "Rent"),
         ("utility", "Utilities"),
+        ("late_fee", "Late Fee"),
     ]
 
+    assessment_key = models.CharField(max_length=100, unique=True, null=True, blank=True)
     application = models.ForeignKey(HousingApplication, on_delete=models.CASCADE, related_name="balance_entries")
     entry_kind = models.CharField(max_length=20, choices=ENTRY_KIND_CHOICES)
     balance_type = models.CharField(max_length=20, choices=BALANCE_TYPE_CHOICES)

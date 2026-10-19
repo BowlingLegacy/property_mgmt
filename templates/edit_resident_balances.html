@@ -77,6 +77,14 @@
         </div>
     </div>
 
+    <div class="card shadow-sm mt-4"><div class="card-body">
+        <h2 class="h5 fw-bold">Automatic Late Fees</h2>
+        <p>Outstanding late fees: ${{ late_fee_due }}. These fees are separate from rent. Save only the fee amount and deadline already agreed in the resident's signed lease. New or increased terms require any legally required advance notice.</p>
+        <form method="post">{% csrf_token %}<input type="hidden" name="action" value="late_fee_policy">
+            {{ late_fee_policy_form.as_p }}
+            <button class="btn btn-dark" type="submit">Save Agreed Late-Fee Policy</button>
+        </form>
+    </div></div>
     <div class="card shadow-sm mt-4">
         <div class="card-body">
             <h2 class="h5 fw-bold mb-1">Post Charge Or Deposit Credit</h2>

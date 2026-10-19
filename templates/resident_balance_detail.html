@@ -54,7 +54,7 @@
 
         <div class="p-4">
             <div class="alert alert-warning">
-                Payments must be received in full by the applicable due date to avoid late fee review.
+                Payments must be received in full by the applicable due date to avoid the late fee stated in your signed agreement.
                 Paying one balance line does not clear other amounts that remain due.
             </div>
 
@@ -100,11 +100,14 @@
                 </div>
             </div>
 
+            {% if late_fee_due > 0 %}
+            <div class="balance-line mt-3"><div class="text-muted fw-bold">Late Fees Due (separate from rent)</div><div class="balance-amount">${{ late_fee_due }}</div><a href="{% url 'pay_by_type' application.id 'late_fee' %}" class="pay-btn mt-3">Pay Late Fees</a></div>
+            {% endif %}
             <div class="border-top mt-4 pt-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
                 <div>
                     <div class="text-muted fw-bold">Total Due</div>
                     <div class="balance-amount">${{ total_due }}</div>
-                    <div class="small text-muted">Includes all unpaid current and past-due rent and utilities.</div>
+                    <div class="small text-muted">Includes unpaid rent, utilities, deposits and separately assessed late fees.</div>
                 </div>
                 {% if total_due > 0 %}
                     <a href="{% url 'pay_by_type' application.id 'total' %}" class="pay-btn">Pay Total Due</a>

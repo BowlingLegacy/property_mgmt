@@ -6,7 +6,10 @@ from . import landlord_views
 from . import auth_views as portal_auth_views
 from . import blog_views
 
+from .cron_views import assess_late_fees_job
+
 urlpatterns = [
+    path("internal/jobs/late-fees/", assess_late_fees_job, name="assess_late_fees_job"),
     path("", views.home, name="home"),
     path("rental-ready-pro/", views.rental_ledger_pro_home, name="rental_ledger_pro_home"),
     path("rental-ledger-pro/", views.rental_ledger_pro_home, name="rental_ledger_pro_legacy"),

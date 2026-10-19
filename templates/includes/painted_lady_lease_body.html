@@ -1,0 +1,19 @@
+<div class="lease-parties">
+    <h1>RESIDENTIAL LEASE AGREEMENT</h1>
+    <p class="text-center"><strong>The Painted Lady Inn</strong><br>Month-to-month room tenancy</p>
+    <p><strong>Landlord:</strong> {{ signed_document.landlord_name }}<br>
+    <strong>Resident:</strong> {{ signed_document.resident_name }}<br>
+    <strong>Property address:</strong> {{ signed_document.property_address|default:"To be completed before signing" }}<br>
+    <strong>Room / space:</strong> {{ signed_document.room_space }}<br>
+    <strong>Tenancy start:</strong> {{ signed_document.lease_start_date|date:"F j, Y" }}<br>
+    <strong>Monthly rent:</strong> ${{ signed_document.monthly_rent }} &nbsp;
+    <strong>Monthly utilities:</strong> ${{ signed_document.utility_fee }}<br>
+    <strong>Security deposit:</strong> ${{ signed_document.security_deposit }}<br>
+    <strong>Deposit terms:</strong> {{ signed_document.get_deposit_payment_plan_display }}</p>
+</div>
+{% for section in lease_sections %}
+<section class="lease-section">
+    <h2>{{ section.number }}. {{ section.title }}</h2>
+    {% for paragraph in section.paragraphs %}<p>{{ paragraph }}</p>{% endfor %}
+</section>
+{% endfor %}
