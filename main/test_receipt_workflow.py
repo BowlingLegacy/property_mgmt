@@ -165,3 +165,30 @@ class ReceiptMonthlyWorkflowTests(TestCase):
             "pacific-power/operating_expense/internet/",
             receipt.receipt_file.name,
         )
+
+    def test_approval_keeps_long_property_scoped_receipt_path(self):
+        receipt_path = (
+            f"accounting_receipts/property-{self.property.id}-monthly-bills-property/"
+            "2026/09/pacific-power/operating_expense/internet/"
+            "0123456789abcdef0123456789abcdef.pdf"
+        )
+        self.assertGreater(len(receipt_path), 100)
+        receipt = AccountingReceipt.objects.create(
+            property=self.property, receipt_file=receipt_path,
+            vendor="Pacific Power", receipt_date=date(2026, 9, 5),
+            category=self.internet, amount=Decimal("90.00"),
+        )
+
+        response = self.client.post(reverse("approve_accounting_receipt", args=[receipt.id]))
+
+        self.assertRedirects(response, reverse("accounting_receipts"))
+        receipt.refresh_from_db()
+        self.assertEqual(receipt.status, "approved")
+        self.assertEqual(receipt.financial_upload.file.name, receipt_path)
+        # SQLite does not enforce the varchar limit that PostgreSQL applies on save.
+        self.assertLessEqual(
+            len(receipt.financial_upload.file.name),
+            receipt.financial_upload._meta.get_field("file").max_length,
+        )
+        self.assertEqual(receipt.financial_entry.upload_id, receipt.financial_upload_id)
+        self.assertEqual(receipt.financial_entry.amount, Decimal("90.00"))

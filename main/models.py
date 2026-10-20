@@ -810,7 +810,7 @@ class FinancialUpload(models.Model):
         null=True,
     )
     ledger_scope = models.CharField(max_length=30, choices=LEDGER_SCOPE_CHOICES, default="property")
-    file = models.FileField(upload_to="financial_uploads/")
+    file = models.FileField(upload_to="financial_uploads/", max_length=255)
     name = models.CharField(max_length=255, default="Financial Upload")
     uploaded_at = models.DateTimeField(auto_now_add=True)
     parsed_at = models.DateTimeField(blank=True, null=True)
