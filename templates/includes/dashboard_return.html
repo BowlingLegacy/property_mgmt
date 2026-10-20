@@ -12,6 +12,7 @@
             document.querySelectorAll("a[href]").forEach((link) => {
                 if (link.closest("[data-dashboard-return]") || link.dataset.keepDashboardLink !== undefined) return;
                 const target = new URL(link.href, window.location.origin);
+                if (target.pathname === "{% url 'tenant_dashboard' %}" && target.searchParams.get("resident")) return;
                 if (target.origin === window.location.origin && dashboardPaths.has(target.pathname)) {
                     link.hidden = true;
                 }

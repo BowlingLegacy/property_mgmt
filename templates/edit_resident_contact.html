@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container my-4" style="max-width: 720px">
+    <h1>Edit Contact Details</h1>
+    <p>{{ application.full_name }} · {{ application.property.name }} · {{ application.space_label }}</p>
+    <p>SMS status: {% if application.sms_opted_in and not application.sms_opted_out_at %}Consented{% elif application.sms_opted_out_at %}Opted out{% else %}No consent recorded{% endif %}</p>
+    <p>Changing the mobile number requires fresh consent for SMS. Record verbal consent in Consent details. Saving this form does not send a message.</p>
+    <form method="post" class="card card-body">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="btn btn-primary" type="submit">Save Contact Details</button>
+    </form>
+    <div class="d-flex gap-2 mt-3 flex-wrap">
+        <a class="btn btn-primary" href="{% url 'resident_document_file' application.pk %}">Resident File / Documents</a>
+        <a class="btn btn-outline-dark" href="{% url 'tenant_dashboard' %}?resident={{ application.pk }}">Inspect Tenant Dashboard</a>
+        <a class="btn btn-outline-secondary" href="{% url 'landlord_resident_files' %}">Resident Files</a>
+    </div>
+</div>
+{% endblock %}

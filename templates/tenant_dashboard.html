@@ -270,6 +270,10 @@ body {
 {% if application %}
 
 <div class="dashboard-wrap">
+    {% if is_superadmin_inspecting %}
+        <div class="mb-3"><a href="{% url 'resident_document_file' application.id %}" class="btn btn-primary">Resident File / Documents</a></div>
+        <div class="mb-3"><a href="{% url 'edit_resident_contact' application.id %}" class="btn btn-outline-primary">Edit Contact / SMS</a></div>
+    {% endif %}
     {% if request.user.is_superuser or request.user.role == "admin" %}
         <div class="mb-3 text-end">
             <a href="{% url 'superadmin_dashboard' %}" class="btn btn-outline-dark rounded-pill">

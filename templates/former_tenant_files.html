@@ -39,6 +39,7 @@
                             <td>${{ resident.balance }} rent<br><span class="text-muted small">${{ resident.utility_balance }} utilities</span></td>
                             <td>{{ resident.tenancy_end_reason|default:"-" }}</td>
                             <td class="d-flex gap-2 flex-wrap">
+                                <a href="{% url 'resident_document_file' resident.id %}" class="btn btn-primary btn-sm">Resident File / Documents</a>
                                 <a href="{% url 'application_detail' resident.id %}" class="btn btn-outline-secondary btn-sm">Open File</a>
                                 <a href="{% url 'move_out_statement' resident.id %}" class="btn btn-outline-dark btn-sm">Statement</a>
                                 {% if resident.balance or resident.utility_balance %}

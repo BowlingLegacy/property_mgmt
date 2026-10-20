@@ -41,6 +41,7 @@ from .late_fees import fee_due
 from .models import ResidentLateFeePolicy
 
 from .forms import (
+    ResidentContactForm,
     InviteCodeForm,
     BlogCommentForm,
     HousingApplicationForm,
@@ -9494,6 +9495,82 @@ def printable_application(request, pk):
         "application": application,
         "review_summary": applicant_review_summary(application),
     })
+
+
+@login_required
+@user_passes_test(staff_required)
+def resident_document_file(request, application_id):
+    application = get_object_or_404(
+        staff_managed_applications(request.user).select_related("property", "user"),
+        pk=application_id,
+    )
+    signed_documents = list(resident_visible_signed_documents(application))
+    document_types = {document.document_type for document in signed_documents}
+    onboarding_checklist = [
+        {"label": label, "on_file": document_type in document_types}
+        for document_type, label in [
+            ("lease", "Resident Lease Agreement"),
+            ("emergency_contact", "Emergency Contact Sheet"),
+            ("painted_lady_acknowledgment", "Who We Are / Painted Lady Acknowledgment"),
+        ]
+    ]
+    return render(request, "resident_document_file.html", {
+        "application": application,
+        "signed_documents": signed_documents,
+        "uploaded_documents": resident_visible_uploaded_documents(application),
+        "onboarding_checklist": onboarding_checklist,
+    })
+
+
+@login_required
+@user_passes_test(staff_required)
+def edit_resident_contact(request, application_id):
+    from django.contrib.admin.models import CHANGE, LogEntry
+    from django.contrib.contenttypes.models import ContentType
+
+    with transaction.atomic():
+        applications = staff_managed_applications(request.user)
+        if request.method == "POST":
+            applications = applications.select_for_update()
+        application = get_object_or_404(applications, pk=application_id)
+        old_phone = application.phone
+        form = ResidentContactForm(request.POST if request.method == "POST" else None, instance=application)
+        if request.method == "POST" and form.is_valid():
+            application = form.save(commit=False)
+            phone_changed = sms_e164_phone(old_phone) != sms_e164_phone(application.phone)
+            action = form.cleaned_data["sms_action"]
+            now = timezone.now()
+            if phone_changed:
+                application.sms_phone_verified = False
+                application.sms_opted_in = False
+                application.sms_opted_in_at = None
+                if application.communication_preference == "sms":
+                    application.communication_preference = "portal"
+            if action == "consent":
+                application.sms_opted_in = True
+                application.sms_opted_in_at = now
+                application.sms_opted_out_at = None
+                application.communication_preference = "sms"
+            elif action == "opt_out":
+                application.sms_opted_in = False
+                application.sms_opted_out_at = now
+                if application.communication_preference == "sms":
+                    application.communication_preference = "portal"
+            application.save(update_fields=["phone", "email", "sms_phone_verified", "sms_opted_in", "sms_opted_in_at", "sms_opted_out_at", "communication_preference"])
+            audit = f"Updated resident contact details. SMS action: {action}. Mobile number changed: {phone_changed}."
+            if action == "consent":
+                audit += f" Consent details: {form.cleaned_data['consent_notes'].strip()}"
+            LogEntry.objects.create(
+                user_id=request.user.pk,
+                content_type=ContentType.objects.get_for_model(application),
+                object_id=str(application.pk),
+                object_repr=str(application)[:200],
+                action_flag=CHANGE,
+                change_message=audit,
+            )
+            messages.success(request, "Contact details saved." + (" Record fresh consent to enable SMS for the new number." if phone_changed and action == "keep" else ""))
+            return redirect("edit_resident_contact", application_id=application.pk)
+    return render(request, "edit_resident_contact.html", {"application": application, "form": form})
 
 
 def get_resident_signed_document(request, document_id):

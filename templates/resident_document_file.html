@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container my-4">
+    <h1>Resident File: {{ application.full_name }}</h1>
+    <p>{{ application.property.name }} · {{ application.space_label|default:"Unit not assigned" }} · {{ application.get_tenancy_status_display }}</p>
+    <div class="d-flex gap-2 mb-4 flex-wrap">
+        <a href="{% url 'tenant_dashboard' %}?resident={{ application.id }}" class="btn btn-outline-dark">Inspect Tenant Dashboard</a>
+        <a href="{% url 'edit_resident_contact' application.id %}" class="btn btn-outline-primary">Edit Contact / SMS</a>
+        <a href="{% url 'application_detail' application.id %}" class="btn btn-outline-secondary">View Application</a>
+        <a href="{% url 'landlord_resident_files' %}" class="btn btn-outline-secondary">Resident Files</a>
+    </div>
+    <section class="card card-body mb-4">
+        <h2 class="h4">Onboarding Documents</h2>
+        <p>Review or print the documents attached to this resident’s file. Signed documents remain locked.</p>
+        <ul>
+            {% for item in onboarding_checklist %}
+            <li>{{ item.label }} — {% if item.on_file %}On file (signature status below){% else %}<strong>No document on file</strong>{% endif %}</li>
+            {% endfor %}
+        </ul>
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead><tr><th>Document</th><th>Status</th><th>Signed</th><th>Actions</th></tr></thead>
+                <tbody>
+                    {% for document in signed_documents %}
+                    <tr>
+                        <td>{{ document.title }}<br><small>{{ document.get_document_type_display }}</small></td>
+                        <td>{% if document.locked and document.signed_at %}Signed / Locked{% elif document.locked %}Locked{% else %}Awaiting resident signature{% endif %}</td>
+                        <td>{{ document.signed_at|date:"M j, Y g:i A T"|default:"Not signed" }}</td>
+                        <td>
+                            <a href="{% url 'onboarding_document' document.id %}?resident={{ application.id }}">View</a> ·
+                            <a href="{% url 'onboarding_document' document.id %}?resident={{ application.id }}&amp;print=1" target="_blank" rel="noopener">Print</a>
+                        </td>
+                    </tr>
+                    {% empty %}<tr><td colspan="4">No onboarding documents on file for this resident.</td></tr>{% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    <section class="card card-body mb-4">
+        <h2 class="h4">Uploaded Documents</h2>
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead><tr><th>Document</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody>
+                    {% for document in uploaded_documents %}
+                    <tr><td>{{ document.name }}<br><small>{{ document.get_document_type_display }}</small></td><td>{{ document.get_status_display }}</td>
+                        <td>{% if document.file %}<a href="{% url 'open_applicant_document' document.id %}" target="_blank" rel="noopener">View / Print</a>{% else %}File unavailable{% endif %}</td></tr>
+                    {% empty %}<tr><td colspan="3">No uploaded documents on file.</td></tr>{% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if application.id_upload %}<a href="{% url 'open_application_upload' application.id 'id_upload' %}" target="_blank" rel="noopener">View identification upload</a>{% endif %}
+        {% if application.identity_selfie_upload %}<a href="{% url 'open_application_upload' application.id 'identity_selfie_upload' %}" target="_blank" rel="noopener">View identity verification photo</a>{% endif %}
+    </section>
+</div>
+{% endblock %}

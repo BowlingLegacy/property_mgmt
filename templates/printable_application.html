@@ -231,6 +231,9 @@ body {
 <div class="application-shell">
 
 <div class="action-bar">
+    <a href="{% url 'resident_document_file' application.id %}" class="dark-btn">Resident File / Documents</a>
+    <a href="{% url 'edit_resident_contact' application.id %}" class="dark-btn">Edit Contact / SMS</a>
+    <a href="{% url 'tenant_dashboard' %}?resident={{ application.id }}" class="dark-btn">Inspect Tenant Dashboard</a>
     <a href="{% url 'landlord_dashboard' %}" class="dark-btn">
         Back To Dashboard
     </a>

@@ -41,16 +41,16 @@
                             <td>${{ resident.balance }}</td>
                             <td>{% if resident.user %}Linked{% else %}No Login{% endif %}</td>
                             <td class="d-flex gap-2 flex-wrap">
+                                <a href="{% url 'resident_document_file' resident.id %}" class="btn btn-primary btn-sm">Resident File / Documents</a>
                                 <a href="{% url 'application_detail' resident.id %}" class="btn btn-outline-secondary btn-sm">Open</a>
+                                <a href="{% url 'edit_resident_contact' resident.id %}" class="btn btn-outline-primary btn-sm">Edit Contact / SMS</a>
                                 <a href="{% url 'transfer_resident_room' resident.id %}" class="btn btn-outline-primary btn-sm">Move Room</a>
                                 <a href="{% url 'edit_resident_balances' resident.id %}" class="btn btn-outline-primary btn-sm">Edit Balances</a>
                                 <a href="{% url 'move_out_statement' resident.id %}" class="btn btn-outline-dark btn-sm">Statement</a>
                                 <a href="{% url 'printable_application' resident.id %}" class="btn btn-outline-secondary btn-sm">Print</a>
                                 <a href="{% url 'record_manual_payment' %}?application={{ resident.id }}" class="btn btn-outline-primary btn-sm">Record Payment</a>
                                 <a href="{% url 'end_resident_tenancy' resident.id %}" class="btn btn-outline-danger btn-sm">End Tenancy</a>
-                                {% if request.user.is_superuser or request.user.role == "admin" %}
                                     <a href="{% url 'tenant_dashboard' %}?resident={{ resident.id }}" class="btn btn-dark btn-sm">Inspect Tenant Dashboard</a>
-                                {% endif %}
                                 {% if not resident.user %}
                                     <a href="{% url 'landlord_create_tenant' %}?application={{ resident.id }}" class="btn btn-primary btn-sm">Create File</a>
                                 {% endif %}

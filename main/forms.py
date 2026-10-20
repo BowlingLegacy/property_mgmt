@@ -1627,6 +1627,42 @@ class HousingApplicationForm(forms.ModelForm):
         return raw_value
 
 
+class ResidentContactForm(forms.ModelForm):
+    sms_action = forms.ChoiceField(
+        choices=[("keep", "Keep current SMS status"), ("consent", "Record consent to receive SMS"), ("opt_out", "Opt out of SMS")],
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    consent_notes = forms.CharField(
+        required=False,
+        label="Consent details",
+        help_text="When recording consent, describe how and when it was given (including verbal consent).",
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+    )
+
+    class Meta:
+        model = HousingApplication
+        fields = ["phone", "email"]
+        widgets = {
+            "phone": forms.TextInput(attrs={"class": "form-control", "inputmode": "tel"}),
+            "email": forms.EmailInput(attrs={"class": "form-control"}),
+        }
+
+    def clean_phone(self):
+        value = self.cleaned_data["phone"].strip()
+        digits = re.sub(r"\D", "", value)
+        if len(digits) == 11 and digits.startswith("1"):
+            digits = digits[1:]
+        if len(digits) != 10 or not digits.isascii():
+            raise forms.ValidationError("Enter a 10-digit US mobile number, optionally starting with +1.")
+        return f"+1{digits}"
+
+    def clean(self):
+        data = super().clean()
+        if data.get("sms_action") == "consent" and not data.get("consent_notes", "").strip():
+            self.add_error("consent_notes", "Record how and when the resident gave SMS consent.")
+        return data
+
+
 class InviteCodeForm(forms.Form):
     invite_code = forms.CharField(
         max_length=6,
