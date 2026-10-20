@@ -51,6 +51,25 @@ class ResidentDocumentFileTests(TestCase):
         self.app.save()
         self.assertEqual(self.client.get(self.url).status_code, 404)
 
+    def test_signed_documents_on_earlier_file_remain_accessible(self):
+        older = HousingApplication.objects.create(property=self.prop, full_name=self.app.full_name, phone="+15035550100", age=40, income_source="Work", monthly_income=2000, housing_need="Housing", space_label="M", tenancy_status="former")
+        lease = SignedDocument.objects.create(application=older, document_type="lease", title="Original signed lease", locked=True, signed_at=timezone.now(), resident_signature="Resident One")
+        response = self.client.get(self.url)
+        self.assertContains(response, "Documents from Earlier Resident Files")
+        self.assertContains(response, "Original signed lease")
+        doc_url = f'{reverse("onboarding_document", args=[lease.pk])}?resident={older.pk}'
+        self.assertContains(response, doc_url)
+        self.assertEqual(self.client.get(doc_url).status_code, 200)
+        lease.refresh_from_db()
+        self.assertTrue(lease.locked)
+        self.assertEqual(lease.application_id, older.pk)
+
+    def test_historical_match_requires_name_and_contact_at_same_property(self):
+        for prop, name, phone in [(self.prop, self.app.full_name, "5035550199"), (self.prop, "Different Resident", self.app.phone), (Property.objects.create(name="Other"), self.app.full_name, self.app.phone)]:
+            older = HousingApplication.objects.create(property=prop, full_name=name, phone=phone, age=40, income_source="Work", monthly_income=2000, housing_need="Housing", tenancy_status="former")
+            SignedDocument.objects.create(application=older, title="PRIVATE HISTORY")
+        self.assertNotContains(self.client.get(self.url), "PRIVATE HISTORY")
+
     def test_tenant_and_anonymous_cannot_open_staff_file(self):
         self.client.force_login(self.tenant)
         self.assertEqual(self.client.get(self.url).status_code, 302)

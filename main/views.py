@@ -9505,6 +9505,14 @@ def resident_document_file(request, application_id):
         pk=application_id,
     )
     signed_documents = list(resident_visible_signed_documents(application))
+    historical_ids = []
+    for candidate in staff_managed_applications(request.user).filter(
+        property_id=application.property_id, tenancy_status="former",
+    ).exclude(pk=application.pk):
+        same_email = bool(application.email and candidate.email and application.email.strip().casefold() == candidate.email.strip().casefold())
+        same_phone = bool(application.phone and candidate.phone and sms_e164_phone(application.phone) == sms_e164_phone(candidate.phone))
+        if resident_names_are_compatible(application.full_name, candidate.full_name) and (same_email or same_phone):
+            historical_ids.append(candidate.pk)
     document_types = {document.document_type for document in signed_documents}
     onboarding_checklist = [
         {"label": label, "on_file": document_type in document_types}
@@ -9519,6 +9527,8 @@ def resident_document_file(request, application_id):
         "signed_documents": signed_documents,
         "uploaded_documents": resident_visible_uploaded_documents(application),
         "onboarding_checklist": onboarding_checklist,
+        "historical_documents": SignedDocument.objects.filter(application_id__in=historical_ids).select_related("application").order_by("application_id", "document_type", "-signed_at"),
+        "historical_uploads": ApplicantDocument.objects.filter(application_id__in=historical_ids).select_related("application").order_by("application_id", "-created_at"),
     })
 
 

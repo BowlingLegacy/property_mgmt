@@ -36,6 +36,25 @@
             </table>
         </div>
     </section>
+    {% if historical_documents or historical_uploads %}
+    <section class="card card-body mb-4">
+        <h2 class="h4">Documents from Earlier Resident Files</h2>
+        <p>These documents belong to an earlier file for this resident. Their original signatures and dates are preserved; they are separate from the current onboarding drafts above.</p>
+        <div class="table-responsive"><table class="table align-middle">
+            <thead><tr><th>Document</th><th>Original File</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+                {% for document in historical_documents %}
+                <tr><td>{{ document.title }}</td><td>#{{ document.application_id }} · {{ document.application.space_label }}</td>
+                    <td>{% if document.locked and document.signed_at %}Signed / Locked · {{ document.signed_at|date:"M j, Y" }}{% elif document.locked %}Locked{% else %}Awaiting resident signature{% endif %}</td>
+                    <td><a href="{% url 'onboarding_document' document.id %}?resident={{ document.application_id }}">View</a> · <a href="{% url 'onboarding_document' document.id %}?resident={{ document.application_id }}&amp;print=1" target="_blank" rel="noopener">Print</a></td></tr>
+                {% endfor %}
+                {% for document in historical_uploads %}
+                <tr><td>{{ document.name }}</td><td>#{{ document.application_id }} · {{ document.application.space_label }}</td><td>{{ document.get_status_display }}</td><td>{% if document.file %}<a href="{% url 'open_applicant_document' document.id %}" target="_blank" rel="noopener">View / Print</a>{% else %}File unavailable{% endif %}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table></div>
+    </section>
+    {% endif %}
     <section class="card card-body mb-4">
         <h2 class="h4">Uploaded Documents</h2>
         <div class="table-responsive">
