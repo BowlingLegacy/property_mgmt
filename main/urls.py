@@ -1,3 +1,4 @@
+from .document_library import document_library, library_download
 from .resident_forms import tenant_form
 from django.urls import path
 from django.contrib.auth import views as auth_views
@@ -10,6 +11,8 @@ from . import blog_views
 from .cron_views import assess_late_fees_job
 
 urlpatterns = [
+    path("staff/documents/", document_library, name="document_library"),
+    path("staff/documents/<str:key>/download/", library_download, name="library_download"),
     path("tenant-dashboard/forms/<str:kind>/", tenant_form, name="tenant_form"),
     path("internal/jobs/late-fees/", assess_late_fees_job, name="assess_late_fees_job"),
     path("", views.home, name="home"),

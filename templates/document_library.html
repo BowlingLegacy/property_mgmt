@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container my-4">
+<h1>Staff Document Library</h1>
+<p>Download a blank form, complete and save it, then file the completed PDF in the correct resident's inbox. Original uploads remain available below for reference.</p>
+<div class="row g-3">
+{% for document in documents %}<div class="col-lg-6"><section class="card h-100"><div class="card-body">
+<span class="badge {% if document.usable %}bg-success{% else %}bg-secondary{% endif %}">{{ document.category }}</span>
+<h2 class="h5 mt-2">{{ document.title }}</h2><p>{{ document.note }}</p>
+<a href="{% url 'library_download' document.key %}" class="btn btn-outline-primary">{% if document.usable %}Download fillable PDF{% else %}Download reference copy{% endif %}</a>
+</div></section></div>{% endfor %}
+</div>
+<section class="card p-4 mt-4"><h2 class="h4">File a completed inspection or receipt</h2>
+<p>This creates a dated document in the resident's file and inbox. It does not post a financial transaction or serve a legal notice. Record actual payments through the payment tools.</p>
+<form method="post" enctype="multipart/form-data">{% csrf_token %}
+<label for="library-resident" class="form-label">Resident</label>
+<select id="library-resident" name="resident" class="form-select mb-3" required><option value="">Choose resident</option>{% for resident in residents %}<option value="{{ resident.pk }}">{{ resident.property.name }} | {{ resident.full_name }} | {{ resident.space_label }}</option>{% endfor %}</select>
+<label for="library-kind" class="form-label">Document</label><select id="library-kind" name="document_kind" class="form-select mb-3" required><option value="inspection">Completed inspection</option><option value="receipt">Completed rent receipt</option></select>
+<label for="library-file" class="form-label">Saved PDF (maximum 5 MB)</label><input id="library-file" name="attachment" type="file" accept="application/pdf,.pdf" class="form-control mb-3" required>
+<label for="library-message" class="form-label">Note for the resident</label><textarea id="library-message" name="message" rows="3" class="form-control mb-3"></textarea>
+<button class="btn btn-primary" type="submit">File PDF in resident inbox</button>
+</form></section></div>
+{% endblock %}
