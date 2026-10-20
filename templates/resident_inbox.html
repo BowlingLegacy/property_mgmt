@@ -112,7 +112,7 @@ body {
                 <tbody>
                     {% for resident_message in resident_messages %}
                     <tr>
-                        <td><strong>{{ resident_message.subject }}</strong><br><span class="text-muted small">{{ resident_message.get_message_type_display }}</span></td>
+                        <td><strong>{{ resident_message.subject }}</strong><br>{% if resident_message.attachment_id %}<a href="{% url 'open_applicant_document' resident_message.attachment_id %}">Submitted PDF</a><br>{% endif %}<span class="text-muted small">{{ resident_message.get_message_type_display }}</span></td>
                         <td>{{ resident_message.get_status_display }}</td>
                         <td>{{ resident_message.created_at|date:"M j, Y" }}</td>
                         <td>{{ resident_message.replies.count }}</td>

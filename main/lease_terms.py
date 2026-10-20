@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-LEASE_VERSION = "painted-lady-2026-10-19"
+LEASE_VERSION = "painted-lady-2026-10-20"
 INITIALS = (
     ("rent_initials", "Rent, deposit, utilities and late fees"),
     ("sobriety_initials", "Sober-living responsibilities"),
@@ -31,7 +31,7 @@ SECTIONS = [
         [
             "Monthly base rent is {rent}. Rent is due on the first (1st) of each month; the regular collection date remains the third (3rd). Payment must be received by 11:59 p.m. Pacific time on the fifth (5th) to avoid the agreed late fee. Collection arrangements do not change the rent due date.",
             "If rent remains unpaid when that deadline expires, one $25.00 late fee is assessed automatically on the sixth (6th), provided it is a reasonable flat fee permitted by ORS 90.260(2)(a). The fee is charged once per monthly rental period, including when only part of the rent remains unpaid. There is no daily or recurring late fee and no late fee based solely on unpaid utilities, deposits or earlier fees.",
-            "Rent, utilities, deposits and fees remain separate obligations. Payments are applied in the order required by ORS 90.220(9); an unpaid late fee does not become rent and may not itself support a nonpayment-of-rent termination. Rent may be paid through bowlinglegacy.com or by another lawful method arranged with management and recorded in the ledger.",
+            "Rent, utilities, deposits and fees remain separate obligations. Payments are applied in the order required by ORS 90.220(9); an unpaid late fee does not become rent and may not itself support a nonpayment-of-rent termination. Pay rent through bowlinglegacy.com, Cash App $Trmf8763, or your bank's online bill pay to our business account. Request verified bank bill-pay instructions privately through the tenant dashboard. Include your name, room and rent month and allow time for receipt. Before the pay-by deadline, report any delay and the promised payment date through the dashboard. Only written landlord approval pauses the fee through that date; a request alone does not. Rent unpaid after an approved date may incur the agreed fee the following day.",
             "A dishonored check may result in a charge of $35 plus actual bank processing charges, only as allowed by ORS 90.302 and ORS 30.701. No key will be issued until the first month's rent is paid and required move-in documents are completed. Nothing in this clause limits statutory tenant rights or makes an existing tenancy disappear.",
         ],
     ),
@@ -136,7 +136,7 @@ SECTIONS = [
     (
         "Resident Portal, Records and Optional Text Messages",
         [
-            "Routine rent, utilities, deposits, maintenance requests, complaints and resident documents may be processed or recorded through the portal so balances, receipts and communications remain organized. Use bowlinglegacy.com to review the dashboard, payment records, documents and maintenance updates. Management should arrange a lawful alternative when needed.",
+            "The tenant dashboard at bowlinglegacy.com is the most effective way to reach the Landlord for maintenance, a 30-day move-out notice, payment arrangements and other written requests. Download the appropriate fillable PDF, complete and save it, and attach it to a dashboard message for the Landlord inbox. Review replies in My Requests. A dated copy remains in the resident file. Use emergency services and direct management contact for emergencies. Management should arrange a lawful alternative when needed.",
             "Routine updates may be sent by email and, with consent, text message. Text participation is optional and is not a condition of renting. Message frequency varies; message and data rates may apply. Reply STOP to opt out or HELP for help. Choosing not to receive texts does not remove responsibility to review communications properly delivered through other lawful methods.",
             "A portal message, email or text does not by itself change statutory notice service requirements. The Parties must use legally authorized delivery methods for termination, rent increases and other formal notices. Keep contact information current and report ledger errors promptly.",
         ],

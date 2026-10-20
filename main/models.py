@@ -1284,6 +1284,10 @@ class ResidentMessage(models.Model):
         ("complaint", "Complaint"),
         ("general", "General Message"),
         ("document", "Document Question"),
+        ("move_out", "30-Day Move-Out Notice"),
+        ("late_payment", "Late Payment Arrangement Request"),
+        ("accommodation", "Accommodation Request"),
+        ("notice", "Other Written Notice"),
     ]
 
     STATUS_CHOICES = [
@@ -1294,6 +1298,11 @@ class ResidentMessage(models.Model):
 
     application = models.ForeignKey(HousingApplication, on_delete=models.CASCADE, related_name="resident_messages")
     message_type = models.CharField(max_length=30, choices=MESSAGE_TYPE_CHOICES, default="general")
+    attachment = models.OneToOneField(ApplicantDocument, on_delete=models.PROTECT, null=True, blank=True, related_name="resident_message")
+    service_month = models.DateField(null=True, blank=True)
+    promised_payment_date = models.DateField(null=True, blank=True)
+    arrangement_approved_at = models.DateTimeField(null=True, blank=True)
+    arrangement_approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="approved_rent_arrangements")
     subject = models.CharField(max_length=255)
     message = models.TextField()
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="submitted")

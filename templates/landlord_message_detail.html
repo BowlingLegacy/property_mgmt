@@ -38,6 +38,13 @@
 {{ resident_message.message }}
         </div>
 
+        {% if resident_message.attachment_id %}
+        <p><a href="{% url 'open_applicant_document' resident_message.attachment_id %}">Open submitted PDF form</a> (filed {{ resident_message.created_at }})</p>
+        {% endif %}
+        {% if resident_message.promised_payment_date %}
+        <p>Rent month: {{ resident_message.service_month|date:"F Y" }}. Promised payment: {{ resident_message.promised_payment_date }}.
+        {% if resident_message.arrangement_approved_at %}Approved {{ resident_message.arrangement_approved_at }} by {{ resident_message.arrangement_approved_by }}.{% else %}Awaiting approval; fee assessment is not paused.{% endif %}</p>
+        {% endif %}
         <h5 class="fw-bold">Secure Replies</h5>
         <div class="mb-4">
             {% for reply in resident_message.replies.all %}
@@ -64,6 +71,9 @@
             <label class="form-label fw-bold">Reply to Resident</label>
             <textarea name="reply_body" class="form-control mb-3" rows="4" placeholder="Write a secure portal reply..."></textarea>
 
+            {% if resident_message.message_type == 'late_payment' and not resident_message.arrangement_approved_at %}
+            <label class="mb-3"><input type="checkbox" name="approve_arrangement" value="yes"> Approve pausing the late fee through the promised payment date. A written reply is required. Existing fees need a separate waiver.</label>
+            {% endif %}
             <label class="form-label fw-bold">Status</label>
             <select name="status" class="form-select mb-3">
                 <option value="submitted" {% if resident_message.status == "submitted" %}selected{% endif %}>Submitted / New</option>

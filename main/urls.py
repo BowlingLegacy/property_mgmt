@@ -1,3 +1,4 @@
+from .resident_forms import tenant_form
 from django.urls import path
 from django.contrib.auth import views as auth_views
 from . import views
@@ -9,6 +10,7 @@ from . import blog_views
 from .cron_views import assess_late_fees_job
 
 urlpatterns = [
+    path("tenant-dashboard/forms/<str:kind>/", tenant_form, name="tenant_form"),
     path("internal/jobs/late-fees/", assess_late_fees_job, name="assess_late_fees_job"),
     path("", views.home, name="home"),
     path("rental-ready-pro/", views.rental_ledger_pro_home, name="rental_ledger_pro_home"),

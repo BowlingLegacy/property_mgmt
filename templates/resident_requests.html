@@ -40,6 +40,9 @@
                     <strong>{{ request_item.get_status_display }}</strong>
                 </div>
                 <div class="mt-3">{{ request_item.message|linebreaks }}</div>
+                {% if request_item.attachment_id %}<p><a href="{% url 'open_applicant_document' request_item.attachment_id %}">View your submitted PDF</a></p>{% endif %}
+                {% if request_item.promised_payment_date %}<p>Rent month: {{ request_item.service_month|date:"F Y" }}. Promised payment: {{ request_item.promised_payment_date }}.
+                {% if request_item.arrangement_approved_at %}Approved through that date, 11:59 p.m. Pacific.{% else %}Awaiting landlord approval; fees are not paused.{% endif %}</p>{% endif %}
 
                 {% if request_item.replies.all %}
                     <div class="mt-3">

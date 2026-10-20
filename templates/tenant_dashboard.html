@@ -1,6 +1,19 @@
 {% extends "base.html" %}
 {% load formatting %}
 {% block content %}
+{% include "includes/tenant_contact_guidance.html" %}
+<section class="soft-card p-4 my-3" id="tenant-forms">
+<h2 class="h4">Fillable tenant forms</h2>
+<p>Download, complete and save a PDF, then use Send a Message to attach it. Submissions are dated and filed in the landlord inbox. For emergencies, call emergency services and management directly.</p>
+<ul>
+<li><a href="{% url 'tenant_form' 'maintenance' %}">Maintenance request</a></li>
+<li><a href="{% url 'tenant_form' 'move_out' %}">30-day move-out notice</a></li>
+<li><a href="{% url 'tenant_form' 'late_payment' %}">Late-payment arrangement request</a></li>
+<li><a href="{% url 'tenant_form' 'accommodation' %}">Accommodation request</a></li>
+<li><a href="{% url 'tenant_form' 'notice' %}">Other written notice</a></li>
+</ul>
+<button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#messageModal">Send a Message / Form</button>
+</section>
 
 <style>
 body {
@@ -775,7 +788,7 @@ body {
             </div>
 
             <div class="modal-body">
-                <form method="POST" action="{% url 'submit_resident_message' %}">
+                <form method="POST" enctype="multipart/form-data" action="{% url 'submit_resident_message' %}">
                     {% csrf_token %}
 
                     <div class="mb-3">
@@ -785,6 +798,10 @@ body {
                             <option value="complaint">Complaint</option>
                             <option value="general">General Message</option>
                             <option value="document">Document Question</option>
+                            <option value="move_out">30-Day Move-Out Notice</option>
+                            <option value="late_payment">Late Payment Arrangement Request</option>
+                            <option value="accommodation">Accommodation Request</option>
+                            <option value="notice">Other Written Notice</option>
                         </select>
                     </div>
 
@@ -798,6 +815,15 @@ body {
                         <textarea name="message" class="form-control" rows="5" required></textarea>
                     </div>
 
+                    <div class="mb-3">
+                        <label for="message-pdf" class="form-label">Saved PDF form (up to 5 MB; required for move-out, late-payment and other notices)</label>
+                        <input id="message-pdf" name="attachment" type="file" accept="application/pdf,.pdf" class="form-control">
+                    </div>
+                    <fieldset class="mb-3"><legend class="h6">For late-payment requests only</legend>
+                        <label for="rent-month">Rent month</label><input id="rent-month" type="month" name="service_month" class="form-control">
+                        <label for="promise-date">Promised payment date</label><input id="promise-date" type="date" name="promised_payment_date" class="form-control">
+                        <p class="small">Use the same dates as your PDF. Only written landlord approval pauses the fee.</p>
+                    </fieldset>
                     <button type="submit" class="gold-btn">
                         Submit Request
                     </button>

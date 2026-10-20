@@ -96,7 +96,16 @@ def assess_late_fees(*, as_of=None, dry_run=False):
         "application", "application__property", "agreed_lease"
     )
     for candidate in policies:
-        for service_month in (previous, month):
+        from .models import ResidentMessage
+        from .views import resident_related_application_ids
+
+        related = resident_related_application_ids(candidate.application)
+        # Honor approved arrangements even when their payment date spans several months.
+        approved_months = ResidentMessage.objects.filter(
+            application_id__in=related, message_type="late_payment",
+            arrangement_approved_at__isnull=False, service_month__lte=month,
+        ).exclude(service_month=None).values_list("service_month", flat=True)
+        for service_month in sorted({previous, month, *approved_months}):
             with transaction.atomic():
                 policy = (
                     ResidentLateFeePolicy.objects.select_for_update(of=("self",))
@@ -143,6 +152,19 @@ def assess_late_fees(*, as_of=None, dry_run=False):
                 ):
                     result["skipped"] += 1
                     continue
+                from .models import ResidentMessage
+                arrangement = ResidentMessage.objects.filter(
+                    application_id__in=related_ids, message_type="late_payment",
+                    service_month=service_month, arrangement_approved_at__isnull=False,
+                ).exclude(promised_payment_date=None).order_by("-promised_payment_date").first()
+                if arrangement:
+                    extended_date = arrangement.promised_payment_date + timedelta(days=1)
+                    if extended_date > fee_date:
+                        fee_date = extended_date
+                        cutoff = datetime.combine(fee_date, time.min, tzinfo=PACIFIC)
+                        if today < fee_date:
+                            result["skipped"] += 1
+                            continue
                 unpaid = unpaid_rent_at_deadline(policy, service_month, cutoff)
                 if unpaid <= 0:
                     result["skipped"] += 1

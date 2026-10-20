@@ -4,5 +4,6 @@ whitenoise
 Pillow
 psycopg2==2.9.9
 reportlab
+pypdf>=5,<7
 stripe
 openpyxl==3.1.5

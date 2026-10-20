@@ -4898,6 +4898,29 @@ def landlord_message_detail(request, message_id):
 
     if request.method == "POST":
         reply_body = request.POST.get("reply_body", "").strip()
+        if request.POST.get("approve_arrangement") == "yes":
+            from .late_fees import PACIFIC
+            today = timezone.localtime(timezone.now(), PACIFIC).date()
+            from .models import ResidentBalanceEntry
+            with transaction.atomic():
+                # Same lock order as assessment prevents approval racing a new charge.
+                list(ResidentLateFeePolicy.objects.select_for_update().filter(
+                    application_id__in=resident_related_application_ids(resident_message.application)
+                ).order_by("pk"))
+                resident_message = ResidentMessage.objects.select_for_update().get(pk=resident_message.pk)
+                already_charged = ResidentBalanceEntry.objects.filter(
+                    application_id__in=resident_related_application_ids(resident_message.application),
+                    balance_type="late_fee", entry_kind="charge", service_month=resident_message.service_month,
+                ).exists()
+                if (resident_message.message_type != "late_payment" or not resident_message.service_month
+                    or not resident_message.promised_payment_date or resident_message.promised_payment_date < today
+                    or already_charged or resident_message.arrangement_approved_at or not reply_body):
+                    messages.error(request, "Approval requires a pending late-payment request, a current payment date and a written reply. Existing fees require a separate credit/waiver.")
+                    return redirect("landlord_message_detail", message_id=resident_message.pk)
+                resident_message.arrangement_approved_at = timezone.now()
+                resident_message.arrangement_approved_by = request.user
+                resident_message.save(update_fields=["arrangement_approved_at", "arrangement_approved_by"])
+                reply_body = f"Approved: late-fee assessment paused for {resident_message.service_month:%B %Y} rent through {resident_message.promised_payment_date:%B %d, %Y}, 11:59 p.m. Pacific. Rent must be received by that deadline. " + reply_body
         new_status = request.POST.get("status")
         status_updated = False
 
@@ -5959,8 +5982,26 @@ def submit_resident_message(request):
         messages.error(request, "Subject and message are required.")
         return redirect("tenant_dashboard")
 
+    from django.core.exceptions import ValidationError
+    from .resident_forms import validate_submission
+    try:
+        upload, service_month, promised = validate_submission(request, message_type)
+        if len(subject) > 255:
+            raise ValidationError("Subject must be 255 characters or fewer.")
+    except ValidationError as exc:
+        messages.error(request, " ".join(exc.messages))
+        return redirect("tenant_dashboard")
+    attachment = None
+    if upload:
+        attachment = ApplicantDocument.objects.create(
+            application=application, document_type="other", file=upload,
+            name=subject, status="locked", locked=True, submitted_at=timezone.now(),
+        )
     resident_message = ResidentMessage.objects.create(
         application=application,
+        attachment=attachment,
+        service_month=service_month,
+        promised_payment_date=promised,
         message_type=message_type,
         subject=subject,
         message=message,
@@ -9470,11 +9511,14 @@ def get_resident_signed_document(request, document_id):
 
 
 def lease_template(document):
-    return "lease_sign.html" if document.lease_version == LEASE_VERSION else "lease_sign_legacy.html"
+    return "lease_sign.html" if document.lease_version in {LEASE_VERSION, "painted-lady-2026-10-19"} else "lease_sign_legacy.html"
 
 
 def lease_context(document):
-    return {"application": document.application, "signed_document": document, "lease_sections": lease_sections(document), "lease_initials": INITIALS}
+    sections = lease_sections
+    if document.lease_version == "painted-lady-2026-10-19":
+        from .lease_terms_20261019 import lease_sections as sections
+    return {"application": document.application, "signed_document": document, "lease_sections": sections(document), "lease_initials": INITIALS}
 
 
 @login_required
@@ -9574,7 +9618,7 @@ def submit_lease_signature(request, document_id=None):
         messages.error(request, "You must agree to electronically sign.")
         return redirect("lease_sign")
 
-    if signed_document.lease_version == LEASE_VERSION:
+    if signed_document.lease_version in {LEASE_VERSION, "painted-lady-2026-10-19"}:
         if any(not getattr(signed_document, name) for name, _label in INITIALS):
             messages.error(request, "Initial each lease acknowledgment before signing.")
             return redirect("onboarding_document", document_id=signed_document.id)
@@ -9582,7 +9626,7 @@ def submit_lease_signature(request, document_id=None):
     signed_document.signed_at = timezone.now()
     signed_document.locked = True
     signed_document.save()
-    if signed_document.lease_version == LEASE_VERSION:
+    if signed_document.lease_version in {LEASE_VERSION, "painted-lady-2026-10-19"}:
         # An existing waiver or separately agreed policy stays under staff control.
         ResidentLateFeePolicy.objects.get_or_create(application=signed_document.application, defaults={"enabled": True, "fee_type": "flat", "amount": Decimal("25.00"), "rent_due_day": 1, "grace_days": 4, "effective_from": timezone.localdate(), "agreed_lease": signed_document, "confirmed_at": timezone.now()})
 
