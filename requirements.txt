@@ -6,4 +6,5 @@ psycopg2==2.9.9
 reportlab
 pypdf>=5,<7
 stripe
+certifi>=2026.10.19
 openpyxl==3.1.5
