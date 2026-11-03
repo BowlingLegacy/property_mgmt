@@ -9799,12 +9799,11 @@ def create_checkout_session(request, application_id, payment_type="rent"):
 
     uncertain_note = "Stripe Checkout creation outcome is uncertain; retry with the same idempotency key."
     stale_before = timezone.now() - timedelta(minutes=30)
-    expired_before = timezone.now() - timedelta(hours=25)
+    idempotency_cutoff = timezone.now() - timedelta(hours=24)
     existing_pending = Payment.objects.filter(
         application=application,
         payment_type=checkout_payment_type,
         status="pending",
-        created_at__gte=expired_before,
     ).exclude(
         created_at__lt=stale_before,
         stripe_session_id="",
@@ -9872,6 +9871,7 @@ def create_checkout_session(request, application_id, payment_type="rent"):
         and not existing_pending.stripe_session_id
         and existing_pending.notes == uncertain_note
         and existing_pending.created_at <= stale_before
+        and existing_pending.created_at >= idempotency_cutoff
         and existing_pending.amount == amount
         and existing_pending.description == description
         and existing_pending.service_month == service_month
@@ -9904,6 +9904,13 @@ def create_checkout_session(request, application_id, payment_type="rent"):
         messages.success(request, "Demo payment recorded. No real card or bank transaction was processed.")
         return redirect("payment_success")
 
+    if payment.notes != uncertain_note:
+        # Mark the attempt before crossing the network boundary. A process
+        # interruption must never make a possibly-created Session look like a
+        # known legacy rejection that can be ignored after 30 minutes.
+        payment.notes = uncertain_note
+        payment.save(update_fields=["notes"])
+
     try:
         session = stripe.checkout.Session.create(
             # Stripe removed payment_method_types for Checkout Sessions. Keep
@@ -9928,15 +9935,14 @@ def create_checkout_session(request, application_id, payment_type="rent"):
         # Stripe rejected the request before creating a usable Checkout
         # Session, so this local attempt is known to be safe to retry.
         payment.status = "failed"
-        payment.save(update_fields=["status"])
+        payment.notes = ""
+        payment.save(update_fields=["status", "notes"])
         return JsonResponse({
             "error": "We could not start checkout. Please try again."
         }, status=502)
     except stripe.StripeError:
         # Connection/API failures can be ambiguous. Keep this attempt pending
         # and reuse its idempotency key on a later retry.
-        payment.notes = uncertain_note
-        payment.save(update_fields=["notes"])
         return JsonResponse({
             "error": "Checkout is temporarily unavailable. Please wait before trying again."
         }, status=503)

@@ -1812,6 +1812,60 @@ class LiveFlowTests(TestCase):
         self.assertEqual(Payment.objects.filter(application=application).count(), 2)
 
     @patch("main.views.stripe.checkout.Session.create")
+    def test_ambiguous_checkout_older_than_idempotency_window_remains_blocked(self, create_session):
+        user = User.objects.create_user(
+            username="old-uncertain-resident", email="old-uncertain@example.com",
+            password="StrongPass123!", role="tenant",
+        )
+        application = HousingApplication.objects.create(
+            user=user, full_name="Old Uncertain Resident", phone="555-0134", age=44,
+            income_source="Employment", monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.", monthly_rent=Decimal("650.00"),
+            balance=Decimal("650.00"),
+        )
+        payment = Payment.objects.create(
+            application=application, payment_type="rent", payment_method="stripe_card",
+            description="Rent Payment", amount=Decimal("650.00"), status="pending",
+            notes="Stripe Checkout creation outcome is uncertain; retry with the same idempotency key.",
+        )
+        Payment.objects.filter(pk=payment.pk).update(
+            created_at=timezone.now() - timedelta(hours=25)
+        )
+        self.client.login(username="old-uncertain-resident", password="StrongPass123!")
+
+        response = self.client.get(reverse("pay_by_type", args=[application.id, "rent"]))
+
+        self.assertEqual(response.status_code, 200)
+        create_session.assert_not_called()
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, "pending")
+        self.assertEqual(payment.stripe_session_id, "")
+        self.assertIn("outcome is uncertain", payment.notes)
+        self.assertEqual(Payment.objects.filter(application=application).count(), 1)
+
+    @patch("main.views.stripe.checkout.Session.create", side_effect=RuntimeError("synthetic interruption"))
+    def test_checkout_is_marked_uncertain_before_external_call(self, _create_session):
+        user = User.objects.create_user(
+            username="interrupted-checkout-resident", email="interrupted-checkout@example.com",
+            password="StrongPass123!", role="tenant",
+        )
+        application = HousingApplication.objects.create(
+            user=user, full_name="Interrupted Checkout Resident", phone="555-0135", age=45,
+            income_source="Employment", monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.", monthly_rent=Decimal("650.00"),
+            balance=Decimal("650.00"),
+        )
+        self.client.login(username="interrupted-checkout-resident", password="StrongPass123!")
+
+        with self.assertRaises(RuntimeError):
+            self.client.get(reverse("pay_by_type", args=[application.id, "rent"]))
+
+        payment = Payment.objects.get(application=application)
+        self.assertEqual(payment.status, "pending")
+        self.assertIn("outcome is uncertain", payment.notes)
+        self.assertEqual(payment.stripe_session_id, "")
+
+    @patch("main.views.stripe.checkout.Session.create")
     def test_resident_can_pay_current_month_rent_when_stored_balance_is_zero(self, create_session):
         create_session.return_value.id = "cs_test_current_rent"
         create_session.return_value.url = "https://checkout.stripe.test/current-rent"
