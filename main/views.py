@@ -9894,21 +9894,40 @@ def create_checkout_session(request, application_id, payment_type="rent"):
         messages.success(request, "Demo payment recorded. No real card or bank transaction was processed.")
         return redirect("payment_success")
 
-    session = stripe.checkout.Session.create(
-        payment_method_types=["card", "cashapp"],
-        mode="payment",
-        line_items=[{
-            "price_data": {
-                "currency": "usd",
-                "product_data": {"name": description},
-                "unit_amount": int(amount * 100),
-            },
-            "quantity": 1,
-        }],
-        success_url=request.build_absolute_uri("/payment-success/"),
-        cancel_url=request.build_absolute_uri("/tenant-dashboard/"),
-        metadata={"payment_id": str(payment.id)},
-    )
+    try:
+        session = stripe.checkout.Session.create(
+            # Stripe removed payment_method_types for Checkout Sessions. Keep
+            # the portal's explicit scope while allowing Stripe to determine
+            # which of these methods are eligible for this transaction.
+            allowed_payment_method_types=["card", "cashapp"],
+            mode="payment",
+            line_items=[{
+                "price_data": {
+                    "currency": "usd",
+                    "product_data": {"name": description},
+                    "unit_amount": int(amount * 100),
+                },
+                "quantity": 1,
+            }],
+            success_url=request.build_absolute_uri("/payment-success/"),
+            cancel_url=request.build_absolute_uri("/tenant-dashboard/"),
+            metadata={"payment_id": str(payment.id)},
+            idempotency_key=f"checkout-payment-{payment.id}",
+        )
+    except stripe.InvalidRequestError:
+        # Stripe rejected the request before creating a usable Checkout
+        # Session, so this local attempt is known to be safe to retry.
+        payment.status = "failed"
+        payment.save(update_fields=["status"])
+        return JsonResponse({
+            "error": "We could not start checkout. Please try again."
+        }, status=502)
+    except stripe.StripeError:
+        # Connection/API failures can be ambiguous. Keep this attempt pending
+        # so a tenant cannot create a second Checkout Session immediately.
+        return JsonResponse({
+            "error": "Checkout is temporarily unavailable. Please wait before trying again."
+        }, status=503)
 
     payment.stripe_session_id = session.id
     payment.save()
