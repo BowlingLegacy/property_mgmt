@@ -9797,19 +9797,18 @@ def create_checkout_session(request, application_id, payment_type="rent"):
         if (not user_application or user_application.id != application.id) and not is_session_fee_payment:
             return JsonResponse({"error": "You are not authorized to pay this account."}, status=403)
 
+    uncertain_note = "Stripe Checkout creation outcome is uncertain; retry with the same idempotency key."
     stale_before = timezone.now() - timedelta(minutes=30)
     expired_before = timezone.now() - timedelta(hours=25)
-    Payment.objects.filter(
-        application=application,
-        payment_type=checkout_payment_type,
-        status="pending",
-        created_at__lt=expired_before,
-    ).update(status="failed")
-
     existing_pending = Payment.objects.filter(
         application=application,
         payment_type=checkout_payment_type,
         status="pending",
+        created_at__gte=expired_before,
+    ).exclude(
+        created_at__lt=stale_before,
+        stripe_session_id="",
+        notes="",
     ).order_by("created_at").first()
 
     rent_portal_due = resident_portal_rent_due(application)
@@ -9868,7 +9867,6 @@ def create_checkout_session(request, application_id, payment_type="rent"):
     if amount <= 0:
         return JsonResponse({"error": "No balance due"})
 
-    uncertain_note = "Stripe Checkout creation outcome is uncertain; retry with the same idempotency key."
     retry_uncertain_payment = (
         existing_pending
         and not existing_pending.stripe_session_id

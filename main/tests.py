@@ -1777,6 +1777,41 @@ class LiveFlowTests(TestCase):
         self.assertEqual(payment.notes, "")
 
     @patch("main.views.stripe.checkout.Session.create")
+    def test_legacy_rejected_checkout_does_not_extend_lock_or_change_history(self, create_session):
+        create_session.return_value = type("StripeSession", (), {
+            "id": "cs_test_after_legacy_failure",
+            "url": "https://checkout.stripe.test/after-legacy-failure",
+        })()
+        user = User.objects.create_user(
+            username="legacy-retry-resident", email="legacy-retry@example.com",
+            password="StrongPass123!", role="tenant",
+        )
+        application = HousingApplication.objects.create(
+            user=user, full_name="Legacy Retry Resident", phone="555-0133", age=43,
+            income_source="Employment", monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.", monthly_rent=Decimal("650.00"),
+            balance=Decimal("650.00"),
+        )
+        legacy_payment = Payment.objects.create(
+            application=application, payment_type="rent", payment_method="stripe_card",
+            description="Rent Payment", amount=Decimal("650.00"), status="pending",
+        )
+        Payment.objects.filter(pk=legacy_payment.pk).update(
+            created_at=timezone.now() - timedelta(minutes=31)
+        )
+        self.client.login(username="legacy-retry-resident", password="StrongPass123!")
+
+        response = self.client.get(reverse("pay_by_type", args=[application.id, "rent"]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "https://checkout.stripe.test/after-legacy-failure")
+        legacy_payment.refresh_from_db()
+        self.assertEqual(legacy_payment.status, "pending")
+        self.assertEqual(legacy_payment.notes, "")
+        self.assertEqual(legacy_payment.stripe_session_id, "")
+        self.assertEqual(Payment.objects.filter(application=application).count(), 2)
+
+    @patch("main.views.stripe.checkout.Session.create")
     def test_resident_can_pay_current_month_rent_when_stored_balance_is_zero(self, create_session):
         create_session.return_value.id = "cs_test_current_rent"
         create_session.return_value.url = "https://checkout.stripe.test/current-rent"
