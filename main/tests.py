@@ -1745,6 +1745,43 @@ class LiveFlowTests(TestCase):
         )
 
     @patch("main.views.stripe.checkout.Session.create")
+    def test_invalid_replay_keeps_original_ambiguous_attempt_pending(self, create_session):
+        create_session.side_effect = [
+            stripe.APIConnectionError("synthetic connection failure"),
+            stripe.InvalidRequestError("synthetic replay rejection", "allowed_payment_method_types"),
+            stripe.APIConnectionError("synthetic repeated connection failure"),
+        ]
+        user = User.objects.create_user(
+            username="invalid-replay-resident", email="invalid-replay@example.com",
+            password="StrongPass123!", role="tenant",
+        )
+        application = HousingApplication.objects.create(
+            user=user, full_name="Invalid Replay Resident", phone="555-0136", age=46,
+            income_source="Employment", monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.", monthly_rent=Decimal("650.00"),
+            balance=Decimal("650.00"),
+        )
+        self.client.login(username="invalid-replay-resident", password="StrongPass123!")
+
+        first = self.client.get(reverse("pay_by_type", args=[application.id, "rent"]))
+        payment = Payment.objects.get(application=application)
+        Payment.objects.filter(pk=payment.pk).update(
+            created_at=timezone.now() - timedelta(minutes=31)
+        )
+        second = self.client.get(reverse("pay_by_type", args=[application.id, "rent"]))
+        third = self.client.get(reverse("pay_by_type", args=[application.id, "rent"]))
+
+        self.assertEqual([first.status_code, second.status_code, third.status_code], [503, 503, 503])
+        self.assertEqual(create_session.call_count, 3)
+        keys = [call.kwargs["idempotency_key"] for call in create_session.call_args_list]
+        self.assertEqual(keys, [f"checkout-payment-{payment.id}"] * 3)
+        self.assertEqual(Payment.objects.filter(application=application).count(), 1)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, "pending")
+        self.assertIn("outcome is uncertain", payment.notes)
+        self.assertEqual(payment.stripe_session_id, "")
+
+    @patch("main.views.stripe.checkout.Session.create")
     def test_uncertain_checkout_failure_stays_pending_and_blocks_retry(self, create_session):
         create_session.side_effect = stripe.APIConnectionError("synthetic connection failure")
         user = User.objects.create_user(

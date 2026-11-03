@@ -9988,6 +9988,13 @@ def create_checkout_session(request, application_id, payment_type="rent"):
             idempotency_key=f"checkout-payment-{payment.id}",
         )
     except stripe.InvalidRequestError:
+        if retry_uncertain_payment is not None:
+            # A validation error while replaying an ambiguous request does not
+            # prove that the original request failed. Preserve the pending
+            # attempt and its idempotency key.
+            return JsonResponse({
+                "error": "Checkout is temporarily unavailable. Please wait before trying again."
+            }, status=503)
         # Stripe rejected the request before creating a usable Checkout
         # Session, so this local attempt is known to be safe to retry.
         payment.status = "failed"
