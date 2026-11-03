@@ -1623,6 +1623,40 @@ class LiveFlowTests(TestCase):
         self.assertEqual(prorated_monthly_charge(Decimal("650.00"), date(2026, 7, 3)), Decimal("608"))
         self.assertEqual(prorated_monthly_charge(Decimal("55.00"), date(2026, 7, 3)), Decimal("51"))
 
+    def _pending_stripe_checkout(self, suffix):
+        user = User.objects.create_user(
+            username=f"pending-stripe-{suffix}", email=f"pending-stripe-{suffix}@example.com",
+            password="StrongPass123!", role="tenant",
+        )
+        application = HousingApplication.objects.create(
+            user=user, full_name=f"Pending Stripe {suffix}", phone="555-0140", age=46,
+            income_source="Employment", monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.", monthly_rent=Decimal("0.00"),
+            balance=Decimal("650.00"),
+        )
+        payment = Payment.objects.create(
+            application=application, payment_type="rent", payment_method="stripe_card",
+            description="Rent Payment", amount=Decimal("650.00"), status="pending",
+            stripe_session_id=f"cs_{suffix}",
+        )
+        self.client.login(username=user.username, password="StrongPass123!")
+        return application, payment
+
+    @staticmethod
+    def _stripe_session_for(payment, **overrides):
+        session = {
+            "id": payment.stripe_session_id,
+            "metadata": {"payment_id": str(payment.id)},
+            "currency": "usd",
+            "amount_total": int(payment.amount * 100),
+            "mode": "payment",
+            "status": "open",
+            "payment_status": "unpaid",
+            "url": "https://checkout.stripe.test/existing",
+        }
+        session.update(overrides)
+        return session
+
     @patch("main.views.stripe.checkout.Session.create")
     def test_resident_can_start_own_rent_payment(self, create_session):
         create_session.return_value.id = "cs_test_123"
@@ -1864,6 +1898,128 @@ class LiveFlowTests(TestCase):
         self.assertEqual(payment.status, "pending")
         self.assertIn("outcome is uncertain", payment.notes)
         self.assertEqual(payment.stripe_session_id, "")
+
+    @patch("main.views.stripe.checkout.Session.create")
+    @patch("main.views.stripe.checkout.Session.retrieve")
+    def test_verified_open_checkout_is_resumed(self, retrieve_session, create_session):
+        application, payment = self._pending_stripe_checkout("open")
+        retrieve_session.return_value = self._stripe_session_for(payment)
+
+        response = self.client.get(reverse("pay_by_type", args=[application.id, "rent"]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "https://checkout.stripe.test/existing")
+        retrieve_session.assert_called_once_with(payment.stripe_session_id)
+        create_session.assert_not_called()
+        self.assertEqual(Payment.objects.filter(application=application).count(), 1)
+
+    @patch("main.views.stripe.checkout.Session.create")
+    @patch("main.views.stripe.checkout.Session.retrieve")
+    def test_verified_expired_unpaid_checkout_allows_replacement(self, retrieve_session, create_session):
+        application, payment = self._pending_stripe_checkout("expired")
+        retrieve_session.return_value = self._stripe_session_for(
+            payment, status="expired", payment_status="unpaid", url=None,
+        )
+        create_session.return_value = type("StripeSession", (), {
+            "id": "cs_replacement", "url": "https://checkout.stripe.test/replacement",
+        })()
+
+        response = self.client.get(reverse("pay_by_type", args=[application.id, "rent"]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "https://checkout.stripe.test/replacement")
+        self.assertEqual(Payment.objects.filter(application=application).count(), 2)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, "pending")
+        self.assertEqual(payment.stripe_session_id, "cs_expired")
+
+    @patch("main.views.stripe.checkout.Session.create")
+    @patch("main.views.stripe.checkout.Session.retrieve")
+    def test_paid_or_complete_checkout_stays_blocked(self, retrieve_session, create_session):
+        application, payment = self._pending_stripe_checkout("paid")
+        retrieve_session.return_value = self._stripe_session_for(
+            payment, status="complete", payment_status="paid", url=None,
+        )
+
+        response = self.client.get(reverse("pay_by_type", args=[application.id, "rent"]))
+
+        self.assertEqual(response.status_code, 200)
+        create_session.assert_not_called()
+        self.assertEqual(Payment.objects.filter(application=application).count(), 1)
+
+    @patch("main.views.stripe.checkout.Session.create")
+    @patch("main.views.stripe.checkout.Session.retrieve")
+    def test_unknown_checkout_status_stays_blocked(self, retrieve_session, create_session):
+        application, payment = self._pending_stripe_checkout("unknown")
+        retrieve_session.return_value = self._stripe_session_for(
+            payment, status="unexpected", payment_status="unpaid", url=None,
+        )
+
+        response = self.client.get(reverse("pay_by_type", args=[application.id, "rent"]))
+
+        self.assertEqual(response.status_code, 200)
+        create_session.assert_not_called()
+
+    @patch("main.views.stripe.checkout.Session.create")
+    @patch("main.views.stripe.checkout.Session.retrieve")
+    def test_checkout_retrieval_error_stays_blocked(self, retrieve_session, create_session):
+        application, _payment = self._pending_stripe_checkout("retrieve-error")
+        retrieve_session.side_effect = stripe.APIConnectionError("synthetic retrieve failure")
+
+        response = self.client.get(reverse("pay_by_type", args=[application.id, "rent"]))
+
+        self.assertEqual(response.status_code, 503)
+        create_session.assert_not_called()
+
+    @patch("main.views.stripe.checkout.Session.create")
+    @patch("main.views.stripe.checkout.Session.retrieve")
+    def test_mismatched_existing_checkout_identity_stays_blocked(self, retrieve_session, create_session):
+        mismatches = {
+            "id": {"id": "cs_wrong"},
+            "metadata": {"metadata": {"payment_id": "999999"}},
+            "currency": {"currency": "eur"},
+            "amount": {"amount_total": 64999},
+            "mode": {"mode": "setup"},
+        }
+        for index, (label, overrides) in enumerate(mismatches.items()):
+            with self.subTest(label=label):
+                self.client.logout()
+                application, payment = self._pending_stripe_checkout(f"mismatch-{index}")
+                retrieve_session.return_value = self._stripe_session_for(payment, **overrides)
+
+                response = self.client.get(reverse("pay_by_type", args=[application.id, "rent"]))
+
+                self.assertEqual(response.status_code, 409)
+                create_session.assert_not_called()
+                create_session.reset_mock()
+
+    @patch("main.views.stripe.checkout.Session.create")
+    @patch("main.views.stripe.checkout.Session.retrieve")
+    def test_expired_checkout_does_not_hide_another_open_checkout(self, retrieve_session, create_session):
+        application, expired_payment = self._pending_stripe_checkout("expired-first")
+        open_payment = Payment.objects.create(
+            application=application, payment_type="rent", payment_method="stripe_card",
+            description="Rent Payment", amount=Decimal("650.00"), status="pending",
+            stripe_session_id="cs_open_second",
+        )
+
+        def session_for(session_id):
+            if session_id == expired_payment.stripe_session_id:
+                return self._stripe_session_for(
+                    expired_payment, status="expired", payment_status="unpaid", url=None,
+                )
+            return self._stripe_session_for(
+                open_payment, url="https://checkout.stripe.test/open-second",
+            )
+
+        retrieve_session.side_effect = session_for
+
+        response = self.client.get(reverse("pay_by_type", args=[application.id, "rent"]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "https://checkout.stripe.test/open-second")
+        self.assertEqual(retrieve_session.call_count, 2)
+        create_session.assert_not_called()
 
     @patch("main.views.stripe.checkout.Session.create")
     def test_resident_can_pay_current_month_rent_when_stored_balance_is_zero(self, create_session):
