@@ -2022,6 +2022,35 @@ class LiveFlowTests(TestCase):
         create_session.assert_not_called()
 
     @patch("main.views.stripe.checkout.Session.create")
+    @patch("main.views.stripe.checkout.Session.retrieve")
+    def test_open_and_ambiguous_checkouts_fail_closed_in_either_order(self, retrieve_session, create_session):
+        uncertain_note = "Stripe Checkout creation outcome is uncertain; retry with the same idempotency key."
+        for index, open_first in enumerate((True, False)):
+            with self.subTest(open_first=open_first):
+                self.client.logout()
+                application, open_payment = self._pending_stripe_checkout(f"mixed-{index}")
+                ambiguous_payment = Payment.objects.create(
+                    application=application, payment_type="rent", payment_method="stripe_card",
+                    description="Rent Payment", amount=Decimal("650.00"), status="pending",
+                    notes=uncertain_note,
+                )
+                now = timezone.now()
+                Payment.objects.filter(pk=open_payment.pk).update(
+                    created_at=now - timedelta(minutes=32 if open_first else 30)
+                )
+                Payment.objects.filter(pk=ambiguous_payment.pk).update(
+                    created_at=now - timedelta(minutes=31 if open_first else 32)
+                )
+                retrieve_session.return_value = self._stripe_session_for(open_payment)
+
+                response = self.client.get(reverse("pay_by_type", args=[application.id, "rent"]))
+
+                self.assertEqual(response.status_code, 409)
+                create_session.assert_not_called()
+                create_session.reset_mock()
+                retrieve_session.reset_mock()
+
+    @patch("main.views.stripe.checkout.Session.create")
     def test_resident_can_pay_current_month_rent_when_stored_balance_is_zero(self, create_session):
         create_session.return_value.id = "cs_test_current_rent"
         create_session.return_value.url = "https://checkout.stripe.test/current-rent"

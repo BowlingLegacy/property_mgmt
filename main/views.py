@@ -9930,6 +9930,11 @@ def create_checkout_session(request, application_id, payment_type="rent"):
             })
         retry_uncertain_payment = pending_payment
 
+    if resumable_session is not None and retry_uncertain_payment is not None:
+        return JsonResponse({
+            "error": "Multiple checkouts are pending. Please contact support."
+        }, status=409)
+
     if resumable_session is not None:
         return redirect(resumable_session.get("url"))
 
