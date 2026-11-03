@@ -9798,23 +9798,19 @@ def create_checkout_session(request, application_id, payment_type="rent"):
             return JsonResponse({"error": "You are not authorized to pay this account."}, status=403)
 
     stale_before = timezone.now() - timedelta(minutes=30)
+    expired_before = timezone.now() - timedelta(hours=25)
     Payment.objects.filter(
         application=application,
         payment_type=checkout_payment_type,
         status="pending",
-        created_at__lt=stale_before,
+        created_at__lt=expired_before,
     ).update(status="failed")
 
     existing_pending = Payment.objects.filter(
         application=application,
         payment_type=checkout_payment_type,
         status="pending",
-    ).exists()
-
-    if existing_pending:
-        return JsonResponse({
-            "error": "A payment is already pending. Please wait before trying again."
-        })
+    ).order_by("created_at").first()
 
     rent_portal_due = resident_portal_rent_due(application)
     next_month_rent_due = resident_portal_next_month_rent_due(application)
@@ -9872,7 +9868,23 @@ def create_checkout_session(request, application_id, payment_type="rent"):
     if amount <= 0:
         return JsonResponse({"error": "No balance due"})
 
-    payment = Payment.objects.create(
+    uncertain_note = "Stripe Checkout creation outcome is uncertain; retry with the same idempotency key."
+    retry_uncertain_payment = (
+        existing_pending
+        and not existing_pending.stripe_session_id
+        and existing_pending.notes == uncertain_note
+        and existing_pending.created_at <= stale_before
+        and existing_pending.amount == amount
+        and existing_pending.description == description
+        and existing_pending.service_month == service_month
+    )
+
+    if existing_pending and not retry_uncertain_payment:
+        return JsonResponse({
+            "error": "A payment is already pending. Please wait before trying again."
+        })
+
+    payment = existing_pending if retry_uncertain_payment else Payment.objects.create(
         application=application,
         payment_type=checkout_payment_type,
         payment_method="stripe_card",
@@ -9924,13 +9936,17 @@ def create_checkout_session(request, application_id, payment_type="rent"):
         }, status=502)
     except stripe.StripeError:
         # Connection/API failures can be ambiguous. Keep this attempt pending
-        # so a tenant cannot create a second Checkout Session immediately.
+        # and reuse its idempotency key on a later retry.
+        payment.notes = uncertain_note
+        payment.save(update_fields=["notes"])
         return JsonResponse({
             "error": "Checkout is temporarily unavailable. Please wait before trying again."
         }, status=503)
 
     payment.stripe_session_id = session.id
-    payment.save()
+    if payment.notes == uncertain_note:
+        payment.notes = ""
+    payment.save(update_fields=["stripe_session_id", "notes"])
 
     return redirect(session.url)
 

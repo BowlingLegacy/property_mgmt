@@ -1,5 +1,5 @@
 from decimal import Decimal
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from io import BytesIO, StringIO
 import importlib
 import json
@@ -1734,6 +1734,47 @@ class LiveFlowTests(TestCase):
         payment = Payment.objects.get(application=application)
         self.assertEqual(payment.status, "pending")
         self.assertEqual(payment.stripe_session_id, "")
+
+    @patch("main.views.stripe.checkout.Session.create")
+    def test_uncertain_checkout_can_safely_resume_after_thirty_minutes(self, create_session):
+        create_session.side_effect = [
+            stripe.APIConnectionError("synthetic connection failure"),
+            type("StripeSession", (), {
+                "id": "cs_test_uncertain_retry",
+                "url": "https://checkout.stripe.test/uncertain-retry",
+            })(),
+        ]
+        user = User.objects.create_user(
+            username="uncertain-retry-resident", email="uncertain-retry@example.com",
+            password="StrongPass123!", role="tenant",
+        )
+        application = HousingApplication.objects.create(
+            user=user, full_name="Uncertain Retry Resident", phone="555-0132", age=42,
+            income_source="Employment", monthly_income=Decimal("2500.00"),
+            housing_need="Current resident.", monthly_rent=Decimal("650.00"),
+            balance=Decimal("650.00"),
+        )
+        self.client.login(username="uncertain-retry-resident", password="StrongPass123!")
+
+        uncertain = self.client.get(reverse("pay_by_type", args=[application.id, "rent"]))
+        payment = Payment.objects.get(application=application)
+        original_key = f"checkout-payment-{payment.id}"
+        Payment.objects.filter(pk=payment.pk).update(
+            created_at=timezone.now() - timedelta(minutes=31)
+        )
+        resumed = self.client.get(reverse("pay_by_type", args=[application.id, "rent"]))
+
+        self.assertEqual(uncertain.status_code, 503)
+        self.assertEqual(resumed.status_code, 302)
+        self.assertEqual(resumed["Location"], "https://checkout.stripe.test/uncertain-retry")
+        self.assertEqual(create_session.call_count, 2)
+        self.assertEqual(create_session.call_args_list[0].kwargs["idempotency_key"], original_key)
+        self.assertEqual(create_session.call_args_list[1].kwargs["idempotency_key"], original_key)
+        self.assertEqual(Payment.objects.filter(application=application).count(), 1)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, "pending")
+        self.assertEqual(payment.stripe_session_id, "cs_test_uncertain_retry")
+        self.assertEqual(payment.notes, "")
 
     @patch("main.views.stripe.checkout.Session.create")
     def test_resident_can_pay_current_month_rent_when_stored_balance_is_zero(self, create_session):
