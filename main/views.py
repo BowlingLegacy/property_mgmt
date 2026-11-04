@@ -2163,7 +2163,7 @@ def prorated_monthly_charge(monthly_amount, start_date):
 
 
 def home(request):
-    properties = Property.objects.all()
+    properties = Property.objects.filter(is_public=True)
     posts = BlogPost.objects.filter(property__isnull=True).order_by("-created_at")[:5]
     painted_lady_profile_property = (
         properties
@@ -2217,7 +2217,7 @@ def demo_status(request):
     })
      
 def properties_list(request):
-    properties = Property.objects.all().order_by("name")
+    properties = Property.objects.filter(is_public=True).order_by("name")
 
     return render(request, "properties.html", {
         "properties": properties,
@@ -8628,7 +8628,7 @@ def property_financials(request, property_id):
 
 
 def property_detail(request, pk):
-    property_obj = get_object_or_404(Property, pk=pk)
+    property_obj = get_object_or_404(Property, pk=pk, is_public=True)
     gallery_images = property_obj.images.all()
     can_manage_property_blog = user_can_manage_property_blog(request.user, property_obj)
     normalized_property_name = property_obj.name.strip().lower()

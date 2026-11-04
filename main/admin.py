@@ -192,8 +192,8 @@ class PropertyUtilityVendorInline(admin.TabularInline):
 @admin.register(Property)
 class PropertyAdmin(admin.ModelAdmin):
     inlines = [PropertyImageInline, PropertyRoomRentInline, PropertyUtilityVendorInline, PropertyOnboardingDocumentInline]
-    list_display = ("name", "availability_status", "available_date", "owner_email", "landlord_email", "charges_application_fee", "requires_background_check")
-    list_filter = ("availability_status", "charges_application_fee", "requires_background_check")
+    list_display = ("name", "is_public", "availability_status", "available_date", "owner_email", "landlord_email", "charges_application_fee", "requires_background_check")
+    list_filter = ("is_public", "availability_status", "charges_application_fee", "requires_background_check")
 
 
 @admin.register(PropertyRoomRent)

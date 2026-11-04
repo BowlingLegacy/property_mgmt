@@ -187,6 +187,10 @@ class Property(models.Model):
 
     availability_status = models.CharField(max_length=20, choices=AVAILABILITY_CHOICES, default="full")
     availability_message = models.CharField(max_length=255, default="Join Waitlist for Availability")
+    is_public = models.BooleanField(
+        default=True,
+        help_text="Show this property on the public website.",
+    )
 
     def __str__(self):
         return self.name
