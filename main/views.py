@@ -9797,24 +9797,18 @@ def create_checkout_session(request, application_id, payment_type="rent"):
         if (not user_application or user_application.id != application.id) and not is_session_fee_payment:
             return JsonResponse({"error": "You are not authorized to pay this account."}, status=403)
 
+    uncertain_note = "Stripe Checkout creation outcome is uncertain; retry with the same idempotency key."
     stale_before = timezone.now() - timedelta(minutes=30)
-    Payment.objects.filter(
+    idempotency_cutoff = timezone.now() - timedelta(hours=24)
+    pending_payments = list(Payment.objects.filter(
         application=application,
         payment_type=checkout_payment_type,
         status="pending",
+    ).exclude(
         created_at__lt=stale_before,
-    ).update(status="failed")
-
-    existing_pending = Payment.objects.filter(
-        application=application,
-        payment_type=checkout_payment_type,
-        status="pending",
-    ).exists()
-
-    if existing_pending:
-        return JsonResponse({
-            "error": "A payment is already pending. Please wait before trying again."
-        })
+        stripe_session_id="",
+        notes="",
+    ).order_by("created_at"))
 
     rent_portal_due = resident_portal_rent_due(application)
     next_month_rent_due = resident_portal_next_month_rent_due(application)
@@ -9872,7 +9866,79 @@ def create_checkout_session(request, application_id, payment_type="rent"):
     if amount <= 0:
         return JsonResponse({"error": "No balance due"})
 
-    payment = Payment.objects.create(
+    retry_uncertain_payment = None
+    resumable_session = None
+    expected_amount = int(amount * 100)
+
+    for pending_payment in pending_payments:
+        local_checkout_matches = (
+            pending_payment.amount == amount
+            and pending_payment.description == description
+            and pending_payment.service_month == service_month
+        )
+
+        if pending_payment.stripe_session_id:
+            try:
+                pending_session = stripe.checkout.Session.retrieve(pending_payment.stripe_session_id)
+            except stripe.StripeError:
+                return JsonResponse({
+                    "error": "We could not verify the pending checkout. Please wait before trying again."
+                }, status=503)
+
+            session_matches = (
+                pending_session.get("id") == pending_payment.stripe_session_id
+                and str((pending_session.get("metadata") or {}).get("payment_id")) == str(pending_payment.id)
+                and str(pending_session.get("currency") or "").lower() == "usd"
+                and pending_session.get("amount_total") == int(pending_payment.amount * 100)
+                and pending_session.get("mode") == "payment"
+            )
+            if not session_matches:
+                return JsonResponse({
+                    "error": "The pending checkout could not be verified. Please contact support."
+                }, status=409)
+
+            session_status = pending_session.get("status")
+            payment_status = pending_session.get("payment_status")
+            if session_status == "expired" and payment_status == "unpaid":
+                continue
+            if (
+                session_status == "open"
+                and payment_status == "unpaid"
+                and local_checkout_matches
+                and pending_session.get("amount_total") == expected_amount
+                and pending_session.get("url")
+            ):
+                if resumable_session is not None:
+                    return JsonResponse({
+                        "error": "Multiple checkouts are pending. Please contact support."
+                    }, status=409)
+                resumable_session = pending_session
+                continue
+            return JsonResponse({
+                "error": "A payment is already pending. Please wait before trying again."
+            })
+
+        retryable_uncertain = (
+            pending_payment.notes == uncertain_note
+            and pending_payment.created_at <= stale_before
+            and pending_payment.created_at >= idempotency_cutoff
+            and local_checkout_matches
+        )
+        if not retryable_uncertain or retry_uncertain_payment is not None:
+            return JsonResponse({
+                "error": "A payment is already pending. Please wait before trying again."
+            })
+        retry_uncertain_payment = pending_payment
+
+    if resumable_session is not None and retry_uncertain_payment is not None:
+        return JsonResponse({
+            "error": "Multiple checkouts are pending. Please contact support."
+        }, status=409)
+
+    if resumable_session is not None:
+        return redirect(resumable_session.get("url"))
+
+    payment = retry_uncertain_payment or Payment.objects.create(
         application=application,
         payment_type=checkout_payment_type,
         payment_method="stripe_card",
@@ -9894,24 +9960,60 @@ def create_checkout_session(request, application_id, payment_type="rent"):
         messages.success(request, "Demo payment recorded. No real card or bank transaction was processed.")
         return redirect("payment_success")
 
-    session = stripe.checkout.Session.create(
-        payment_method_types=["card", "cashapp"],
-        mode="payment",
-        line_items=[{
-            "price_data": {
-                "currency": "usd",
-                "product_data": {"name": description},
-                "unit_amount": int(amount * 100),
-            },
-            "quantity": 1,
-        }],
-        success_url=request.build_absolute_uri("/payment-success/"),
-        cancel_url=request.build_absolute_uri("/tenant-dashboard/"),
-        metadata={"payment_id": str(payment.id)},
-    )
+    if payment.notes != uncertain_note:
+        # Mark the attempt before crossing the network boundary. A process
+        # interruption must never make a possibly-created Session look like a
+        # known legacy rejection that can be ignored after 30 minutes.
+        payment.notes = uncertain_note
+        payment.save(update_fields=["notes"])
+
+    try:
+        session = stripe.checkout.Session.create(
+            # Stripe removed payment_method_types for Checkout Sessions. Keep
+            # the portal's explicit scope while allowing Stripe to determine
+            # which of these methods are eligible for this transaction.
+            allowed_payment_method_types=["card", "cashapp"],
+            mode="payment",
+            line_items=[{
+                "price_data": {
+                    "currency": "usd",
+                    "product_data": {"name": description},
+                    "unit_amount": int(amount * 100),
+                },
+                "quantity": 1,
+            }],
+            success_url=request.build_absolute_uri("/payment-success/"),
+            cancel_url=request.build_absolute_uri("/tenant-dashboard/"),
+            metadata={"payment_id": str(payment.id)},
+            idempotency_key=f"checkout-payment-{payment.id}",
+        )
+    except stripe.InvalidRequestError:
+        if retry_uncertain_payment is not None:
+            # A validation error while replaying an ambiguous request does not
+            # prove that the original request failed. Preserve the pending
+            # attempt and its idempotency key.
+            return JsonResponse({
+                "error": "Checkout is temporarily unavailable. Please wait before trying again."
+            }, status=503)
+        # Stripe rejected the request before creating a usable Checkout
+        # Session, so this local attempt is known to be safe to retry.
+        payment.status = "failed"
+        payment.notes = ""
+        payment.save(update_fields=["status", "notes"])
+        return JsonResponse({
+            "error": "We could not start checkout. Please try again."
+        }, status=502)
+    except stripe.StripeError:
+        # Connection/API failures can be ambiguous. Keep this attempt pending
+        # and reuse its idempotency key on a later retry.
+        return JsonResponse({
+            "error": "Checkout is temporarily unavailable. Please wait before trying again."
+        }, status=503)
 
     payment.stripe_session_id = session.id
-    payment.save()
+    if payment.notes == uncertain_note:
+        payment.notes = ""
+    payment.save(update_fields=["stripe_session_id", "notes"])
 
     return redirect(session.url)
 
