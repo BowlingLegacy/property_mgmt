@@ -1655,7 +1655,7 @@ class LiveFlowTests(TestCase):
             "url": "https://checkout.stripe.test/existing",
         }
         session.update(overrides)
-        return session
+        return stripe.checkout.Session.construct_from(session, None)
 
     @patch("main.views.stripe.checkout.Session.create")
     def test_resident_can_start_own_rent_payment(self, create_session):

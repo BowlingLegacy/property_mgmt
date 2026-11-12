@@ -1,6 +1,11 @@
 from decimal import Decimal
 import threading
 from unittest.mock import patch
+import stripe
+import hashlib
+import hmac
+import json
+import time
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -29,7 +34,7 @@ def create_application(**overrides):
 
 
 def stripe_event(payment_id, session_id="cs_test", amount_total=2500):
-    return {
+    return stripe.Event.construct_from({
         "type": "checkout.session.completed",
         "data": {"object": {
             "id": session_id,
@@ -40,7 +45,7 @@ def stripe_event(payment_id, session_id="cs_test", amount_total=2500):
             "currency": "usd",
             "amount_total": amount_total,
         }},
-    }
+    }, None)
 
 
 class PrivateApplicationAccessTests(TestCase):
@@ -138,6 +143,100 @@ class StripeWebhookTests(TestCase):
             status="pending",
             stripe_session_id="cs_test",
         )
+
+    @override_settings(STRIPE_WEBHOOK_SECRET="whsec_synthetic_regression")
+    @patch("main.views.send_mail")
+    def test_signed_sdk_event_completes_once(self, send_mail):
+        payload = json.dumps(stripe_event(self.payment.id).to_dict()).encode()
+        timestamp = int(time.time())
+        signature = hmac.new(
+            b"whsec_synthetic_regression",
+            str(timestamp).encode() + b"." + payload,
+            hashlib.sha256,
+        ).hexdigest()
+        for _ in range(2):
+            response = self.client.post(
+                reverse("stripe_webhook"), payload, content_type="application/json",
+                HTTP_STRIPE_SIGNATURE=f"t={timestamp},v1={signature}",
+            )
+            self.assertEqual(response.status_code, 200)
+        self.payment.refresh_from_db()
+        self.application.refresh_from_db()
+        self.assertEqual(self.payment.status, "completed")
+        self.assertEqual(self.payment.stripe_payment_intent, "pi_test")
+        self.assertEqual(self.application.balance, Decimal("75.00"))
+        send_mail.assert_called_once()
+
+    @patch("main.views.send_mail")
+    @patch("main.views.stripe.Webhook.construct_event")
+    def test_reconciliation_hold_preserves_pending_payment_and_retries(self, construct_event, send_mail):
+        construct_event.return_value = stripe_event(self.payment.id)
+        with self.settings(STRIPE_WEBHOOK_HELD_PAYMENT_IDS=f" {self.payment.id},99999 "):
+            for _ in range(2):
+                response = self.client.post(reverse("stripe_webhook"), b"{}", content_type="application/json")
+                self.assertEqual(response.status_code, 503)
+        self.payment.refresh_from_db()
+        self.application.refresh_from_db()
+        self.assertEqual(self.payment.status, "pending")
+        self.assertEqual(self.payment.stripe_payment_intent, "")
+        self.assertIsNone(self.payment.received_at)
+        self.assertEqual(self.application.balance, Decimal("100.00"))
+        send_mail.assert_not_called()
+        # A hold for a different record does not prevent ordinary processing.
+        with self.settings(STRIPE_WEBHOOK_HELD_PAYMENT_IDS="99999"):
+            response = self.client.post(reverse("stripe_webhook"), b"{}", content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+        self.payment.refresh_from_db()
+        self.assertEqual(self.payment.status, "completed")
+
+    @patch("main.views.send_mail")
+    @patch("main.views.stripe.Webhook.construct_event")
+    def test_refunded_uncredited_payment_is_never_applied_by_replay(self, construct_event, send_mail):
+        self.payment.status = "refunded"
+        self.payment.stripe_payment_intent = "pi_test"
+        self.payment.notes = "Verified full refund re_synthetic before ledger credit."
+        self.payment.save()
+        construct_event.return_value = stripe_event(self.payment.id)
+        for _ in range(2):
+            response = self.client.post(reverse("stripe_webhook"), b"{}", content_type="application/json")
+            self.assertEqual(response.status_code, 200)
+        self.payment.refresh_from_db()
+        self.application.refresh_from_db()
+        self.assertEqual(self.payment.status, "refunded")
+        self.assertEqual(self.payment.amount, Decimal("25.00"))
+        self.assertEqual(self.payment.stripe_session_id, "cs_test")
+        self.assertEqual(self.payment.stripe_payment_intent, "pi_test")
+        self.assertIsNone(self.payment.received_at)
+        self.assertEqual(self.application.balance, Decimal("100.00"))
+        self.assertEqual(Payment.objects.count(), 1)
+        send_mail.assert_not_called()
+
+    @patch("main.views.send_mail")
+    @patch("main.views.stripe.Webhook.construct_event")
+    def test_sdk_combined_checkout_splits_once(self, construct_event, send_mail):
+        self.application.balance = Decimal("605.00")
+        self.application.utility_balance = Decimal("55.00")
+        self.application.deposit_required = Decimal("0.00")
+        self.application.save()
+        self.payment.payment_type = "other"
+        self.payment.description = "Combined Payment - Total Due"
+        self.payment.amount = Decimal("660.00")
+        self.payment.save()
+        construct_event.return_value = stripe_event(self.payment.id, amount_total=66000)
+        for _ in range(2):
+            response = self.client.post(reverse("stripe_webhook"), b"{}", content_type="application/json")
+            self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            list(Payment.objects.filter(application=self.application).order_by("id").values_list(
+                "payment_type", "amount", "status", "stripe_payment_intent",
+            )),
+            [("rent", Decimal("605.00"), "completed", "pi_test"),
+             ("utility", Decimal("55.00"), "completed", "pi_test")],
+        )
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.balance, Decimal("0.00"))
+        self.assertEqual(self.application.utility_balance, Decimal("0.00"))
+        send_mail.assert_called_once()
 
     @patch("main.views.send_mail")
     @patch("main.views.stripe.Webhook.construct_event")

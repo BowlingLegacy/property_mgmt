@@ -686,6 +686,7 @@ class Payment(models.Model):
         ("pending", "Pending"),
         ("completed", "Completed"),
         ("failed", "Failed"),
+        ("refunded", "Refunded"),
     ]
 
     PAYMENT_TYPE_CHOICES = [

@@ -9880,6 +9880,9 @@ def create_checkout_session(request, application_id, payment_type="rent"):
         if pending_payment.stripe_session_id:
             try:
                 pending_session = stripe.checkout.Session.retrieve(pending_payment.stripe_session_id)
+                # stripe-python 16 resources no longer expose dict methods.
+                # Convert nested metadata too before validating the response.
+                pending_session = pending_session.to_dict()
             except stripe.StripeError:
                 return JsonResponse({
                     "error": "We could not verify the pending checkout. Please wait before trying again."
@@ -10035,7 +10038,8 @@ def stripe_webhook(request):
     if event["type"] != "checkout.session.completed":
         return HttpResponse(status=200)
 
-    session = event["data"]["object"]
+    # Stripe SDK resources are not dictionaries; to_dict also converts metadata.
+    session = event["data"]["object"].to_dict()
     payment_id = session.get("metadata", {}).get("payment_id")
 
     if not payment_id:
@@ -10044,8 +10048,17 @@ def stripe_webhook(request):
     try:
         with transaction.atomic():
             payment = Payment.objects.select_for_update(of=("self",)).get(id=payment_id)
-            if payment.status == "completed":
+            # A verified full refund of a never-credited payment is terminal.
+            # A delayed paid Checkout event must not credit it or send a receipt.
+            if payment.status in {"completed", "refunded"}:
                 return HttpResponse(status=200)
+            held_payment_ids = {
+                value.strip()
+                for value in settings.STRIPE_WEBHOOK_HELD_PAYMENT_IDS.split(",")
+                if value.strip()
+            }
+            if str(payment.id) in held_payment_ids:
+                return HttpResponse(status=503)
             application = (
                 HousingApplication.objects
                 .select_related("property")

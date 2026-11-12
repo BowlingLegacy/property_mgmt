@@ -42,6 +42,9 @@ ALLOWED_HOSTS.extend([
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_PUBLIC_KEY = os.environ.get("STRIPE_PUBLIC_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+# Temporary holds for existing payments awaiting verified reconciliation.
+# This does not change their status or suppress retries from Stripe.
+STRIPE_WEBHOOK_HELD_PAYMENT_IDS = os.environ.get("STRIPE_WEBHOOK_HELD_PAYMENT_IDS", "")
 
 # ---------------------------------------------------------
 # CUSTOM USER MODEL
